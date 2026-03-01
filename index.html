@@ -39,12 +39,10 @@
         <main class="app-content" id="mainContent">
             <!-- الصفحة الرئيسية -->
             <div class="page home-page active">
-                <!-- قصص -->
                 <div class="stories-section">
                     <div class="stories-container" id="storiesContainer"></div>
                 </div>
 
-                <!-- منشورات الرحلات -->
                 <div class="posts-section">
                     <div class="posts-container" id="postsContainer">
                         <div class="post-card">
@@ -108,20 +106,20 @@
                     <h2 id="profileName"></h2>
                     <p class="profile-bio" id="profileBio"></p>
                     
-                    <!-- إحصائيات قابلة للضغط -->
+                    <!-- إحصائيات كروابط -->
                     <div class="profile-stats">
-                        <div class="stat-item" onclick="showUserTrips()">
+                        <a href="#" class="stat-link" onclick="showUserTrips()">
                             <span class="stat-value" id="tripsCount">0</span>
                             <span data-i18n="trips">رحلات</span>
-                        </div>
-                        <div class="stat-item" onclick="showUserFollowers()">
+                        </a>
+                        <a href="#" class="stat-link" onclick="showUserFollowers()">
                             <span class="stat-value" id="followersCount">0</span>
                             <span data-i18n="followers">متابعون</span>
-                        </div>
-                        <div class="stat-item" onclick="showUserFollowing()">
+                        </a>
+                        <a href="#" class="stat-link" onclick="showUserFollowing()">
                             <span class="stat-value" id="followingCount">0</span>
                             <span data-i18n="following">يتابع</span>
-                        </div>
+                        </a>
                     </div>
 
                     <div class="profile-id-box">
@@ -132,23 +130,35 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- قوائم (تظهر عند الضغط) -->
-                <div class="profile-lists">
-                    <div class="list-container" id="tripsList" style="display: none;">
+            <!-- الصفحات الفرعية -->
+            <div class="profile-pages">
+                <!-- صفحة الرحلات -->
+                <div class="profile-subpage" id="tripsPage" style="display: none;">
+                    <div class="subpage-header">
+                        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
                         <h3 data-i18n="trips">الرحلات</h3>
-                        <div class="trips-grid"></div>
                     </div>
-                    
-                    <div class="list-container" id="followersList" style="display: none;">
+                    <div class="trips-grid" id="tripsGrid"></div>
+                </div>
+                
+                <!-- صفحة المتابعين -->
+                <div class="profile-subpage" id="followersPage" style="display: none;">
+                    <div class="subpage-header">
+                        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
                         <h3 data-i18n="followers">المتابعون</h3>
-                        <div class="users-list"></div>
                     </div>
-                    
-                    <div class="list-container" id="followingList" style="display: none;">
+                    <div class="users-list" id="followersPageList"></div>
+                </div>
+                
+                <!-- صفحة من يتابعهم -->
+                <div class="profile-subpage" id="followingPage" style="display: none;">
+                    <div class="subpage-header">
+                        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
                         <h3 data-i18n="following">يتابع</h3>
-                        <div class="users-list"></div>
                     </div>
+                    <div class="users-list" id="followingPageList"></div>
                 </div>
             </div>
 
@@ -258,7 +268,6 @@
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
     
-    <!-- كود التأكد من إخفاء شاشة التحميل -->
     <script>
     window.addEventListener('load', function() {
         setTimeout(function() {
