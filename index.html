@@ -106,7 +106,6 @@
                     <h2 id="profileName"></h2>
                     <p class="profile-bio" id="profileBio"></p>
                     
-                    <!-- إحصائيات كروابط -->
                     <div class="profile-stats">
                         <a href="#" class="stat-link" onclick="showUserTrips()">
                             <span class="stat-value" id="tripsCount">0</span>
@@ -140,7 +139,13 @@
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
                         <h3 data-i18n="trips">الرحلات</h3>
                     </div>
-                    <div class="trips-grid" id="tripsGrid"></div>
+                    <div class="trips-grid" id="tripsGrid">
+                        <div class="empty-state">
+                            <i class="fas fa-map-marked-alt"></i>
+                            <h3 data-i18n="no_trips">لا توجد رحلات</h3>
+                            <p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- صفحة المتابعين -->
@@ -149,7 +154,13 @@
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
                         <h3 data-i18n="followers">المتابعون</h3>
                     </div>
-                    <div class="users-list" id="followersPageList"></div>
+                    <div class="users-list" id="followersPageList">
+                        <div class="empty-state">
+                            <i class="fas fa-users"></i>
+                            <h3 data-i18n="no_followers">لا يوجد متابعين</h3>
+                            <p data-i18n="no_followers_desc">لم يتابعك أحد بعد</p>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- صفحة من يتابعهم -->
@@ -158,7 +169,13 @@
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
                         <h3 data-i18n="following">يتابع</h3>
                     </div>
-                    <div class="users-list" id="followingPageList"></div>
+                    <div class="users-list" id="followingPageList">
+                        <div class="empty-state">
+                            <i class="fas fa-user-friends"></i>
+                            <h3 data-i18n="no_following">لا تتابع أحداً</h3>
+                            <p data-i18n="no_following_desc">لم تتابع أي شخص بعد</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
