@@ -125,7 +125,9 @@ function loadChats() {
 window.showUserTrips = function() {
     document.querySelector('.profile-page').style.display = 'none';
     document.getElementById('tripsPage').style.display = 'block';
-    document.getElementById('tripsGrid').innerHTML = '<div class="empty-state">لا توجد رحلات</div>';
+    
+    // هنا تجيب بيانات الرحلات من Firebase
+    // إذا كانت البيانات موجودة، اعرضها بدل الحالة الفارغة
 };
 
 window.showUserFollowers = function() {
@@ -133,7 +135,17 @@ window.showUserFollowers = function() {
     document.getElementById('followersPage').style.display = 'block';
     
     const list = document.getElementById('followersPageList');
-    list.innerHTML = window.followersData || '<div class="empty-state">لا يوجد متابعين</div>';
+    if (window.followersData && window.followersData.trim() !== '') {
+        list.innerHTML = window.followersData;
+    } else {
+        list.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-users"></i>
+                <h3>${i18n.t('no_followers')}</h3>
+                <p>${i18n.t('no_followers_desc')}</p>
+            </div>
+        `;
+    }
 };
 
 window.showUserFollowing = function() {
@@ -141,7 +153,17 @@ window.showUserFollowing = function() {
     document.getElementById('followingPage').style.display = 'block';
     
     const list = document.getElementById('followingPageList');
-    list.innerHTML = window.followingData || '<div class="empty-state">لا تتابع أحداً</div>';
+    if (window.followingData && window.followingData.trim() !== '') {
+        list.innerHTML = window.followingData;
+    } else {
+        list.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-user-friends"></i>
+                <h3>${i18n.t('no_following')}</h3>
+                <p>${i18n.t('no_following_desc')}</p>
+            </div>
+        `;
+    }
 };
 
 window.goBack = function() {
