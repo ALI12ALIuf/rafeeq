@@ -62,7 +62,9 @@ const i18n = {
             remove_photo: 'إزالة الصورة',
             report: 'تبليغ',
             block_user: 'حظر المستخدم',
-            unblock_user: 'إلغاء حظر المستخدم'
+            unblock_user: 'إلغاء حظر المستخدم',
+            arabic: 'العربية',
+            english: 'English'
         },
         en: {
             app_name: 'Rafeeq',
@@ -123,7 +125,9 @@ const i18n = {
             remove_photo: 'Remove Photo',
             report: 'Report',
             block_user: 'Block User',
-            unblock_user: 'Unblock User'
+            unblock_user: 'Unblock User',
+            arabic: 'Arabic',
+            english: 'English'
         }
     },
     
@@ -160,18 +164,10 @@ const i18n = {
             el.title = this.t(key);
         });
         
-        // تحديث نص زر تبديل اللغة
-        const langToggle = document.querySelector('.language-option.active');
-        if (langToggle) {
-            langToggle.textContent = this.currentLang === 'ar' ? 'English' : 'العربية';
-        }
-        
         localStorage.setItem('language', this.currentLang);
         
-        // إعادة تطبيق الثيم بعد تغيير اللغة (لأن بعض العناصر قد تتأثر)
-        if (typeof theme !== 'undefined' && theme.applyTheme) {
-            theme.applyTheme();
-        }
+        // إرسال حدث تغيير اللغة
+        document.dispatchEvent(new Event('languageChanged'));
     },
     
     setupLanguageObserver() {
@@ -220,9 +216,7 @@ i18n.init();
 window.changeLanguage = function(lang) {
     if (i18n.translations[lang]) {
         i18n.currentLang = lang;
-        // بعد تطبيق اللغة
-document.dispatchEvent(new Event('languageChanged'));
-        i18n.applyLanguage();
+        i18n.applyLanguage();  // هذه الدالة ترسل حدث languageChanged داخلياً
         closeModal();
     }
 };
