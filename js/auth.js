@@ -1,6 +1,6 @@
 // توليد معرف عشوائي من 10 أرقام
 function generateShareableId() {
-    return Math.random().toString().36().substring(2, 12).toUpperCase();
+    return Math.random().toString(36).substring(2, 12).toUpperCase();
 }
 
 // تسجيل الدخول بجوجل
@@ -18,9 +18,9 @@ async function signInWithGoogle() {
             
             await db.collection('users').doc(user.uid).set({
                 uid: user.uid,
-                name: user.displayName,
-                email: user.email,
-                photoUrl: user.photoURL,
+                name: user.displayName || 'مستخدم',
+                email: user.email || '',
+                photoUrl: user.photoURL || '',
                 shareableId: shareableId,
                 bio: '',
                 followers: [],
@@ -30,18 +30,33 @@ async function signInWithGoogle() {
             });
         }
         
-        // إخفاء شاشة التحميل
-        document.getElementById('splash').classList.add('hide');
-        setTimeout(() => {
-            document.getElementById('splash').style.display = 'none';
-            document.getElementById('app').style.display = 'flex';
-        }, 500);
+        // تحديث واجهة المستخدم
+        updateUserUI();
         
         return true;
     } catch (error) {
         console.error('Login error:', error);
+        alert('حدث خطأ في تسجيل الدخول: ' + error.message);
         return false;
     }
+}
+
+// تحديث واجهة المستخدم بعد تسجيل الدخول
+function updateUserUI() {
+    const splash = document.getElementById('splash');
+    const app = document.getElementById('app');
+    
+    if (splash) {
+        splash.classList.add('hide');
+        setTimeout(() => {
+            splash.style.display = 'none';
+            if (app) app.style.display = 'flex';
+        }, 500);
+    }
+    
+    // تحديث أزرار تسجيل الدخول
+    const loginPrompt = document.querySelector('.login-prompt');
+    if (loginPrompt) loginPrompt.remove();
 }
 
 // تسجيل الخروج
@@ -54,34 +69,6 @@ async function logout() {
     }
 }
 
-// مراقبة حالة المستخدم
-auth.onAuthStateChanged(async (user) => {
-    const splash = document.getElementById('splash');
-    const app = document.getElementById('app');
-    
-    if (user) {
-        // مستخدم مسجل
-        await loadUserData(user.uid);
-        
-        splash.classList.add('hide');
-        setTimeout(() => {
-            splash.style.display = 'none';
-            app.style.display = 'flex';
-        }, 500);
-    } else {
-        // مستخدم غير مسجل - عرض شاشة التحميل ثم إظهار الصفحة الرئيسية
-        setTimeout(() => {
-            splash.classList.add('hide');
-            setTimeout(() => {
-                splash.style.display = 'none';
-                app.style.display = 'flex';
-                // إظهار رسالة أن بعض الميزات تحتاج تسجيل
-                showLoginPrompt();
-            }, 500);
-        }, 2000);
-    }
-});
-
 // تحميل بيانات المستخدم
 async function loadUserData(uid) {
     try {
@@ -90,109 +77,132 @@ async function loadUserData(uid) {
             const userData = userDoc.data();
             
             // تحديث واجهة المستخدم
-            document.getElementById('profileName').textContent = userData.name;
-            document.getElementById('profileAvatar').src = userData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userData.name);
-            document.getElementById('menuAvatar').src = userData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userData.name);
-            document.getElementById('menuName').textContent = userData.name;
-            document.getElementById('profileBio').textContent = userData.bio || '';
-            document.getElementById('shareableId').textContent = userData.shareableId;
+            const profileName = document.getElementById('profileName');
+            const profileAvatar = document.getElementById('profileAvatar');
+            const menuAvatar = document.getElementById('menuAvatar');
+            const menuName = document.getElementById('menuName');
+            const profileBio = document.getElementById('profileBio');
+            const shareableId = document.getElementById('shareableId');
+            
+            if (profileName) profileName.textContent = userData.name || 'مستخدم';
+            if (profileAvatar) profileAvatar.src = userData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userData.name || 'User');
+            if (menuAvatar) menuAvatar.src = userData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userData.name || 'User');
+            if (menuName) menuName.textContent = userData.name || 'مستخدم';
+            if (profileBio) profileBio.textContent = userData.bio || '';
+            if (shareableId) shareableId.textContent = userData.shareableId || '---';
             
             // تحديث الإحصائيات
-            document.getElementById('followersCount').textContent = userData.followers?.length || 0;
-            document.getElementById('followingCount').textContent = userData.following?.length || 0;
+            const followersCount = document.getElementById('followersCount');
+            const followingCount = document.getElementById('followingCount');
+            
+            if (followersCount) followersCount.textContent = (userData.followers || []).length;
+            if (followingCount) followingCount.textContent = (userData.following || []).length;
             
             // تحميل قوائم المتابعين
-            loadFollowersList(uid, userData.followers || []);
-            loadFollowingList(uid, userData.following || []);
+            if (typeof loadFollowersList === 'function') {
+                loadFollowersList(uid, userData.followers || []);
+                loadFollowingList(uid, userData.following || []);
+            }
         }
     } catch (error) {
         console.error('Error loading user data:', error);
     }
 }
 
-// تحميل قائمة المتابعين
-async function loadFollowersList(currentUid, followers) {
-    const followersList = document.getElementById('followersList');
-    if (!followersList) return;
+// إظهار رسالة تسجيل الدخول
+function showLoginPrompt() {
+    // التأكد من عدم وجود الرسالة مسبقاً
+    if (document.querySelector('.login-prompt')) return;
     
-    if (followers.length === 0) {
-        followersList.innerHTML = '<div class="empty-state">لا يوجد متابعين</div>';
-        return;
-    }
+    const loginPrompt = document.createElement('div');
+    loginPrompt.className = 'login-prompt';
+    loginPrompt.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 20px;
+        right: 20px;
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        z-index: 1000;
+        text-align: center;
+    `;
     
-    let html = '';
-    for (const followerId of followers) {
-        const userDoc = await db.collection('users').doc(followerId).get();
-        if (userDoc.exists) {
-            const user = userDoc.data();
-            html += `
-                <div class="user-item">
-                    <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" class="user-avatar">
-                    <div class="user-info">
-                        <h4>${user.name}</h4>
-                        <p>${user.shareableId}</p>
-                    </div>
-                    <div class="user-actions">
-                        <button class="action-btn" onclick="openChat('${followerId}')"><i class="fas fa-comment"></i></button>
-                        <button class="action-btn remove" onclick="removeFollower('${followerId}')"><i class="fas fa-user-minus"></i></button>
-                    </div>
-                </div>
-            `;
-        }
-    }
-    followersList.innerHTML = html;
+    loginPrompt.innerHTML = `
+        <i class="fas fa-lock" style="font-size: 2rem; color: var(--primary); margin-bottom: 10px;"></i>
+        <h3 style="margin-bottom: 10px;">${i18n ? i18n.t('login') : 'تسجيل الدخول'}</h3>
+        <p style="margin-bottom: 20px; color: var(--text-light);">${i18n ? i18n.t('login_desc') : 'سجل دخولك للوصول إلى جميع الميزات'}</p>
+        <button class="btn btn-primary" onclick="signInWithGoogle()" style="width: 100%;">${i18n ? i18n.t('login_with_google') : 'المتابعة بحساب جوجل'}</button>
+    `;
+    
+    document.body.appendChild(loginPrompt);
 }
 
-// تحميل قائمة من يتابعهم
-async function loadFollowingList(currentUid, following) {
-    const followingList = document.getElementById('followingList');
-    if (!followingList) return;
+// مراقبة حالة المستخدم
+auth.onAuthStateChanged(async (user) => {
+    console.log('Auth state changed:', user ? 'logged in' : 'logged out');
     
-    if (following.length === 0) {
-        followingList.innerHTML = '<div class="empty-state">لا تتابع أحداً بعد</div>';
-        return;
-    }
+    const splash = document.getElementById('splash');
+    const app = document.getElementById('app');
     
-    let html = '';
-    for (const followingId of following) {
-        const userDoc = await db.collection('users').doc(followingId).get();
-        if (userDoc.exists) {
-            const user = userDoc.data();
-            html += `
-                <div class="user-item">
-                    <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" class="user-avatar">
-                    <div class="user-info">
-                        <h4>${user.name}</h4>
-                        <p>${user.shareableId}</p>
-                    </div>
-                    <div class="user-actions">
-                        <button class="action-btn" onclick="openChat('${followingId}')"><i class="fas fa-comment"></i></button>
-                        <button class="action-btn following" onclick="unfollow('${followingId}')"><i class="fas fa-check"></i></button>
-                    </div>
-                </div>
-            `;
+    if (user) {
+        // مستخدم مسجل
+        console.log('Loading user data for:', user.uid);
+        await loadUserData(user.uid);
+        
+        if (splash) {
+            splash.classList.add('hide');
+            setTimeout(() => {
+                splash.style.display = 'none';
+                if (app) app.style.display = 'flex';
+            }, 500);
         }
+    } else {
+        // مستخدم غير مسجل - انتظر 2 ثانية ثم أظهر المحتوى
+        console.log('User not logged in, showing content after delay');
+        setTimeout(() => {
+            if (splash) {
+                splash.classList.add('hide');
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    if (app) app.style.display = 'flex';
+                    
+                    // إظهار رسالة تسجيل الدخول للميزات المهمة
+                    setTimeout(showLoginPrompt, 1000);
+                }, 500);
+            }
+        }, 2000);
     }
-    followingList.innerHTML = html;
-}
+});
 
 // نسخ المعرف
 function copyId() {
-    const id = document.getElementById('shareableId').textContent;
-    navigator.clipboard.writeText(id);
-    alert(i18n.t('copied'));
+    const idElement = document.getElementById('shareableId');
+    if (!idElement) return;
+    
+    const id = idElement.textContent;
+    navigator.clipboard.writeText(id).then(() => {
+        alert(i18n ? i18n.t('copied') : 'تم النسخ');
+    }).catch(err => {
+        console.error('Copy failed:', err);
+    });
 }
 
 // البحث عن صديق بالمعرف
 async function searchFriend() {
-    const searchId = document.getElementById('searchInput').value.trim().toUpperCase();
+    const searchInput = document.getElementById('searchInput');
+    const resultsDiv = document.getElementById('searchResults');
+    
+    if (!searchInput || !resultsDiv) return;
+    
+    const searchId = searchInput.value.trim().toUpperCase();
     if (!searchId || searchId.length !== 10) {
         alert('الرجاء إدخال 10 أرقام');
         return;
     }
     
-    const resultsDiv = document.getElementById('searchResults');
-    resultsDiv.innerHTML = '<div class="loading">جاري البحث...</div>';
+    resultsDiv.innerHTML = '<div class="loading" style="text-align: center; padding: 20px;">جاري البحث...</div>';
     
     try {
         const snapshot = await db.collection('users')
@@ -200,7 +210,7 @@ async function searchFriend() {
             .get();
         
         if (snapshot.empty) {
-            resultsDiv.innerHTML = '<div class="empty-state">لا يوجد مستخدم بهذا المعرف</div>';
+            resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">لا يوجد مستخدم بهذا المعرف</div>';
             return;
         }
         
@@ -208,24 +218,24 @@ async function searchFriend() {
         const userId = snapshot.docs[0].id;
         const currentUser = auth.currentUser;
         
-        if (userId === currentUser.uid) {
-            resultsDiv.innerHTML = '<div class="empty-state">هذا معرفك أنت</div>';
+        if (currentUser && userId === currentUser.uid) {
+            resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
             return;
         }
         
         resultsDiv.innerHTML = `
-            <div class="search-result-item">
-                <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" class="search-result-avatar">
-                <div class="search-result-info">
-                    <h4>${user.name}</h4>
-                    <p>${user.shareableId}</p>
+            <div class="search-result-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border-bottom: 1px solid var(--border);">
+                <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                <div style="flex: 1;">
+                    <h4 style="margin-bottom: 5px;">${user.name}</h4>
+                    <p style="color: var(--text-light);">${user.shareableId}</p>
                 </div>
-                <button class="btn btn-primary" onclick="sendFriendRequest('${userId}')">إضافة</button>
+                ${currentUser ? '<button class="btn btn-primary" onclick="sendFriendRequest(\'' + userId + '\')" style="padding: 8px 16px;">إضافة</button>' : ''}
             </div>
         `;
     } catch (error) {
         console.error('Search error:', error);
-        resultsDiv.innerHTML = '<div class="empty-state">حدث خطأ</div>';
+        resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">حدث خطأ في البحث</div>';
     }
 }
 
@@ -248,7 +258,7 @@ async function sendFriendRequest(targetUserId) {
         alert('تم إرسال طلب الصداقة');
     } catch (error) {
         console.error('Error sending request:', error);
-        alert('حدث خطأ');
+        alert('حدث خطأ في إرسال الطلب');
     }
 }
 
@@ -263,7 +273,9 @@ async function removeFollower(followerId) {
         
         // تحديث القائمة
         const userDoc = await db.collection('users').doc(auth.currentUser.uid).get();
-        loadFollowersList(auth.currentUser.uid, userDoc.data().followers || []);
+        if (userDoc.exists) {
+            loadFollowersList(auth.currentUser.uid, userDoc.data().followers || []);
+        }
     } catch (error) {
         console.error('Error removing follower:', error);
     }
@@ -284,23 +296,84 @@ async function unfollow(followingId) {
         
         // تحديث القائمة
         const userDoc = await db.collection('users').doc(auth.currentUser.uid).get();
-        loadFollowingList(auth.currentUser.uid, userDoc.data().following || []);
+        if (userDoc.exists) {
+            loadFollowingList(auth.currentUser.uid, userDoc.data().following || []);
+        }
     } catch (error) {
         console.error('Error unfollowing:', error);
     }
 }
 
-// إظهار رسالة تسجيل الدخول
-function showLoginPrompt() {
-    const loginPrompt = document.createElement('div');
-    loginPrompt.className = 'login-prompt';
-    loginPrompt.innerHTML = `
-        <div class="login-prompt-content">
-            <i class="fas fa-lock"></i>
-            <h3>${i18n.t('login')}</h3>
-            <p>${i18n.t('login_desc')}</p>
-            <button class="btn btn-primary" onclick="signInWithGoogle()">${i18n.t('login_with_google')}</button>
-        </div>
-    `;
-    document.body.appendChild(loginPrompt);
+// تحميل قائمة المتابعين
+async function loadFollowersList(currentUid, followers) {
+    const followersList = document.getElementById('followersList');
+    if (!followersList) return;
+    
+    if (!followers || followers.length === 0) {
+        followersList.innerHTML = '<div class="empty-state" style="text-align: center; padding: 40px;">لا يوجد متابعين</div>';
+        return;
+    }
+    
+    let html = '';
+    for (const followerId of followers) {
+        try {
+            const userDoc = await db.collection('users').doc(followerId).get();
+            if (userDoc.exists) {
+                const user = userDoc.data();
+                html += `
+                    <div class="user-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: 12px; margin-bottom: 10px;">
+                        <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                        <div style="flex: 1;">
+                            <h4 style="margin-bottom: 5px;">${user.name}</h4>
+                            <p style="color: var(--text-light);">${user.shareableId || ''}</p>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="action-btn" onclick="openChat('${followerId}')" style="width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--light); cursor: pointer;"><i class="fas fa-comment"></i></button>
+                            <button class="action-btn remove" onclick="removeFollower('${followerId}')" style="width: 35px; height: 35px; border-radius: 50%; border: none; background: #f44336; color: white; cursor: pointer;"><i class="fas fa-user-minus"></i></button>
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading follower:', error);
+        }
+    }
+    followersList.innerHTML = html;
+}
+
+// تحميل قائمة من يتابعهم
+async function loadFollowingList(currentUid, following) {
+    const followingList = document.getElementById('followingList');
+    if (!followingList) return;
+    
+    if (!following || following.length === 0) {
+        followingList.innerHTML = '<div class="empty-state" style="text-align: center; padding: 40px;">لا تتابع أحداً بعد</div>';
+        return;
+    }
+    
+    let html = '';
+    for (const followingId of following) {
+        try {
+            const userDoc = await db.collection('users').doc(followingId).get();
+            if (userDoc.exists) {
+                const user = userDoc.data();
+                html += `
+                    <div class="user-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: 12px; margin-bottom: 10px;">
+                        <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                        <div style="flex: 1;">
+                            <h4 style="margin-bottom: 5px;">${user.name}</h4>
+                            <p style="color: var(--text-light);">${user.shareableId || ''}</p>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="action-btn" onclick="openChat('${followingId}')" style="width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--light); cursor: pointer;"><i class="fas fa-comment"></i></button>
+                            <button class="action-btn following" onclick="unfollow('${followingId}')" style="width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer;"><i class="fas fa-check"></i></button>
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading following:', error);
+        }
+    }
+    followingList.innerHTML = html;
 }
