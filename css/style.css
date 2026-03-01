@@ -926,9 +926,7 @@ input:checked + .slider:before {
     }
 }
 
-/* أنماط دعم اتجاهات اللغات - محذوفة لأننا نريد الأيقونات ثابتة */
-
-/* ===== أنماط تثبيت الأيقونات (جديدة) ===== */
+/* ===== أنماط تثبيت الأيقونات (نهائية) ===== */
 
 /* إلغاء تأثير اتجاه اللغة على جميع الأيقونات */
 .bottom-nav .nav-item i,
@@ -943,7 +941,8 @@ input:checked + .slider:before {
 .copy-btn i,
 .close-modal i,
 .search-input button i,
-.language-option i {
+.language-option i,
+.fa, .fas, .far, .fab {
     transform: none !important;
     transition: none !important;
 }
@@ -980,19 +979,6 @@ input:checked + .slider:before {
 [dir="ltr"] .search-box i {
     margin-left: 0.5rem;
     margin-right: 0;
-}
-
-[dir="ltr"] .search-box i {
-    margin-left: 0.5rem;
-    margin-right: 0;
-}
-
-/* إلغاء أي تحويلات سابقة للأيقونات */
-.fa-chevron-left,
-.fa-arrow-right,
-.fa-chevron-right,
-.fa-arrow-left {
-    transform: none !important;
 }
 
 /* تثبيت موضع زر الإغلاق */
