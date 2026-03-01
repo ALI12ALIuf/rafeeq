@@ -1073,3 +1073,88 @@ input:checked + .slider:before {
     background: var(--primary);
     color: white;
 }
+
+/* أنماط الروابط الإحصائية */
+.stat-link {
+    text-decoration: none;
+    color: var(--text);
+    text-align: center;
+    padding: 10px;
+    border-radius: var(--radius);
+    transition: all 0.3s;
+    display: inline-block;
+    flex: 1;
+}
+
+.stat-link:hover {
+    background: var(--light);
+    transform: translateY(-2px);
+}
+
+.stat-link:active {
+    transform: translateY(0);
+}
+
+.profile-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 1rem;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+/* أنماط الصفحات الفرعية */
+.profile-subpage {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg);
+    z-index: 1000;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.subpage-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.back-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--light);
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.back-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.subpage-header h3 {
+    flex: 1;
+    text-align: center;
+    font-size: 1.2rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-light);
+}
