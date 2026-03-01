@@ -339,6 +339,9 @@ async function loadFollowersList(currentUid, followers) {
         }
     }
     followersList.innerHTML = html;
+    
+    // ✅ حفظ البيانات للصفحات الفرعية
+    window.followersData = html;
 }
 
 // تحميل قائمة من يتابعهم
@@ -376,4 +379,7 @@ async function loadFollowingList(currentUid, following) {
         }
     }
     followingList.innerHTML = html;
+    
+    // ✅ حفظ البيانات للصفحات الفرعية
+    window.followingData = html;
 }
