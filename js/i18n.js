@@ -220,6 +220,8 @@ i18n.init();
 window.changeLanguage = function(lang) {
     if (i18n.translations[lang]) {
         i18n.currentLang = lang;
+        // بعد تطبيق اللغة
+document.dispatchEvent(new Event('languageChanged'));
         i18n.applyLanguage();
         closeModal();
     }
