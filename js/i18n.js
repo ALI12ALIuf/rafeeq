@@ -142,9 +142,9 @@ const i18n = {
     },
     
     applyLanguage() {
-        // تغيير اتجاه الصفحة
-        document.documentElement.lang = this.currentLang;
-        document.documentElement.dir = this.currentLang === 'ar' ? 'rtl' : 'ltr';
+        // ✅ إزالة تغيير اتجاه الصفحة - الاتجاه ثابت (rtl)
+        // document.documentElement.lang = this.currentLang;
+        // document.documentElement.dir = this.currentLang === 'ar' ? 'rtl' : 'ltr';
         
         // تحديث جميع العناصر التي تحمل data-i18n
         document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -216,7 +216,7 @@ i18n.init();
 window.changeLanguage = function(lang) {
     if (i18n.translations[lang]) {
         i18n.currentLang = lang;
-        i18n.applyLanguage();  // هذه الدالة ترسل حدث languageChanged داخلياً
+        i18n.applyLanguage();
         closeModal();
     }
 };
