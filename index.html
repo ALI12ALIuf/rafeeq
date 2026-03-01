@@ -35,21 +35,18 @@
             </div>
         </header>
 
-        <!-- المحتوى الرئيسي (يتبدل حسب الصفحة) -->
+        <!-- المحتوى الرئيسي -->
         <main class="app-content" id="mainContent">
             <!-- الصفحة الرئيسية -->
             <div class="page home-page active">
-                <!-- قصص (مثل انستغرام) -->
+                <!-- قصص -->
                 <div class="stories-section">
-                    <div class="stories-container" id="storiesContainer">
-                        <!-- ستتم إضافة القصص ديناميكياً -->
-                    </div>
+                    <div class="stories-container" id="storiesContainer"></div>
                 </div>
 
                 <!-- منشورات الرحلات -->
                 <div class="posts-section">
                     <div class="posts-container" id="postsContainer">
-                        <!-- منشورات الرحلات -->
                         <div class="post-card">
                             <div class="post-header">
                                 <img src="https://ui-avatars.com/api/?name=أحمد&background=2196F3&color=fff" class="post-avatar">
@@ -83,11 +80,10 @@
             <div class="page chat-page">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="friendSearch" placeholder="البحث عن أصدقاء..." data-i18n="search_friends">
+                    <input type="text" id="friendSearch" placeholder="البحث عن أصدقاء..." data-i18n-placeholder="search_friends">
                 </div>
                 
                 <div class="chats-list" id="chatsList">
-                    <!-- قائمة المحادثات -->
                     <div class="chat-item">
                         <img src="https://ui-avatars.com/api/?name=محمد&background=4CAF50&color=fff" class="chat-avatar">
                         <div class="chat-info">
@@ -143,7 +139,6 @@
                 </div>
 
                 <div class="profile-tab-content">
-                    <!-- محتوى التبويبات -->
                     <div class="tab-pane active" id="postsTab">
                         <div class="profile-posts-grid"></div>
                     </div>
@@ -155,9 +150,33 @@
                     </div>
                 </div>
             </div>
+
+            <!-- صفحة الإعدادات -->
+            <div class="page settings-page">
+                <div class="settings-list">
+                    <div class="settings-item">
+                        <div class="settings-item-left">
+                            <i class="fas fa-palette"></i>
+                            <span data-i18n="theme">المظهر</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="themeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="settings-item" onclick="openLanguageModal()">
+                        <div class="settings-item-left">
+                            <i class="fas fa-globe"></i>
+                            <span data-i18n="language">اللغة</span>
+                        </div>
+                        <i class="fas fa-chevron-left"></i>
+                    </div>
+                </div>
+            </div>
         </main>
 
-        <!-- شريط التنقل السفلي (مثل التطبيقات) -->
+        <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-page="home">
                 <i class="fas fa-home"></i>
@@ -177,7 +196,7 @@
             </button>
         </nav>
 
-        <!-- قائمة جانبية (للشاشات الكبيرة) -->
+        <!-- قائمة جانبية -->
         <div class="side-menu" id="sideMenu">
             <div class="menu-header">
                 <img src="" id="menuAvatar" alt="">
@@ -225,14 +244,42 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js"></script>
+    
+    <!-- ملفات JavaScript -->
     <script src="js/firebase.js"></script>
     <script src="js/i18n.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
+    
+    <!-- كود التأكد من إخفاء شاشة التحميل -->
+    <script>
+    // التأكد من إخفاء شاشة التحميل بعد 3 ثواني كحد أقصى
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            var splash = document.getElementById('splash');
+            var app = document.getElementById('app');
+            if (splash && !splash.classList.contains('hide')) {
+                console.log('إخفاء شاشة التحميل يدوياً');
+                splash.classList.add('hide');
+                setTimeout(function() {
+                    splash.style.display = 'none';
+                    if (app) app.style.display = 'flex';
+                }, 500);
+            }
+        }, 3000);
+    });
+    
+    // كشف الأخطاء
+    window.onerror = function(msg, url, line) {
+        console.log('خطأ في الموقع:', msg, 'السطر:', line);
+        return false;
+    };
+    </script>
 </body>
 </html>
