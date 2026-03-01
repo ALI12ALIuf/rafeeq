@@ -214,22 +214,22 @@
     </div>
 
     <!-- نافذة تغيير اللغة -->
-    <div class="modal" id="languageModal">
-        <div class="modal-content">
-            <h3 data-i18n="select_language">اختر اللغة</h3>
-            <div class="language-options">
-                <button class="language-option" onclick="changeLanguage('ar')">
-                    <span class="flag">🇮🇶</span>
-                    <span>العربية</span>
-                </button>
-                <button class="language-option" onclick="changeLanguage('en')">
-                    <span class="flag">🇬🇧</span>
-                    <span>English</span>
-                </button>
-            </div>
-            <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+<div class="modal" id="languageModal">
+    <div class="modal-content">
+        <h3 data-i18n="select_language">اختر اللغة</h3>
+        <div class="language-options">
+            <button class="language-option" onclick="changeLanguage('ar')">
+                <span class="flag">🇮🇶</span>
+                <span data-i18n="arabic">العربية</span>
+            </button>
+            <button class="language-option" onclick="changeLanguage('en')">
+                <span class="flag">🇬🇧</span>
+                <span data-i18n="english">English</span>
+            </button>
         </div>
+        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
     </div>
+</div>
 
     <!-- نافذة البحث عن الأصدقاء -->
     <div class="modal" id="searchModal">
