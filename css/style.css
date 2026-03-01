@@ -1056,3 +1056,49 @@ input:checked + .slider:before {
     margin-left: 0;
     margin-right: 1rem;
 }
+
+/* ===== الأنماط المفقودة (المهمة) ===== */
+
+/* أنماط بطاقات الرحلات */
+.trip-item {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow);
+    transition: transform 0.3s;
+}
+
+.trip-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+/* أنماط الروابط الإحصائية */
+.stat-link {
+    text-decoration: none;
+    color: var(--text);
+    text-align: center;
+    padding: 10px;
+    border-radius: var(--radius);
+    transition: all 0.3s;
+    display: inline-block;
+    flex: 1;
+}
+
+.stat-link:hover {
+    background: var(--light);
+    transform: translateY(-2px);
+}
+
+.stat-link:active {
+    transform: translateY(0);
+}
+
+.profile-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 1rem;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
