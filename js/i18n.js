@@ -64,7 +64,14 @@ const i18n = {
             block_user: 'حظر المستخدم',
             unblock_user: 'إلغاء حظر المستخدم',
             arabic: 'العربية',
-            english: 'English'
+            english: 'English',
+            // الترجمات الجديدة للصفحات الفرعية
+            no_trips: 'لا توجد رحلات',
+            no_trips_desc: 'لم تقم بأي رحلة بعد',
+            no_followers: 'لا يوجد متابعين',
+            no_followers_desc: 'لم يتابعك أحد بعد',
+            no_following: 'لا تتابع أحداً',
+            no_following_desc: 'لم تتابع أي شخص بعد'
         },
         en: {
             app_name: 'Rafeeq',
@@ -127,7 +134,14 @@ const i18n = {
             block_user: 'Block User',
             unblock_user: 'Unblock User',
             arabic: 'Arabic',
-            english: 'English'
+            english: 'English',
+            // New translations for subpages
+            no_trips: 'No Trips',
+            no_trips_desc: "You haven't taken any trips yet",
+            no_followers: 'No Followers',
+            no_followers_desc: "No one is following you yet",
+            no_following: 'Not Following',
+            no_following_desc: "You aren't following anyone yet"
         }
     },
     
