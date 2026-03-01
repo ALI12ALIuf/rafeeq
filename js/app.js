@@ -192,3 +192,24 @@ function loadChats() {
     
     // سيتم تنفيذها لاحقاً مع WebRTC
 }
+
+// تحديث اتجاه الأيقونات عند تغيير اللغة
+function updateIconsDirection() {
+    const dir = document.documentElement.dir;
+    const chevrons = document.querySelectorAll('.fa-chevron-left, .fa-arrow-right');
+    
+    chevrons.forEach(icon => {
+        if (dir === 'ltr') {
+            if (icon.classList.contains('fa-chevron-left')) {
+                icon.style.transform = 'rotate(0deg)';
+            }
+        } else {
+            if (icon.classList.contains('fa-chevron-left')) {
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+    });
+}
+
+// استدعاء الدالة عند تغيير اللغة
+document.addEventListener('languageChanged', updateIconsDirection);
