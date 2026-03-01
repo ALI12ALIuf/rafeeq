@@ -1,15 +1,6 @@
 // إدارة التنقل بين الصفحات
 document.addEventListener('DOMContentLoaded', () => {
-    // إخفاء شاشة التحميل بعد 2 ثانية (إذا لم يسجل الدخول)
-    setTimeout(() => {
-        if (!auth.currentUser) {
-            document.getElementById('splash').classList.add('hide');
-            setTimeout(() => {
-                document.getElementById('splash').style.display = 'none';
-                document.getElementById('app').style.display = 'flex';
-            }, 500);
-        }
-    }, 2000);
+    console.log('App loaded, setting up navigation...');
     
     // إعداد أزرار التنقل
     setupNavigation();
@@ -17,8 +8,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // إعداد القائمة الجانبية
     setupSideMenu();
     
-    // إعداد نوافذ البحث واللغة
+    // إعداد النوافذ المنبثقة
     setupModals();
+    
+    // تحميل القصص والمحادثات
+    loadStories();
+    loadChats();
 });
 
 // إعداد التنقل
@@ -27,7 +22,14 @@ function setupNavigation() {
     const menuLinks = document.querySelectorAll('.menu-items a');
     const pages = document.querySelectorAll('.page');
     
+    if (!navItems.length || !pages.length) {
+        console.log('Navigation elements not found yet');
+        return;
+    }
+    
     function switchPage(pageId) {
+        console.log('Switching to page:', pageId);
+        
         // إخفاء كل الصفحات
         pages.forEach(page => page.classList.remove('active'));
         
@@ -42,8 +44,9 @@ function setupNavigation() {
             item.classList.toggle('active', item.dataset.page === pageId);
         });
         
-        // إغلاق القائمة الجانبية على الجوال
-        document.getElementById('sideMenu').classList.remove('open');
+        // إغلاق القائمة الجانبية
+        const sideMenu = document.getElementById('sideMenu');
+        if (sideMenu) sideMenu.classList.remove('open');
     }
     
     navItems.forEach(item => {
@@ -63,15 +66,21 @@ function setupNavigation() {
     });
     
     // زر القائمة الجانبية
-    document.getElementById('menuBtn').addEventListener('click', () => {
-        document.getElementById('sideMenu').classList.toggle('open');
-    });
+    const menuBtn = document.getElementById('menuBtn');
+    const sideMenu = document.getElementById('sideMenu');
+    
+    if (menuBtn && sideMenu) {
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sideMenu.classList.toggle('open');
+        });
+    }
     
     // إغلاق القائمة عند النقر خارجها
     document.addEventListener('click', (e) => {
         const menu = document.getElementById('sideMenu');
-        const menuBtn = document.getElementById('menuBtn');
-        if (!menu.contains(e.target) && !menuBtn.contains(e.target)) {
+        const btn = document.getElementById('menuBtn');
+        if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
             menu.classList.remove('open');
         }
     });
@@ -79,31 +88,32 @@ function setupNavigation() {
 
 // إعداد القائمة الجانبية
 function setupSideMenu() {
-    // تحديث الصورة والاسم إذا كان المستخدم مسجلاً
-    if (auth.currentUser) {
-        const menuAvatar = document.getElementById('menuAvatar');
-        const menuName = document.getElementById('menuName');
-        menuAvatar.src = auth.currentUser.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(auth.currentUser.displayName || 'User');
-        menuName.textContent = auth.currentUser.displayName || 'مستخدم';
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (typeof logout === 'function') {
+                logout();
+            }
+        });
     }
-    
-    // زر تسجيل الخروج
-    document.getElementById('logoutBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        logout();
-    });
 }
 
 // إعداد النوافذ المنبثقة
 function setupModals() {
+    // دالة فتح نافذة اللغة
     window.openLanguageModal = function() {
-        document.getElementById('languageModal').classList.add('active');
+        const modal = document.getElementById('languageModal');
+        if (modal) modal.classList.add('active');
     };
     
+    // دالة فتح نافذة البحث
     window.openSearchModal = function() {
-        document.getElementById('searchModal').classList.add('active');
+        const modal = document.getElementById('searchModal');
+        if (modal) modal.classList.add('active');
     };
     
+    // دالة إغلاق النوافذ
     window.closeModal = function() {
         document.querySelectorAll('.modal').forEach(modal => {
             modal.classList.remove('active');
@@ -125,53 +135,60 @@ function setupModals() {
         searchBtn.addEventListener('click', openSearchModal);
     }
     
-    // زر اللغة في الإعدادات
-    const langBtn = document.querySelector('[data-i18n="language"]')?.parentElement;
-    if (langBtn) {
-        langBtn.addEventListener('click', openLanguageModal);
-    }
+    // عنصر اللغة في الإعدادات
+    const langItems = document.querySelectorAll('.settings-item');
+    langItems.forEach(item => {
+        if (item.querySelector('[data-i18n="language"]')) {
+            item.addEventListener('click', openLanguageModal);
+        }
+    });
 }
 
 // التبديل بين تبويبات الملف الشخصي
-function switchProfileTab(tab) {
-    document.querySelectorAll('.profile-tabs .tab-btn').forEach(btn => {
+window.switchProfileTab = function(tab) {
+    console.log('Switching profile tab to:', tab);
+    
+    const tabs = document.querySelectorAll('.profile-tabs .tab-btn');
+    const panes = document.querySelectorAll('.profile-tab-content .tab-pane');
+    
+    tabs.forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(tab));
     });
     
-    document.querySelectorAll('.profile-tab-content .tab-pane').forEach(pane => {
+    panes.forEach(pane => {
         pane.classList.toggle('active', pane.id === tab + 'Tab');
     });
-}
+};
 
 // فتح الدردشة
-function openChat(userId) {
-    // سيتم تنفيذها لاحقاً مع WebRTC
+window.openChat = function(userId) {
     alert('الدردشة المباشرة قيد التطوير');
-}
+};
 
 // تحميل القصص
 function loadStories() {
     const container = document.getElementById('storiesContainer');
+    if (!container) return;
+    
     const stories = [
-        { name: 'قصتك', avatar: auth.currentUser?.photoURL || 'https://ui-avatars.com/api/?name=You' },
-        { name: 'محمد', avatar: 'https://ui-avatars.com/api/?name=محمد' },
-        { name: 'أحمد', avatar: 'https://ui-avatars.com/api/?name=أحمد' },
-        { name: 'سارة', avatar: 'https://ui-avatars.com/api/?name=سارة' },
+        { name: 'قصتك', avatar: 'https://ui-avatars.com/api/?name=You&background=2196F3&color=fff' },
+        { name: 'محمد', avatar: 'https://ui-avatars.com/api/?name=محمد&background=4CAF50&color=fff' },
+        { name: 'أحمد', avatar: 'https://ui-avatars.com/api/?name=أحمد&background=FF9800&color=fff' },
+        { name: 'سارة', avatar: 'https://ui-avatars.com/api/?name=سارة&background=E91E63&color=fff' },
     ];
     
     container.innerHTML = stories.map(story => `
-        <div class="story-item">
-            <img src="${story.avatar}" class="story-avatar">
-            <span class="story-name">${story.name}</span>
+        <div class="story-item" style="display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 70px;">
+            <img src="${story.avatar}" class="story-avatar" style="width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--primary); padding: 2px; object-fit: cover;">
+            <span class="story-name" style="font-size: 0.8rem; color: var(--text-light);">${story.name}</span>
         </div>
     `).join('');
 }
 
 // تحميل المحادثات
 function loadChats() {
-    // سيتم تنفيذها لاحقاً
+    const container = document.getElementById('chatsList');
+    if (!container) return;
+    
+    // سيتم تنفيذها لاحقاً مع WebRTC
 }
-
-// عند تحميل الصفحة
-loadStories();
-loadChats();
