@@ -138,6 +138,7 @@ const i18n = {
     },
     
     applyLanguage() {
+        // تغيير اتجاه الصفحة
         document.documentElement.lang = this.currentLang;
         document.documentElement.dir = this.currentLang === 'ar' ? 'rtl' : 'ltr';
         
@@ -153,7 +154,24 @@ const i18n = {
             el.placeholder = this.t(key);
         });
         
+        // تحديث سمات مثل title
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            const key = el.getAttribute('data-i18n-title');
+            el.title = this.t(key);
+        });
+        
+        // تحديث نص زر تبديل اللغة
+        const langToggle = document.querySelector('.language-option.active');
+        if (langToggle) {
+            langToggle.textContent = this.currentLang === 'ar' ? 'English' : 'العربية';
+        }
+        
         localStorage.setItem('language', this.currentLang);
+        
+        // إعادة تطبيق الثيم بعد تغيير اللغة (لأن بعض العناصر قد تتأثر)
+        if (typeof theme !== 'undefined' && theme.applyTheme) {
+            theme.applyTheme();
+        }
     },
     
     setupLanguageObserver() {
@@ -162,10 +180,17 @@ const i18n = {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === 1) {
+                        // تطبيق الترجمة على العنصر الجديد نفسه
                         if (node.hasAttribute && node.hasAttribute('data-i18n')) {
                             const key = node.getAttribute('data-i18n');
                             node.textContent = this.t(key);
                         }
+                        if (node.hasAttribute && node.hasAttribute('data-i18n-placeholder')) {
+                            const key = node.getAttribute('data-i18n-placeholder');
+                            node.placeholder = this.t(key);
+                        }
+                        
+                        // تطبيق الترجمة على العناصر الفرعية
                         if (node.querySelectorAll) {
                             node.querySelectorAll('[data-i18n]').forEach(el => {
                                 const key = el.getAttribute('data-i18n');
