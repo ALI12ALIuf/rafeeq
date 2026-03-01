@@ -1,11 +1,30 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log('App loaded, setting up navigation...');
+    ensureSinglePage();
     setupNavigation();
     setupSideMenu();
     setupModals();
     loadStories();
     loadChats();
 });
+
+// التأكد من ظهور صفحة واحدة فقط
+function ensureSinglePage() {
+    const pages = document.querySelectorAll('.page');
+    const subpages = document.querySelectorAll('.profile-subpage');
+    
+    subpages.forEach(page => {
+        page.style.display = 'none';
+    });
+    
+    pages.forEach(page => {
+        if (page.classList.contains('active')) {
+            page.style.display = 'block';
+        } else {
+            page.style.display = 'none';
+        }
+    });
+}
 
 function setupNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
@@ -17,7 +36,22 @@ function setupNavigation() {
     function switchPage(pageId) {
         pages.forEach(page => page.classList.remove('active'));
         const targetPage = document.querySelector(`.page.${pageId}-page`);
-        if (targetPage) targetPage.classList.add('active');
+        if (targetPage) {
+            targetPage.classList.add('active');
+            targetPage.style.display = 'block';
+        }
+        
+        // إخفاء الصفحات الأخرى
+        pages.forEach(page => {
+            if (!page.classList.contains('active')) {
+                page.style.display = 'none';
+            }
+        });
+        
+        // إخفاء الصفحات الفرعية
+        document.querySelectorAll('.profile-subpage').forEach(sp => {
+            sp.style.display = 'none';
+        });
         
         navItems.forEach(item => {
             item.classList.toggle('active', item.dataset.page === pageId);
@@ -127,7 +161,6 @@ window.showUserTrips = function() {
     document.getElementById('tripsPage').style.display = 'block';
     
     // هنا تجيب بيانات الرحلات من Firebase
-    // إذا كانت البيانات موجودة، اعرضها بدل الحالة الفارغة
 };
 
 window.showUserFollowers = function() {
@@ -167,10 +200,22 @@ window.showUserFollowing = function() {
 };
 
 window.goBack = function() {
+    // إخفاء جميع الصفحات الفرعية
     document.querySelectorAll('.profile-subpage').forEach(page => {
         page.style.display = 'none';
     });
+    
+    // إظهار صفحة الملف الشخصي الرئيسية
     document.querySelector('.profile-page').style.display = 'block';
+    document.querySelector('.profile-page').classList.add('active');
+    
+    // التأكد من أن باقي الصفحات الرئيسية مخفية
+    document.querySelectorAll('.page').forEach(page => {
+        if (!page.classList.contains('profile-page')) {
+            page.style.display = 'none';
+            page.classList.remove('active');
+        }
+    });
 };
 
 document.addEventListener('languageChanged', function() {
