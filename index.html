@@ -108,18 +108,19 @@
                     <h2 id="profileName"></h2>
                     <p class="profile-bio" id="profileBio"></p>
                     
+                    <!-- إحصائيات قابلة للضغط -->
                     <div class="profile-stats">
-                        <div class="stat-item">
+                        <div class="stat-item" onclick="showUserTrips()">
+                            <span class="stat-value" id="tripsCount">0</span>
+                            <span data-i18n="trips">رحلات</span>
+                        </div>
+                        <div class="stat-item" onclick="showUserFollowers()">
                             <span class="stat-value" id="followersCount">0</span>
                             <span data-i18n="followers">متابعون</span>
                         </div>
-                        <div class="stat-item">
+                        <div class="stat-item" onclick="showUserFollowing()">
                             <span class="stat-value" id="followingCount">0</span>
                             <span data-i18n="following">يتابع</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="tripsCount">0</span>
-                            <span data-i18n="trips">رحلات</span>
                         </div>
                     </div>
 
@@ -130,23 +131,23 @@
                             <button class="copy-btn" onclick="copyId()"><i class="far fa-copy"></i></button>
                         </div>
                     </div>
-
-                    <div class="profile-tabs">
-                        <button class="tab-btn active" onclick="switchProfileTab('posts')" data-i18n="posts">المنشورات</button>
-                        <button class="tab-btn" onclick="switchProfileTab('followers')" data-i18n="followers">المتابعون</button>
-                        <button class="tab-btn" onclick="switchProfileTab('following')" data-i18n="following">يتابع</button>
-                    </div>
                 </div>
 
-                <div class="profile-tab-content">
-                    <div class="tab-pane active" id="postsTab">
-                        <div class="profile-posts-grid"></div>
+                <!-- قوائم (تظهر عند الضغط) -->
+                <div class="profile-lists">
+                    <div class="list-container" id="tripsList" style="display: none;">
+                        <h3 data-i18n="trips">الرحلات</h3>
+                        <div class="trips-grid"></div>
                     </div>
-                    <div class="tab-pane" id="followersTab">
-                        <div class="users-list" id="followersList"></div>
+                    
+                    <div class="list-container" id="followersList" style="display: none;">
+                        <h3 data-i18n="followers">المتابعون</h3>
+                        <div class="users-list"></div>
                     </div>
-                    <div class="tab-pane" id="followingTab">
-                        <div class="users-list" id="followingList"></div>
+                    
+                    <div class="list-container" id="followingList" style="display: none;">
+                        <h3 data-i18n="following">يتابع</h3>
+                        <div class="users-list"></div>
                     </div>
                 </div>
             </div>
@@ -214,22 +215,22 @@
     </div>
 
     <!-- نافذة تغيير اللغة -->
-<div class="modal" id="languageModal">
-    <div class="modal-content">
-        <h3 data-i18n="select_language">اختر اللغة</h3>
-        <div class="language-options">
-            <button class="language-option" onclick="changeLanguage('ar')">
-                <span class="flag">🇮🇶</span>
-                <span data-i18n="arabic">العربية</span>
-            </button>
-            <button class="language-option" onclick="changeLanguage('en')">
-                <span class="flag">🇬🇧</span>
-                <span data-i18n="english">English</span>
-            </button>
+    <div class="modal" id="languageModal">
+        <div class="modal-content">
+            <h3 data-i18n="select_language">اختر اللغة</h3>
+            <div class="language-options">
+                <button class="language-option" onclick="changeLanguage('ar')">
+                    <span class="flag">🇮🇶</span>
+                    <span data-i18n="arabic">العربية</span>
+                </button>
+                <button class="language-option" onclick="changeLanguage('en')">
+                    <span class="flag">🇬🇧</span>
+                    <span data-i18n="english">English</span>
+                </button>
+            </div>
+            <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
-        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
     </div>
-</div>
 
     <!-- نافذة البحث عن الأصدقاء -->
     <div class="modal" id="searchModal">
@@ -259,13 +260,11 @@
     
     <!-- كود التأكد من إخفاء شاشة التحميل -->
     <script>
-    // التأكد من إخفاء شاشة التحميل بعد 3 ثواني كحد أقصى
     window.addEventListener('load', function() {
         setTimeout(function() {
             var splash = document.getElementById('splash');
             var app = document.getElementById('app');
             if (splash && !splash.classList.contains('hide')) {
-                console.log('إخفاء شاشة التحميل يدوياً');
                 splash.classList.add('hide');
                 setTimeout(function() {
                     splash.style.display = 'none';
@@ -275,7 +274,6 @@
         }, 3000);
     });
     
-    // كشف الأخطاء
     window.onerror = function(msg, url, line) {
         console.log('خطأ في الموقع:', msg, 'السطر:', line);
         return false;
