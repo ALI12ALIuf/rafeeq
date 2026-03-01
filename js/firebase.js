@@ -1,0 +1,31 @@
+// إعدادات Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyAgzcrAAC5Yn-uIopUUYvcjTOn0-mR2D94",
+    authDomain: "rafeeq-f656c.firebaseapp.com",
+    projectId: "rafeeq-f656c",
+    storageBucket: "rafeeq-f656c.firebasestorage.app",
+    messagingSenderId: "102848779844",
+    appId: "1:102848779844:web:211c7ef6d7acfccf014e11"
+};
+
+// تهيئة Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+// إعدادات Firestore
+db.settings({
+    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+});
+
+// تمكين persistence
+firebase.firestore().enablePersistence()
+    .catch((err) => {
+        if (err.code == 'failed-precondition') {
+            console.log('Persistence failed');
+        } else if (err.code == 'unimplemented') {
+            console.log('Persistence not available');
+        }
+    });
