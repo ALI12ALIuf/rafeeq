@@ -128,12 +128,13 @@ const i18n = {
     },
     
     init() {
+        console.log('Initializing i18n with language:', this.currentLang);
         this.applyLanguage();
         this.setupLanguageObserver();
     },
     
     t(key) {
-        return this.translations[this.currentLang][key] || key;
+        return this.translations[this.currentLang]?.[key] || key;
     },
     
     applyLanguage() {
@@ -156,7 +157,7 @@ const i18n = {
     },
     
     setupLanguageObserver() {
-        // مراقبة العناصر الجديدة التي تضاف ديناميكياً
+        // مراقبة العناصر الجديدة
         const observer = new MutationObserver((mutations) => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
@@ -165,10 +166,16 @@ const i18n = {
                             const key = node.getAttribute('data-i18n');
                             node.textContent = this.t(key);
                         }
-                        node.querySelectorAll?.('[data-i18n]').forEach(el => {
-                            const key = el.getAttribute('data-i18n');
-                            el.textContent = this.t(key);
-                        });
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll('[data-i18n]').forEach(el => {
+                                const key = el.getAttribute('data-i18n');
+                                el.textContent = this.t(key);
+                            });
+                            node.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                                const key = el.getAttribute('data-i18n-placeholder');
+                                el.placeholder = this.t(key);
+                            });
+                        }
                     }
                 });
             });
@@ -185,10 +192,10 @@ const i18n = {
 i18n.init();
 
 // دالة تغيير اللغة
-function changeLanguage(lang) {
+window.changeLanguage = function(lang) {
     if (i18n.translations[lang]) {
         i18n.currentLang = lang;
         i18n.applyLanguage();
         closeModal();
     }
-}
+};
