@@ -3,6 +3,7 @@ const theme = {
     currentTheme: localStorage.getItem('theme') || 'light',
     
     init() {
+        console.log('Initializing theme:', this.currentTheme);
         this.applyTheme();
         this.setupThemeToggle();
     },
@@ -37,4 +38,5 @@ const theme = {
     }
 };
 
+// تهيئة الثيم
 theme.init();
