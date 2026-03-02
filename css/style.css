@@ -871,7 +871,7 @@ body {
     text-align: center;
 }
 
-/* نافذة تعديل الملف الشخصي - التصحيح النهائي */
+/* نافذة تعديل الملف الشخصي */
 .edit-field {
     margin-bottom: 1.5rem;
     text-align: center;
@@ -885,19 +885,19 @@ body {
     text-align: center;
 }
 
-/* حقل الإدخال مع عداد الأحرف - معدل */
+/* حقل الإدخال مع عداد الأحرف */
 .input-wrapper {
     position: relative;
     width: 100%;
     max-width: 300px;
     margin: 0 auto;
-    direction: ltr; /* للعداد */
+    direction: ltr;
 }
 
 .edit-field input {
     width: 100%;
     padding: 0.75rem;
-    padding-left: 50px; /* مساحة للعداد على اليسار */
+    padding-left: 50px;
     padding-right: 0.75rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -912,7 +912,7 @@ body {
     border-color: var(--primary);
 }
 
-/* عداد الأحرف - على اليسار */
+/* عداد الأحرف */
 .char-counter {
     position: absolute;
     left: 10px;
@@ -971,40 +971,44 @@ body {
     font-size: 1rem;
 }
 
-/* أزرار الحفظ والإلغاء - بنفس التنسيق */
+/* أزرار الحفظ والإلغاء - كبيرة وموحدة */
 .modal-actions {
     display: flex;
-    gap: 1rem;
-    margin-top: 1.5rem;
+    gap: 1.2rem;
+    margin-top: 2rem;
     justify-content: center;
 }
 
-.btn-cancel, .btn-save {
+.modal-btn {
     flex: 1;
-    max-width: 120px;
-    padding: 0.75rem;
+    max-width: 140px;
+    padding: 0.9rem 1.5rem;
     border: none;
     border-radius: var(--radius);
     font-weight: 600;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s;
     text-align: center;
-    background: var(--primary);
-    color: white;
 }
 
-.btn-cancel {
+.modal-btn-cancel {
     background: transparent;
     border: 2px solid var(--primary);
     color: var(--primary);
 }
 
-.btn-cancel:hover {
+.modal-btn-cancel:hover {
     background: var(--primary);
     color: white;
 }
 
-.btn-save:hover {
+.modal-btn-save {
+    background: var(--primary);
+    color: white;
+}
+
+.modal-btn-save:hover {
     background: var(--primary-dark);
 }
 
@@ -1294,6 +1298,12 @@ input:checked + .slider:before {
     
     .edit-field input {
         max-width: 100%;
+    }
+    
+    .modal-btn {
+        max-width: 120px;
+        padding: 0.8rem 1.2rem;
+        font-size: 0.95rem;
     }
 }
 
