@@ -69,6 +69,7 @@ const i18n = {
             name: 'الاسم',
             avatar: 'الصورة الرمزية',
             change_avatar: 'تغيير',
+            choose_avatar: 'اختر صورتك الرمزية',
             // ترجمات الأفاتار
             male: 'رجل',
             female: 'امرأة',
@@ -152,6 +153,7 @@ const i18n = {
             name: 'Name',
             avatar: 'Avatar',
             change_avatar: 'Change',
+            choose_avatar: 'Choose Avatar',
             // Avatar translations
             male: 'Male',
             female: 'Female',
