@@ -18,31 +18,26 @@ function getEmojiForUser(userData) {
     return emojiMap[userData.avatarType] || '👤';
 }
 
-// إنشاء مزود تسجيل الدخول بجوجل (بعد التأكد من وجود auth)
-let googleProvider;
-if (typeof auth !== 'undefined') {
-    googleProvider = new auth.GoogleAuthProvider();
-}
-
 // تسجيل الدخول بجوجل
 async function signInWithGoogle() {
     try {
-        if (!auth || !googleProvider) {
-            alert('مكتبة Firebase لم يتم تحميلها بعد');
+        // استخدام googleProvider من window (الذي تم تعريفه في index.html)
+        if (!window.auth || !window.googleProvider) {
+            alert('مكتبة Firebase لم يتم تحميلها بعد. يرجى تحديث الصفحة.');
             return false;
         }
         
-        const result = await auth.signInWithPopup(googleProvider);
+        const result = await window.auth.signInWithPopup(window.googleProvider);
         const user = result.user;
         
         // التحقق من وجود المستخدم في Firestore
-        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userDoc = await window.db.collection('users').doc(user.uid).get();
         
         if (!userDoc.exists) {
             // مستخدم جديد - إنشاء ملفه
             const shareableId = generateShareableId();
             
-            await db.collection('users').doc(user.uid).set({
+            await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid,
                 name: (user.displayName || 'مستخدم').substring(0, 25),
                 email: user.email || '',
@@ -62,7 +57,20 @@ async function signInWithGoogle() {
         return true;
     } catch (error) {
         console.error('Login error:', error);
-        alert('حدث خطأ في تسجيل الدخول: ' + error.message);
+        
+        // رسالة خطأ مخصصة
+        let errorMessage = 'حدث خطأ في تسجيل الدخول';
+        if (error.code === 'auth/popup-closed-by-user') {
+            errorMessage = 'تم إغلاق نافذة تسجيل الدخول';
+        } else if (error.code === 'auth/cancelled-popup-request') {
+            errorMessage = 'تم إلغاء طلب تسجيل الدخول';
+        } else if (error.code === 'auth/network-request-failed') {
+            errorMessage = 'خطأ في الشبكة. تحقق من اتصالك بالإنترنت';
+        } else {
+            errorMessage += ': ' + error.message;
+        }
+        
+        alert(errorMessage);
         return false;
     }
 }
@@ -88,7 +96,7 @@ function updateUserUI() {
 // تسجيل الخروج
 async function logout() {
     try {
-        await auth.signOut();
+        await window.auth.signOut();
         window.location.reload();
     } catch (error) {
         console.error('Logout error:', error);
@@ -98,7 +106,7 @@ async function logout() {
 // تحميل بيانات المستخدم
 async function loadUserData(uid) {
     try {
-        const userDoc = await db.collection('users').doc(uid).get();
+        const userDoc = await window.db.collection('users').doc(uid).get();
         if (userDoc.exists) {
             const userData = userDoc.data();
             
@@ -178,8 +186,8 @@ function showLoginPrompt() {
 }
 
 // مراقبة حالة المستخدم
-if (typeof auth !== 'undefined') {
-    auth.onAuthStateChanged(async (user) => {
+if (typeof window.auth !== 'undefined') {
+    window.auth.onAuthStateChanged(async (user) => {
         console.log('Auth state changed:', user ? 'logged in' : 'logged out');
         
         const splash = document.getElementById('splash');
@@ -249,7 +257,7 @@ async function searchFriend() {
     resultsDiv.innerHTML = '<div class="loading" style="text-align: center; padding: 20px;">جاري البحث...</div>';
     
     try {
-        const snapshot = await db.collection('users')
+        const snapshot = await window.db.collection('users')
             .where('shareableId', '==', searchId)
             .get();
         
@@ -260,7 +268,7 @@ async function searchFriend() {
         
         const user = snapshot.docs[0].data();
         const userId = snapshot.docs[0].id;
-        const currentUser = auth ? auth.currentUser : null;
+        const currentUser = window.auth ? window.auth.currentUser : null;
         
         if (currentUser && userId === currentUser.uid) {
             resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
@@ -287,14 +295,14 @@ async function searchFriend() {
 
 // إرسال طلب صداقة
 async function sendFriendRequest(targetUserId) {
-    if (!auth || !auth.currentUser) {
+    if (!window.auth || !window.auth.currentUser) {
         alert('الرجاء تسجيل الدخول أولاً');
         return;
     }
     
     try {
-        await db.collection('friendRequests').add({
-            from: auth.currentUser.uid,
+        await window.db.collection('friendRequests').add({
+            from: window.auth.currentUser.uid,
             to: targetUserId,
             status: 'pending',
             timestamp: new Date()
@@ -310,17 +318,17 @@ async function sendFriendRequest(targetUserId) {
 
 // إزالة متابع
 async function removeFollower(followerId) {
-    if (!auth || !auth.currentUser) return;
+    if (!window.auth || !window.auth.currentUser) return;
     
     try {
-        await db.collection('users').doc(auth.currentUser.uid).update({
-            followers: firebase.firestore.FieldValue.arrayRemove(followerId)
+        await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+            followers: window.db.FieldValue.arrayRemove(followerId)
         });
         
         // تحديث القائمة
-        const userDoc = await db.collection('users').doc(auth.currentUser.uid).get();
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
         if (userDoc.exists) {
-            loadFollowersList(auth.currentUser.uid, userDoc.data().followers || []);
+            loadFollowersList(window.auth.currentUser.uid, userDoc.data().followers || []);
         }
     } catch (error) {
         console.error('Error removing follower:', error);
@@ -329,21 +337,21 @@ async function removeFollower(followerId) {
 
 // إلغاء متابعة
 async function unfollow(followingId) {
-    if (!auth || !auth.currentUser) return;
+    if (!window.auth || !window.auth.currentUser) return;
     
     try {
-        await db.collection('users').doc(auth.currentUser.uid).update({
-            following: firebase.firestore.FieldValue.arrayRemove(followingId)
+        await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+            following: window.db.FieldValue.arrayRemove(followingId)
         });
         
-        await db.collection('users').doc(followingId).update({
-            followers: firebase.firestore.FieldValue.arrayRemove(auth.currentUser.uid)
+        await window.db.collection('users').doc(followingId).update({
+            followers: window.db.FieldValue.arrayRemove(window.auth.currentUser.uid)
         });
         
         // تحديث القائمة
-        const userDoc = await db.collection('users').doc(auth.currentUser.uid).get();
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
         if (userDoc.exists) {
-            loadFollowingList(auth.currentUser.uid, userDoc.data().following || []);
+            loadFollowingList(window.auth.currentUser.uid, userDoc.data().following || []);
         }
     } catch (error) {
         console.error('Error unfollowing:', error);
@@ -363,7 +371,7 @@ async function loadFollowersList(currentUid, followers) {
     let html = '';
     for (const followerId of followers) {
         try {
-            const userDoc = await db.collection('users').doc(followerId).get();
+            const userDoc = await window.db.collection('users').doc(followerId).get();
             if (userDoc.exists) {
                 const user = userDoc.data();
                 const avatarEmoji = getEmojiForUser(user);
@@ -405,7 +413,7 @@ async function loadFollowingList(currentUid, following) {
     let html = '';
     for (const followingId of following) {
         try {
-            const userDoc = await db.collection('users').doc(followingId).get();
+            const userDoc = await window.db.collection('users').doc(followingId).get();
             if (userDoc.exists) {
                 const user = userDoc.data();
                 const avatarEmoji = getEmojiForUser(user);
