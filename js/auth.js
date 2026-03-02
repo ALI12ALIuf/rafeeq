@@ -18,9 +18,20 @@ function getEmojiForUser(userData) {
     return emojiMap[userData.avatarType] || '👤';
 }
 
+// إنشاء مزود تسجيل الدخول بجوجل (بعد التأكد من وجود auth)
+let googleProvider;
+if (typeof auth !== 'undefined') {
+    googleProvider = new auth.GoogleAuthProvider();
+}
+
 // تسجيل الدخول بجوجل
 async function signInWithGoogle() {
     try {
+        if (!auth || !googleProvider) {
+            alert('مكتبة Firebase لم يتم تحميلها بعد');
+            return false;
+        }
+        
         const result = await auth.signInWithPopup(googleProvider);
         const user = result.user;
         
@@ -41,7 +52,7 @@ async function signInWithGoogle() {
                 followers: [],
                 following: [],
                 blocked: [],
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                createdAt: new Date() // استخدام Date بدلاً من FieldValue.serverTimestamp()
             });
         }
         
@@ -167,41 +178,47 @@ function showLoginPrompt() {
 }
 
 // مراقبة حالة المستخدم
-auth.onAuthStateChanged(async (user) => {
-    console.log('Auth state changed:', user ? 'logged in' : 'logged out');
-    
-    const splash = document.getElementById('splash');
-    const app = document.getElementById('app');
-    
-    if (user) {
-        // مستخدم مسجل
-        console.log('Loading user data for:', user.uid);
-        await loadUserData(user.uid);
+if (typeof auth !== 'undefined') {
+    auth.onAuthStateChanged(async (user) => {
+        console.log('Auth state changed:', user ? 'logged in' : 'logged out');
         
-        if (splash) {
-            splash.classList.add('hide');
-            setTimeout(() => {
-                splash.style.display = 'none';
-                if (app) app.style.display = 'flex';
-            }, 500);
-        }
-    } else {
-        // مستخدم غير مسجل - انتظر 2 ثانية ثم أظهر المحتوى
-        console.log('User not logged in, showing content after delay');
-        setTimeout(() => {
+        const splash = document.getElementById('splash');
+        const app = document.getElementById('app');
+        
+        if (user) {
+            // مستخدم مسجل
+            console.log('Loading user data for:', user.uid);
+            await loadUserData(user.uid);
+            
             if (splash) {
                 splash.classList.add('hide');
                 setTimeout(() => {
                     splash.style.display = 'none';
                     if (app) app.style.display = 'flex';
-                    
-                    // إظهار رسالة تسجيل الدخول للميزات المهمة
-                    setTimeout(showLoginPrompt, 1000);
                 }, 500);
             }
-        }, 2000);
-    }
-});
+        } else {
+            // مستخدم غير مسجل - انتظر 2 ثانية ثم أظهر المحتوى
+            console.log('User not logged in, showing content after delay');
+            setTimeout(() => {
+                if (splash) {
+                    splash.classList.add('hide');
+                    setTimeout(() => {
+                        splash.style.display = 'none';
+                        if (app) app.style.display = 'flex';
+                        
+                        // إظهار رسالة تسجيل الدخول للميزات المهمة
+                        setTimeout(showLoginPrompt, 1000);
+                    }, 500);
+                }
+            }, 2000);
+        }
+    });
+} else {
+    console.error('auth is not defined. Firebase may not be loaded yet.');
+    // محاولة إظهار رسالة تسجيل الدخول بعد فترة
+    setTimeout(showLoginPrompt, 3000);
+}
 
 // نسخ المعرف
 function copyId() {
@@ -243,7 +260,7 @@ async function searchFriend() {
         
         const user = snapshot.docs[0].data();
         const userId = snapshot.docs[0].id;
-        const currentUser = auth.currentUser;
+        const currentUser = auth ? auth.currentUser : null;
         
         if (currentUser && userId === currentUser.uid) {
             resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
@@ -270,7 +287,7 @@ async function searchFriend() {
 
 // إرسال طلب صداقة
 async function sendFriendRequest(targetUserId) {
-    if (!auth.currentUser) {
+    if (!auth || !auth.currentUser) {
         alert('الرجاء تسجيل الدخول أولاً');
         return;
     }
@@ -280,7 +297,7 @@ async function sendFriendRequest(targetUserId) {
             from: auth.currentUser.uid,
             to: targetUserId,
             status: 'pending',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            timestamp: new Date()
         });
         
         closeModal();
@@ -293,7 +310,7 @@ async function sendFriendRequest(targetUserId) {
 
 // إزالة متابع
 async function removeFollower(followerId) {
-    if (!auth.currentUser) return;
+    if (!auth || !auth.currentUser) return;
     
     try {
         await db.collection('users').doc(auth.currentUser.uid).update({
@@ -312,7 +329,7 @@ async function removeFollower(followerId) {
 
 // إلغاء متابعة
 async function unfollow(followingId) {
-    if (!auth.currentUser) return;
+    if (!auth || !auth.currentUser) return;
     
     try {
         await db.collection('users').doc(auth.currentUser.uid).update({
