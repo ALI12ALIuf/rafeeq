@@ -566,13 +566,13 @@ body {
     margin: 0;
 }
 
-/* صف المعرف مع الخلفية - الترتيب المطلوب */
+/* صف المعرف مع الخلفية - الترتيب الجديد */
 .profile-id-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    background: var(--light);  /* الخلفية الرمادية */
+    background: var(--light);
     padding: 0.5rem 1rem;
     border-radius: 25px;
     width: fit-content;
@@ -580,12 +580,21 @@ body {
     min-width: 250px;
 }
 
-/* كلمة ID على اليسار */
-.id-label-english {
-    color: var(--text-light);  /* رمادي فاتح ثابت */
-    font-size: 0.9rem;
-    font-weight: 500;
+/* زر النسخ على اليسار */
+.copy-btn-left {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0 5px;
+    transition: transform 0.3s;
     order: 0;
+}
+
+.copy-btn-left:hover {
+    transform: scale(1.1);
+    color: var(--primary-dark);
 }
 
 /* الأرقام في المنتصف */
@@ -593,7 +602,7 @@ body {
     font-family: monospace;
     font-size: 1.1rem;
     font-weight: 500;
-    color: var(--primary);  /* أزرق ثابت */
+    color: var(--primary);
     direction: ltr;
     letter-spacing: 1px;
     order: 1;
@@ -601,21 +610,12 @@ body {
     text-align: center;
 }
 
-/* زر النسخ على اليمين */
-.copy-btn-left {
-    background: none;
-    border: none;
-    color: var(--primary);  /* أزرق ثابت */
-    cursor: pointer;
-    font-size: 1.1rem;
-    padding: 0 5px;
-    transition: transform 0.3s;
+/* كلمة ID على اليمين - بنفس لون النسخ */
+.id-label-english {
+    color: var(--primary);
+    font-size: 0.9rem;
+    font-weight: 500;
     order: 2;
-}
-
-.copy-btn-left:hover {
-    transform: scale(1.1);
-    color: var(--primary-dark);
 }
 
 .profile-bio {
