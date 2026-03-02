@@ -252,3 +252,21 @@ window.changeLanguage = function(lang) {
         closeModal();
     }
 };
+
+// Force update all translatable elements after language change
+window.changeLanguage = function(lang) {
+    if (i18n.translations[lang]) {
+        i18n.currentLang = lang;
+        i18n.applyLanguage();
+        
+        // تحديث جميع العناصر التي قد تكون أضيفت حديثاً
+        setTimeout(() => {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = i18n.t(key);
+            });
+        }, 100);
+        
+        closeModal();
+    }
+};
