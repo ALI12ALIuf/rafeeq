@@ -1,6 +1,11 @@
-// توليد معرف عشوائي من 10 أرقام
+// توليد معرف عشوائي من 10 أرقام (أرقام فقط)
 function generateShareableId() {
-    return Math.random().toString(36).substring(2, 12).toUpperCase();
+    // توليد 10 أرقام عشوائية
+    let id = '';
+    for (let i = 0; i < 10; i++) {
+        id += Math.floor(Math.random() * 10).toString();
+    }
+    return id;
 }
 
 // دالة لتحديد الملصق المناسب
@@ -47,7 +52,7 @@ async function signInWithGoogle() {
                 followers: [],
                 following: [],
                 blocked: [],
-                createdAt: new Date() // استخدام Date بدلاً من FieldValue.serverTimestamp()
+                createdAt: new Date()
             });
         }
         
@@ -122,7 +127,9 @@ async function loadUserData(uid) {
             if (profileName) profileName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (menuName) menuName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (profileBio) profileBio.textContent = userData.bio || '';
-            if (shareableId) shareableId.textContent = userData.shareableId || '---';
+            
+            // تحديث المعرف (يظهر كأرقام فقط)
+            if (shareableId) shareableId.textContent = userData.shareableId || '0000000000';
             
             // تحديث الملصقات
             const avatarEmoji = getEmojiForUser(userData);
@@ -248,9 +255,9 @@ async function searchFriend() {
     
     if (!searchInput || !resultsDiv) return;
     
-    const searchId = searchInput.value.trim().toUpperCase();
-    if (!searchId || searchId.length !== 10) {
-        alert('الرجاء إدخال 10 أرقام');
+    const searchId = searchInput.value.trim();
+    if (!searchId || searchId.length !== 10 || !/^\d+$/.test(searchId)) {
+        alert('الرجاء إدخال 10 أرقام فقط');
         return;
     }
     
