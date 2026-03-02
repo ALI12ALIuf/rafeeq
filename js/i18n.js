@@ -65,7 +65,11 @@ const i18n = {
             unblock_user: 'إلغاء حظر المستخدم',
             arabic: 'العربية',
             english: 'English',
-            // ترجمات الأفاتار (الملصقات)
+            // ترجمات نافذة التعديل
+            name: 'الاسم',
+            avatar: 'الصورة الرمزية',
+            change_avatar: 'تغيير',
+            // ترجمات الأفاتار
             male: 'رجل',
             female: 'امرأة',
             boy: 'ولد',
@@ -144,6 +148,10 @@ const i18n = {
             unblock_user: 'Unblock User',
             arabic: 'Arabic',
             english: 'English',
+            // Edit window translations
+            name: 'Name',
+            avatar: 'Avatar',
+            change_avatar: 'Change',
             // Avatar translations
             male: 'Male',
             female: 'Female',
@@ -174,10 +182,6 @@ const i18n = {
     },
     
     applyLanguage() {
-        // ✅ إزالة تغيير اتجاه الصفحة - الاتجاه ثابت (rtl)
-        // document.documentElement.lang = this.currentLang;
-        // document.documentElement.dir = this.currentLang === 'ar' ? 'rtl' : 'ltr';
-        
         // تحديث جميع العناصر التي تحمل data-i18n
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
