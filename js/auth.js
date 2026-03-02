@@ -18,7 +18,7 @@ function getEmojiForUser(userData) {
     return emojiMap[userData.avatarType] || '👤';
 }
 
-// تسجيل الدخول بجوجل (محاولة popup أولاً، ثم redirect كبديل)
+// تسجيل الدخول بجوجل
 async function signInWithGoogle() {
     try {
         // استخدام googleProvider من window (الذي تم تعريفه في index.html)
@@ -27,49 +27,34 @@ async function signInWithGoogle() {
             return false;
         }
         
-        // محاولة popup أولاً
-        try {
-            const result = await window.auth.signInWithPopup(window.googleProvider);
-            const user = result.user;
+        const result = await window.auth.signInWithPopup(window.googleProvider);
+        const user = result.user;
+        
+        // التحقق من وجود المستخدم في Firestore
+        const userDoc = await window.db.collection('users').doc(user.uid).get();
+        
+        if (!userDoc.exists) {
+            // مستخدم جديد - إنشاء ملفه
+            const shareableId = generateShareableId();
             
-            // التحقق من وجود المستخدم في Firestore
-            const userDoc = await window.db.collection('users').doc(user.uid).get();
-            
-            if (!userDoc.exists) {
-                // مستخدم جديد - إنشاء ملفه
-                const shareableId = generateShareableId();
-                
-                await window.db.collection('users').doc(user.uid).set({
-                    uid: user.uid,
-                    name: (user.displayName || 'مستخدم').substring(0, 25),
-                    email: user.email || '',
-                    shareableId: shareableId,
-                    bio: '',
-                    avatarType: 'male', // ملصق افتراضي
-                    followers: [],
-                    following: [],
-                    blocked: [],
-                    createdAt: new Date()
-                });
-            }
-            
-            // تحديث واجهة المستخدم
-            updateUserUI();
-            
-            return true;
-            
-        } catch (popupError) {
-            // إذا فشل popup بسبب مانع النوافذ، استخدم redirect
-            console.log('Popup failed, trying redirect...', popupError);
-            
-            // رسالة للمستخدم
-            alert('سيتم توجيهك إلى صفحة تسجيل الدخول...');
-            
-            // استخدام redirect بدلاً من popup
-            await window.auth.signInWithRedirect(window.googleProvider);
-            // بعد التوجيه، سيعود المستخدم تلقائياً
+            await window.db.collection('users').doc(user.uid).set({
+                uid: user.uid,
+                name: (user.displayName || 'مستخدم').substring(0, 25),
+                email: user.email || '',
+                shareableId: shareableId,
+                bio: '',
+                avatarType: 'male', // ملصق افتراضي
+                followers: [],
+                following: [],
+                blocked: [],
+                createdAt: new Date() // استخدام Date بدلاً من FieldValue.serverTimestamp()
+            });
         }
         
+        // تحديث واجهة المستخدم
+        updateUserUI();
+        
+        return true;
     } catch (error) {
         console.error('Login error:', error);
         
@@ -89,39 +74,6 @@ async function signInWithGoogle() {
         return false;
     }
 }
-
-// معالجة نتيجة تسجيل الدخول عبر redirect
-window.auth.getRedirectResult().then((result) => {
-    if (result.user) {
-        console.log('Redirect sign-in successful:', result.user);
-        
-        // التحقق من وجود المستخدم في Firestore
-        window.db.collection('users').doc(result.user.uid).get().then((userDoc) => {
-            if (!userDoc.exists) {
-                // مستخدم جديد - إنشاء ملفه
-                const shareableId = generateShareableId();
-                
-                window.db.collection('users').doc(result.user.uid).set({
-                    uid: result.user.uid,
-                    name: (result.user.displayName || 'مستخدم').substring(0, 25),
-                    email: result.user.email || '',
-                    shareableId: shareableId,
-                    bio: '',
-                    avatarType: 'male',
-                    followers: [],
-                    following: [],
-                    blocked: [],
-                    createdAt: new Date()
-                });
-            }
-        });
-        
-        // تحديث واجهة المستخدم
-        updateUserUI();
-    }
-}).catch((error) => {
-    console.error('Redirect sign-in error:', error);
-});
 
 // تحديث واجهة المستخدم بعد تسجيل الدخول
 function updateUserUI() {
