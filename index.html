@@ -98,19 +98,30 @@
                 <div class="profile-header">
                     <!-- المنطقة الزرقاء مع الأيقونة والقلم -->
                     <div class="profile-cover">
-                        <div class="profile-avatar-wrapper">
+                        <div class="profile-avatar-wrapper-right">
                             <div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div>
                         </div>
-                        <!-- زر القلم في الزاوية اليمنى -->
-                        <button class="edit-avatar-btn" onclick="openEditProfileModal()">
+                        <!-- زر القلم في الزاوية اليسرى -->
+                        <button class="edit-profile-btn-left" onclick="openEditProfileModal()">
                             <i class="fas fa-pen"></i>
                         </button>
                     </div>
                     
-                    <h2 id="profileName"></h2>
-                    <p class="profile-bio" id="profileBio"></p>
+                    <!-- حاوية الاسم والمعرف -->
+                    <div class="profile-info-container">
+                        <div class="profile-name-wrapper">
+                            <h2 id="profileName"></h2>
+                        </div>
+                        
+                        <!-- المعرف تحت الاسم مع زر نسخ في اليسار -->
+                        <div class="profile-id-row">
+                            <span class="id-label-small" data-i18n="your_id">معرفك</span>
+                            <span id="shareableId" class="id-value-small"></span>
+                            <button class="copy-btn-small" onclick="copyId()"><i class="far fa-copy"></i></button>
+                        </div>
+                    </div>
                     
-                    <!-- إزالة زر تعديل الملف الشخصي النصي -->
+                    <p class="profile-bio" id="profileBio"></p>
                     
                     <div class="profile-stats">
                         <a href="#" class="stat-link" onclick="showUserTrips()">
@@ -125,14 +136,6 @@
                             <span class="stat-value" id="followingCount">0</span>
                             <span data-i18n="following">يتابع</span>
                         </a>
-                    </div>
-
-                    <div class="profile-id-box">
-                        <span class="id-label" data-i18n="your_id">معرفك</span>
-                        <div class="id-value">
-                            <span id="shareableId"></span>
-                            <button class="copy-btn" onclick="copyId()"><i class="far fa-copy"></i></button>
-                        </div>
                     </div>
                 </div>
             </div>
