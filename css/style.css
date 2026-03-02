@@ -223,7 +223,7 @@ body {
     margin-bottom: 2rem;
 }
 
-.menu-avatar-icon {
+.menu-avatar-emoji {
     width: 80px;
     height: 80px;
     border-radius: 50%;
@@ -233,7 +233,6 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 4rem;
-    color: var(--primary);
 }
 
 .menu-items {
@@ -288,7 +287,7 @@ body {
     min-width: 70px;
 }
 
-.story-avatar-icon {
+.story-avatar-emoji {
     width: 60px;
     height: 60px;
     border-radius: 50%;
@@ -296,8 +295,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2.5rem;
-    color: var(--primary);
+    font-size: 3rem;
     border: 2px solid var(--primary);
 }
 
@@ -322,7 +320,7 @@ body {
     gap: 0.75rem;
 }
 
-.post-avatar-icon {
+.post-avatar-emoji {
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -330,8 +328,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.8rem;
-    color: var(--primary);
+    font-size: 2rem;
 }
 
 .post-user {
@@ -452,7 +449,7 @@ body {
     background: var(--light);
 }
 
-.chat-avatar-icon {
+.chat-avatar-emoji {
     width: 50px;
     height: 50px;
     border-radius: 50%;
@@ -460,8 +457,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    color: var(--primary);
+    font-size: 2.5rem;
 }
 
 .chat-info {
@@ -508,7 +504,7 @@ body {
     margin: -50px auto 1rem;
 }
 
-.profile-avatar-icon {
+.profile-avatar-emoji {
     width: 100%;
     height: 100%;
     border-radius: 50%;
@@ -517,7 +513,6 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 5rem;
-    color: var(--primary);
     border: 3px solid var(--card-bg);
 }
 
@@ -548,6 +543,15 @@ body {
     color: var(--text-light);
     margin-bottom: 1rem;
     padding: 0 1rem;
+}
+
+/* زر تعديل الملف الشخصي */
+.edit-profile-btn {
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
 }
 
 /* إحصائيات قابلة للضغط */
@@ -732,7 +736,7 @@ body {
     transform: translateX(-5px);
 }
 
-.user-avatar-icon {
+.user-avatar-emoji {
     width: 50px;
     height: 50px;
     border-radius: 50%;
@@ -740,8 +744,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    color: var(--primary);
+    font-size: 2.5rem;
 }
 
 .user-info {
@@ -830,6 +833,95 @@ body {
     color: var(--primary);
 }
 
+/* نافذة تعديل الملف الشخصي */
+.edit-field {
+    margin-bottom: 1.5rem;
+}
+
+.edit-field label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+.edit-field input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--light);
+    color: var(--text);
+    font-size: 1rem;
+}
+
+.edit-field input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.current-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.modal-actions .btn {
+    flex: 1;
+}
+
+/* نافذة اختيار الملصق */
+.avatar-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.avatar-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--light);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.avatar-option:hover {
+    background: var(--primary);
+    color: white;
+    transform: scale(1.05);
+}
+
+.avatar-option span:first-child {
+    font-size: 2.5rem;
+}
+
+.avatar-option span:last-child {
+    font-size: 0.9rem;
+}
+
+.avatar-option:hover span:first-child {
+    filter: brightness(0) invert(1);
+}
+
+/* نافذة تغيير اللغة */
 .language-options {
     display: flex;
     flex-direction: column;
@@ -914,7 +1006,7 @@ body {
     background: var(--light);
 }
 
-.search-result-avatar-icon {
+.search-result-avatar-emoji {
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -922,8 +1014,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.6rem;
-    color: var(--primary);
+    font-size: 2rem;
 }
 
 .search-result-info {
@@ -938,46 +1029,6 @@ body {
 .search-result-info p {
     color: var(--text-light);
     font-size: 0.8rem;
-}
-
-/* نافذة اختيار الأيقونة */
-.avatar-options {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    margin: 1rem 0;
-}
-
-.avatar-option {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1rem;
-    background: var(--light);
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.avatar-option:hover {
-    background: var(--primary);
-    color: white;
-    transform: scale(1.05);
-}
-
-.avatar-option i {
-    font-size: 2rem;
-    color: var(--primary);
-}
-
-.avatar-option:hover i {
-    color: white;
-}
-
-.avatar-option span {
-    font-size: 0.9rem;
 }
 
 /* زر تغيير اللغة في الإعدادات */
@@ -1082,6 +1133,10 @@ input:checked + .slider:before {
     
     .empty-state p {
         font-size: 0.9rem;
+    }
+    
+    .avatar-option span:first-child {
+        font-size: 2rem;
     }
 }
 
