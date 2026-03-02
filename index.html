@@ -348,15 +348,12 @@
         </div>
     </div>
 
-    <!-- Firebase SDK - النسخة المحدثة -->
+    <!-- Firebase SDK - نسخة مع GoogleProvider -->
     <script type="module">
-        // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
-        import { getStorage } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-storage.js";
 
-        // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyApCsnS6CjnzfMPjNsvidLiuX0ZlJ11szU",
             authDomain: "rafeeq-9959a.firebaseapp.com",
@@ -366,16 +363,14 @@
             appId: "1:348154736690:web:c2ebd6c4fb88e3594f8c2b"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const storage = getStorage(app);
+        const googleProvider = new GoogleAuthProvider();
         
-        // Make auth and db available globally (for your other scripts)
         window.auth = auth;
         window.db = db;
-        window.storage = storage;
+        window.googleProvider = googleProvider;
         
         console.log('Firebase initialized successfully');
     </script>
