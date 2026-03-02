@@ -871,7 +871,7 @@ body {
     text-align: center;
 }
 
-/* نافذة تعديل الملف الشخصي - تنسيق جديد */
+/* نافذة تعديل الملف الشخصي - التصحيح النهائي */
 .edit-field {
     margin-bottom: 1.5rem;
     text-align: center;
@@ -885,18 +885,20 @@ body {
     text-align: center;
 }
 
-/* حقل الإدخال مع عداد الأحرف */
+/* حقل الإدخال مع عداد الأحرف - معدل */
 .input-wrapper {
     position: relative;
     width: 100%;
     max-width: 300px;
     margin: 0 auto;
+    direction: ltr; /* للعداد */
 }
 
 .edit-field input {
     width: 100%;
     padding: 0.75rem;
-    padding-right: 50px; /* مساحة للعداد */
+    padding-left: 50px; /* مساحة للعداد على اليسار */
+    padding-right: 0.75rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--light);
@@ -910,16 +912,19 @@ body {
     border-color: var(--primary);
 }
 
-/* عداد الأحرف */
+/* عداد الأحرف - على اليسار */
 .char-counter {
     position: absolute;
-    right: 10px;
+    left: 10px;
     top: 50%;
     transform: translateY(-50%);
     font-size: 0.8rem;
     color: var(--text-light);
     font-weight: 500;
     direction: ltr;
+    background: transparent;
+    padding: 2px 4px;
+    border-radius: 4px;
 }
 
 .char-counter.full {
@@ -942,7 +947,10 @@ body {
 
 /* زر تغيير الأفاتار */
 .change-avatar-btn {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     margin: 0 auto;
     padding: 0.5rem 1rem;
     background: var(--light);
@@ -959,7 +967,11 @@ body {
     color: white;
 }
 
-/* أزرار الحفظ والإلغاء */
+.change-avatar-btn i {
+    font-size: 1rem;
+}
+
+/* أزرار الحفظ والإلغاء - بنفس التنسيق */
 .modal-actions {
     display: flex;
     gap: 1rem;
@@ -967,7 +979,7 @@ body {
     justify-content: center;
 }
 
-.modal-actions .btn {
+.btn-cancel, .btn-save {
     flex: 1;
     max-width: 120px;
     padding: 0.75rem;
@@ -977,25 +989,22 @@ body {
     cursor: pointer;
     transition: all 0.3s;
     text-align: center;
+    background: var(--primary);
+    color: white;
 }
 
-.btn-outline {
+.btn-cancel {
     background: transparent;
     border: 2px solid var(--primary);
     color: var(--primary);
 }
 
-.btn-outline:hover {
+.btn-cancel:hover {
     background: var(--primary);
     color: white;
 }
 
-.btn-primary {
-    background: var(--primary);
-    color: white;
-}
-
-.btn-primary:hover {
+.btn-save:hover {
     background: var(--primary-dark);
 }
 
