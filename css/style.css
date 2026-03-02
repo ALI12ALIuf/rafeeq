@@ -483,7 +483,7 @@ body {
     font-size: 0.7rem;
 }
 
-/* صفحة الملف الشخصي */
+/* صفحة الملف الشخصي - معدلة */
 .profile-header {
     background: var(--card-bg);
     border-radius: var(--radius);
@@ -495,13 +495,18 @@ body {
     height: 150px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
+/* الأيقونة في منتصف المنطقة الزرقاء */
 .profile-avatar-wrapper {
-    position: relative;
+    position: absolute;
     width: 100px;
     height: 100px;
-    margin: -50px auto 1rem;
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 .profile-avatar-emoji {
@@ -513,28 +518,45 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 5rem;
-    border: 3px solid var(--card-bg);
+    border: 3px solid white;
+    box-shadow: var(--shadow);
 }
 
+/* زر القلم في الزاوية اليمنى من المنطقة الزرقاء */
 .edit-avatar-btn {
     position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 30px;
-    height: 30px;
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    background: var(--primary);
+    background: white;
     border: none;
-    color: white;
+    color: var(--primary);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
+    font-size: 1.2rem;
+    box-shadow: var(--shadow);
+    transition: all 0.3s;
+    z-index: 10;
+}
+
+.edit-avatar-btn:hover {
+    transform: scale(1.1);
+    background: var(--primary);
+    color: white;
+}
+
+/* إزالة زر تعديل الملف الشخصي النصي */
+.edit-profile-btn {
+    display: none !important;
 }
 
 .profile-header h2 {
     text-align: center;
+    margin-top: 60px; /* مسافة بعد الأيقونة */
     margin-bottom: 0.25rem;
 }
 
@@ -543,15 +565,6 @@ body {
     color: var(--text-light);
     margin-bottom: 1rem;
     padding: 0 1rem;
-}
-
-/* زر تعديل الملف الشخصي */
-.edit-profile-btn {
-    margin: 0 auto 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
 }
 
 /* إحصائيات قابلة للضغط */
@@ -627,7 +640,7 @@ body {
     font-size: 1.1rem;
 }
 
-/* الصفحات الفرعية */
+/* باقي الأنماط كما هي */
 .profile-subpage {
     position: fixed;
     top: 0;
