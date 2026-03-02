@@ -241,7 +241,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل الملف الشخصي - مع التعديلات -->
+    <!-- نافذة تعديل الملف الشخصي -->
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
@@ -249,7 +249,6 @@
             <div class="edit-field">
                 <label data-i18n="name">الاسم</label>
                 <div class="input-wrapper">
-                    <!-- حقل فارغ بدون placeholder -->
                     <input type="text" id="editName" maxlength="25">
                     <span class="char-counter" id="charCounter">0/25</span>
                 </div>
@@ -264,7 +263,6 @@
             </div>
             
             <div class="modal-actions">
-                <!-- الأزرار متشابهة (كلاهما بإطار أزرق) -->
                 <button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
                 <button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button>
             </div>
@@ -273,7 +271,7 @@
         </div>
     </div>
 
-    <!-- نافذة اختيار الملصق - مع ترجمات -->
+    <!-- نافذة اختيار الملصق -->
     <div class="modal" id="avatarModal">
         <div class="modal-content">
             <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
@@ -333,13 +331,13 @@
         </div>
     </div>
 
-    <!-- نافذة البحث عن الأصدقاء -->
+    <!-- نافذة البحث عن الأصدقاء (محسنة) -->
     <div class="modal" id="searchModal">
         <div class="modal-content">
             <h3 data-i18n="search_friends">البحث عن أصدقاء</h3>
             <div class="search-input">
-                <input type="text" id="searchInput" placeholder="أدخل معرف الصديق (10 أرقام)" maxlength="10">
-                <button onclick="searchFriend()"><i class="fas fa-search"></i></button>
+                <input type="text" id="searchInput" placeholder="أدخل 10 أرقام" maxlength="10" inputmode="numeric" pattern="\d*">
+                <!-- إزالة زر البحث -->
             </div>
             <div class="search-results" id="searchResults"></div>
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
@@ -391,27 +389,42 @@
             }
         }, 3000);
         
-        // إعداد عداد الأحرف - محسّن
+        // إعداد البحث الفوري (بدون زر)
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                // استدعاء دالة البحث من auth.js
+                if (typeof searchFriend === 'function') {
+                    searchFriend();
+                }
+            });
+            
+            // السماح بالأرقام فقط
+            searchInput.addEventListener('keypress', function(e) {
+                const char = String.fromCharCode(e.which);
+                if (!/[0-9]/.test(char)) {
+                    e.preventDefault();
+                }
+            });
+        }
+        
+        // إعداد عداد الأحرف
         const nameInput = document.getElementById('editName');
         const charCounter = document.getElementById('charCounter');
         
         if (nameInput && charCounter) {
-            // تعيين القيمة الأولية
             charCounter.textContent = '0/25';
             
             nameInput.addEventListener('input', function(e) {
                 let value = this.value;
                 
-                // منع إدخال أكثر من 25 حرف بشكل صارم
                 if (value.length > 25) {
                     this.value = value.slice(0, 25);
                 }
                 
-                // تحديث العداد
                 const currentLength = this.value.length;
                 charCounter.textContent = currentLength + '/25';
                 
-                // تغيير اللون عند الوصول للحد الأقصى
                 if (currentLength >= 25) {
                     charCounter.classList.add('full');
                 } else {
@@ -419,38 +432,14 @@
                 }
             });
             
-            // منع أي محاولة لإدخال حرف إضافي بعد 25
             nameInput.addEventListener('keydown', function(e) {
                 if (this.value.length >= 25 && 
                     e.key !== 'Backspace' && 
                     e.key !== 'Delete' && 
                     e.key !== 'ArrowLeft' && 
                     e.key !== 'ArrowRight' && 
-                    e.key !== 'Tab' &&
-                    !e.ctrlKey && 
-                    !e.metaKey) {
+                    e.key !== 'Tab') {
                     e.preventDefault();
-                }
-            });
-            
-            // منع اللصق إذا كان سيتجاوز 25 حرف
-            nameInput.addEventListener('paste', function(e) {
-                e.preventDefault();
-                const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-                const currentLength = this.value.length;
-                const availableSpace = 25 - currentLength;
-                
-                if (availableSpace > 0) {
-                    const newText = pastedText.slice(0, availableSpace);
-                    this.value += newText;
-                    
-                    // تحديث العداد
-                    const newLength = this.value.length;
-                    charCounter.textContent = newLength + '/25';
-                    
-                    if (newLength >= 25) {
-                        charCounter.classList.add('full');
-                    }
                 }
             });
         }
