@@ -483,7 +483,7 @@ body {
     font-size: 0.7rem;
 }
 
-/* صفحة الملف الشخصي - التنسيقات الجديدة */
+/* صفحة الملف الشخصي */
 .profile-header {
     background: var(--card-bg);
     border-radius: var(--radius);
@@ -500,7 +500,6 @@ body {
     justify-content: center;
 }
 
-/* الأيقونة في منتصف المنطقة الزرقاء */
 .profile-avatar-center {
     width: 100px;
     height: 100px;
@@ -521,7 +520,6 @@ body {
     overflow: hidden;
 }
 
-/* زر القلم في أعلى اليسار */
 .edit-profile-btn-left {
     position: absolute;
     top: 20px;
@@ -548,7 +546,6 @@ body {
     color: white;
 }
 
-/* حاوية الاسم والمعرف */
 .profile-info-container {
     padding: 1rem;
     margin-top: 10px;
@@ -569,12 +566,13 @@ body {
     margin: 0;
 }
 
-/* صف المعرف الجديد - التنسيق المطلوب */
+/* صف المعرف مع الخلفية - الترتيب المطلوب */
 .profile-id-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+    background: var(--light);  /* الخلفية الرمادية */
     padding: 0.5rem 1rem;
     border-radius: 25px;
     width: fit-content;
@@ -584,10 +582,10 @@ body {
 
 /* كلمة ID على اليسار */
 .id-label-english {
-    color: var(--text-light);
+    color: var(--text-light);  /* رمادي فاتح ثابت */
     font-size: 0.9rem;
     font-weight: 500;
-    order: 0; /* في أقصى اليسار */
+    order: 0;
 }
 
 /* الأرقام في المنتصف */
@@ -595,7 +593,7 @@ body {
     font-family: monospace;
     font-size: 1.1rem;
     font-weight: 500;
-    color: var(--primary);
+    color: var(--primary);  /* أزرق ثابت */
     direction: ltr;
     letter-spacing: 1px;
     order: 1;
@@ -603,16 +601,16 @@ body {
     text-align: center;
 }
 
-/* زر النسخ على اليمين (بدون خلفية) */
+/* زر النسخ على اليمين */
 .copy-btn-left {
     background: none;
     border: none;
-    color: var(--primary);
+    color: var(--primary);  /* أزرق ثابت */
     cursor: pointer;
     font-size: 1.1rem;
     padding: 0 5px;
     transition: transform 0.3s;
-    order: 2; /* في أقصى اليمين */
+    order: 2;
 }
 
 .copy-btn-left:hover {
@@ -627,7 +625,7 @@ body {
     text-align: center;
 }
 
-/* إحصائيات قابلة للضغط */
+/* إحصائيات */
 .profile-stats {
     display: flex;
     justify-content: space-around;
@@ -668,7 +666,6 @@ body {
     color: var(--text-light);
 }
 
-/* إخفاء الـ profile-id-box القديم */
 .profile-id-box {
     display: none;
 }
@@ -731,7 +728,6 @@ body {
     padding: 1rem;
 }
 
-/* الحالة الفارغة */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -765,7 +761,6 @@ body {
     color: var(--text-light);
 }
 
-/* بطاقات المستخدمين */
 .user-item {
     display: flex;
     align-items: center;
@@ -841,7 +836,6 @@ body {
     color: white;
 }
 
-/* النوافذ المنبثقة */
 .modal {
     position: fixed;
     top: 0;
@@ -879,7 +873,6 @@ body {
     color: var(--primary);
 }
 
-/* نافذة تعديل الملف الشخصي */
 .edit-field {
     margin-bottom: 1.5rem;
 }
@@ -928,7 +921,6 @@ body {
     flex: 1;
 }
 
-/* نافذة اختيار الملصق */
 .avatar-options {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -967,7 +959,6 @@ body {
     filter: brightness(0) invert(1);
 }
 
-/* نافذة تغيير اللغة */
 .language-options {
     display: flex;
     flex-direction: column;
@@ -1007,7 +998,6 @@ body {
     cursor: pointer;
 }
 
-/* نافذة البحث */
 .search-input {
     display: flex;
     gap: 0.5rem;
@@ -1077,7 +1067,6 @@ body {
     font-size: 0.8rem;
 }
 
-/* زر تغيير اللغة في الإعدادات */
 .settings-item {
     display: flex;
     align-items: center;
@@ -1144,7 +1133,6 @@ input:checked + .slider:before {
     transform: translateX(26px);
 }
 
-/* التجاوب مع الشاشات */
 @media (min-width: 768px) {
     .bottom-nav {
         display: none;
@@ -1185,7 +1173,6 @@ input:checked + .slider:before {
         font-size: 2rem;
     }
     
-    /* تحسينات للشاشات الصغيرة */
     .profile-cover {
         height: 120px;
     }
@@ -1236,7 +1223,6 @@ input:checked + .slider:before {
     transition: none !important;
 }
 
-/* تثبيت مواضع الأيقونات */
 [dir="rtl"] .bottom-nav .nav-item i,
 [dir="ltr"] .bottom-nav .nav-item i {
     margin: 0 0 4px 0;
