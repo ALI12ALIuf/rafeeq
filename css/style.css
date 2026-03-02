@@ -492,18 +492,18 @@ body {
 }
 
 .profile-cover {
-    height: 120px;
+    height: 150px; /* زيادة الارتفاع */
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* الأيقونة في أعلى اليمين */
-.profile-avatar-wrapper-right {
-    position: absolute;
-    width: 80px;
-    height: 80px;
-    top: 20px;
-    right: 20px;
+/* الأيقونة في منتصف المنطقة الزرقاء */
+.profile-avatar-center {
+    width: 100px;
+    height: 100px;
     z-index: 5;
 }
 
@@ -515,10 +515,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 4rem;
-    border: 3px solid white;
+    font-size: 5rem; /* حجم أكبر */
+    border: 4px solid white;
     box-shadow: var(--shadow);
-    overflow: hidden; /* يضمن عدم خروج الملصق عن الإطار */
+    overflow: hidden;
 }
 
 /* زر القلم في أعلى اليسار */
@@ -526,8 +526,8 @@ body {
     position: absolute;
     top: 20px;
     left: 20px;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: white;
     border: none;
@@ -536,7 +536,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     box-shadow: var(--shadow);
     transition: all 0.3s;
     z-index: 10;
@@ -552,13 +552,23 @@ body {
 .profile-info-container {
     padding: 1rem;
     margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.profile-name-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
 }
 
 .profile-name-wrapper h2 {
     font-size: 1.3rem;
-    margin-bottom: 0.5rem;
     color: var(--text);
-    text-align: right;
+    margin: 0;
 }
 
 /* صف المعرف مع زر النسخ */
@@ -1170,27 +1180,34 @@ input:checked + .slider:before {
     }
     
     /* تحسينات للشاشات الصغيرة */
-    .profile-avatar-wrapper-right {
-        width: 60px;
-        height: 60px;
-        top: 15px;
-        right: 15px;
+    .profile-cover {
+        height: 120px;
+    }
+    
+    .profile-avatar-center {
+        width: 80px;
+        height: 80px;
     }
     
     .profile-avatar-emoji {
-        font-size: 3rem;
+        font-size: 4rem;
     }
     
     .edit-profile-btn-left {
-        width: 32px;
-        height: 32px;
-        top: 15px;
-        left: 15px;
-        font-size: 1rem;
+        width: 36px;
+        height: 36px;
+        top: 10px;
+        left: 10px;
+        font-size: 1.1rem;
+    }
+    
+    .profile-info-container {
+        flex-direction: column;
+        align-items: flex-start;
     }
     
     .profile-id-row {
-        flex-wrap: wrap;
+        width: 100%;
     }
 }
 
