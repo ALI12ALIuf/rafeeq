@@ -138,9 +138,11 @@ function setupModals() {
     });
 }
 
-// إعداد البحث الفوري (بدون زر)
+// إعداد البحث الفوري (بدون زر) - كود مستقل تماماً
 function setupInstantSearch() {
     const searchInput = document.getElementById('searchInput');
+    const resultsDiv = document.getElementById('searchResults');
+    
     if (!searchInput) {
         console.error('❌ لم يتم العثور على حقل البحث');
         return;
@@ -148,7 +150,6 @@ function setupInstantSearch() {
     
     console.log('✅ تم العثور على حقل البحث');
     
-    // البحث عند كل إدخال
     searchInput.addEventListener('input', function(e) {
         // تنظيف الإدخال (أرقام فقط)
         let value = this.value.replace(/[^0-9]/g, '');
@@ -156,33 +157,29 @@ function setupInstantSearch() {
         
         console.log('🔍 جاري البحث عن:', value);
         
-        const resultsDiv = document.getElementById('searchResults');
+        if (!resultsDiv) return;
         
+        // مسح النتائج إذا كان الحقل فارغاً
         if (value.length === 0) {
-            if (resultsDiv) resultsDiv.innerHTML = '';
+            resultsDiv.innerHTML = '';
             return;
         }
         
+        // التحقق من الطول
         if (value.length !== 10) {
-            if (resultsDiv) {
-                resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #666;">
-                    ⏳ يجب إدخال 10 أرقام (${value.length}/10)
-                </div>`;
-            }
+            resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #666;">
+                ⏳ يجب إدخال 10 أرقام (${value.length}/10)
+            </div>`;
             return;
         }
         
-        // تنفيذ البحث
-        if (typeof window.searchFriend === 'function') {
-            window.searchFriend();
-        } else {
-            console.error('❌ دالة searchFriend غير موجودة');
-            if (resultsDiv) {
-                resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #f44336;">
-                    ❌ خطأ في نظام البحث
-                </div>`;
-            }
-        }
+        // عرض رسالة جاري البحث
+        resultsDiv.innerHTML = `<div class="loading" style="text-align: center; padding: 20px;">
+            <i class="fas fa-spinner fa-spin"></i> جاري البحث...
+        </div>`;
+        
+        // تنفيذ البحث مباشرة
+        performSearch(value);
     });
     
     // السماح بالأرقام فقط عند الكتابة
@@ -200,13 +197,112 @@ function setupInstantSearch() {
         const numbersOnly = pastedText.replace(/[^0-9]/g, '').slice(0, 10);
         if (numbersOnly) {
             this.value = numbersOnly;
-            // تشغيل البحث تلقائياً بعد اللصق
-            if (numbersOnly.length === 10 && typeof window.searchFriend === 'function') {
-                window.searchFriend();
+            if (numbersOnly.length === 10) {
+                performSearch(numbersOnly);
+            } else {
+                if (resultsDiv) {
+                    resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #666;">
+                        ⏳ يجب إدخال 10 أرقام (${numbersOnly.length}/10)
+                    </div>`;
+                }
             }
         }
     });
 }
+
+// دالة البحث المباشرة
+async function performSearch(searchId) {
+    const resultsDiv = document.getElementById('searchResults');
+    if (!resultsDiv) return;
+    
+    try {
+        // التحقق من وجود db
+        if (!window.db) {
+            resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #f44336;">
+                ❌ Firebase غير متصل
+            </div>`;
+            return;
+        }
+        
+        // البحث في Firestore
+        const snapshot = await window.db.collection('users')
+            .where('shareableId', '==', searchId)
+            .get();
+        
+        if (snapshot.empty) {
+            resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px;">
+                😕 لا يوجد مستخدم بهذا المعرف
+            </div>`;
+            return;
+        }
+        
+        const user = snapshot.docs[0].data();
+        const userId = snapshot.docs[0].id;
+        const currentUser = window.auth ? window.auth.currentUser : null;
+        
+        // التحقق مما إذا كان المعرف خاص بالمستخدم الحالي
+        if (currentUser && userId === currentUser.uid) {
+            resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px;">
+                👤 هذا معرفك أنت
+            </div>`;
+            return;
+        }
+        
+        // تحديد الملصق المناسب
+        const emojiMap = {
+            'male': '👨',
+            'female': '👩',
+            'boy': '🧒',
+            'girl': '👧',
+            'father': '👨‍🦳',
+            'mother': '👩‍🦳',
+            'grandfather': '👴',
+            'grandmother': '👵'
+        };
+        const avatarEmoji = emojiMap[user.avatarType] || '👤';
+        
+        // عرض النتيجة
+        resultsDiv.innerHTML = `
+            <div class="search-result-item">
+                <div class="search-result-avatar-emoji">${avatarEmoji}</div>
+                <div class="search-result-info">
+                    <h4>${user.name}</h4>
+                    <p>${user.shareableId}</p>
+                </div>
+                ${currentUser ? '<button class="btn btn-primary" onclick="addFriend(\'' + userId + '\')">➕ إضافة</button>' : ''}
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Search error:', error);
+        resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #f44336;">
+            ⚠️ حدث خطأ في البحث: ${error.message}
+        </div>`;
+    }
+}
+
+// دالة إضافة صديق
+window.addFriend = async function(userId) {
+    if (!window.auth || !window.auth.currentUser) {
+        alert('الرجاء تسجيل الدخول أولاً');
+        return;
+    }
+    
+    try {
+        await window.db.collection('friendRequests').add({
+            from: window.auth.currentUser.uid,
+            to: userId,
+            status: 'pending',
+            timestamp: new Date()
+        });
+        
+        closeModal();
+        alert('✅ تم إرسال طلب الصداقة');
+    } catch (error) {
+        console.error('Error sending request:', error);
+        alert('❌ حدث خطأ في إرسال الطلب');
+    }
+};
 
 function loadStories() {
     const container = document.getElementById('storiesContainer');
