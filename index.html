@@ -348,12 +348,13 @@
         </div>
     </div>
 
-    <!-- Firebase SDK - نسخة مع GoogleProvider -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
-        import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
+    <!-- Firebase SDK (Compatibility Mode) - الحل النهائي -->
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
 
+    <script>
+        // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyApCsnS6CjnzfMPjNsvidLiuX0ZlJ11szU",
             authDomain: "rafeeq-9959a.firebaseapp.com",
@@ -363,19 +364,18 @@
             appId: "1:348154736690:web:c2ebd6c4fb88e3594f8c2b"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const googleProvider = new GoogleAuthProvider();
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
         
-        window.auth = auth;
-        window.db = db;
-        window.googleProvider = googleProvider;
+        // Make auth and db available globally
+        window.auth = firebase.auth();
+        window.db = firebase.firestore();
+        window.googleProvider = new firebase.auth.GoogleAuthProvider();
         
-        console.log('Firebase initialized successfully');
+        console.log('Firebase initialized successfully (compat mode)');
     </script>
     
-    <!-- ملفات JavaScript (تأكد من أنها تأتي بعد Firebase) -->
+    <!-- ملفات JavaScript -->
     <script src="js/i18n.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/auth.js"></script>
