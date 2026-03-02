@@ -47,7 +47,9 @@
                     <div class="posts-container" id="postsContainer">
                         <div class="post-card">
                             <div class="post-header">
-                                <img src="https://ui-avatars.com/api/?name=أحمد&background=2196F3&color=fff" class="post-avatar">
+                                <div class="post-avatar-icon">
+                                    <i class="fas fa-user-circle"></i>
+                                </div>
                                 <div class="post-user">
                                     <h4>أحمد</h4>
                                     <span class="post-time">منذ ساعتين</span>
@@ -83,7 +85,9 @@
                 
                 <div class="chats-list" id="chatsList">
                     <div class="chat-item">
-                        <img src="https://ui-avatars.com/api/?name=محمد&background=4CAF50&color=fff" class="chat-avatar">
+                        <div class="chat-avatar-icon">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
                         <div class="chat-info">
                             <h4>محمد</h4>
                             <p>مرحباً! كيف حالك؟</p>
@@ -96,12 +100,14 @@
             <!-- صفحة الملف الشخصي -->
             <div class="page profile-page">
                 <div class="profile-header">
-                    <div class="profile-cover">
-                        <button class="edit-cover-btn"><i class="fas fa-camera"></i></button>
-                    </div>
+                    <div class="profile-cover"></div>
                     <div class="profile-avatar-wrapper">
-                        <img src="" id="profileAvatar" class="profile-avatar" alt="Profile">
-                        <button class="edit-avatar-btn"><i class="fas fa-camera"></i></button>
+                        <div class="profile-avatar-icon" id="profileAvatarIcon">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <button class="edit-avatar-btn" onclick="openAvatarModal()">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
                     </div>
                     <h2 id="profileName"></h2>
                     <p class="profile-bio" id="profileBio"></p>
@@ -227,7 +233,9 @@
         <!-- قائمة جانبية -->
         <div class="side-menu" id="sideMenu">
             <div class="menu-header">
-                <img src="" id="menuAvatar" alt="">
+                <div class="menu-avatar-icon" id="menuAvatarIcon">
+                    <i class="fas fa-user-circle"></i>
+                </div>
                 <h3 id="menuName"></h3>
             </div>
             <div class="menu-items">
@@ -238,6 +246,48 @@
                 <hr>
                 <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">تسجيل الخروج</span></a>
             </div>
+        </div>
+    </div>
+
+    <!-- نافذة اختيار الأيقونة -->
+    <div class="modal" id="avatarModal">
+        <div class="modal-content">
+            <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
+            <div class="avatar-options">
+                <button class="avatar-option" onclick="selectAvatar('male', this)">
+                    <i class="fas fa-user"></i>
+                    <span>👤 رجل</span>
+                </button>
+                <button class="avatar-option" onclick="selectAvatar('female', this)">
+                    <i class="fas fa-user"></i>
+                    <span>👩 امرأة</span>
+                </button>
+                <button class="avatar-option" onclick="selectAvatar('boy', this)">
+                    <i class="fas fa-child"></i>
+                    <span>🧒 ولد</span>
+                </button>
+                <button class="avatar-option" onclick="selectAvatar('girl', this)">
+                    <i class="fas fa-child"></i>
+                    <span>👧 بنت</span>
+                </button>
+                <button class="avatar-option" onclick="selectAvatar('father', this)">
+                    <i class="fas fa-user-tie"></i>
+                    <span>👨‍🦳 أب</span>
+                </button>
+                <button class="avatar-option" onclick="selectAvatar('mother', this)">
+                    <i class="fas fa-user"></i>
+                    <span>👵 أم</span>
+                </button>
+                <button class="avatar-option" onclick="selectAvatar('grandfather', this)">
+                    <i class="fas fa-user"></i>
+                    <span>👴 جد</span>
+                </button>
+                <button class="avatar-option" onclick="selectAvatar('grandmother', this)">
+                    <i class="fas fa-user"></i>
+                    <span>👵 جدة</span>
+                </button>
+            </div>
+            <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
 
