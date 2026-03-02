@@ -1004,6 +1004,18 @@ body {
     color: white;
 }
 
+/* زر الحفظ (أزرق خالص) */
+.modal-btn-primary {
+    background: var(--primary);
+    border: 2px solid var(--primary);
+    color: white;
+}
+
+.modal-btn-primary:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+}
+
 .close-modal {
     position: absolute;
     top: 1rem;
@@ -1013,6 +1025,92 @@ body {
     color: var(--text-light);
     font-size: 1.2rem;
     cursor: pointer;
+}
+
+/* نافذة البحث - تحسينات للأرقام فقط */
+.search-input input {
+    text-align: center;
+    font-family: monospace;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+}
+
+/* نتائج البحث - مع زر المتابعة */
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+}
+
+.search-result-item:hover {
+    background: var(--light);
+}
+
+.search-result-avatar-emoji {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+}
+
+.search-result-info {
+    flex: 1;
+}
+
+.search-result-info h4 {
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+}
+
+.search-result-info p {
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+.search-result-info small {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+/* زر المتابعة في نتائج البحث */
+.search-result-item .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 500;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.search-result-item .btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.search-result-item .btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.search-result-item .btn-outline {
+    background: transparent;
+    border: 1px solid var(--primary);
+    color: var(--primary);
+}
+
+.search-result-item .btn-outline:hover {
+    background: var(--primary);
+    color: white;
 }
 
 /* باقي الأنماط */
@@ -1080,75 +1178,6 @@ body {
 
 .language-option .flag {
     font-size: 1.5rem;
-}
-
-.search-input {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.search-input input {
-    flex: 1;
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--light);
-    color: var(--text);
-    font-size: 1rem;
-}
-
-.search-input button {
-    width: 45px;
-    height: 45px;
-    border: none;
-    border-radius: var(--radius);
-    background: var(--primary);
-    color: white;
-    cursor: pointer;
-}
-
-.search-results {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.search-result-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-}
-
-.search-result-item:hover {
-    background: var(--light);
-}
-
-.search-result-avatar-emoji {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--light);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-}
-
-.search-result-info {
-    flex: 1;
-}
-
-.search-result-info h4 {
-    margin-bottom: 0.25rem;
-    font-size: 0.9rem;
-}
-
-.search-result-info p {
-    color: var(--text-light);
-    font-size: 0.8rem;
 }
 
 .settings-item {
@@ -1296,6 +1325,15 @@ input:checked + .slider:before {
         max-width: 120px;
         padding: 0.8rem 1.2rem;
         font-size: 0.95rem;
+    }
+    
+    .search-result-item {
+        flex-wrap: wrap;
+    }
+    
+    .search-result-item .btn {
+        width: 100%;
+        margin-top: 0.5rem;
     }
 }
 
