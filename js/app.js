@@ -362,3 +362,39 @@ window.openAvatarModal = function() {
 document.addEventListener('languageChanged', function() {
     console.log('Language changed');
 });
+
+// ربط البحث الفوري بشكل مباشر
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        console.log('✅ تم العثور على حقل البحث');
+        
+        // البحث عند كل إدخال
+        searchInput.addEventListener('input', function(e) {
+            const value = this.value.replace(/[^0-9]/g, ''); // أرقام فقط
+            this.value = value; // تحديث الحقل
+            
+            console.log('🔍 جاري البحث عن:', value);
+            
+            if (value.length === 10) {
+                if (typeof window.searchFriend === 'function') {
+                    window.searchFriend();
+                } else {
+                    console.error('❌ دالة searchFriend غير موجودة');
+                }
+            } else if (value.length > 0) {
+                // عرض رسالة انتظار
+                const resultsDiv = document.getElementById('searchResults');
+                if (resultsDiv) {
+                    resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">🔍 انتظر... يجب إدخال 10 أرقام</div>';
+                }
+            } else {
+                // مسح النتائج إذا كان الحقل فارغاً
+                const resultsDiv = document.getElementById('searchResults');
+                if (resultsDiv) resultsDiv.innerHTML = '';
+            }
+        });
+    } else {
+        console.error('❌ لم يتم العثور على حقل البحث');
+    }
+});
