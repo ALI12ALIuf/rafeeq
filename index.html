@@ -241,7 +241,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل الملف الشخصي -->
+    <!-- نافذة تعديل الملف الشخصي - مع التعديلات -->
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
@@ -249,6 +249,7 @@
             <div class="edit-field">
                 <label data-i18n="name">الاسم</label>
                 <div class="input-wrapper">
+                    <!-- حقل فارغ بدون placeholder -->
                     <input type="text" id="editName" maxlength="25">
                     <span class="char-counter" id="charCounter">0/25</span>
                 </div>
@@ -263,15 +264,16 @@
             </div>
             
             <div class="modal-actions">
+                <!-- الأزرار متشابهة (كلاهما بإطار أزرق) -->
                 <button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
-                <button class="modal-btn modal-btn-primary" onclick="saveProfile()" data-i18n="save">حفظ</button>
+                <button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button>
             </div>
             
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
 
-    <!-- نافذة اختيار الملصق -->
+    <!-- نافذة اختيار الملصق - مع ترجمات -->
     <div class="modal" id="avatarModal">
         <div class="modal-content">
             <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
@@ -331,12 +333,12 @@
         </div>
     </div>
 
-    <!-- نافذة البحث عن الأصدقاء (مطورة) -->
+    <!-- نافذة البحث عن الأصدقاء -->
     <div class="modal" id="searchModal">
         <div class="modal-content">
             <h3 data-i18n="search_friends">البحث عن أصدقاء</h3>
             <div class="search-input">
-                <input type="text" id="searchInput" placeholder="أدخل معرف الصديق (10 أرقام)" maxlength="10" pattern="\d*" inputmode="numeric">
+                <input type="text" id="searchInput" placeholder="أدخل معرف الصديق (10 أرقام)" maxlength="10">
                 <button onclick="searchFriend()"><i class="fas fa-search"></i></button>
             </div>
             <div class="search-results" id="searchResults"></div>
@@ -389,23 +391,27 @@
             }
         }, 3000);
         
-        // إعداد عداد الأحرف
+        // إعداد عداد الأحرف - محسّن
         const nameInput = document.getElementById('editName');
         const charCounter = document.getElementById('charCounter');
         
         if (nameInput && charCounter) {
+            // تعيين القيمة الأولية
             charCounter.textContent = '0/25';
             
             nameInput.addEventListener('input', function(e) {
                 let value = this.value;
                 
+                // منع إدخال أكثر من 25 حرف بشكل صارم
                 if (value.length > 25) {
                     this.value = value.slice(0, 25);
                 }
                 
+                // تحديث العداد
                 const currentLength = this.value.length;
                 charCounter.textContent = currentLength + '/25';
                 
+                // تغيير اللون عند الوصول للحد الأقصى
                 if (currentLength >= 25) {
                     charCounter.classList.add('full');
                 } else {
@@ -413,6 +419,7 @@
                 }
             });
             
+            // منع أي محاولة لإدخال حرف إضافي بعد 25
             nameInput.addEventListener('keydown', function(e) {
                 if (this.value.length >= 25 && 
                     e.key !== 'Backspace' && 
@@ -426,6 +433,7 @@
                 }
             });
             
+            // منع اللصق إذا كان سيتجاوز 25 حرف
             nameInput.addEventListener('paste', function(e) {
                 e.preventDefault();
                 const pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -436,6 +444,7 @@
                     const newText = pastedText.slice(0, availableSpace);
                     this.value += newText;
                     
+                    // تحديث العداد
                     const newLength = this.value.length;
                     charCounter.textContent = newLength + '/25';
                     
@@ -443,24 +452,6 @@
                         charCounter.classList.add('full');
                     }
                 }
-            });
-        }
-        
-        // منع إدخال أحرف غير رقمية في بحث الصديق
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.addEventListener('keydown', function(e) {
-                // السماح بالأرقام فقط، وبعض المفاتيح المسموحة
-                const allowedKeys = ['0','1','2','3','4','5','6','7','8','9','Backspace','Delete','ArrowLeft','ArrowRight','Tab','Home','End'];
-                
-                if (!allowedKeys.includes(e.key) && !e.ctrlKey && !e.metaKey) {
-                    e.preventDefault();
-                }
-            });
-            
-            searchInput.addEventListener('input', function(e) {
-                // إزالة أي أحرف غير رقمية
-                this.value = this.value.replace(/[^0-9]/g, '');
             });
         }
     });
