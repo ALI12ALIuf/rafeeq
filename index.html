@@ -241,7 +241,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل الملف الشخصي - مع الأزرار الكبيرة -->
+    <!-- نافذة تعديل الملف الشخصي - مع التعديلات -->
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
@@ -249,7 +249,8 @@
             <div class="edit-field">
                 <label data-i18n="name">الاسم</label>
                 <div class="input-wrapper">
-                    <input type="text" id="editName" maxlength="25" placeholder="أدخل اسمك">
+                    <!-- حقل فارغ بدون placeholder -->
+                    <input type="text" id="editName" maxlength="25">
                     <span class="char-counter" id="charCounter">0/25</span>
                 </div>
             </div>
@@ -263,15 +264,16 @@
             </div>
             
             <div class="modal-actions">
-                <button class="modal-btn modal-btn-cancel" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
-                <button class="modal-btn modal-btn-save" onclick="saveProfile()" data-i18n="save">حفظ</button>
+                <!-- الأزرار متشابهة (كلاهما بإطار أزرق) -->
+                <button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
+                <button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button>
             </div>
             
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
 
-    <!-- نافذة اختيار الملصق -->
+    <!-- نافذة اختيار الملصق - مع ترجمات -->
     <div class="modal" id="avatarModal">
         <div class="modal-content">
             <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
