@@ -1,16 +1,6 @@
-// دالة تنسيق الأرقام (1K, 1M)
-function formatNumber(num) {
-    if (num >= 1000000) {
-        return (num / 1000000).toFixed(1) + 'M';
-    }
-    if (num >= 1000) {
-        return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-}
-
 // توليد معرف عشوائي من 10 أرقام (أرقام فقط)
 function generateShareableId() {
+    // توليد 10 أرقام عشوائية
     let id = '';
     for (let i = 0; i < 10; i++) {
         id += Math.floor(Math.random() * 10).toString();
@@ -36,6 +26,7 @@ function getEmojiForUser(userData) {
 // تسجيل الدخول بجوجل
 async function signInWithGoogle() {
     try {
+        // استخدام googleProvider من window (الذي تم تعريفه في index.html)
         if (!window.auth || !window.googleProvider) {
             alert('مكتبة Firebase لم يتم تحميلها بعد. يرجى تحديث الصفحة.');
             return false;
@@ -44,9 +35,11 @@ async function signInWithGoogle() {
         const result = await window.auth.signInWithPopup(window.googleProvider);
         const user = result.user;
         
+        // التحقق من وجود المستخدم في Firestore
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         
         if (!userDoc.exists) {
+            // مستخدم جديد - إنشاء ملفه
             const shareableId = generateShareableId();
             
             await window.db.collection('users').doc(user.uid).set({
@@ -55,19 +48,22 @@ async function signInWithGoogle() {
                 email: user.email || '',
                 shareableId: shareableId,
                 bio: '',
-                avatarType: 'male',
+                avatarType: 'male', // ملصق افتراضي
                 followers: [],
                 following: [],
-                trips: [],
+                blocked: [],
                 createdAt: new Date()
             });
         }
         
+        // تحديث واجهة المستخدم
         updateUserUI();
+        
         return true;
     } catch (error) {
         console.error('Login error:', error);
         
+        // رسالة خطأ مخصصة
         let errorMessage = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') {
             errorMessage = 'تم إغلاق نافذة تسجيل الدخول';
@@ -97,6 +93,7 @@ function updateUserUI() {
         }, 500);
     }
     
+    // تحديث أزرار تسجيل الدخول
     const loginPrompt = document.querySelector('.login-prompt');
     if (loginPrompt) loginPrompt.remove();
 }
@@ -118,6 +115,7 @@ async function loadUserData(uid) {
         if (userDoc.exists) {
             const userData = userDoc.data();
             
+            // تحديث واجهة المستخدم
             const profileName = document.getElementById('profileName');
             const profileAvatarEmoji = document.getElementById('profileAvatarEmoji');
             const menuAvatarEmoji = document.getElementById('menuAvatarEmoji');
@@ -129,23 +127,31 @@ async function loadUserData(uid) {
             if (profileName) profileName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (menuName) menuName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (profileBio) profileBio.textContent = userData.bio || '';
+            
+            // تحديث المعرف (يظهر كأرقام فقط)
             if (shareableId) shareableId.textContent = userData.shareableId || '0000000000';
             
+            // تحديث الملصقات
             const avatarEmoji = getEmojiForUser(userData);
             
-            if (profileAvatarEmoji) profileAvatarEmoji.textContent = avatarEmoji;
-            if (menuAvatarEmoji) menuAvatarEmoji.textContent = avatarEmoji;
-            if (currentAvatarEmoji) currentAvatarEmoji.textContent = avatarEmoji;
+            if (profileAvatarEmoji) {
+                profileAvatarEmoji.textContent = avatarEmoji;
+            }
+            if (menuAvatarEmoji) {
+                menuAvatarEmoji.textContent = avatarEmoji;
+            }
+            if (currentAvatarEmoji) {
+                currentAvatarEmoji.textContent = avatarEmoji;
+            }
             
-            // تحديث العدادات بالتنسيق
+            // تحديث الإحصائيات
             const followersCount = document.getElementById('followersCount');
             const followingCount = document.getElementById('followingCount');
-            const tripsCount = document.getElementById('tripsCount');
             
-            if (followersCount) followersCount.textContent = formatNumber((userData.followers || []).length);
-            if (followingCount) followingCount.textContent = formatNumber((userData.following || []).length);
-            if (tripsCount) tripsCount.textContent = formatNumber((userData.trips || []).length);
+            if (followersCount) followersCount.textContent = (userData.followers || []).length;
+            if (followingCount) followingCount.textContent = (userData.following || []).length;
             
+            // تحميل قوائم المتابعين
             if (typeof loadFollowersList === 'function') {
                 loadFollowersList(uid, userData.followers || []);
                 loadFollowingList(uid, userData.following || []);
@@ -158,6 +164,7 @@ async function loadUserData(uid) {
 
 // إظهار رسالة تسجيل الدخول
 function showLoginPrompt() {
+    // التأكد من عدم وجود الرسالة مسبقاً
     if (document.querySelector('.login-prompt')) return;
     
     const loginPrompt = document.createElement('div');
@@ -194,6 +201,7 @@ if (typeof window.auth !== 'undefined') {
         const app = document.getElementById('app');
         
         if (user) {
+            // مستخدم مسجل
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
             
@@ -205,6 +213,7 @@ if (typeof window.auth !== 'undefined') {
                 }, 500);
             }
         } else {
+            // مستخدم غير مسجل - انتظر 2 ثانية ثم أظهر المحتوى
             console.log('User not logged in, showing content after delay');
             setTimeout(() => {
                 if (splash) {
@@ -212,6 +221,8 @@ if (typeof window.auth !== 'undefined') {
                     setTimeout(() => {
                         splash.style.display = 'none';
                         if (app) app.style.display = 'flex';
+                        
+                        // إظهار رسالة تسجيل الدخول للميزات المهمة
                         setTimeout(showLoginPrompt, 1000);
                     }, 500);
                 }
@@ -220,6 +231,7 @@ if (typeof window.auth !== 'undefined') {
     });
 } else {
     console.error('auth is not defined. Firebase may not be loaded yet.');
+    // محاولة إظهار رسالة تسجيل الدخول بعد فترة
     setTimeout(showLoginPrompt, 3000);
 }
 
@@ -236,7 +248,7 @@ function copyId() {
     });
 }
 
-// البحث عن صديق بالمعرف (أرقام فقط)
+// البحث عن صديق بالمعرف
 async function searchFriend() {
     const searchInput = document.getElementById('searchInput');
     const resultsDiv = document.getElementById('searchResults');
@@ -270,10 +282,6 @@ async function searchFriend() {
             return;
         }
         
-        // التحقق إذا كان المستخدم مُتابَعاً أم لا
-        const isFollowing = currentUser ? 
-            (await window.db.collection('users').doc(currentUser.uid).get()).data().following?.includes(userId) : false;
-        
         const avatarEmoji = getEmojiForUser(user);
         
         resultsDiv.innerHTML = `
@@ -282,14 +290,8 @@ async function searchFriend() {
                 <div class="search-result-info">
                     <h4>${user.name}</h4>
                     <p>${user.shareableId}</p>
-                    <small>متابعون: ${formatNumber(user.followers?.length || 0)}</small>
                 </div>
-                ${currentUser ? `
-                    <button class="btn ${isFollowing ? 'btn-outline' : 'btn-primary'}" 
-                            onclick="${isFollowing ? 'unfollowUser' : 'followUser'}('${userId}')">
-                        ${isFollowing ? 'إلغاء متابعة' : 'متابعة'}
-                    </button>
-                ` : ''}
+                ${currentUser ? '<button class="btn btn-primary" onclick="sendFriendRequest(\'' + userId + '\')">إضافة</button>' : ''}
             </div>
         `;
     } catch (error) {
@@ -298,66 +300,26 @@ async function searchFriend() {
     }
 }
 
-// متابعة مستخدم
-async function followUser(targetUserId) {
+// إرسال طلب صداقة
+async function sendFriendRequest(targetUserId) {
     if (!window.auth || !window.auth.currentUser) {
         alert('الرجاء تسجيل الدخول أولاً');
         return;
     }
     
-    const currentUserId = window.auth.currentUser.uid;
-    
     try {
-        // إضافة للمتابعين
-        await window.db.collection('users').doc(currentUserId).update({
-            following: firebase.firestore.FieldValue.arrayUnion(targetUserId)
+        await window.db.collection('friendRequests').add({
+            from: window.auth.currentUser.uid,
+            to: targetUserId,
+            status: 'pending',
+            timestamp: new Date()
         });
-        
-        await window.db.collection('users').doc(targetUserId).update({
-            followers: firebase.firestore.FieldValue.arrayUnion(currentUserId)
-        });
-        
-        // تحديث العدادات
-        const userDoc = await window.db.collection('users').doc(currentUserId).get();
-        document.getElementById('followingCount').textContent = formatNumber(userDoc.data().following?.length || 0);
         
         closeModal();
-        alert('تمت المتابعة بنجاح');
-        
+        alert('تم إرسال طلب الصداقة');
     } catch (error) {
-        console.error('Error following user:', error);
-        alert('حدث خطأ في المتابعة');
-    }
-}
-
-// إلغاء متابعة مستخدم
-async function unfollowUser(targetUserId) {
-    if (!window.auth || !window.auth.currentUser) {
-        alert('الرجاء تسجيل الدخول أولاً');
-        return;
-    }
-    
-    const currentUserId = window.auth.currentUser.uid;
-    
-    try {
-        await window.db.collection('users').doc(currentUserId).update({
-            following: firebase.firestore.FieldValue.arrayRemove(targetUserId)
-        });
-        
-        await window.db.collection('users').doc(targetUserId).update({
-            followers: firebase.firestore.FieldValue.arrayRemove(currentUserId)
-        });
-        
-        // تحديث العدادات
-        const userDoc = await window.db.collection('users').doc(currentUserId).get();
-        document.getElementById('followingCount').textContent = formatNumber(userDoc.data().following?.length || 0);
-        
-        closeModal();
-        alert('تم إلغاء المتابعة');
-        
-    } catch (error) {
-        console.error('Error unfollowing user:', error);
-        alert('حدث خطأ في إلغاء المتابعة');
+        console.error('Error sending request:', error);
+        alert('حدث خطأ في إرسال الطلب');
     }
 }
 
@@ -367,13 +329,12 @@ async function removeFollower(followerId) {
     
     try {
         await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            followers: firebase.firestore.FieldValue.arrayRemove(followerId)
+            followers: window.db.FieldValue.arrayRemove(followerId)
         });
         
+        // تحديث القائمة
         const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
-        document.getElementById('followersCount').textContent = formatNumber(userDoc.data().followers?.length || 0);
-        
-        if (typeof loadFollowersList === 'function') {
+        if (userDoc.exists) {
             loadFollowersList(window.auth.currentUser.uid, userDoc.data().followers || []);
         }
     } catch (error) {
@@ -381,7 +342,30 @@ async function removeFollower(followerId) {
     }
 }
 
-// باقي الدوال (loadFollowersList, loadFollowingList) كما هي...
+// إلغاء متابعة
+async function unfollow(followingId) {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    try {
+        await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+            following: window.db.FieldValue.arrayRemove(followingId)
+        });
+        
+        await window.db.collection('users').doc(followingId).update({
+            followers: window.db.FieldValue.arrayRemove(window.auth.currentUser.uid)
+        });
+        
+        // تحديث القائمة
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+        if (userDoc.exists) {
+            loadFollowingList(window.auth.currentUser.uid, userDoc.data().following || []);
+        }
+    } catch (error) {
+        console.error('Error unfollowing:', error);
+    }
+}
+
+// تحميل قائمة المتابعين
 async function loadFollowersList(currentUid, followers) {
     const followersList = document.getElementById('followersList');
     if (!followersList) return;
@@ -418,9 +402,12 @@ async function loadFollowersList(currentUid, followers) {
         }
     }
     followersList.innerHTML = html;
+    
+    // حفظ البيانات للصفحات الفرعية
     window.followersData = html;
 }
 
+// تحميل قائمة من يتابعهم
 async function loadFollowingList(currentUid, following) {
     const followingList = document.getElementById('followingList');
     if (!followingList) return;
@@ -457,5 +444,7 @@ async function loadFollowingList(currentUid, following) {
         }
     }
     followingList.innerHTML = html;
+    
+    // حفظ البيانات للصفحات الفرعية
     window.followingData = html;
 }
