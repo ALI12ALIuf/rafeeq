@@ -241,7 +241,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل الملف الشخصي - مطورة -->
+    <!-- نافذة تعديل الملف الشخصي - مصححة -->
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
@@ -249,7 +249,7 @@
             <div class="edit-field">
                 <label data-i18n="name">الاسم</label>
                 <div class="input-wrapper">
-                    <input type="text" id="editName" maxlength="25" placeholder="الاسم">
+                    <input type="text" id="editName" maxlength="25" placeholder="أدخل اسمك">
                     <span class="char-counter" id="charCounter">0/25</span>
                 </div>
             </div>
@@ -258,13 +258,13 @@
                 <label data-i18n="avatar">صورتك الرمزية</label>
                 <div class="current-avatar" id="currentAvatarEmoji">👤</div>
                 <button class="change-avatar-btn" onclick="openAvatarModal()">
-                    <span data-i18n="change_avatar">تغيير</span>
+                    <i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span>
                 </button>
             </div>
             
             <div class="modal-actions">
-                <button class="btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
-                <button class="btn-primary" onclick="saveProfile()" data-i18n="save">حفظ</button>
+                <button class="btn-cancel" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
+                <button class="btn-save" onclick="saveProfile()" data-i18n="save">حفظ</button>
             </div>
             
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
@@ -394,14 +394,33 @@
         const charCounter = document.getElementById('charCounter');
         
         if (nameInput && charCounter) {
-            nameInput.addEventListener('input', function() {
-                const length = this.value.length;
-                charCounter.textContent = length + '/25';
+            // تعيين القيمة الأولية
+            charCounter.textContent = '0/25';
+            
+            nameInput.addEventListener('input', function(e) {
+                let value = this.value;
                 
-                if (length >= 25) {
+                // التأكد من أن القيمة لا تتجاوز 25 حرف
+                if (value.length > 25) {
+                    this.value = value.slice(0, 25);
+                }
+                
+                // تحديث العداد
+                const currentLength = this.value.length;
+                charCounter.textContent = currentLength + '/25';
+                
+                // تغيير اللون عند الاقتراب من الحد الأقصى
+                if (currentLength >= 25) {
                     charCounter.classList.add('full');
                 } else {
                     charCounter.classList.remove('full');
+                }
+            });
+            
+            // منع إدخال أكثر من 25 حرف
+            nameInput.addEventListener('keydown', function(e) {
+                if (this.value.length >= 25 && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab') {
+                    e.preventDefault();
                 }
             });
         }
