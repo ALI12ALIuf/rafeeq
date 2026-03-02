@@ -233,6 +233,11 @@
                 <h3 id="menuName"></h3>
             </div>
             <div class="menu-items">
+                <!-- زر تسجيل الدخول (يظهر فقط للمستخدم غير المسجل) -->
+                <a href="#" id="loginMenuItem" style="display: none;" onclick="signInWithGoogle()">
+                    <i class="fas fa-sign-in-alt"></i> <span data-i18n="login">تسجيل الدخول</span>
+                </a>
+                
                 <a href="#" data-page="home"><i class="fas fa-home"></i> <span data-i18n="home">الرئيسية</span></a>
                 <a href="#" data-page="profile"><i class="fas fa-user"></i> <span data-i18n="profile">الملف الشخصي</span></a>
                 <a href="#" data-page="chat"><i class="fas fa-comment"></i> <span data-i18n="chat">الدردشة</span></a>
