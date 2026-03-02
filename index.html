@@ -93,27 +93,23 @@
                 </div>
             </div>
 
-            <!-- صفحة الملف الشخصي - معدلة -->
+            <!-- صفحة الملف الشخصي -->
             <div class="page profile-page">
                 <div class="profile-header">
-                    <!-- المنطقة الزرقاء مع الأيقونة في المنتصف -->
                     <div class="profile-cover">
                         <div class="profile-avatar-center">
                             <div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div>
                         </div>
-                        <!-- زر القلم في الزاوية اليسرى -->
                         <button class="edit-profile-btn-left" onclick="openEditProfileModal()">
                             <i class="fas fa-pen"></i>
                         </button>
                     </div>
                     
-                    <!-- حاوية الاسم والمعرف -->
                     <div class="profile-info-container">
                         <div class="profile-name-wrapper">
                             <h2 id="profileName"></h2>
                         </div>
                         
-                        <!-- صف المعرف - الترتيب الجديد: النسخ على اليسار، الأرقام في المنتصف، ID على اليمين -->
                         <div class="profile-id-row">
                             <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
                             <span id="shareableId" class="id-value-numbers"></span>
@@ -142,7 +138,6 @@
 
             <!-- الصفحات الفرعية -->
             <div class="profile-pages">
-                <!-- صفحة الرحلات -->
                 <div class="profile-subpage" id="tripsPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
@@ -157,7 +152,6 @@
                     </div>
                 </div>
                 
-                <!-- صفحة المتابعين -->
                 <div class="profile-subpage" id="followersPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
@@ -172,7 +166,6 @@
                     </div>
                 </div>
                 
-                <!-- صفحة من يتابعهم -->
                 <div class="profile-subpage" id="followingPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
@@ -213,7 +206,6 @@
             </div>
         </main>
 
-        <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-page="home">
                 <i class="fas fa-home"></i>
@@ -233,7 +225,6 @@
             </button>
         </nav>
 
-        <!-- قائمة جانبية -->
         <div class="side-menu" id="sideMenu">
             <div class="menu-header">
                 <div class="menu-avatar-emoji" id="menuAvatarEmoji">👤</div>
@@ -250,25 +241,30 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل الملف الشخصي -->
+    <!-- نافذة تعديل الملف الشخصي - مطورة -->
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
             
             <div class="edit-field">
                 <label data-i18n="name">الاسم</label>
-                <input type="text" id="editName" maxlength="25" placeholder="الاسم (25 حرف كحد أقصى)">
+                <div class="input-wrapper">
+                    <input type="text" id="editName" maxlength="25" placeholder="الاسم">
+                    <span class="char-counter" id="charCounter">0/25</span>
+                </div>
             </div>
             
             <div class="edit-field">
                 <label data-i18n="avatar">صورتك الرمزية</label>
                 <div class="current-avatar" id="currentAvatarEmoji">👤</div>
-                <button class="btn btn-outline" onclick="openAvatarModal()" data-i18n="change_avatar">تغيير</button>
+                <button class="change-avatar-btn" onclick="openAvatarModal()">
+                    <span data-i18n="change_avatar">تغيير</span>
+                </button>
             </div>
             
             <div class="modal-actions">
-                <button class="btn btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
-                <button class="btn btn-primary" onclick="saveProfile()" data-i18n="save">حفظ</button>
+                <button class="btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
+                <button class="btn-primary" onclick="saveProfile()" data-i18n="save">حفظ</button>
             </div>
             
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
@@ -348,13 +344,13 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (Compatibility Mode) -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
 
     <script>
-        // Your web app's Firebase configuration
+        // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyApCsnS6CjnzfMPjNsvidLiuX0ZlJ11szU",
             authDomain: "rafeeq-9959a.firebaseapp.com",
@@ -364,15 +360,13 @@
             appId: "1:348154736690:web:c2ebd6c4fb88e3594f8c2b"
         };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         
-        // Make auth and db available globally
         window.auth = firebase.auth();
         window.db = firebase.firestore();
         window.googleProvider = new firebase.auth.GoogleAuthProvider();
         
-        console.log('Firebase initialized successfully (compat mode)');
+        console.log('Firebase initialized successfully');
     </script>
     
     <!-- ملفات JavaScript -->
@@ -394,6 +388,23 @@
                 }, 500);
             }
         }, 3000);
+        
+        // إعداد عداد الأحرف
+        const nameInput = document.getElementById('editName');
+        const charCounter = document.getElementById('charCounter');
+        
+        if (nameInput && charCounter) {
+            nameInput.addEventListener('input', function() {
+                const length = this.value.length;
+                charCounter.textContent = length + '/25';
+                
+                if (length >= 25) {
+                    charCounter.classList.add('full');
+                } else {
+                    charCounter.classList.remove('full');
+                }
+            });
+        }
     });
     
     window.onerror = function(msg, url, line) {
