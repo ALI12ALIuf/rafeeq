@@ -566,7 +566,7 @@ body {
     margin: 0;
 }
 
-/* صف المعرف مع الخلفية - الترتيب الجديد */
+/* صف المعرف */
 .profile-id-row {
     display: flex;
     align-items: center;
@@ -580,7 +580,6 @@ body {
     min-width: 250px;
 }
 
-/* زر النسخ على اليسار */
 .copy-btn-left {
     background: none;
     border: none;
@@ -597,7 +596,6 @@ body {
     color: var(--primary-dark);
 }
 
-/* الأرقام في المنتصف */
 .id-value-numbers {
     font-family: monospace;
     font-size: 1.1rem;
@@ -610,7 +608,6 @@ body {
     text-align: center;
 }
 
-/* كلمة ID على اليمين - بنفس لون النسخ */
 .id-label-english {
     color: var(--primary);
     font-size: 0.9rem;
@@ -625,7 +622,6 @@ body {
     text-align: center;
 }
 
-/* إحصائيات */
 .profile-stats {
     display: flex;
     justify-content: space-around;
@@ -670,7 +666,7 @@ body {
     display: none;
 }
 
-/* باقي الأنماط كما هي */
+/* الصفحات الفرعية */
 .profile-subpage {
     position: fixed;
     top: 0;
@@ -836,6 +832,7 @@ body {
     color: white;
 }
 
+/* النوافذ المنبثقة */
 .modal {
     position: fixed;
     top: 0;
@@ -871,10 +868,13 @@ body {
 .modal-content h3 {
     margin-bottom: 1.5rem;
     color: var(--primary);
+    text-align: center;
 }
 
+/* نافذة تعديل الملف الشخصي - تنسيق جديد */
 .edit-field {
     margin-bottom: 1.5rem;
+    text-align: center;
 }
 
 .edit-field label {
@@ -882,16 +882,27 @@ body {
     margin-bottom: 0.5rem;
     color: var(--text-light);
     font-size: 0.9rem;
+    text-align: center;
+}
+
+/* حقل الإدخال مع عداد الأحرف */
+.input-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
 }
 
 .edit-field input {
     width: 100%;
     padding: 0.75rem;
+    padding-right: 50px; /* مساحة للعداد */
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--light);
     color: var(--text);
     font-size: 1rem;
+    text-align: center;
 }
 
 .edit-field input:focus {
@@ -899,28 +910,107 @@ body {
     border-color: var(--primary);
 }
 
+/* عداد الأحرف */
+.char-counter {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-weight: 500;
+    direction: ltr;
+}
+
+.char-counter.full {
+    color: var(--danger);
+    font-weight: bold;
+}
+
+/* الأفاتار */
 .current-avatar {
-    width: 60px;
-    height: 60px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     background: var(--light);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 3rem;
-    margin-bottom: 0.5rem;
+    font-size: 4rem;
+    margin: 0 auto 1rem;
 }
 
+/* زر تغيير الأفاتار */
+.change-avatar-btn {
+    display: inline-block;
+    margin: 0 auto;
+    padding: 0.5rem 1rem;
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.change-avatar-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+/* أزرار الحفظ والإلغاء */
 .modal-actions {
     display: flex;
     gap: 1rem;
     margin-top: 1.5rem;
+    justify-content: center;
 }
 
 .modal-actions .btn {
     flex: 1;
+    max-width: 120px;
+    padding: 0.75rem;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
 }
 
+.btn-outline {
+    background: transparent;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+}
+
+.btn-outline:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.close-modal {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: none;
+    border: none;
+    color: var(--text-light);
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+/* باقي الأنماط */
 .avatar-options {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -985,17 +1075,6 @@ body {
 
 .language-option .flag {
     font-size: 1.5rem;
-}
-
-.close-modal {
-    position: absolute;
-    top: 1rem;
-    left: 1rem;
-    background: none;
-    border: none;
-    color: var(--text-light);
-    font-size: 1.2rem;
-    cursor: pointer;
 }
 
 .search-input {
@@ -1202,6 +1281,10 @@ input:checked + .slider:before {
     .profile-id-row {
         width: 100%;
         min-width: auto;
+    }
+    
+    .edit-field input {
+        max-width: 100%;
     }
 }
 
