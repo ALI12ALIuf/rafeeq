@@ -6,9 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModals();
     loadStories();
     loadChats();
-    
-    // إعداد البحث الفوري
-    setupInstantSearch();
 });
 
 // التأكد من ظهور صفحة واحدة فقط
@@ -44,12 +41,14 @@ function setupNavigation() {
             targetPage.style.display = 'block';
         }
         
+        // إخفاء الصفحات الأخرى
         pages.forEach(page => {
             if (!page.classList.contains('active')) {
                 page.style.display = 'none';
             }
         });
         
+        // إخفاء الصفحات الفرعية
         document.querySelectorAll('.profile-subpage').forEach(sp => {
             sp.style.display = 'none';
         });
@@ -109,11 +108,6 @@ function setupModals() {
     
     window.openSearchModal = () => {
         document.getElementById('searchModal')?.classList.add('active');
-        // تفريغ نتائج البحث السابقة عند الفتح
-        const resultsDiv = document.getElementById('searchResults');
-        if (resultsDiv) resultsDiv.innerHTML = '';
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) searchInput.value = '';
     };
     
     window.closeModal = () => {
@@ -137,172 +131,6 @@ function setupModals() {
         }
     });
 }
-
-// إعداد البحث الفوري (بدون زر) - كود مستقل تماماً
-function setupInstantSearch() {
-    const searchInput = document.getElementById('searchInput');
-    const resultsDiv = document.getElementById('searchResults');
-    
-    if (!searchInput) {
-        console.error('❌ لم يتم العثور على حقل البحث');
-        return;
-    }
-    
-    console.log('✅ تم العثور على حقل البحث');
-    
-    searchInput.addEventListener('input', function(e) {
-        // تنظيف الإدخال (أرقام فقط)
-        let value = this.value.replace(/[^0-9]/g, '');
-        this.value = value;
-        
-        console.log('🔍 جاري البحث عن:', value);
-        
-        if (!resultsDiv) return;
-        
-        // مسح النتائج إذا كان الحقل فارغاً
-        if (value.length === 0) {
-            resultsDiv.innerHTML = '';
-            return;
-        }
-        
-        // التحقق من الطول
-        if (value.length !== 10) {
-            resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #666;">
-                ⏳ يجب إدخال 10 أرقام (${value.length}/10)
-            </div>`;
-            return;
-        }
-        
-        // عرض رسالة جاري البحث
-        resultsDiv.innerHTML = `<div class="loading" style="text-align: center; padding: 20px;">
-            <i class="fas fa-spinner fa-spin"></i> جاري البحث...
-        </div>`;
-        
-        // تنفيذ البحث مباشرة
-        performSearch(value);
-    });
-    
-    // السماح بالأرقام فقط عند الكتابة
-    searchInput.addEventListener('keypress', function(e) {
-        const char = String.fromCharCode(e.which);
-        if (!/[0-9]/.test(char)) {
-            e.preventDefault();
-        }
-    });
-    
-    // منع اللصق غير الرقمي
-    searchInput.addEventListener('paste', function(e) {
-        e.preventDefault();
-        const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-        const numbersOnly = pastedText.replace(/[^0-9]/g, '').slice(0, 10);
-        if (numbersOnly) {
-            this.value = numbersOnly;
-            if (numbersOnly.length === 10) {
-                performSearch(numbersOnly);
-            } else {
-                if (resultsDiv) {
-                    resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #666;">
-                        ⏳ يجب إدخال 10 أرقام (${numbersOnly.length}/10)
-                    </div>`;
-                }
-            }
-        }
-    });
-}
-
-// دالة البحث المباشرة
-async function performSearch(searchId) {
-    const resultsDiv = document.getElementById('searchResults');
-    if (!resultsDiv) return;
-    
-    try {
-        // التحقق من وجود db
-        if (!window.db) {
-            resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #f44336;">
-                ❌ Firebase غير متصل
-            </div>`;
-            return;
-        }
-        
-        // البحث في Firestore
-        const snapshot = await window.db.collection('users')
-            .where('shareableId', '==', searchId)
-            .get();
-        
-        if (snapshot.empty) {
-            resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px;">
-                😕 لا يوجد مستخدم بهذا المعرف
-            </div>`;
-            return;
-        }
-        
-        const user = snapshot.docs[0].data();
-        const userId = snapshot.docs[0].id;
-        const currentUser = window.auth ? window.auth.currentUser : null;
-        
-        // التحقق مما إذا كان المعرف خاص بالمستخدم الحالي
-        if (currentUser && userId === currentUser.uid) {
-            resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px;">
-                👤 هذا معرفك أنت
-            </div>`;
-            return;
-        }
-        
-        // تحديد الملصق المناسب
-        const emojiMap = {
-            'male': '👨',
-            'female': '👩',
-            'boy': '🧒',
-            'girl': '👧',
-            'father': '👨‍🦳',
-            'mother': '👩‍🦳',
-            'grandfather': '👴',
-            'grandmother': '👵'
-        };
-        const avatarEmoji = emojiMap[user.avatarType] || '👤';
-        
-        // عرض النتيجة
-        resultsDiv.innerHTML = `
-            <div class="search-result-item">
-                <div class="search-result-avatar-emoji">${avatarEmoji}</div>
-                <div class="search-result-info">
-                    <h4>${user.name}</h4>
-                    <p>${user.shareableId}</p>
-                </div>
-                ${currentUser ? '<button class="btn btn-primary" onclick="addFriend(\'' + userId + '\')">➕ إضافة</button>' : ''}
-            </div>
-        `;
-        
-    } catch (error) {
-        console.error('Search error:', error);
-        resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #f44336;">
-            ⚠️ حدث خطأ في البحث: ${error.message}
-        </div>`;
-    }
-}
-
-// دالة إضافة صديق
-window.addFriend = async function(userId) {
-    if (!window.auth || !window.auth.currentUser) {
-        alert('الرجاء تسجيل الدخول أولاً');
-        return;
-    }
-    
-    try {
-        await window.db.collection('friendRequests').add({
-            from: window.auth.currentUser.uid,
-            to: userId,
-            status: 'pending',
-            timestamp: new Date()
-        });
-        
-        closeModal();
-        alert('✅ تم إرسال طلب الصداقة');
-    } catch (error) {
-        console.error('Error sending request:', error);
-        alert('❌ حدث خطأ في إرسال الطلب');
-    }
-};
 
 function loadStories() {
     const container = document.getElementById('storiesContainer');
@@ -329,18 +157,21 @@ function loadChats() {
 
 // فتح نافذة تعديل الملف الشخصي
 window.openEditProfileModal = function() {
+    // تعبئة البيانات الحالية
     const currentName = document.getElementById('profileName').textContent;
     const currentNameInput = document.getElementById('editName');
     if (currentNameInput) {
         currentNameInput.value = currentName;
     }
     
+    // تحديث الملصق الحالي
     const currentEmoji = document.getElementById('profileAvatarEmoji').textContent;
     const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
     if (currentAvatarEmoji) {
         currentAvatarEmoji.textContent = currentEmoji;
     }
     
+    // فتح النافذة
     document.getElementById('editProfileModal').classList.add('active');
 };
 
@@ -358,10 +189,12 @@ window.saveProfile = function() {
         return;
     }
     
+    // حفظ في Firebase
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
             name: newName
         }).then(() => {
+            // تحديث واجهة المستخدم
             document.getElementById('profileName').textContent = newName;
             document.getElementById('menuName').textContent = newName;
             
@@ -378,6 +211,8 @@ window.saveProfile = function() {
 window.showUserTrips = function() {
     document.querySelector('.profile-page').style.display = 'none';
     document.getElementById('tripsPage').style.display = 'block';
+    
+    // هنا تجيب بيانات الرحلات من Firebase
 };
 
 window.showUserFollowers = function() {
@@ -417,13 +252,16 @@ window.showUserFollowing = function() {
 };
 
 window.goBack = function() {
+    // إخفاء جميع الصفحات الفرعية
     document.querySelectorAll('.profile-subpage').forEach(page => {
         page.style.display = 'none';
     });
     
+    // إظهار صفحة الملف الشخصي الرئيسية
     document.querySelector('.profile-page').style.display = 'block';
     document.querySelector('.profile-page').classList.add('active');
     
+    // التأكد من أن باقي الصفحات الرئيسية مخفية
     document.querySelectorAll('.page').forEach(page => {
         if (!page.classList.contains('profile-page')) {
             page.style.display = 'none';
@@ -447,16 +285,19 @@ window.selectAvatar = function(type) {
     
     const selectedEmoji = emojiMap[type] || '👤';
     
+    // تحديث الملصق في الملف الشخصي
     const profileAvatar = document.getElementById('profileAvatarEmoji');
     if (profileAvatar) {
         profileAvatar.textContent = selectedEmoji;
     }
     
+    // تحديث الملصق في نافذة التعديل
     const currentAvatar = document.getElementById('currentAvatarEmoji');
     if (currentAvatar) {
         currentAvatar.textContent = selectedEmoji;
     }
     
+    // حفظ الاختيار في Firebase
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
             avatarType: type
