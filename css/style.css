@@ -492,7 +492,7 @@ body {
 }
 
 .profile-cover {
-    height: 150px; /* زيادة الارتفاع */
+    height: 150px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     position: relative;
     display: flex;
@@ -515,7 +515,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 5rem; /* حجم أكبر */
+    font-size: 5rem;
     border: 4px solid white;
     box-shadow: var(--shadow);
     overflow: hidden;
@@ -553,16 +553,14 @@ body {
     padding: 1rem;
     margin-top: 10px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 1rem;
-    flex-wrap: wrap;
 }
 
 .profile-name-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 1;
+    text-align: center;
+    width: 100%;
 }
 
 .profile-name-wrapper h2 {
@@ -571,45 +569,53 @@ body {
     margin: 0;
 }
 
-/* صف المعرف مع زر النسخ */
+/* صف المعرف الجديد - التنسيق المطلوب */
 .profile-id-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
-    background: var(--light);
     padding: 0.5rem 1rem;
     border-radius: 25px;
     width: fit-content;
     max-width: 100%;
+    min-width: 250px;
 }
 
-.id-label-small {
+/* كلمة ID على اليسار */
+.id-label-english {
     color: var(--text-light);
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    order: 0; /* في أقصى اليسار */
 }
 
-.id-value-small {
+/* الأرقام في المنتصف */
+.id-value-numbers {
     font-family: monospace;
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 500;
     color: var(--primary);
     direction: ltr;
+    letter-spacing: 1px;
+    order: 1;
+    flex: 1;
+    text-align: center;
 }
 
-.copy-btn-small {
+/* زر النسخ على اليمين (بدون خلفية) */
+.copy-btn-left {
     background: none;
     border: none;
     color: var(--primary);
     cursor: pointer;
-    font-size: 1rem;
-    padding: 0 0.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s;
+    font-size: 1.1rem;
+    padding: 0 5px;
+    transition: transform 0.3s;
+    order: 2; /* في أقصى اليمين */
 }
 
-.copy-btn-small:hover {
+.copy-btn-left:hover {
     transform: scale(1.1);
     color: var(--primary-dark);
 }
@@ -618,7 +624,7 @@ body {
     padding: 0 1rem 1rem;
     color: var(--text-light);
     font-size: 0.9rem;
-    text-align: right;
+    text-align: center;
 }
 
 /* إحصائيات قابلة للضغط */
@@ -1203,11 +1209,12 @@ input:checked + .slider:before {
     
     .profile-info-container {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: center;
     }
     
     .profile-id-row {
         width: 100%;
+        min-width: auto;
     }
 }
 
