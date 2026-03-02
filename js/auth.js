@@ -3,6 +3,35 @@ function generateShareableId() {
     return Math.random().toString(36).substring(2, 12).toUpperCase();
 }
 
+// دالة لتوليد لون ثابت من الاسم
+function getColorFromName(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = ['#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0', '#3F51B5', '#009688', '#FF5722'];
+    return colors[Math.abs(hash) % colors.length];
+}
+
+// دالة لتحديد الأيقونة المناسبة
+function getAvatarForUser(userData) {
+    const defaultIcon = 'fas fa-user-circle';
+    if (userData.avatarType) {
+        const iconMap = {
+            'male': 'fas fa-user',
+            'female': 'fas fa-user',
+            'boy': 'fas fa-child',
+            'girl': 'fas fa-child',
+            'father': 'fas fa-user-tie',
+            'mother': 'fas fa-user',
+            'grandfather': 'fas fa-user',
+            'grandmother': 'fas fa-user'
+        };
+        return iconMap[userData.avatarType] || defaultIcon;
+    }
+    return defaultIcon;
+}
+
 // تسجيل الدخول بجوجل
 async function signInWithGoogle() {
     try {
@@ -20,9 +49,10 @@ async function signInWithGoogle() {
                 uid: user.uid,
                 name: user.displayName || 'مستخدم',
                 email: user.email || '',
-                photoUrl: user.photoURL || '',
                 shareableId: shareableId,
                 bio: '',
+                avatarType: 'male', // أيقونة افتراضية
+                avatarColor: getColorFromName(user.displayName || 'مستخدم'),
                 followers: [],
                 following: [],
                 blocked: [],
@@ -78,18 +108,27 @@ async function loadUserData(uid) {
             
             // تحديث واجهة المستخدم
             const profileName = document.getElementById('profileName');
-            const profileAvatar = document.getElementById('profileAvatar');
-            const menuAvatar = document.getElementById('menuAvatar');
+            const profileAvatarIcon = document.getElementById('profileAvatarIcon');
+            const menuAvatarIcon = document.getElementById('menuAvatarIcon');
             const menuName = document.getElementById('menuName');
             const profileBio = document.getElementById('profileBio');
             const shareableId = document.getElementById('shareableId');
             
-            if (profileName) profileName.textContent = userData.name || 'مستخدم';
-            if (profileAvatar) profileAvatar.src = userData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userData.name || 'User');
-            if (menuAvatar) menuAvatar.src = userData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userData.name || 'User');
-            if (menuName) menuName.textContent = userData.name || 'مستخدم';
+            if (profileName) profileName.textContent = (userData.name || 'مستخدم').substring(0, 25);
+            if (menuName) menuName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (profileBio) profileBio.textContent = userData.bio || '';
             if (shareableId) shareableId.textContent = userData.shareableId || '---';
+            
+            // تحديث الأيقونات
+            const avatarIcon = getAvatarForUser(userData);
+            const avatarColor = userData.avatarColor || '#2196F3';
+            
+            if (profileAvatarIcon) {
+                profileAvatarIcon.innerHTML = `<i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 5rem;"></i>`;
+            }
+            if (menuAvatarIcon) {
+                menuAvatarIcon.innerHTML = `<i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 2.5rem;"></i>`;
+            }
             
             // تحديث الإحصائيات
             const followersCount = document.getElementById('followersCount');
@@ -223,9 +262,14 @@ async function searchFriend() {
             return;
         }
         
+        const avatarIcon = getAvatarForUser(user);
+        const avatarColor = user.avatarColor || '#2196F3';
+        
         resultsDiv.innerHTML = `
             <div class="search-result-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border-bottom: 1px solid var(--border);">
-                <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                <div class="user-avatar-icon" style="width: 50px; height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center;">
+                    <i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 2rem;"></i>
+                </div>
                 <div style="flex: 1;">
                     <h4 style="margin-bottom: 5px;">${user.name}</h4>
                     <p style="color: var(--text-light);">${user.shareableId}</p>
@@ -320,9 +364,14 @@ async function loadFollowersList(currentUid, followers) {
             const userDoc = await db.collection('users').doc(followerId).get();
             if (userDoc.exists) {
                 const user = userDoc.data();
+                const avatarIcon = getAvatarForUser(user);
+                const avatarColor = user.avatarColor || '#2196F3';
+                
                 html += `
                     <div class="user-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: 12px; margin-bottom: 10px;">
-                        <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                        <div class="user-avatar-icon" style="width: 50px; height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center;">
+                            <i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 2rem;"></i>
+                        </div>
                         <div style="flex: 1;">
                             <h4 style="margin-bottom: 5px;">${user.name}</h4>
                             <p style="color: var(--text-light);">${user.shareableId || ''}</p>
@@ -360,9 +409,14 @@ async function loadFollowingList(currentUid, following) {
             const userDoc = await db.collection('users').doc(followingId).get();
             if (userDoc.exists) {
                 const user = userDoc.data();
+                const avatarIcon = getAvatarForUser(user);
+                const avatarColor = user.avatarColor || '#2196F3';
+                
                 html += `
                     <div class="user-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: 12px; margin-bottom: 10px;">
-                        <img src="${user.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                        <div class="user-avatar-icon" style="width: 50px; height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center;">
+                            <i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 2rem;"></i>
+                        </div>
                         <div style="flex: 1;">
                             <h4 style="margin-bottom: 5px;">${user.name}</h4>
                             <p style="color: var(--text-light);">${user.shareableId || ''}</p>
