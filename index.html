@@ -93,27 +93,23 @@
                 </div>
             </div>
 
-            <!-- صفحة الملف الشخصي - معدلة -->
+            <!-- صفحة الملف الشخصي -->
             <div class="page profile-page">
                 <div class="profile-header">
-                    <!-- المنطقة الزرقاء مع الأيقونة في المنتصف -->
                     <div class="profile-cover">
                         <div class="profile-avatar-center">
                             <div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div>
                         </div>
-                        <!-- زر القلم في الزاوية اليسرى -->
                         <button class="edit-profile-btn-left" onclick="openEditProfileModal()">
                             <i class="fas fa-pen"></i>
                         </button>
                     </div>
                     
-                    <!-- حاوية الاسم والمعرف -->
                     <div class="profile-info-container">
                         <div class="profile-name-wrapper">
                             <h2 id="profileName"></h2>
                         </div>
                         
-                        <!-- المعرف تحت الاسم مع زر نسخ في اليسار -->
                         <div class="profile-id-row">
                             <span class="id-label-small" data-i18n="your_id">معرفك</span>
                             <span id="shareableId" class="id-value-small"></span>
@@ -142,7 +138,6 @@
 
             <!-- الصفحات الفرعية -->
             <div class="profile-pages">
-                <!-- صفحة الرحلات -->
                 <div class="profile-subpage" id="tripsPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
@@ -157,7 +152,6 @@
                     </div>
                 </div>
                 
-                <!-- صفحة المتابعين -->
                 <div class="profile-subpage" id="followersPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
@@ -172,7 +166,6 @@
                     </div>
                 </div>
                 
-                <!-- صفحة من يتابعهم -->
                 <div class="profile-subpage" id="followingPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
@@ -254,23 +247,19 @@
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
-            
             <div class="edit-field">
                 <label data-i18n="name">الاسم</label>
                 <input type="text" id="editName" maxlength="25" placeholder="الاسم (25 حرف كحد أقصى)">
             </div>
-            
             <div class="edit-field">
                 <label data-i18n="avatar">صورتك الرمزية</label>
                 <div class="current-avatar" id="currentAvatarEmoji">👤</div>
                 <button class="btn btn-outline" onclick="openAvatarModal()" data-i18n="change_avatar">تغيير</button>
             </div>
-            
             <div class="modal-actions">
                 <button class="btn btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
                 <button class="btn btn-primary" onclick="saveProfile()" data-i18n="save">حفظ</button>
             </div>
-            
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
@@ -280,38 +269,14 @@
         <div class="modal-content">
             <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
             <div class="avatar-options">
-                <button class="avatar-option" onclick="selectAvatar('male')">
-                    <span>👨</span>
-                    <span data-i18n="male">رجل</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('female')">
-                    <span>👩</span>
-                    <span data-i18n="female">امرأة</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('boy')">
-                    <span>🧒</span>
-                    <span data-i18n="boy">ولد</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('girl')">
-                    <span>👧</span>
-                    <span data-i18n="girl">بنت</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('father')">
-                    <span>👨‍🦳</span>
-                    <span data-i18n="father">أب</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('mother')">
-                    <span>👩‍🦳</span>
-                    <span data-i18n="mother">أم</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('grandfather')">
-                    <span>👴</span>
-                    <span data-i18n="grandfather">جد</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('grandmother')">
-                    <span>👵</span>
-                    <span data-i18n="grandmother">جدة</span>
-                </button>
+                <button class="avatar-option" onclick="selectAvatar('male')"><span>👨</span><span>رجل</span></button>
+                <button class="avatar-option" onclick="selectAvatar('female')"><span>👩</span><span>امرأة</span></button>
+                <button class="avatar-option" onclick="selectAvatar('boy')"><span>🧒</span><span>ولد</span></button>
+                <button class="avatar-option" onclick="selectAvatar('girl')"><span>👧</span><span>بنت</span></button>
+                <button class="avatar-option" onclick="selectAvatar('father')"><span>👨‍🦳</span><span>أب</span></button>
+                <button class="avatar-option" onclick="selectAvatar('mother')"><span>👩‍🦳</span><span>أم</span></button>
+                <button class="avatar-option" onclick="selectAvatar('grandfather')"><span>👴</span><span>جد</span></button>
+                <button class="avatar-option" onclick="selectAvatar('grandmother')"><span>👵</span><span>جدة</span></button>
             </div>
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
@@ -348,14 +313,13 @@
         </div>
     </div>
 
-    <!-- Firebase SDK - النسخة المحدثة -->
-    <script type="module">
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
-        import { getStorage } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-storage.js";
+    <!-- Firebase SDK - الطريقة العادية -->
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-storage.js"></script>
 
+    <script>
         // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyApCsnS6CjnzfMPjNsvidLiuX0ZlJ11szU",
@@ -367,20 +331,17 @@
         };
 
         // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
+        firebase.initializeApp(firebaseConfig);
         
-        // Make auth and db available globally (for your other scripts)
-        window.auth = auth;
-        window.db = db;
-        window.storage = storage;
+        // Make auth and db available globally
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
         
         console.log('Firebase initialized successfully');
     </script>
     
-    <!-- ملفات JavaScript (تأكد من أنها تأتي بعد Firebase) -->
+    <!-- ملفات JavaScript -->
     <script src="js/i18n.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/auth.js"></script>
