@@ -113,11 +113,11 @@
                             <h2 id="profileName"></h2>
                         </div>
                         
-                        <!-- المعرف تحت الاسم مع زر نسخ في اليسار -->
+                        <!-- صف المعرف الجديد: ID على اليمين، الأرقام في المنتصف، النسخ على اليسار -->
                         <div class="profile-id-row">
-                            <span class="id-label-small" data-i18n="your_id">معرفك</span>
-                            <span id="shareableId" class="id-value-small"></span>
-                            <button class="copy-btn-small" onclick="copyId()"><i class="far fa-copy"></i></button>
+                            <span class="id-label-english">ID</span>
+                            <span id="shareableId" class="id-value-numbers"></span>
+                            <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
                         </div>
                     </div>
                     
@@ -348,7 +348,7 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (Compatibility Mode) - الحل النهائي -->
+    <!-- Firebase SDK (Compatibility Mode) -->
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
