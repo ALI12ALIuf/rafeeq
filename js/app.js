@@ -137,15 +137,17 @@ function loadStories() {
     if (!container) return;
     
     const stories = [
-        { name: 'قصتك', avatar: 'https://ui-avatars.com/api/?name=You&background=2196F3&color=fff' },
-        { name: 'محمد', avatar: 'https://ui-avatars.com/api/?name=محمد&background=4CAF50&color=fff' },
-        { name: 'أحمد', avatar: 'https://ui-avatars.com/api/?name=أحمد&background=FF9800&color=fff' },
-        { name: 'سارة', avatar: 'https://ui-avatars.com/api/?name=سارة&background=E91E63&color=fff' },
+        { name: 'قصتك', avatar: 'fas fa-user-circle' },
+        { name: 'محمد', avatar: 'fas fa-user' },
+        { name: 'أحمد', avatar: 'fas fa-user-tie' },
+        { name: 'سارة', avatar: 'fas fa-user' },
     ];
     
     container.innerHTML = stories.map(story => `
         <div class="story-item">
-            <img src="${story.avatar}" class="story-avatar">
+            <div class="story-avatar-icon">
+                <i class="${story.avatar}"></i>
+            </div>
             <span class="story-name">${story.name}</span>
         </div>
     `).join('');
@@ -216,6 +218,52 @@ window.goBack = function() {
             page.classList.remove('active');
         }
     });
+};
+
+// دالة اختيار الأيقونة
+window.selectAvatar = function(type, element) {
+    const iconMap = {
+        'male': 'fas fa-user',
+        'female': 'fas fa-user',
+        'boy': 'fas fa-child',
+        'girl': 'fas fa-child',
+        'father': 'fas fa-user-tie',
+        'mother': 'fas fa-user',
+        'grandfather': 'fas fa-user',
+        'grandmother': 'fas fa-user'
+    };
+    
+    const colorMap = {
+        'male': '#2196F3',
+        'female': '#E91E63',
+        'boy': '#4CAF50',
+        'girl': '#FF9800',
+        'father': '#3F51B5',
+        'mother': '#9C27B0',
+        'grandfather': '#795548',
+        'grandmother': '#FF5722'
+    };
+    
+    const icon = document.getElementById('profileAvatarIcon');
+    if (icon) {
+        icon.innerHTML = `<i class="${iconMap[type]}" style="color: ${colorMap[type]}; font-size: 5rem;"></i>`;
+    }
+    
+    // حفظ الاختيار في Firebase (اختياري)
+    if (auth && auth.currentUser) {
+        db.collection('users').doc(auth.currentUser.uid).update({
+            avatarType: type,
+            avatarColor: colorMap[type]
+        });
+    }
+    
+    closeModal();
+};
+
+// فتح نافذة اختيار الأيقونة
+window.openAvatarModal = function() {
+    const modal = document.getElementById('avatarModal');
+    if (modal) modal.classList.add('active');
 };
 
 document.addEventListener('languageChanged', function() {
