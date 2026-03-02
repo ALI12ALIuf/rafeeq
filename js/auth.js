@@ -3,33 +3,19 @@ function generateShareableId() {
     return Math.random().toString(36).substring(2, 12).toUpperCase();
 }
 
-// دالة لتوليد لون ثابت من الاسم
-function getColorFromName(name) {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const colors = ['#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0', '#3F51B5', '#009688', '#FF5722'];
-    return colors[Math.abs(hash) % colors.length];
-}
-
-// دالة لتحديد الأيقونة المناسبة
-function getAvatarForUser(userData) {
-    const defaultIcon = 'fas fa-user-circle';
-    if (userData.avatarType) {
-        const iconMap = {
-            'male': 'fas fa-user',
-            'female': 'fas fa-user',
-            'boy': 'fas fa-child',
-            'girl': 'fas fa-child',
-            'father': 'fas fa-user-tie',
-            'mother': 'fas fa-user',
-            'grandfather': 'fas fa-user',
-            'grandmother': 'fas fa-user'
-        };
-        return iconMap[userData.avatarType] || defaultIcon;
-    }
-    return defaultIcon;
+// دالة لتحديد الملصق المناسب
+function getEmojiForUser(userData) {
+    const emojiMap = {
+        'male': '👨',
+        'female': '👩',
+        'boy': '🧒',
+        'girl': '👧',
+        'father': '👨‍🦳',
+        'mother': '👩‍🦳',
+        'grandfather': '👴',
+        'grandmother': '👵'
+    };
+    return emojiMap[userData.avatarType] || '👤';
 }
 
 // تسجيل الدخول بجوجل
@@ -47,12 +33,11 @@ async function signInWithGoogle() {
             
             await db.collection('users').doc(user.uid).set({
                 uid: user.uid,
-                name: user.displayName || 'مستخدم',
+                name: (user.displayName || 'مستخدم').substring(0, 25),
                 email: user.email || '',
                 shareableId: shareableId,
                 bio: '',
-                avatarType: 'male', // أيقونة افتراضية
-                avatarColor: getColorFromName(user.displayName || 'مستخدم'),
+                avatarType: 'male', // ملصق افتراضي
                 followers: [],
                 following: [],
                 blocked: [],
@@ -108,26 +93,29 @@ async function loadUserData(uid) {
             
             // تحديث واجهة المستخدم
             const profileName = document.getElementById('profileName');
-            const profileAvatarIcon = document.getElementById('profileAvatarIcon');
-            const menuAvatarIcon = document.getElementById('menuAvatarIcon');
+            const profileAvatarEmoji = document.getElementById('profileAvatarEmoji');
+            const menuAvatarEmoji = document.getElementById('menuAvatarEmoji');
             const menuName = document.getElementById('menuName');
             const profileBio = document.getElementById('profileBio');
             const shareableId = document.getElementById('shareableId');
+            const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
             
             if (profileName) profileName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (menuName) menuName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (profileBio) profileBio.textContent = userData.bio || '';
             if (shareableId) shareableId.textContent = userData.shareableId || '---';
             
-            // تحديث الأيقونات
-            const avatarIcon = getAvatarForUser(userData);
-            const avatarColor = userData.avatarColor || '#2196F3';
+            // تحديث الملصقات
+            const avatarEmoji = getEmojiForUser(userData);
             
-            if (profileAvatarIcon) {
-                profileAvatarIcon.innerHTML = `<i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 5rem;"></i>`;
+            if (profileAvatarEmoji) {
+                profileAvatarEmoji.textContent = avatarEmoji;
             }
-            if (menuAvatarIcon) {
-                menuAvatarIcon.innerHTML = `<i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 2.5rem;"></i>`;
+            if (menuAvatarEmoji) {
+                menuAvatarEmoji.textContent = avatarEmoji;
+            }
+            if (currentAvatarEmoji) {
+                currentAvatarEmoji.textContent = avatarEmoji;
             }
             
             // تحديث الإحصائيات
@@ -262,19 +250,16 @@ async function searchFriend() {
             return;
         }
         
-        const avatarIcon = getAvatarForUser(user);
-        const avatarColor = user.avatarColor || '#2196F3';
+        const avatarEmoji = getEmojiForUser(user);
         
         resultsDiv.innerHTML = `
-            <div class="search-result-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border-bottom: 1px solid var(--border);">
-                <div class="user-avatar-icon" style="width: 50px; height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center;">
-                    <i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 2rem;"></i>
+            <div class="search-result-item">
+                <div class="search-result-avatar-emoji">${avatarEmoji}</div>
+                <div class="search-result-info">
+                    <h4>${user.name}</h4>
+                    <p>${user.shareableId}</p>
                 </div>
-                <div style="flex: 1;">
-                    <h4 style="margin-bottom: 5px;">${user.name}</h4>
-                    <p style="color: var(--text-light);">${user.shareableId}</p>
-                </div>
-                ${currentUser ? '<button class="btn btn-primary" onclick="sendFriendRequest(\'' + userId + '\')" style="padding: 8px 16px;">إضافة</button>' : ''}
+                ${currentUser ? '<button class="btn btn-primary" onclick="sendFriendRequest(\'' + userId + '\')">إضافة</button>' : ''}
             </div>
         `;
     } catch (error) {
@@ -354,7 +339,7 @@ async function loadFollowersList(currentUid, followers) {
     if (!followersList) return;
     
     if (!followers || followers.length === 0) {
-        followersList.innerHTML = '<div class="empty-state" style="text-align: center; padding: 40px;">لا يوجد متابعين</div>';
+        followersList.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>لا يوجد متابعين</h3><p>لم يتابعك أحد بعد</p></div>';
         return;
     }
     
@@ -364,21 +349,18 @@ async function loadFollowersList(currentUid, followers) {
             const userDoc = await db.collection('users').doc(followerId).get();
             if (userDoc.exists) {
                 const user = userDoc.data();
-                const avatarIcon = getAvatarForUser(user);
-                const avatarColor = user.avatarColor || '#2196F3';
+                const avatarEmoji = getEmojiForUser(user);
                 
                 html += `
-                    <div class="user-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: 12px; margin-bottom: 10px;">
-                        <div class="user-avatar-icon" style="width: 50px; height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center;">
-                            <i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 2rem;"></i>
+                    <div class="user-item">
+                        <div class="user-avatar-emoji">${avatarEmoji}</div>
+                        <div class="user-info">
+                            <h4>${user.name}</h4>
+                            <p>${user.shareableId || ''}</p>
                         </div>
-                        <div style="flex: 1;">
-                            <h4 style="margin-bottom: 5px;">${user.name}</h4>
-                            <p style="color: var(--text-light);">${user.shareableId || ''}</p>
-                        </div>
-                        <div style="display: flex; gap: 5px;">
-                            <button class="action-btn" onclick="openChat('${followerId}')" style="width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--light); cursor: pointer;"><i class="fas fa-comment"></i></button>
-                            <button class="action-btn remove" onclick="removeFollower('${followerId}')" style="width: 35px; height: 35px; border-radius: 50%; border: none; background: #f44336; color: white; cursor: pointer;"><i class="fas fa-user-minus"></i></button>
+                        <div class="user-actions">
+                            <button class="action-btn" onclick="openChat('${followerId}')"><i class="fas fa-comment"></i></button>
+                            <button class="action-btn remove" onclick="removeFollower('${followerId}')"><i class="fas fa-user-minus"></i></button>
                         </div>
                     </div>
                 `;
@@ -389,7 +371,7 @@ async function loadFollowersList(currentUid, followers) {
     }
     followersList.innerHTML = html;
     
-    // ✅ حفظ البيانات للصفحات الفرعية
+    // حفظ البيانات للصفحات الفرعية
     window.followersData = html;
 }
 
@@ -399,7 +381,7 @@ async function loadFollowingList(currentUid, following) {
     if (!followingList) return;
     
     if (!following || following.length === 0) {
-        followingList.innerHTML = '<div class="empty-state" style="text-align: center; padding: 40px;">لا تتابع أحداً بعد</div>';
+        followingList.innerHTML = '<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا تتابع أحداً</h3><p>لم تتابع أي شخص بعد</p></div>';
         return;
     }
     
@@ -409,21 +391,18 @@ async function loadFollowingList(currentUid, following) {
             const userDoc = await db.collection('users').doc(followingId).get();
             if (userDoc.exists) {
                 const user = userDoc.data();
-                const avatarIcon = getAvatarForUser(user);
-                const avatarColor = user.avatarColor || '#2196F3';
+                const avatarEmoji = getEmojiForUser(user);
                 
                 html += `
-                    <div class="user-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: 12px; margin-bottom: 10px;">
-                        <div class="user-avatar-icon" style="width: 50px; height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center;">
-                            <i class="${avatarIcon}" style="color: ${avatarColor}; font-size: 2rem;"></i>
+                    <div class="user-item">
+                        <div class="user-avatar-emoji">${avatarEmoji}</div>
+                        <div class="user-info">
+                            <h4>${user.name}</h4>
+                            <p>${user.shareableId || ''}</p>
                         </div>
-                        <div style="flex: 1;">
-                            <h4 style="margin-bottom: 5px;">${user.name}</h4>
-                            <p style="color: var(--text-light);">${user.shareableId || ''}</p>
-                        </div>
-                        <div style="display: flex; gap: 5px;">
-                            <button class="action-btn" onclick="openChat('${followingId}')" style="width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--light); cursor: pointer;"><i class="fas fa-comment"></i></button>
-                            <button class="action-btn following" onclick="unfollow('${followingId}')" style="width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer;"><i class="fas fa-check"></i></button>
+                        <div class="user-actions">
+                            <button class="action-btn" onclick="openChat('${followingId}')"><i class="fas fa-comment"></i></button>
+                            <button class="action-btn following" onclick="unfollow('${followingId}')"><i class="fas fa-check"></i></button>
                         </div>
                     </div>
                 `;
@@ -434,6 +413,6 @@ async function loadFollowingList(currentUid, following) {
     }
     followingList.innerHTML = html;
     
-    // ✅ حفظ البيانات للصفحات الفرعية
+    // حفظ البيانات للصفحات الفرعية
     window.followingData = html;
 }
