@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStories();
     loadChats();
     
-    // إعداد البحث الفوري بعد تحميل الصفحة
+    // إعداد البحث الفوري
     setupInstantSearch();
 });
 
@@ -44,14 +44,12 @@ function setupNavigation() {
             targetPage.style.display = 'block';
         }
         
-        // إخفاء الصفحات الأخرى
         pages.forEach(page => {
             if (!page.classList.contains('active')) {
                 page.style.display = 'none';
             }
         });
         
-        // إخفاء الصفحات الفرعية
         document.querySelectorAll('.profile-subpage').forEach(sp => {
             sp.style.display = 'none';
         });
@@ -143,16 +141,51 @@ function setupModals() {
 // إعداد البحث الفوري (بدون زر)
 function setupInstantSearch() {
     const searchInput = document.getElementById('searchInput');
-    if (!searchInput) return;
+    if (!searchInput) {
+        console.error('❌ لم يتم العثور على حقل البحث');
+        return;
+    }
+    
+    console.log('✅ تم العثور على حقل البحث');
     
     // البحث عند كل إدخال
-    searchInput.addEventListener('input', function() {
-        if (typeof searchFriend === 'function') {
-            searchFriend();
+    searchInput.addEventListener('input', function(e) {
+        // تنظيف الإدخال (أرقام فقط)
+        let value = this.value.replace(/[^0-9]/g, '');
+        this.value = value;
+        
+        console.log('🔍 جاري البحث عن:', value);
+        
+        const resultsDiv = document.getElementById('searchResults');
+        
+        if (value.length === 0) {
+            if (resultsDiv) resultsDiv.innerHTML = '';
+            return;
+        }
+        
+        if (value.length !== 10) {
+            if (resultsDiv) {
+                resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #666;">
+                    ⏳ يجب إدخال 10 أرقام (${value.length}/10)
+                </div>`;
+            }
+            return;
+        }
+        
+        // تنفيذ البحث
+        if (typeof window.searchFriend === 'function') {
+            window.searchFriend();
+        } else {
+            console.error('❌ دالة searchFriend غير موجودة');
+            if (resultsDiv) {
+                resultsDiv.innerHTML = `<div class="empty-state" style="text-align: center; padding: 20px; color: #f44336;">
+                    ❌ خطأ في نظام البحث
+                </div>`;
+            }
         }
     });
     
-    // السماح بالأرقام فقط
+    // السماح بالأرقام فقط عند الكتابة
     searchInput.addEventListener('keypress', function(e) {
         const char = String.fromCharCode(e.which);
         if (!/[0-9]/.test(char)) {
@@ -164,11 +197,12 @@ function setupInstantSearch() {
     searchInput.addEventListener('paste', function(e) {
         e.preventDefault();
         const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-        const numbersOnly = pastedText.replace(/[^0-9]/g, '');
+        const numbersOnly = pastedText.replace(/[^0-9]/g, '').slice(0, 10);
         if (numbersOnly) {
-            this.value = numbersOnly.slice(0, 10);
-            if (typeof searchFriend === 'function') {
-                searchFriend();
+            this.value = numbersOnly;
+            // تشغيل البحث تلقائياً بعد اللصق
+            if (numbersOnly.length === 10 && typeof window.searchFriend === 'function') {
+                window.searchFriend();
             }
         }
     });
@@ -199,21 +233,18 @@ function loadChats() {
 
 // فتح نافذة تعديل الملف الشخصي
 window.openEditProfileModal = function() {
-    // تعبئة البيانات الحالية
     const currentName = document.getElementById('profileName').textContent;
     const currentNameInput = document.getElementById('editName');
     if (currentNameInput) {
         currentNameInput.value = currentName;
     }
     
-    // تحديث الملصق الحالي
     const currentEmoji = document.getElementById('profileAvatarEmoji').textContent;
     const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
     if (currentAvatarEmoji) {
         currentAvatarEmoji.textContent = currentEmoji;
     }
     
-    // فتح النافذة
     document.getElementById('editProfileModal').classList.add('active');
 };
 
@@ -231,12 +262,10 @@ window.saveProfile = function() {
         return;
     }
     
-    // حفظ في Firebase
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
             name: newName
         }).then(() => {
-            // تحديث واجهة المستخدم
             document.getElementById('profileName').textContent = newName;
             document.getElementById('menuName').textContent = newName;
             
@@ -253,8 +282,6 @@ window.saveProfile = function() {
 window.showUserTrips = function() {
     document.querySelector('.profile-page').style.display = 'none';
     document.getElementById('tripsPage').style.display = 'block';
-    
-    // هنا تجيب بيانات الرحلات من Firebase
 };
 
 window.showUserFollowers = function() {
@@ -294,16 +321,13 @@ window.showUserFollowing = function() {
 };
 
 window.goBack = function() {
-    // إخفاء جميع الصفحات الفرعية
     document.querySelectorAll('.profile-subpage').forEach(page => {
         page.style.display = 'none';
     });
     
-    // إظهار صفحة الملف الشخصي الرئيسية
     document.querySelector('.profile-page').style.display = 'block';
     document.querySelector('.profile-page').classList.add('active');
     
-    // التأكد من أن باقي الصفحات الرئيسية مخفية
     document.querySelectorAll('.page').forEach(page => {
         if (!page.classList.contains('profile-page')) {
             page.style.display = 'none';
@@ -327,19 +351,16 @@ window.selectAvatar = function(type) {
     
     const selectedEmoji = emojiMap[type] || '👤';
     
-    // تحديث الملصق في الملف الشخصي
     const profileAvatar = document.getElementById('profileAvatarEmoji');
     if (profileAvatar) {
         profileAvatar.textContent = selectedEmoji;
     }
     
-    // تحديث الملصق في نافذة التعديل
     const currentAvatar = document.getElementById('currentAvatarEmoji');
     if (currentAvatar) {
         currentAvatar.textContent = selectedEmoji;
     }
     
-    // حفظ الاختيار في Firebase
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
             avatarType: type
@@ -361,40 +382,4 @@ window.openAvatarModal = function() {
 
 document.addEventListener('languageChanged', function() {
     console.log('Language changed');
-});
-
-// ربط البحث الفوري بشكل مباشر
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        console.log('✅ تم العثور على حقل البحث');
-        
-        // البحث عند كل إدخال
-        searchInput.addEventListener('input', function(e) {
-            const value = this.value.replace(/[^0-9]/g, ''); // أرقام فقط
-            this.value = value; // تحديث الحقل
-            
-            console.log('🔍 جاري البحث عن:', value);
-            
-            if (value.length === 10) {
-                if (typeof window.searchFriend === 'function') {
-                    window.searchFriend();
-                } else {
-                    console.error('❌ دالة searchFriend غير موجودة');
-                }
-            } else if (value.length > 0) {
-                // عرض رسالة انتظار
-                const resultsDiv = document.getElementById('searchResults');
-                if (resultsDiv) {
-                    resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">🔍 انتظر... يجب إدخال 10 أرقام</div>';
-                }
-            } else {
-                // مسح النتائج إذا كان الحقل فارغاً
-                const resultsDiv = document.getElementById('searchResults');
-                if (resultsDiv) resultsDiv.innerHTML = '';
-            }
-        });
-    } else {
-        console.error('❌ لم يتم العثور على حقل البحث');
-    }
 });
