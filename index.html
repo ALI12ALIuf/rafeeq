@@ -93,23 +93,24 @@
                 </div>
             </div>
 
-            <!-- صفحة الملف الشخصي -->
+            <!-- صفحة الملف الشخصي - معدلة -->
             <div class="page profile-page">
                 <div class="profile-header">
-                    <div class="profile-cover"></div>
-                    <div class="profile-avatar-wrapper">
-                        <div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div>
-                        <button class="edit-avatar-btn" onclick="openAvatarModal()">
-                            <i class="fas fa-chevron-down"></i>
+                    <!-- المنطقة الزرقاء مع الأيقونة والقلم -->
+                    <div class="profile-cover">
+                        <div class="profile-avatar-wrapper">
+                            <div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div>
+                        </div>
+                        <!-- زر القلم في الزاوية اليمنى -->
+                        <button class="edit-avatar-btn" onclick="openEditProfileModal()">
+                            <i class="fas fa-pen"></i>
                         </button>
                     </div>
+                    
                     <h2 id="profileName"></h2>
                     <p class="profile-bio" id="profileBio"></p>
                     
-                    <!-- زر تعديل الملف الشخصي -->
-                    <button class="btn btn-outline edit-profile-btn" onclick="openEditProfileModal()">
-                        <i class="fas fa-pen"></i> <span data-i18n="edit_profile">تعديل الملف</span>
-                    </button>
+                    <!-- إزالة زر تعديل الملف الشخصي النصي -->
                     
                     <div class="profile-stats">
                         <a href="#" class="stat-link" onclick="showUserTrips()">
