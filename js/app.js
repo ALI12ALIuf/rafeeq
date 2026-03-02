@@ -137,17 +137,15 @@ function loadStories() {
     if (!container) return;
     
     const stories = [
-        { name: 'قصتك', avatar: 'fas fa-user-circle' },
-        { name: 'محمد', avatar: 'fas fa-user' },
-        { name: 'أحمد', avatar: 'fas fa-user-tie' },
-        { name: 'سارة', avatar: 'fas fa-user' },
+        { name: 'قصتك', emoji: '👤' },
+        { name: 'محمد', emoji: '👨' },
+        { name: 'أحمد', emoji: '👨‍🦳' },
+        { name: 'سارة', emoji: '👩' },
     ];
     
     container.innerHTML = stories.map(story => `
         <div class="story-item">
-            <div class="story-avatar-icon">
-                <i class="${story.avatar}"></i>
-            </div>
+            <div class="story-avatar-emoji">${story.emoji}</div>
             <span class="story-name">${story.name}</span>
         </div>
     `).join('');
@@ -156,6 +154,58 @@ function loadStories() {
 function loadChats() {
     // للاستخدام المستقبلي
 }
+
+// فتح نافذة تعديل الملف الشخصي
+window.openEditProfileModal = function() {
+    // تعبئة البيانات الحالية
+    const currentName = document.getElementById('profileName').textContent;
+    const currentNameInput = document.getElementById('editName');
+    if (currentNameInput) {
+        currentNameInput.value = currentName;
+    }
+    
+    // تحديث الملصق الحالي
+    const currentEmoji = document.getElementById('profileAvatarEmoji').textContent;
+    const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
+    if (currentAvatarEmoji) {
+        currentAvatarEmoji.textContent = currentEmoji;
+    }
+    
+    // فتح النافذة
+    document.getElementById('editProfileModal').classList.add('active');
+};
+
+// حفظ التغييرات
+window.saveProfile = function() {
+    const newName = document.getElementById('editName').value.trim();
+    
+    if (!newName) {
+        alert('الرجاء إدخال الاسم');
+        return;
+    }
+    
+    if (newName.length > 25) {
+        alert('الاسم يجب أن لا يتجاوز 25 حرف');
+        return;
+    }
+    
+    // حفظ في Firebase
+    if (auth && auth.currentUser) {
+        db.collection('users').doc(auth.currentUser.uid).update({
+            name: newName
+        }).then(() => {
+            // تحديث واجهة المستخدم
+            document.getElementById('profileName').textContent = newName;
+            document.getElementById('menuName').textContent = newName;
+            
+            closeModal();
+            alert('تم حفظ التغييرات');
+        }).catch(error => {
+            console.error('Error saving profile:', error);
+            alert('حدث خطأ في الحفظ');
+        });
+    }
+};
 
 // دوال الملف الشخصي
 window.showUserTrips = function() {
@@ -176,8 +226,8 @@ window.showUserFollowers = function() {
         list.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-users"></i>
-                <h3>${i18n.t('no_followers')}</h3>
-                <p>${i18n.t('no_followers_desc')}</p>
+                <h3>${i18n ? i18n.t('no_followers') : 'لا يوجد متابعين'}</h3>
+                <p>${i18n ? i18n.t('no_followers_desc') : 'لم يتابعك أحد بعد'}</p>
             </div>
         `;
     }
@@ -194,8 +244,8 @@ window.showUserFollowing = function() {
         list.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-user-friends"></i>
-                <h3>${i18n.t('no_following')}</h3>
-                <p>${i18n.t('no_following_desc')}</p>
+                <h3>${i18n ? i18n.t('no_following') : 'لا تتابع أحداً'}</h3>
+                <p>${i18n ? i18n.t('no_following_desc') : 'لم تتابع أي شخص بعد'}</p>
             </div>
         `;
     }
@@ -220,47 +270,48 @@ window.goBack = function() {
     });
 };
 
-// دالة اختيار الأيقونة
-window.selectAvatar = function(type, element) {
-    const iconMap = {
-        'male': 'fas fa-user',
-        'female': 'fas fa-user',
-        'boy': 'fas fa-child',
-        'girl': 'fas fa-child',
-        'father': 'fas fa-user-tie',
-        'mother': 'fas fa-user',
-        'grandfather': 'fas fa-user',
-        'grandmother': 'fas fa-user'
+// دالة اختيار الملصق
+window.selectAvatar = function(type) {
+    const emojiMap = {
+        'male': '👨',
+        'female': '👩',
+        'boy': '🧒',
+        'girl': '👧',
+        'father': '👨‍🦳',
+        'mother': '👩‍🦳',
+        'grandfather': '👴',
+        'grandmother': '👵'
     };
     
-    const colorMap = {
-        'male': '#2196F3',
-        'female': '#E91E63',
-        'boy': '#4CAF50',
-        'girl': '#FF9800',
-        'father': '#3F51B5',
-        'mother': '#9C27B0',
-        'grandfather': '#795548',
-        'grandmother': '#FF5722'
-    };
+    const selectedEmoji = emojiMap[type] || '👤';
     
-    const icon = document.getElementById('profileAvatarIcon');
-    if (icon) {
-        icon.innerHTML = `<i class="${iconMap[type]}" style="color: ${colorMap[type]}; font-size: 5rem;"></i>`;
+    // تحديث الملصق في الملف الشخصي
+    const profileAvatar = document.getElementById('profileAvatarEmoji');
+    if (profileAvatar) {
+        profileAvatar.textContent = selectedEmoji;
     }
     
-    // حفظ الاختيار في Firebase (اختياري)
+    // تحديث الملصق في نافذة التعديل
+    const currentAvatar = document.getElementById('currentAvatarEmoji');
+    if (currentAvatar) {
+        currentAvatar.textContent = selectedEmoji;
+    }
+    
+    // حفظ الاختيار في Firebase
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
-            avatarType: type,
-            avatarColor: colorMap[type]
+            avatarType: type
+        }).then(() => {
+            console.log('Avatar updated successfully');
+        }).catch(error => {
+            console.error('Error updating avatar:', error);
         });
     }
     
     closeModal();
 };
 
-// فتح نافذة اختيار الأيقونة
+// فتح نافذة اختيار الملصق
 window.openAvatarModal = function() {
     const modal = document.getElementById('avatarModal');
     if (modal) modal.classList.add('active');
