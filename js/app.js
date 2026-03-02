@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModals();
     loadStories();
     loadChats();
+    
+    // إعداد البحث الفوري بعد تحميل الصفحة
+    setupInstantSearch();
 });
 
 // التأكد من ظهور صفحة واحدة فقط
@@ -108,6 +111,11 @@ function setupModals() {
     
     window.openSearchModal = () => {
         document.getElementById('searchModal')?.classList.add('active');
+        // تفريغ نتائج البحث السابقة عند الفتح
+        const resultsDiv = document.getElementById('searchResults');
+        if (resultsDiv) resultsDiv.innerHTML = '';
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
     };
     
     window.closeModal = () => {
@@ -128,6 +136,40 @@ function setupModals() {
     document.querySelectorAll('.settings-item').forEach(item => {
         if (item.querySelector('[data-i18n="language"]')) {
             item.addEventListener('click', openLanguageModal);
+        }
+    });
+}
+
+// إعداد البحث الفوري (بدون زر)
+function setupInstantSearch() {
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput) return;
+    
+    // البحث عند كل إدخال
+    searchInput.addEventListener('input', function() {
+        if (typeof searchFriend === 'function') {
+            searchFriend();
+        }
+    });
+    
+    // السماح بالأرقام فقط
+    searchInput.addEventListener('keypress', function(e) {
+        const char = String.fromCharCode(e.which);
+        if (!/[0-9]/.test(char)) {
+            e.preventDefault();
+        }
+    });
+    
+    // منع اللصق غير الرقمي
+    searchInput.addEventListener('paste', function(e) {
+        e.preventDefault();
+        const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+        const numbersOnly = pastedText.replace(/[^0-9]/g, '');
+        if (numbersOnly) {
+            this.value = numbersOnly.slice(0, 10);
+            if (typeof searchFriend === 'function') {
+                searchFriend();
+            }
         }
     });
 }
