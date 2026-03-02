@@ -172,9 +172,15 @@ auth.onAuthStateChanged(async (user) => {
     
     const splash = document.getElementById('splash');
     const app = document.getElementById('app');
+    const loginMenuItem = document.getElementById('loginMenuItem');
     
     if (user) {
-        // مستخدم مسجل
+        // مستخدم مسجل - إخفاء زر تسجيل الدخول
+        if (loginMenuItem) {
+            loginMenuItem.style.display = 'none';
+        }
+        
+        // تحميل بيانات المستخدم
         console.log('Loading user data for:', user.uid);
         await loadUserData(user.uid);
         
@@ -186,7 +192,12 @@ auth.onAuthStateChanged(async (user) => {
             }, 500);
         }
     } else {
-        // مستخدم غير مسجل - انتظر 2 ثانية ثم أظهر المحتوى
+        // مستخدم غير مسجل - إظهار زر تسجيل الدخول
+        if (loginMenuItem) {
+            loginMenuItem.style.display = 'block';
+        }
+        
+        // انتظر 2 ثانية ثم أظهر المحتوى
         console.log('User not logged in, showing content after delay');
         setTimeout(() => {
             if (splash) {
