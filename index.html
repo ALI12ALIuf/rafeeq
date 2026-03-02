@@ -241,7 +241,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل الملف الشخصي - مصححة -->
+    <!-- نافذة تعديل الملف الشخصي - مع الأزرار الكبيرة -->
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
@@ -263,8 +263,8 @@
             </div>
             
             <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
-                <button class="btn-save" onclick="saveProfile()" data-i18n="save">حفظ</button>
+                <button class="modal-btn modal-btn-cancel" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
+                <button class="modal-btn modal-btn-save" onclick="saveProfile()" data-i18n="save">حفظ</button>
             </div>
             
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
@@ -389,7 +389,7 @@
             }
         }, 3000);
         
-        // إعداد عداد الأحرف
+        // إعداد عداد الأحرف - محسّن
         const nameInput = document.getElementById('editName');
         const charCounter = document.getElementById('charCounter');
         
@@ -400,7 +400,7 @@
             nameInput.addEventListener('input', function(e) {
                 let value = this.value;
                 
-                // التأكد من أن القيمة لا تتجاوز 25 حرف
+                // منع إدخال أكثر من 25 حرف بشكل صارم
                 if (value.length > 25) {
                     this.value = value.slice(0, 25);
                 }
@@ -409,7 +409,7 @@
                 const currentLength = this.value.length;
                 charCounter.textContent = currentLength + '/25';
                 
-                // تغيير اللون عند الاقتراب من الحد الأقصى
+                // تغيير اللون عند الوصول للحد الأقصى
                 if (currentLength >= 25) {
                     charCounter.classList.add('full');
                 } else {
@@ -417,10 +417,38 @@
                 }
             });
             
-            // منع إدخال أكثر من 25 حرف
+            // منع أي محاولة لإدخال حرف إضافي بعد 25
             nameInput.addEventListener('keydown', function(e) {
-                if (this.value.length >= 25 && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab') {
+                if (this.value.length >= 25 && 
+                    e.key !== 'Backspace' && 
+                    e.key !== 'Delete' && 
+                    e.key !== 'ArrowLeft' && 
+                    e.key !== 'ArrowRight' && 
+                    e.key !== 'Tab' &&
+                    !e.ctrlKey && 
+                    !e.metaKey) {
                     e.preventDefault();
+                }
+            });
+            
+            // منع اللصق إذا كان سيتجاوز 25 حرف
+            nameInput.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                const currentLength = this.value.length;
+                const availableSpace = 25 - currentLength;
+                
+                if (availableSpace > 0) {
+                    const newText = pastedText.slice(0, availableSpace);
+                    this.value += newText;
+                    
+                    // تحديث العداد
+                    const newLength = this.value.length;
+                    charCounter.textContent = newLength + '/25';
+                    
+                    if (newLength >= 25) {
+                        charCounter.classList.add('full');
+                    }
                 }
             });
         }
