@@ -65,7 +65,7 @@ const i18n = {
             unblock_user: 'إلغاء حظر المستخدم',
             arabic: 'العربية',
             english: 'English',
-            // ترجمات الأفاتار
+            // ترجمات الأفاتار (الملصقات)
             male: 'رجل',
             female: 'امرأة',
             boy: 'ولد',
@@ -74,6 +74,7 @@ const i18n = {
             mother: 'أم',
             grandfather: 'جد',
             grandmother: 'جدة',
+            // الترجمات القديمة
             no_trips: 'لا توجد رحلات',
             no_trips_desc: 'لم تقم بأي رحلة بعد',
             no_followers: 'لا يوجد متابعين',
@@ -152,6 +153,7 @@ const i18n = {
             mother: 'Mother',
             grandfather: 'Grandfather',
             grandmother: 'Grandmother',
+            // Old translations
             no_trips: 'No Trips',
             no_trips_desc: "You haven't taken any trips yet",
             no_followers: 'No Followers',
@@ -172,6 +174,10 @@ const i18n = {
     },
     
     applyLanguage() {
+        // ✅ إزالة تغيير اتجاه الصفحة - الاتجاه ثابت (rtl)
+        // document.documentElement.lang = this.currentLang;
+        // document.documentElement.dir = this.currentLang === 'ar' ? 'rtl' : 'ltr';
+        
         // تحديث جميع العناصر التي تحمل data-i18n
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
@@ -197,10 +203,12 @@ const i18n = {
     },
     
     setupLanguageObserver() {
+        // مراقبة العناصر الجديدة
         const observer = new MutationObserver((mutations) => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === 1) {
+                        // تطبيق الترجمة على العنصر الجديد نفسه
                         if (node.hasAttribute && node.hasAttribute('data-i18n')) {
                             const key = node.getAttribute('data-i18n');
                             node.textContent = this.t(key);
@@ -210,6 +218,7 @@ const i18n = {
                             node.placeholder = this.t(key);
                         }
                         
+                        // تطبيق الترجمة على العناصر الفرعية
                         if (node.querySelectorAll) {
                             node.querySelectorAll('[data-i18n]').forEach(el => {
                                 const key = el.getAttribute('data-i18n');
@@ -235,20 +244,11 @@ const i18n = {
 // تهيئة الترجمة
 i18n.init();
 
-// دالة تغيير اللغة - نسخة واحدة فقط مع تحديث إضافي
+// دالة تغيير اللغة
 window.changeLanguage = function(lang) {
     if (i18n.translations[lang]) {
         i18n.currentLang = lang;
         i18n.applyLanguage();
-        
-        // تحديث إضافي للتأكد من ترجمة جميع العناصر
-        setTimeout(() => {
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                el.textContent = i18n.t(key);
-            });
-        }, 50);
-        
         closeModal();
     }
 };
