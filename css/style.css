@@ -483,7 +483,7 @@ body {
     font-size: 0.7rem;
 }
 
-/* صفحة الملف الشخصي - معدلة */
+/* صفحة الملف الشخصي - التنسيقات الجديدة */
 .profile-header {
     background: var(--card-bg);
     border-radius: var(--radius);
@@ -492,21 +492,19 @@ body {
 }
 
 .profile-cover {
-    height: 150px;
+    height: 120px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
-/* الأيقونة في منتصف المنطقة الزرقاء */
-.profile-avatar-wrapper {
+/* الأيقونة في أعلى اليمين */
+.profile-avatar-wrapper-right {
     position: absolute;
-    width: 100px;
-    height: 100px;
-    top: 50%;
-    transform: translateY(-50%);
+    width: 80px;
+    height: 80px;
+    top: 20px;
+    right: 20px;
+    z-index: 5;
 }
 
 .profile-avatar-emoji {
@@ -517,16 +515,17 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 5rem;
+    font-size: 4rem;
     border: 3px solid white;
     box-shadow: var(--shadow);
+    overflow: hidden; /* يضمن عدم خروج الملصق عن الإطار */
 }
 
-/* زر القلم في الزاوية اليمنى من المنطقة الزرقاء */
-.edit-avatar-btn {
+/* زر القلم في أعلى اليسار */
+.edit-profile-btn-left {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 20px;
+    left: 20px;
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -543,28 +542,73 @@ body {
     z-index: 10;
 }
 
-.edit-avatar-btn:hover {
+.edit-profile-btn-left:hover {
     transform: scale(1.1);
     background: var(--primary);
     color: white;
 }
 
-/* إزالة زر تعديل الملف الشخصي النصي */
-.edit-profile-btn {
-    display: none !important;
+/* حاوية الاسم والمعرف */
+.profile-info-container {
+    padding: 1rem;
+    margin-top: 10px;
 }
 
-.profile-header h2 {
-    text-align: center;
-    margin-top: 60px; /* مسافة بعد الأيقونة */
-    margin-bottom: 0.25rem;
+.profile-name-wrapper h2 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+    text-align: right;
+}
+
+/* صف المعرف مع زر النسخ */
+.profile-id-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--light);
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    width: fit-content;
+    max-width: 100%;
+}
+
+.id-label-small {
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+.id-value-small {
+    font-family: monospace;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--primary);
+    direction: ltr;
+}
+
+.copy-btn-small {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.copy-btn-small:hover {
+    transform: scale(1.1);
+    color: var(--primary-dark);
 }
 
 .profile-bio {
-    text-align: center;
+    padding: 0 1rem 1rem;
     color: var(--text-light);
-    margin-bottom: 1rem;
-    padding: 0 1rem;
+    font-size: 0.9rem;
+    text-align: right;
 }
 
 /* إحصائيات قابلة للضغط */
@@ -608,36 +652,9 @@ body {
     color: var(--text-light);
 }
 
+/* إخفاء الـ profile-id-box القديم */
 .profile-id-box {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1rem;
-    background: var(--light);
-    margin: 1rem;
-    border-radius: var(--radius);
-}
-
-.id-label {
-    color: var(--text-light);
-    font-size: 0.9rem;
-}
-
-.id-value {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-family: monospace;
-    font-size: 1.1rem;
-}
-
-.copy-btn {
-    background: none;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    font-size: 1.1rem;
+    display: none;
 }
 
 /* باقي الأنماط كما هي */
@@ -1150,6 +1167,30 @@ input:checked + .slider:before {
     
     .avatar-option span:first-child {
         font-size: 2rem;
+    }
+    
+    /* تحسينات للشاشات الصغيرة */
+    .profile-avatar-wrapper-right {
+        width: 60px;
+        height: 60px;
+        top: 15px;
+        right: 15px;
+    }
+    
+    .profile-avatar-emoji {
+        font-size: 3rem;
+    }
+    
+    .edit-profile-btn-left {
+        width: 32px;
+        height: 32px;
+        top: 15px;
+        left: 15px;
+        font-size: 1rem;
+    }
+    
+    .profile-id-row {
+        flex-wrap: wrap;
     }
 }
 
