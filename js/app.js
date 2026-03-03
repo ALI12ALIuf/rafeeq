@@ -6,7 +6,41 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModals();
     loadStories();
     loadChats();
+    
+    // تحديث عدد الرحلات إذا كانت موجودة
+    updateTripsCount();
 });
+
+// دالة تنسيق الأرقام (يجب أن تكون متطابقة مع الموجودة في auth.js)
+function formatNumber(num) {
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    if (num >= 1000) {
+        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    }
+    return num.toString();
+}
+
+// تحديث عدد الرحلات
+async function updateTripsCount() {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    try {
+        // حساب عدد الرحلات المنتهية للمستخدم الحالي
+        const snapshot = await window.db.collection('trips')
+            .where('userId', '==', window.auth.currentUser.uid)
+            .where('status', '==', 'ended')
+            .get();
+        
+        const tripsCount = document.getElementById('tripsCount');
+        if (tripsCount) {
+            tripsCount.textContent = formatNumber(snapshot.size);
+        }
+    } catch (error) {
+        console.error('Error updating trips count:', error);
+    }
+}
 
 // التأكد من ظهور صفحة واحدة فقط
 function ensureSinglePage() {
@@ -209,6 +243,70 @@ window.showUserTrips = function() {
     document.getElementById('tripsPage').style.display = 'block';
     
     // هنا تجيب بيانات الرحلات من Firebase
+    loadUserTrips();
+};
+
+// تحميل بيانات الرحلات
+async function loadUserTrips() {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    const tripsGrid = document.getElementById('tripsGrid');
+    if (!tripsGrid) return;
+    
+    try {
+        const snapshot = await window.db.collection('trips')
+            .where('userId', '==', window.auth.currentUser.uid)
+            .orderBy('startTime', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            tripsGrid.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <h3>${i18n ? i18n.t('no_trips') : 'لا توجد رحلات'}</h3>
+                    <p>${i18n ? i18n.t('no_trips_desc') : 'لم تقم بأي رحلة بعد'}</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        snapshot.forEach(doc => {
+            const trip = doc.data();
+            const startTime = trip.startTime ? new Date(trip.startTime.seconds * 1000) : new Date();
+            const endTime = trip.endTime ? new Date(trip.endTime.seconds * 1000) : null;
+            
+            html += `
+                <div class="trip-item" onclick="viewTripDetails('${doc.id}')">
+                    <div class="trip-date">${startTime.toLocaleDateString('ar-EG')}</div>
+                    <div class="trip-route">${trip.destination || 'رحلة'}</div>
+                    <div class="trip-stats">
+                        <span>⏱️ ${trip.duration || '--'}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        tripsGrid.innerHTML = html;
+        
+        // تحديث عدد الرحلات في الملف الشخصي
+        updateTripsCount();
+        
+    } catch (error) {
+        console.error('Error loading trips:', error);
+        tripsGrid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>خطأ في تحميل الرحلات</h3>
+            </div>
+        `;
+    }
+}
+
+// عرض تفاصيل رحلة
+window.viewTripDetails = function(tripId) {
+    alert('تفاصيل الرحلة - معرف: ' + tripId);
+    // يمكن تطويرها لاحقاً
 };
 
 window.showUserFollowers = function() {
