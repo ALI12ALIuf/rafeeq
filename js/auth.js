@@ -248,14 +248,22 @@ function copyId() {
     });
 }
 
-// البحث عن صديق بالمعرف
-async function searchFriend() {
-    const searchInput = document.getElementById('searchInput');
-    const resultsDiv = document.getElementById('searchResults');
+// ========== دوال البحث الجديدة (بأسماء مختلفة) ==========
+
+// فتح نافذة البحث عن الأصدقاء
+window.openFindFriendModal = function() {
+    const modal = document.getElementById('findFriendModal');
+    if (modal) modal.classList.add('active');
+};
+
+// البحث عن مستخدم بالمعرف
+window.findUserById = async function() {
+    const input = document.getElementById('friendIdInput');
+    const resultsDiv = document.getElementById('findResults');
     
-    if (!searchInput || !resultsDiv) return;
+    if (!input || !resultsDiv) return;
     
-    const searchId = searchInput.value.trim();
+    const searchId = input.value.trim();
     if (!searchId || searchId.length !== 10 || !/^\d+$/.test(searchId)) {
         alert('الرجاء إدخال 10 أرقام فقط');
         return;
@@ -291,17 +299,17 @@ async function searchFriend() {
                     <h4>${user.name}</h4>
                     <p>${user.shareableId}</p>
                 </div>
-                ${currentUser ? '<button class="btn btn-primary" onclick="sendFriendRequest(\'' + userId + '\')">إضافة</button>' : ''}
+                ${currentUser ? '<button class="btn btn-primary" onclick="addNewFriend(\'' + userId + '\')">إضافة</button>' : ''}
             </div>
         `;
     } catch (error) {
         console.error('Search error:', error);
         resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">حدث خطأ في البحث</div>';
     }
-}
+};
 
-// إرسال طلب صداقة
-async function sendFriendRequest(targetUserId) {
+// إضافة صديق جديد
+window.addNewFriend = async function(targetUserId) {
     if (!window.auth || !window.auth.currentUser) {
         alert('الرجاء تسجيل الدخول أولاً');
         return;
@@ -321,7 +329,9 @@ async function sendFriendRequest(targetUserId) {
         console.error('Error sending request:', error);
         alert('حدث خطأ في إرسال الطلب');
     }
-}
+};
+
+// ========== باقي الدوال كما هي ==========
 
 // إزالة متابع
 async function removeFollower(followerId) {
