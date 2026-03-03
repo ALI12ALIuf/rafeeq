@@ -483,6 +483,17 @@ window.acceptFriendRequest = async function(requestId, fromUserId) {
         // إعادة تحميل بيانات المستخدم لتحديث قوائم المتابعين
         await loadUserData(currentUserId);
         
+        // تحديث الصفحات الفرعية إذا كانت مفتوحة
+        const followersPage = document.getElementById('followersPage');
+        const followingPage = document.getElementById('followingPage');
+        
+        if (followersPage && followersPage.style.display === 'block') {
+            showUserFollowers();
+        }
+        if (followingPage && followingPage.style.display === 'block') {
+            showUserFollowing();
+        }
+        
         alert(i18n ? i18n.t('request_accepted') : 'تم قبول طلب الصداقة');
         
     } catch (error) {
