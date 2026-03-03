@@ -1,3 +1,14 @@
+// دالة تنسيق الأرقام (تحويل 1000 → 1K، 1000000 → 1M)
+function formatNumber(num) {
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    if (num >= 1000) {
+        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    }
+    return num.toString();
+}
+
 // توليد معرف عشوائي من 10 أرقام (أرقام فقط)
 function generateShareableId() {
     // توليد 10 أرقام عشوائية
@@ -144,12 +155,12 @@ async function loadUserData(uid) {
                 currentAvatarEmoji.textContent = avatarEmoji;
             }
             
-            // تحديث الإحصائيات
+            // تحديث الإحصائيات مع التنسيق الذكي
             const followersCount = document.getElementById('followersCount');
             const followingCount = document.getElementById('followingCount');
             
-            if (followersCount) followersCount.textContent = (userData.followers || []).length;
-            if (followingCount) followingCount.textContent = (userData.following || []).length;
+            if (followersCount) followersCount.textContent = formatNumber((userData.followers || []).length);
+            if (followingCount) followingCount.textContent = formatNumber((userData.following || []).length);
             
             // تحميل قوائم المتابعين
             if (typeof loadFollowersList === 'function') {
