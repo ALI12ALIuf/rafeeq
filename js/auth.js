@@ -148,8 +148,8 @@ async function loadUserData(uid) {
                 loadFollowingList(uid, userData.following || []);
             }
             
-            // تحميل طلبات الصداقة للمستخدم
-            loadFriendRequests(uid);
+            // ===== الاستماع المباشر لطلبات الصداقة =====
+            listenToFriendRequests(uid);
         }
     } catch (error) {
         console.error('Error loading user data:', error);
@@ -331,39 +331,41 @@ window.hideSearchResults = function() {
     }
 };
 
-// ========== دوال طلبات الصداقة الجديدة ==========
+// ========== دوال طلبات الصداقة مع Real-time listener ==========
 
-// تحميل طلبات الصداقة
-async function loadFriendRequests(uid) {
-    try {
-        const requestsSnapshot = await window.db.collection('friendRequests')
-            .where('to', '==', uid)
-            .where('status', '==', 'pending')
-            .orderBy('timestamp', 'desc')
-            .get();
-        
-        updateRequestsBadge(requestsSnapshot.size);
-        displayFriendRequests(requestsSnapshot);
-    } catch (error) {
-        console.error('Error loading friend requests:', error);
-    }
-}
-
-// تحديث عداد الإشعارات
-function updateRequestsBadge(count) {
-    const badge = document.getElementById('requestsBadge');
-    if (!badge) return;
+// الاستماع المباشر لطلبات الصداقة
+function listenToFriendRequests(uid) {
+    if (!uid) return;
     
-    if (count > 0) {
-        badge.textContent = count > 9 ? '9+' : count;
-        badge.style.display = 'flex';
-    } else {
-        badge.style.display = 'none';
-    }
+    console.log('🎧 بدء الاستماع لطلبات الصداقة لـ:', uid);
+    
+    window.db.collection('friendRequests')
+        .where('to', '==', uid)
+        .where('status', '==', 'pending')
+        .orderBy('timestamp', 'desc')
+        .onSnapshot((snapshot) => {
+            console.log('📩 تحديث طلبات الصداقة:', snapshot.size, 'طلبات');
+            
+            // تحديث العداد
+            updateRequestsBadge(snapshot.size);
+            
+            // عرض الطلبات في الصفحة (إذا كانت مفتوحة)
+            displayFriendRequestsRealTime(snapshot);
+            
+            // يمكن إظهار إشعار إذا كان هناك طلب جديد
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                    console.log('➕ طلب صداقة جديد وصل!');
+                    // هنا يمكن إضافة إشعار (اختياري)
+                }
+            });
+        }, (error) => {
+            console.error('❌ خطأ في الاستماع للطلبات:', error);
+        });
 }
 
-// عرض طلبات الصداقة في الصفحة
-async function displayFriendRequests(snapshot) {
+// عرض الطلبات في الوقت الحقيقي
+async function displayFriendRequestsRealTime(snapshot) {
     const requestsList = document.getElementById('requestsList');
     if (!requestsList) return;
     
@@ -383,33 +385,50 @@ async function displayFriendRequests(snapshot) {
         const request = doc.data();
         const requestId = doc.id;
         
-        // جلب بيانات المرسل
-        const userDoc = await window.db.collection('users').doc(request.from).get();
-        if (!userDoc.exists) continue;
-        
-        const user = userDoc.data();
-        const avatarEmoji = getEmojiForUser(user);
-        
-        html += `
-            <div class="request-item" data-request-id="${requestId}">
-                <div class="request-avatar-emoji">${avatarEmoji}</div>
-                <div class="request-info">
-                    <h4>${user.name}</h4>
-                    <p>${user.shareableId || ''}</p>
+        try {
+            // جلب بيانات المرسل
+            const userDoc = await window.db.collection('users').doc(request.from).get();
+            if (!userDoc.exists) continue;
+            
+            const user = userDoc.data();
+            const avatarEmoji = getEmojiForUser(user);
+            
+            html += `
+                <div class="request-item" data-request-id="${requestId}">
+                    <div class="request-avatar-emoji">${avatarEmoji}</div>
+                    <div class="request-info">
+                        <h4>${user.name}</h4>
+                        <p>${user.shareableId || ''}</p>
+                    </div>
+                    <div class="request-actions">
+                        <button class="request-btn accept" onclick="acceptFriendRequest('${requestId}', '${request.from}')">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button class="request-btn reject" onclick="rejectFriendRequest('${requestId}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="request-actions">
-                    <button class="request-btn accept" onclick="acceptFriendRequest('${requestId}', '${request.from}')">
-                        <i class="fas fa-check"></i>
-                    </button>
-                    <button class="request-btn reject" onclick="rejectFriendRequest('${requestId}')">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        `;
+            `;
+        } catch (error) {
+            console.error('Error loading user data for request:', error);
+        }
     }
     
     requestsList.innerHTML = html;
+}
+
+// تحديث عداد الإشعارات
+function updateRequestsBadge(count) {
+    const badge = document.getElementById('requestsBadge');
+    if (!badge) return;
+    
+    if (count > 0) {
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
 }
 
 // قبول طلب صداقة
@@ -422,7 +441,7 @@ window.acceptFriendRequest = async function(requestId, fromUserId) {
             status: 'accepted'
         });
         
-        // إضافة الصديق لقائمة الأصدقاء (سنستخدم followers/following)
+        // إضافة الصديق لقائمة الأصدقاء
         await window.db.collection('users').doc(window.auth.currentUser.uid).update({
             followers: window.db.FieldValue.arrayUnion(fromUserId)
         });
@@ -431,14 +450,7 @@ window.acceptFriendRequest = async function(requestId, fromUserId) {
             following: window.db.FieldValue.arrayUnion(window.auth.currentUser.uid)
         });
         
-        // إزالة الطلب من الواجهة
-        const requestElement = document.querySelector(`[data-request-id="${requestId}"]`);
-        if (requestElement) {
-            requestElement.remove();
-        }
-        
-        // تحديث العداد
-        updateRequestsBadge(document.querySelectorAll('.request-item').length);
+        // إزالة الطلب من الواجهة (سيتم تلقائياً عبر onSnapshot)
         
         // تحديث قوائم المتابعين
         loadUserData(window.auth.currentUser.uid);
@@ -460,14 +472,7 @@ window.rejectFriendRequest = async function(requestId) {
             status: 'rejected'
         });
         
-        // إزالة الطلب من الواجهة
-        const requestElement = document.querySelector(`[data-request-id="${requestId}"]`);
-        if (requestElement) {
-            requestElement.remove();
-        }
-        
-        // تحديث العداد
-        updateRequestsBadge(document.querySelectorAll('.request-item').length);
+        // إزالة الطلب من الواجهة (سيتم تلقائياً عبر onSnapshot)
         
         alert(i18n ? i18n.t('request_rejected') : 'تم رفض طلب الصداقة');
     } catch (error) {
@@ -476,7 +481,23 @@ window.rejectFriendRequest = async function(requestId) {
     }
 };
 
-// ========== الدوال القديمة (كما هي) ==========
+// تحميل طلبات الصداقة (لقطة واحدة - تستخدم كاحتياطي)
+async function loadFriendRequests(uid) {
+    try {
+        const requestsSnapshot = await window.db.collection('friendRequests')
+            .where('to', '==', uid)
+            .where('status', '==', 'pending')
+            .orderBy('timestamp', 'desc')
+            .get();
+        
+        updateRequestsBadge(requestsSnapshot.size);
+        // لا نحتاج لعرضها هنا لأن real-time listener سيفعل ذلك
+    } catch (error) {
+        console.error('Error loading friend requests:', error);
+    }
+}
+
+// ========== الدوال القديمة ==========
 
 async function removeFollower(followerId) {
     if (!window.auth || !window.auth.currentUser) return;
