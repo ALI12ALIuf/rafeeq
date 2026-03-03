@@ -65,11 +65,13 @@ const i18n = {
             unblock_user: 'إلغاء حظر المستخدم',
             arabic: 'العربية',
             english: 'English',
+            
             // ترجمات نافذة التعديل
             name: 'الاسم',
             avatar: 'الصورة الرمزية',
             change_avatar: 'تغيير',
             choose_avatar: 'اختر صورتك الرمزية',
+            
             // ترجمات الأفاتار
             male: 'رجل',
             female: 'امرأة',
@@ -79,13 +81,20 @@ const i18n = {
             mother: 'أم',
             grandfather: 'جد',
             grandmother: 'جدة',
+            
             // الترجمات القديمة
             no_trips: 'لا توجد رحلات',
             no_trips_desc: 'لم تقم بأي رحلة بعد',
             no_followers: 'لا يوجد متابعين',
             no_followers_desc: 'لم يتابعك أحد بعد',
             no_following: 'لا تتابع أحداً',
-            no_following_desc: 'لم تتابع أي شخص بعد'
+            no_following_desc: 'لم تتابع أي شخص بعد',
+            
+            // ترجمات البحث الجديدة - بالعربية
+            search_placeholder: 'البحث عن الأصدقاء',
+            search_no_user: 'لا يوجد مستخدم',
+            search_yourself: 'هذا حسابك الشخصي',
+            search_error: 'حدث خطأ بالبحث حاول مرة ثانية'
         },
         en: {
             app_name: 'Rafeeq',
@@ -149,11 +158,13 @@ const i18n = {
             unblock_user: 'Unblock User',
             arabic: 'Arabic',
             english: 'English',
+            
             // Edit window translations
             name: 'Name',
             avatar: 'Avatar',
             change_avatar: 'Change',
             choose_avatar: 'Choose Avatar',
+            
             // Avatar translations
             male: 'Male',
             female: 'Female',
@@ -163,13 +174,20 @@ const i18n = {
             mother: 'Mother',
             grandfather: 'Grandfather',
             grandmother: 'Grandmother',
+            
             // Old translations
             no_trips: 'No Trips',
             no_trips_desc: "You haven't taken any trips yet",
             no_followers: 'No Followers',
             no_followers_desc: "No one is following you yet",
             no_following: 'Not Following',
-            no_following_desc: "You aren't following anyone yet"
+            no_following_desc: "You aren't following anyone yet",
+            
+            // New search translations - English
+            search_placeholder: 'Search for friends',
+            search_no_user: 'No user found',
+            search_yourself: 'This is your account',
+            search_error: 'Search error, please try again'
         }
     },
     
