@@ -74,10 +74,10 @@
                 </div>
             </div>
 
-            <!-- صفحة الدردشة (يبقى كما هو) -->
+            <!-- صفحة الدردشة - مع أيقونة قابلة للنقر -->
             <div class="page chat-page">
                 <div class="search-box">
-                    <i class="fas fa-search"></i>
+                    <i class="fas fa-search" onclick="openFindFriendModal()" style="cursor: pointer;"></i>
                     <input type="text" id="friendSearch" placeholder="البحث عن أصدقاء..." data-i18n-placeholder="search_friends">
                 </div>
                 
@@ -331,7 +331,7 @@
         </div>
     </div>
 
-    <!-- نافذة البحث عن الأصدقاء - بأسماء جديدة -->
+    <!-- نافذة البحث عن الأصدقاء -->
     <div class="modal" id="findFriendModal">
         <div class="modal-content">
             <h3 data-i18n="search_friends">البحث عن أصدقاء</h3>
