@@ -248,20 +248,14 @@ function copyId() {
     });
 }
 
-// ========== دوال البحث الجديدة (بأسماء مختلفة) ==========
+// ========== دوال البحث المباشر (بدون نافذة منبثقة) ==========
 
-// فتح نافذة البحث عن الأصدقاء
-window.openFindFriendModal = function() {
-    const modal = document.getElementById('findFriendModal');
-    if (modal) modal.classList.add('active');
-};
-
-// البحث عن مستخدم بالمعرف
+// البحث عن مستخدم بالمعرف - مباشرة من صفحة الدردشة
 window.findUserById = async function() {
-    const input = document.getElementById('friendIdInput');
-    const resultsDiv = document.getElementById('findResults');
+    const input = document.getElementById('searchInput');
+    const resultsContainer = document.getElementById('searchResultsContainer');
     
-    if (!input || !resultsDiv) return;
+    if (!input || !resultsContainer) return;
     
     const searchId = input.value.trim();
     if (!searchId || searchId.length !== 10 || !/^\d+$/.test(searchId)) {
@@ -269,7 +263,8 @@ window.findUserById = async function() {
         return;
     }
     
-    resultsDiv.innerHTML = '<div class="loading" style="text-align: center; padding: 20px;">جاري البحث...</div>';
+    resultsContainer.style.display = 'block';
+    resultsContainer.innerHTML = '<div class="loading" style="text-align: center; padding: 20px;">جاري البحث...</div>';
     
     try {
         const snapshot = await window.db.collection('users')
@@ -277,7 +272,7 @@ window.findUserById = async function() {
             .get();
         
         if (snapshot.empty) {
-            resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">لا يوجد مستخدم بهذا المعرف</div>';
+            resultsContainer.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">لا يوجد مستخدم بهذا المعرف</div>';
             return;
         }
         
@@ -286,25 +281,25 @@ window.findUserById = async function() {
         const currentUser = window.auth ? window.auth.currentUser : null;
         
         if (currentUser && userId === currentUser.uid) {
-            resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
+            resultsContainer.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
             return;
         }
         
         const avatarEmoji = getEmojiForUser(user);
         
-        resultsDiv.innerHTML = `
+        resultsContainer.innerHTML = `
             <div class="search-result-item">
                 <div class="search-result-avatar-emoji">${avatarEmoji}</div>
                 <div class="search-result-info">
                     <h4>${user.name}</h4>
                     <p>${user.shareableId}</p>
                 </div>
-                ${currentUser ? '<button class="btn btn-primary" onclick="addNewFriend(\'' + userId + '\')">إضافة</button>' : ''}
+                ${currentUser ? '<button class="btn btn-primary" onclick="addNewFriend(\'' + userId + '\')">إضافة صديق</button>' : ''}
             </div>
         `;
     } catch (error) {
         console.error('Search error:', error);
-        resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">حدث خطأ في البحث</div>';
+        resultsContainer.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">حدث خطأ في البحث</div>';
     }
 };
 
@@ -323,11 +318,30 @@ window.addNewFriend = async function(targetUserId) {
             timestamp: new Date()
         });
         
-        closeModal();
+        // إخفاء نتائج البحث
+        const resultsContainer = document.getElementById('searchResultsContainer');
+        if (resultsContainer) {
+            resultsContainer.style.display = 'none';
+            resultsContainer.innerHTML = '';
+        }
+        
+        // إفراغ حقل البحث
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
+        
         alert('تم إرسال طلب الصداقة');
     } catch (error) {
         console.error('Error sending request:', error);
         alert('حدث خطأ في إرسال الطلب');
+    }
+};
+
+// إخفاء نتائج البحث
+window.hideSearchResults = function() {
+    const resultsContainer = document.getElementById('searchResultsContainer');
+    if (resultsContainer) {
+        resultsContainer.style.display = 'none';
+        resultsContainer.innerHTML = '';
     }
 };
 
