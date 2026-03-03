@@ -267,7 +267,7 @@ window.findUserById = async function() {
     }
     
     resultsContainer.style.display = 'block';
-    resultsContainer.innerHTML = '<div style="text-align: center; padding: 10px; color: var(--text-light);">جاري البحث...</div>';
+    resultsContainer.innerHTML = `<div style="text-align: center; padding: 10px; color: var(--text-light);">${i18n ? i18n.t('searching') : 'جاري البحث...'}</div>`;
     
     try {
         // البحث في قاعدة البيانات باستخدام shareableId
@@ -276,8 +276,8 @@ window.findUserById = async function() {
             .get();
         
         if (snapshot.empty) {
-            // رسالة صغيرة أسفل البحث
-            resultsContainer.innerHTML = '<div style="text-align: right; padding: 8px; color: var(--text-light); font-size: 0.9rem;">لا يوجد مستخدم بهذا المعرف</div>';
+            // رسالة في المنتصف
+            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">${i18n ? i18n.t('search_no_user') : 'لا يوجد مستخدم'}</div>`;
             return;
         }
         
@@ -286,7 +286,7 @@ window.findUserById = async function() {
         const currentUser = window.auth ? window.auth.currentUser : null;
         
         if (currentUser && userId === currentUser.uid) {
-            resultsContainer.innerHTML = '<div style="text-align: right; padding: 8px; color: var(--text-light); font-size: 0.9rem;">هذا معرفك أنت</div>';
+            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">${i18n ? i18n.t('search_yourself') : 'هذا حسابك الشخصي'}</div>`;
             return;
         }
         
@@ -299,12 +299,12 @@ window.findUserById = async function() {
                     <h4 style="margin: 0; font-size: 1rem;">${user.name}</h4>
                     <p style="margin: 0; color: var(--text-light); font-size: 0.85rem;">${user.shareableId}</p>
                 </div>
-                ${currentUser ? '<button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85rem;" onclick="addNewFriend(\'' + userId + '\')">إضافة</button>' : ''}
+                ${currentUser ? '<button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85rem;" onclick="addNewFriend(\'' + userId + '\')">' + (i18n ? i18n.t('add_friend') : 'إضافة') + '</button>' : ''}
             </div>
         `;
     } catch (error) {
         console.error('Search error:', error);
-        resultsContainer.innerHTML = '<div style="text-align: right; padding: 8px; color: var(--text-light); font-size: 0.9rem;">حدث خطأ في البحث</div>';
+        resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">${i18n ? i18n.t('search_error') : 'حدث خطأ بالبحث حاول مرة ثانية'}</div>`;
     }
 };
 
@@ -334,10 +334,10 @@ window.addNewFriend = async function(targetUserId) {
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.value = '';
         
-        alert('تم إرسال طلب الصداقة');
+        alert(i18n ? i18n.t('request_sent') : 'تم إرسال طلب الصداقة');
     } catch (error) {
         console.error('Error sending request:', error);
-        alert('حدث خطأ في إرسال الطلب');
+        alert(i18n ? i18n.t('request_error') : 'حدث خطأ في إرسال الطلب');
     }
 };
 
