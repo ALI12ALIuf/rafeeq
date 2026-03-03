@@ -216,10 +216,13 @@ if (typeof window.auth !== 'undefined') {
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
             
-            // تحميل طلبات الصداقة بعد تسجيل الدخول
-            if (typeof loadFriendRequests === 'function') {
-                loadFriendRequests();
-            }
+            // تحميل طلبات الصداقة بعد تسجيل الدخول مع تأخير بسيط للتأكد من تحميل DOM
+            setTimeout(() => {
+                if (typeof loadFriendRequests === 'function') {
+                    console.log('Loading friend requests...');
+                    loadFriendRequests();
+                }
+            }, 500);
             
             if (splash) {
                 splash.classList.add('hide');
@@ -376,15 +379,22 @@ window.loadFriendRequests = async function() {
     const requestsList = document.getElementById('requestsList');
     const badge = document.getElementById('requestsBadge');
     
-    if (!requestsList) return;
+    // التأكد من وجود العنصر، وإعادة المحاولة بعد ثانية إذا لم يوجد
+    if (!requestsList) {
+        console.log('Requests list element not found, retrying in 1 second...');
+        setTimeout(loadFriendRequests, 1000);
+        return;
+    }
     
     try {
+        console.log('Loading friend requests for user:', currentUserId);
         const snapshot = await window.db.collection('friendRequests')
             .where('to', '==', currentUserId)
             .where('status', '==', 'pending')
             .get();
         
         const requests = snapshot.docs;
+        console.log('Found', requests.length, 'pending requests');
         
         // تحديث العداد
         if (badge) {
