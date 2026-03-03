@@ -11,6 +11,7 @@ function formatNumber(num) {
 
 // توليد معرف عشوائي من 10 أرقام (أرقام فقط)
 function generateShareableId() {
+    // توليد 10 أرقام عشوائية
     let id = '';
     for (let i = 0; i < 10; i++) {
         id += Math.floor(Math.random() * 10).toString();
@@ -36,6 +37,7 @@ function getEmojiForUser(userData) {
 // تسجيل الدخول بجوجل
 async function signInWithGoogle() {
     try {
+        // استخدام googleProvider من window (الذي تم تعريفه في index.html)
         if (!window.auth || !window.googleProvider) {
             alert('مكتبة Firebase لم يتم تحميلها بعد. يرجى تحديث الصفحة.');
             return false;
@@ -44,9 +46,11 @@ async function signInWithGoogle() {
         const result = await window.auth.signInWithPopup(window.googleProvider);
         const user = result.user;
         
+        // التحقق من وجود المستخدم في Firestore
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         
         if (!userDoc.exists) {
+            // مستخدم جديد - إنشاء ملفه
             const shareableId = generateShareableId();
             
             await window.db.collection('users').doc(user.uid).set({
@@ -55,7 +59,7 @@ async function signInWithGoogle() {
                 email: user.email || '',
                 shareableId: shareableId,
                 bio: '',
-                avatarType: 'male',
+                avatarType: 'male', // ملصق افتراضي
                 followers: [],
                 following: [],
                 blocked: [],
@@ -63,11 +67,14 @@ async function signInWithGoogle() {
             });
         }
         
+        // تحديث واجهة المستخدم
         updateUserUI();
+        
         return true;
     } catch (error) {
         console.error('Login error:', error);
         
+        // رسالة خطأ مخصصة
         let errorMessage = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') {
             errorMessage = 'تم إغلاق نافذة تسجيل الدخول';
@@ -97,6 +104,7 @@ function updateUserUI() {
         }, 500);
     }
     
+    // تحديث أزرار تسجيل الدخول
     const loginPrompt = document.querySelector('.login-prompt');
     if (loginPrompt) loginPrompt.remove();
 }
@@ -118,6 +126,7 @@ async function loadUserData(uid) {
         if (userDoc.exists) {
             const userData = userDoc.data();
             
+            // تحديث واجهة المستخدم
             const profileName = document.getElementById('profileName');
             const profileAvatarEmoji = document.getElementById('profileAvatarEmoji');
             const menuAvatarEmoji = document.getElementById('menuAvatarEmoji');
@@ -129,27 +138,35 @@ async function loadUserData(uid) {
             if (profileName) profileName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (menuName) menuName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (profileBio) profileBio.textContent = userData.bio || '';
+            
+            // تحديث المعرف (يظهر كأرقام فقط)
             if (shareableId) shareableId.textContent = userData.shareableId || '0000000000';
             
+            // تحديث الملصقات
             const avatarEmoji = getEmojiForUser(userData);
             
-            if (profileAvatarEmoji) profileAvatarEmoji.textContent = avatarEmoji;
-            if (menuAvatarEmoji) menuAvatarEmoji.textContent = avatarEmoji;
-            if (currentAvatarEmoji) currentAvatarEmoji.textContent = avatarEmoji;
+            if (profileAvatarEmoji) {
+                profileAvatarEmoji.textContent = avatarEmoji;
+            }
+            if (menuAvatarEmoji) {
+                menuAvatarEmoji.textContent = avatarEmoji;
+            }
+            if (currentAvatarEmoji) {
+                currentAvatarEmoji.textContent = avatarEmoji;
+            }
             
+            // تحديث الإحصائيات مع التنسيق الذكي
             const followersCount = document.getElementById('followersCount');
             const followingCount = document.getElementById('followingCount');
             
             if (followersCount) followersCount.textContent = formatNumber((userData.followers || []).length);
             if (followingCount) followingCount.textContent = formatNumber((userData.following || []).length);
             
+            // تحميل قوائم المتابعين
             if (typeof loadFollowersList === 'function') {
                 loadFollowersList(uid, userData.followers || []);
                 loadFollowingList(uid, userData.following || []);
             }
-            
-            // ===== الاستماع المباشر لطلبات الصداقة =====
-            listenToFriendRequests(uid);
         }
     } catch (error) {
         console.error('Error loading user data:', error);
@@ -158,6 +175,7 @@ async function loadUserData(uid) {
 
 // إظهار رسالة تسجيل الدخول
 function showLoginPrompt() {
+    // التأكد من عدم وجود الرسالة مسبقاً
     if (document.querySelector('.login-prompt')) return;
     
     const loginPrompt = document.createElement('div');
@@ -194,6 +212,7 @@ if (typeof window.auth !== 'undefined') {
         const app = document.getElementById('app');
         
         if (user) {
+            // مستخدم مسجل
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
             
@@ -205,6 +224,7 @@ if (typeof window.auth !== 'undefined') {
                 }, 500);
             }
         } else {
+            // مستخدم غير مسجل - انتظر 2 ثانية ثم أظهر المحتوى
             console.log('User not logged in, showing content after delay');
             setTimeout(() => {
                 if (splash) {
@@ -213,6 +233,7 @@ if (typeof window.auth !== 'undefined') {
                         splash.style.display = 'none';
                         if (app) app.style.display = 'flex';
                         
+                        // إظهار رسالة تسجيل الدخول للميزات المهمة
                         setTimeout(showLoginPrompt, 1000);
                     }, 500);
                 }
@@ -221,6 +242,7 @@ if (typeof window.auth !== 'undefined') {
     });
 } else {
     console.error('auth is not defined. Firebase may not be loaded yet.');
+    // محاولة إظهار رسالة تسجيل الدخول بعد فترة
     setTimeout(showLoginPrompt, 3000);
 }
 
@@ -237,8 +259,9 @@ function copyId() {
     });
 }
 
-// ========== دوال البحث المباشر ==========
+// ========== دوال البحث المباشر (بدون شروط) ==========
 
+// البحث عن مستخدم بالمعرف - بحث حر بدون شروط
 window.findUserById = async function() {
     const input = document.getElementById('searchInput');
     const resultsContainer = document.getElementById('searchResultsContainer');
@@ -247,6 +270,7 @@ window.findUserById = async function() {
     
     const searchText = input.value.trim();
     
+    // إذا كان الحقل فارغاً، نخفي النتائج
     if (searchText === '') {
         resultsContainer.style.display = 'none';
         resultsContainer.innerHTML = '';
@@ -257,11 +281,13 @@ window.findUserById = async function() {
     resultsContainer.innerHTML = `<div style="text-align: center; padding: 10px; color: var(--text-light);">${i18n ? i18n.t('searching') : 'جاري البحث...'}</div>`;
     
     try {
+        // البحث في قاعدة البيانات باستخدام shareableId
         const snapshot = await window.db.collection('users')
             .where('shareableId', '==', searchText)
             .get();
         
         if (snapshot.empty) {
+            // رسالة في المنتصف
             resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">${i18n ? i18n.t('search_no_user') : 'لا يوجد مستخدم'}</div>`;
             return;
         }
@@ -293,6 +319,7 @@ window.findUserById = async function() {
     }
 };
 
+// إضافة صديق جديد
 window.addNewFriend = async function(targetUserId) {
     if (!window.auth || !window.auth.currentUser) {
         alert('الرجاء تسجيل الدخول أولاً');
@@ -307,12 +334,14 @@ window.addNewFriend = async function(targetUserId) {
             timestamp: new Date()
         });
         
+        // إخفاء نتائج البحث
         const resultsContainer = document.getElementById('searchResultsContainer');
         if (resultsContainer) {
             resultsContainer.style.display = 'none';
             resultsContainer.innerHTML = '';
         }
         
+        // إفراغ حقل البحث
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.value = '';
         
@@ -323,6 +352,7 @@ window.addNewFriend = async function(targetUserId) {
     }
 };
 
+// إخفاء نتائج البحث
 window.hideSearchResults = function() {
     const resultsContainer = document.getElementById('searchResultsContainer');
     if (resultsContainer) {
@@ -331,176 +361,9 @@ window.hideSearchResults = function() {
     }
 };
 
-// ========== دوال طلبات الصداقة مع Real-time listener ==========
+// ========== باقي الدوال كما هي ==========
 
-// الاستماع المباشر لطلبات الصداقة
-function listenToFriendRequests(uid) {
-    if (!uid) return;
-    
-    // رسالة تأكيد بدء الـ listener
-    alert('✅ LISTENER بدأ للمستخدم: ' + uid);
-    
-    window.db.collection('friendRequests')
-        .where('to', '==', uid)
-        .where('status', '==', 'pending')
-        .orderBy('timestamp', 'desc')
-        .onSnapshot((snapshot) => {
-            // رسالة تأكيد عدد الطلبات
-            alert('👀 عدد الطلبات: ' + snapshot.size);
-            
-            // تحديث العداد
-            updateRequestsBadge(snapshot.size);
-            
-            // عرض الطلبات في الصفحة (إذا كانت مفتوحة)
-            displayFriendRequestsRealTime(snapshot);
-            
-            // يمكن إظهار إشعار إذا كان هناك طلب جديد
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added') {
-                    console.log('➕ طلب صداقة جديد وصل!');
-                    // هنا يمكن إضافة إشعار (اختياري)
-                }
-            });
-        }, (error) => {
-            console.error('❌ خطأ في الاستماع للطلبات:', error);
-        });
-}
-
-// عرض الطلبات في الوقت الحقيقي
-async function displayFriendRequestsRealTime(snapshot) {
-    const requestsList = document.getElementById('requestsList');
-    if (!requestsList) return;
-    
-    if (snapshot.empty) {
-        requestsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-user-friends"></i>
-                <h3>${i18n ? i18n.t('no_requests') : 'لا توجد طلبات صداقة'}</h3>
-            </div>
-        `;
-        return;
-    }
-    
-    let html = '';
-    
-    for (const doc of snapshot.docs) {
-        const request = doc.data();
-        const requestId = doc.id;
-        
-        try {
-            // جلب بيانات المرسل
-            const userDoc = await window.db.collection('users').doc(request.from).get();
-            if (!userDoc.exists) continue;
-            
-            const user = userDoc.data();
-            const avatarEmoji = getEmojiForUser(user);
-            
-            html += `
-                <div class="request-item" data-request-id="${requestId}">
-                    <div class="request-avatar-emoji">${avatarEmoji}</div>
-                    <div class="request-info">
-                        <h4>${user.name}</h4>
-                        <p>${user.shareableId || ''}</p>
-                    </div>
-                    <div class="request-actions">
-                        <button class="request-btn accept" onclick="acceptFriendRequest('${requestId}', '${request.from}')">
-                            <i class="fas fa-check"></i>
-                        </button>
-                        <button class="request-btn reject" onclick="rejectFriendRequest('${requestId}')">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        } catch (error) {
-            console.error('Error loading user data for request:', error);
-        }
-    }
-    
-    requestsList.innerHTML = html;
-}
-
-// تحديث عداد الإشعارات
-function updateRequestsBadge(count) {
-    const badge = document.getElementById('requestsBadge');
-    if (!badge) return;
-    
-    if (count > 0) {
-        badge.textContent = count > 9 ? '9+' : count;
-        badge.style.display = 'flex';
-    } else {
-        badge.style.display = 'none';
-    }
-}
-
-// قبول طلب صداقة
-window.acceptFriendRequest = async function(requestId, fromUserId) {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        // تحديث حالة الطلب
-        await window.db.collection('friendRequests').doc(requestId).update({
-            status: 'accepted'
-        });
-        
-        // إضافة الصديق لقائمة الأصدقاء
-        await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            followers: window.db.FieldValue.arrayUnion(fromUserId)
-        });
-        
-        await window.db.collection('users').doc(fromUserId).update({
-            following: window.db.FieldValue.arrayUnion(window.auth.currentUser.uid)
-        });
-        
-        // إزالة الطلب من الواجهة (سيتم تلقائياً عبر onSnapshot)
-        
-        // تحديث قوائم المتابعين
-        loadUserData(window.auth.currentUser.uid);
-        
-        alert(i18n ? i18n.t('request_accepted') : 'تم قبول طلب الصداقة');
-    } catch (error) {
-        console.error('Error accepting request:', error);
-        alert(i18n ? i18n.t('request_error') : 'حدث خطأ');
-    }
-};
-
-// رفض طلب صداقة
-window.rejectFriendRequest = async function(requestId) {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        // تحديث حالة الطلب
-        await window.db.collection('friendRequests').doc(requestId).update({
-            status: 'rejected'
-        });
-        
-        // إزالة الطلب من الواجهة (سيتم تلقائياً عبر onSnapshot)
-        
-        alert(i18n ? i18n.t('request_rejected') : 'تم رفض طلب الصداقة');
-    } catch (error) {
-        console.error('Error rejecting request:', error);
-        alert(i18n ? i18n.t('request_error') : 'حدث خطأ');
-    }
-};
-
-// تحميل طلبات الصداقة (لقطة واحدة - تستخدم كاحتياطي)
-async function loadFriendRequests(uid) {
-    try {
-        const requestsSnapshot = await window.db.collection('friendRequests')
-            .where('to', '==', uid)
-            .where('status', '==', 'pending')
-            .orderBy('timestamp', 'desc')
-            .get();
-        
-        updateRequestsBadge(requestsSnapshot.size);
-        // لا نحتاج لعرضها هنا لأن real-time listener سيفعل ذلك
-    } catch (error) {
-        console.error('Error loading friend requests:', error);
-    }
-}
-
-// ========== الدوال القديمة ==========
-
+// إزالة متابع
 async function removeFollower(followerId) {
     if (!window.auth || !window.auth.currentUser) return;
     
@@ -509,6 +372,7 @@ async function removeFollower(followerId) {
             followers: window.db.FieldValue.arrayRemove(followerId)
         });
         
+        // تحديث القائمة
         const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
         if (userDoc.exists) {
             loadFollowersList(window.auth.currentUser.uid, userDoc.data().followers || []);
@@ -518,6 +382,7 @@ async function removeFollower(followerId) {
     }
 }
 
+// إلغاء متابعة
 async function unfollow(followingId) {
     if (!window.auth || !window.auth.currentUser) return;
     
@@ -530,6 +395,7 @@ async function unfollow(followingId) {
             followers: window.db.FieldValue.arrayRemove(window.auth.currentUser.uid)
         });
         
+        // تحديث القائمة
         const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
         if (userDoc.exists) {
             loadFollowingList(window.auth.currentUser.uid, userDoc.data().following || []);
@@ -539,6 +405,7 @@ async function unfollow(followingId) {
     }
 }
 
+// تحميل قائمة المتابعين
 async function loadFollowersList(currentUid, followers) {
     const followersList = document.getElementById('followersList');
     if (!followersList) return;
@@ -575,9 +442,12 @@ async function loadFollowersList(currentUid, followers) {
         }
     }
     followersList.innerHTML = html;
+    
+    // حفظ البيانات للصفحات الفرعية
     window.followersData = html;
 }
 
+// تحميل قائمة من يتابعهم
 async function loadFollowingList(currentUid, following) {
     const followingList = document.getElementById('followingList');
     if (!followingList) return;
@@ -614,5 +484,7 @@ async function loadFollowingList(currentUid, following) {
         }
     }
     followingList.innerHTML = html;
+    
+    // حفظ البيانات للصفحات الفرعية
     window.followingData = html;
 }
