@@ -74,11 +74,18 @@
                 </div>
             </div>
 
-            <!-- صفحة الدردشة - مع أيقونة قابلة للنقر -->
+            <!-- صفحة الدردشة - معدلة: بدون نافذة منبثقة -->
             <div class="page chat-page">
-                <div class="search-box">
-                    <i class="fas fa-search" onclick="openFindFriendModal()" style="cursor: pointer;"></i>
-                    <input type="text" id="friendSearch" placeholder="البحث عن أصدقاء..." data-i18n-placeholder="search_friends">
+                <div class="search-container">
+                    <div class="search-box">
+                        <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
+                        <input type="text" id="searchInput" placeholder="أدخل معرف الصديق (10 أرقام)" maxlength="10">
+                    </div>
+                    
+                    <!-- نتائج البحث تظهر هنا -->
+                    <div id="searchResultsContainer" class="search-results-container" style="display: none;">
+                        <!-- النتائج ستضاف هنا ديناميكياً -->
+                    </div>
                 </div>
                 
                 <div class="chats-list" id="chatsList">
@@ -331,18 +338,7 @@
         </div>
     </div>
 
-    <!-- نافذة البحث عن الأصدقاء -->
-    <div class="modal" id="findFriendModal">
-        <div class="modal-content">
-            <h3 data-i18n="search_friends">البحث عن أصدقاء</h3>
-            <div class="search-input">
-                <input type="text" id="friendIdInput" placeholder="أدخل معرف الصديق (10 أرقام)" maxlength="10">
-                <button onclick="findUserById()"><i class="fas fa-search"></i></button>
-            </div>
-            <div class="search-results" id="findResults"></div>
-            <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
-        </div>
-    </div>
+    <!-- تم إزالة نافذة البحث المنبثقة (findFriendModal) -->
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
@@ -426,7 +422,24 @@
                 }
             });
         }
+        
+        // إضافة حدث Enter لحقل البحث
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+        }
     });
+    
+    // دالة البحث (سيتم تعريفها في auth.js)
+    window.performSearch = function() {
+        if (typeof findUserById === 'function') {
+            findUserById();
+        }
+    };
     
     window.onerror = function(msg, url, line) {
         console.log('خطأ في الموقع:', msg, 'السطر:', line);
