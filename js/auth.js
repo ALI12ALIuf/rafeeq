@@ -248,31 +248,36 @@ function copyId() {
     });
 }
 
-// ========== دوال البحث المباشر (بدون نافذة منبثقة) ==========
+// ========== دوال البحث المباشر (بدون شروط) ==========
 
-// البحث عن مستخدم بالمعرف - مباشرة من صفحة الدردشة
+// البحث عن مستخدم بالمعرف - بحث حر بدون شروط
 window.findUserById = async function() {
     const input = document.getElementById('searchInput');
     const resultsContainer = document.getElementById('searchResultsContainer');
     
     if (!input || !resultsContainer) return;
     
-    const searchId = input.value.trim();
-    if (!searchId || searchId.length !== 10 || !/^\d+$/.test(searchId)) {
-        alert('الرجاء إدخال 10 أرقام فقط');
+    const searchText = input.value.trim();
+    
+    // إذا كان الحقل فارغاً، نخفي النتائج
+    if (searchText === '') {
+        resultsContainer.style.display = 'none';
+        resultsContainer.innerHTML = '';
         return;
     }
     
     resultsContainer.style.display = 'block';
-    resultsContainer.innerHTML = '<div class="loading" style="text-align: center; padding: 20px;">جاري البحث...</div>';
+    resultsContainer.innerHTML = '<div style="text-align: center; padding: 10px; color: var(--text-light);">جاري البحث...</div>';
     
     try {
+        // البحث في قاعدة البيانات باستخدام shareableId
         const snapshot = await window.db.collection('users')
-            .where('shareableId', '==', searchId)
+            .where('shareableId', '==', searchText)
             .get();
         
         if (snapshot.empty) {
-            resultsContainer.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">لا يوجد مستخدم بهذا المعرف</div>';
+            // رسالة صغيرة أسفل البحث
+            resultsContainer.innerHTML = '<div style="text-align: right; padding: 8px; color: var(--text-light); font-size: 0.9rem;">لا يوجد مستخدم بهذا المعرف</div>';
             return;
         }
         
@@ -281,25 +286,25 @@ window.findUserById = async function() {
         const currentUser = window.auth ? window.auth.currentUser : null;
         
         if (currentUser && userId === currentUser.uid) {
-            resultsContainer.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
+            resultsContainer.innerHTML = '<div style="text-align: right; padding: 8px; color: var(--text-light); font-size: 0.9rem;">هذا معرفك أنت</div>';
             return;
         }
         
         const avatarEmoji = getEmojiForUser(user);
         
         resultsContainer.innerHTML = `
-            <div class="search-result-item">
-                <div class="search-result-avatar-emoji">${avatarEmoji}</div>
-                <div class="search-result-info">
-                    <h4>${user.name}</h4>
-                    <p>${user.shareableId}</p>
+            <div class="search-result-item" style="display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border);">
+                <div class="search-result-avatar-emoji" style="width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 1.8rem;">${avatarEmoji}</div>
+                <div style="flex: 1;">
+                    <h4 style="margin: 0; font-size: 1rem;">${user.name}</h4>
+                    <p style="margin: 0; color: var(--text-light); font-size: 0.85rem;">${user.shareableId}</p>
                 </div>
-                ${currentUser ? '<button class="btn btn-primary" onclick="addNewFriend(\'' + userId + '\')">إضافة صديق</button>' : ''}
+                ${currentUser ? '<button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85rem;" onclick="addNewFriend(\'' + userId + '\')">إضافة</button>' : ''}
             </div>
         `;
     } catch (error) {
         console.error('Search error:', error);
-        resultsContainer.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">حدث خطأ في البحث</div>';
+        resultsContainer.innerHTML = '<div style="text-align: right; padding: 8px; color: var(--text-light); font-size: 0.9rem;">حدث خطأ في البحث</div>';
     }
 };
 
