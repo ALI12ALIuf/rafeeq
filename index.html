@@ -22,7 +22,7 @@
 
     <!-- المحتوى الرئيسي -->
     <div class="app-container" id="app" style="display: none;">
-        <!-- الهيدر -->
+        <!-- الهيدر مع زر طلبات الصداقة -->
         <header class="app-header">
             <div class="header-left">
                 <button class="icon-btn" id="menuBtn"><i class="fas fa-bars"></i></button>
@@ -31,6 +31,11 @@
                 <h1 data-i18n="app_name">رفيق</h1>
             </div>
             <div class="header-right">
+                <!-- زر طلبات الصداقة مع عداد أحمر -->
+                <button class="icon-btn friend-requests-btn" onclick="openRequestsPage()">
+                    <i class="fas fa-user-plus"></i>
+                    <span class="requests-badge" id="requestsBadge" style="display: none;">0</span>
+                </button>
                 <button class="icon-btn" id="notificationsBtn"><i class="fas fa-bell"></i></button>
             </div>
         </header>
@@ -74,7 +79,7 @@
                 </div>
             </div>
 
-            <!-- صفحة الدردشة - مع placeholder مترجم -->
+            <!-- صفحة الدردشة - مع البحث -->
             <div class="page chat-page">
                 <div class="search-container">
                     <div class="search-box">
@@ -96,6 +101,21 @@
                             <p>مرحباً! كيف حالك؟</p>
                         </div>
                         <span class="chat-time">10:30</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- صفحة طلبات الصداقة -->
+            <div class="page requests-page">
+                <div class="subpage-header">
+                    <button class="back-btn" onclick="switchPage('chat')"><i class="fas fa-arrow-right"></i></button>
+                    <h3 data-i18n="friend_requests">طلبات الصداقة</h3>
+                </div>
+                <div class="requests-list" id="requestsList">
+                    <div class="no-requests" id="noRequestsPlaceholder">
+                        <i class="fas fa-user-friends"></i>
+                        <h3 data-i18n="no_requests">لا توجد طلبات صداقة</h3>
+                        <p data-i18n="no_requests_desc">عندما يرسل لك أحد طلباً سيظهر هنا</p>
                     </div>
                 </div>
             </div>
@@ -222,6 +242,10 @@
                 <i class="fas fa-comment"></i>
                 <span data-i18n="chat">الدردشة</span>
             </button>
+            <button class="nav-item" data-page="requests">
+                <i class="fas fa-user-friends"></i>
+                <span data-i18n="requests">الطلبات</span>
+            </button>
             <button class="nav-item" data-page="profile">
                 <i class="fas fa-user"></i>
                 <span data-i18n="profile">الملف</span>
@@ -241,6 +265,7 @@
                 <a href="#" data-page="home"><i class="fas fa-home"></i> <span data-i18n="home">الرئيسية</span></a>
                 <a href="#" data-page="profile"><i class="fas fa-user"></i> <span data-i18n="profile">الملف الشخصي</span></a>
                 <a href="#" data-page="chat"><i class="fas fa-comment"></i> <span data-i18n="chat">الدردشة</span></a>
+                <a href="#" data-page="requests"><i class="fas fa-user-friends"></i> <span data-i18n="requests">الطلبات</span></a>
                 <a href="#" data-page="settings"><i class="fas fa-cog"></i> <span data-i18n="settings">الإعدادات</span></a>
                 <hr>
                 <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">تسجيل الخروج</span></a>
@@ -337,8 +362,6 @@
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
-
-    <!-- تم إزالة نافذة البحث المنبثقة (findFriendModal) -->
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
@@ -439,6 +462,11 @@
         if (typeof findUserById === 'function') {
             findUserById();
         }
+    };
+    
+    // دالة فتح صفحة الطلبات
+    window.openRequestsPage = function() {
+        switchPage('requests');
     };
     
     window.onerror = function(msg, url, line) {
