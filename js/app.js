@@ -106,10 +106,7 @@ function setupModals() {
         document.getElementById('languageModal')?.classList.add('active');
     };
     
-    // تغيير اسم الدالة من openSearchModal إلى openFindFriendModal
-    window.openFindFriendModal = () => {
-        document.getElementById('findFriendModal')?.classList.add('active');
-    };
+    // تم إزالة openFindFriendModal لأن النافذة المنبثقة أزيلت
     
     window.closeModal = () => {
         document.querySelectorAll('.modal').forEach(modal => {
@@ -123,10 +120,7 @@ function setupModals() {
         });
     });
     
-    // ربط زر البحث بالدالة الجديدة
-    const searchBtn = document.querySelector('.search-box button');
-    if (searchBtn) searchBtn.addEventListener('click', openFindFriendModal);
-    
+    // تم إزالة ربط زر البحث
     document.querySelectorAll('.settings-item').forEach(item => {
         if (item.querySelector('[data-i18n="language"]')) {
             item.addEventListener('click', openLanguageModal);
