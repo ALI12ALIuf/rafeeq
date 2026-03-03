@@ -120,7 +120,6 @@ body {
 .header-left, .header-right {
     display: flex;
     gap: 0.5rem;
-    position: relative;
 }
 
 .icon-btn {
@@ -140,31 +139,6 @@ body {
 
 .icon-btn:hover {
     background: var(--light);
-}
-
-/* عداد الإشعارات (للطلبات) */
-.notification-badge {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    background: var(--danger);
-    color: white;
-    font-size: 0.7rem;
-    font-weight: bold;
-    min-width: 18px;
-    height: 18px;
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 4px;
-    border: 2px solid var(--card-bg);
-    z-index: 2;
-}
-
-/* تعديل موضع العداد لأيقونة الطلبات */
-#friendRequestsBtn {
-    position: relative;
 }
 
 .header-title h1 {
@@ -507,100 +481,6 @@ body {
 .chat-time {
     color: var(--text-light);
     font-size: 0.7rem;
-}
-
-/* صفحة طلبات الصداقة */
-.friend-requests-page {
-    padding: 1rem;
-}
-
-.friend-requests-page h2 {
-    margin-bottom: 1rem;
-    color: var(--primary);
-}
-
-.requests-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.request-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-    background: var(--card-bg);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    transition: transform 0.3s;
-}
-
-.request-item:hover {
-    transform: translateX(-5px);
-}
-
-.request-avatar-emoji {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    background: var(--light);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.5rem;
-}
-
-.request-info {
-    flex: 1;
-}
-
-.request-info h4 {
-    margin-bottom: 0.25rem;
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-.request-info p {
-    color: var(--text-light);
-    font-size: 0.85rem;
-}
-
-.request-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.request-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s;
-}
-
-.request-btn.accept {
-    background: var(--success);
-    color: white;
-}
-
-.request-btn.accept:hover {
-    transform: scale(1.1);
-    background: #45a049;
-}
-
-.request-btn.reject {
-    background: var(--danger);
-    color: white;
-}
-
-.request-btn.reject:hover {
-    transform: scale(1.1);
-    background: #d32f2f;
 }
 
 /* صفحة الملف الشخصي */
