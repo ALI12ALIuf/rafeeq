@@ -337,14 +337,16 @@ window.hideSearchResults = function() {
 function listenToFriendRequests(uid) {
     if (!uid) return;
     
-    console.log('🎧 بدء الاستماع لطلبات الصداقة لـ:', uid);
+    // رسالة تأكيد بدء الـ listener
+    alert('✅ LISTENER بدأ للمستخدم: ' + uid);
     
     window.db.collection('friendRequests')
         .where('to', '==', uid)
         .where('status', '==', 'pending')
         .orderBy('timestamp', 'desc')
         .onSnapshot((snapshot) => {
-            console.log('📩 تحديث طلبات الصداقة:', snapshot.size, 'طلبات');
+            // رسالة تأكيد عدد الطلبات
+            alert('👀 عدد الطلبات: ' + snapshot.size);
             
             // تحديث العداد
             updateRequestsBadge(snapshot.size);
