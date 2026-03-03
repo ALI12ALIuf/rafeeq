@@ -216,14 +216,6 @@ if (typeof window.auth !== 'undefined') {
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
             
-            // تحميل طلبات الصداقة بعد تسجيل الدخول مع تأخير بسيط للتأكد من تحميل DOM
-            setTimeout(() => {
-                if (typeof loadFriendRequests === 'function') {
-                    console.log('Loading friend requests...');
-                    loadFriendRequests();
-                }
-            }, 500);
-            
             if (splash) {
                 splash.classList.add('hide');
                 setTimeout(() => {
@@ -267,7 +259,7 @@ function copyId() {
     });
 }
 
-// ========== دوال البحث المباشر ==========
+// ========== دوال البحث المباشر (بدون شروط) ==========
 
 // البحث عن مستخدم بالمعرف - بحث حر بدون شروط
 window.findUserById = async function() {
@@ -369,159 +361,7 @@ window.hideSearchResults = function() {
     }
 };
 
-// ========== دوال طلبات الصداقة ==========
-
-// تحميل طلبات الصداقة
-window.loadFriendRequests = async function() {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    const currentUserId = window.auth.currentUser.uid;
-    const requestsList = document.getElementById('requestsList');
-    const badge = document.getElementById('requestsBadge');
-    
-    // التأكد من وجود العنصر، وإعادة المحاولة بعد ثانية إذا لم يوجد
-    if (!requestsList) {
-        console.log('Requests list element not found, retrying in 1 second...');
-        setTimeout(loadFriendRequests, 1000);
-        return;
-    }
-    
-    try {
-        console.log('Loading friend requests for user:', currentUserId);
-        const snapshot = await window.db.collection('friendRequests')
-            .where('to', '==', currentUserId)
-            .where('status', '==', 'pending')
-            .get();
-        
-        const requests = snapshot.docs;
-        console.log('Found', requests.length, 'pending requests');
-        
-        // تحديث العداد
-        if (badge) {
-            if (requests.length > 0) {
-                badge.textContent = requests.length > 9 ? '9+' : requests.length;
-                badge.style.display = 'flex';
-            } else {
-                badge.style.display = 'none';
-            }
-        }
-        
-        if (requests.length === 0) {
-            requestsList.innerHTML = `
-                <div class="no-requests">
-                    <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_requests') : 'لا توجد طلبات صداقة'}</h3>
-                    <p>${i18n ? i18n.t('no_requests_desc') : 'عندما يرسل لك أحد طلباً سيظهر هنا'}</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = '';
-        
-        for (const doc of snapshot.docs) {
-            const request = doc.data();
-            const userDoc = await window.db.collection('users').doc(request.from).get();
-            
-            if (userDoc.exists) {
-                const user = userDoc.data();
-                const avatarEmoji = getEmojiForUser(user);
-                
-                html += `
-                    <div class="request-item" data-request-id="${doc.id}">
-                        <div class="request-avatar">${avatarEmoji}</div>
-                        <div class="request-info">
-                            <h4>${user.name}</h4>
-                            <p>${user.shareableId || ''}</p>
-                        </div>
-                        <div class="request-actions">
-                            <button class="request-accept-btn" onclick="acceptFriendRequest('${doc.id}', '${request.from}')">
-                                <i class="fas fa-check"></i>
-                            </button>
-                            <button class="request-reject-btn" onclick="rejectFriendRequest('${doc.id}')">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-        
-        requestsList.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading friend requests:', error);
-    }
-};
-
-// قبول طلب صداقة
-window.acceptFriendRequest = async function(requestId, fromUserId) {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        const currentUserId = window.auth.currentUser.uid;
-        
-        // تحديث حالة الطلب
-        await window.db.collection('friendRequests').doc(requestId).update({
-            status: 'accepted'
-        });
-        
-        // إضافة كل منهما للآخر
-        await window.db.collection('users').doc(currentUserId).update({
-            followers: window.db.FieldValue.arrayUnion(fromUserId),
-            following: window.db.FieldValue.arrayUnion(fromUserId)
-        });
-        
-        await window.db.collection('users').doc(fromUserId).update({
-            followers: window.db.FieldValue.arrayUnion(currentUserId),
-            following: window.db.FieldValue.arrayUnion(currentUserId)
-        });
-        
-        // إعادة تحميل الطلبات
-        loadFriendRequests();
-        
-        // إعادة تحميل بيانات المستخدم لتحديث قوائم المتابعين
-        await loadUserData(currentUserId);
-        
-        // تحديث الصفحات الفرعية إذا كانت مفتوحة
-        const followersPage = document.getElementById('followersPage');
-        const followingPage = document.getElementById('followingPage');
-        
-        if (followersPage && followersPage.style.display === 'block') {
-            showUserFollowers();
-        }
-        if (followingPage && followingPage.style.display === 'block') {
-            showUserFollowing();
-        }
-        
-        alert(i18n ? i18n.t('request_accepted') : 'تم قبول طلب الصداقة');
-        
-    } catch (error) {
-        console.error('Error accepting friend request:', error);
-        alert(i18n ? i18n.t('request_error') : 'حدث خطأ في قبول الطلب');
-    }
-};
-
-// رفض طلب صداقة
-window.rejectFriendRequest = async function(requestId) {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        // تحديث حالة الطلب إلى مرفوض
-        await window.db.collection('friendRequests').doc(requestId).update({
-            status: 'rejected'
-        });
-        
-        // إعادة تحميل الطلبات
-        loadFriendRequests();
-        
-    } catch (error) {
-        console.error('Error rejecting friend request:', error);
-        alert(i18n ? i18n.t('request_error') : 'حدث خطأ في رفض الطلب');
-    }
-};
-
-// ========== باقي الدوال ==========
+// ========== باقي الدوال كما هي ==========
 
 // إزالة متابع
 async function removeFollower(followerId) {
