@@ -480,6 +480,9 @@ window.acceptFriendRequest = async function(requestId, fromUserId) {
         // إعادة تحميل الطلبات
         loadFriendRequests();
         
+        // إعادة تحميل بيانات المستخدم لتحديث قوائم المتابعين
+        await loadUserData(currentUserId);
+        
         alert(i18n ? i18n.t('request_accepted') : 'تم قبول طلب الصداقة');
         
     } catch (error) {
