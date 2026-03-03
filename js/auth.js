@@ -248,80 +248,54 @@ function copyId() {
     });
 }
 
-// البحث عن صديق بالمعرف - مع تنبيهات للتشخيص
+// البحث عن صديق بالمعرف
 async function searchFriend() {
-    alert('🔍 1. بدأ البحث');
-    
     const searchInput = document.getElementById('searchInput');
     const resultsDiv = document.getElementById('searchResults');
     
-    if (!searchInput || !resultsDiv) {
-        alert('❌ عناصر البحث غير موجودة');
-        return;
-    }
+    if (!searchInput || !resultsDiv) return;
     
     const searchId = searchInput.value.trim();
-    alert('📝 2. الرقم المدخل: ' + searchId);
-    
     if (!searchId || searchId.length !== 10 || !/^\d+$/.test(searchId)) {
-        alert('❌ 3. رقم غير صالح: ' + searchId);
         alert('الرجاء إدخال 10 أرقام فقط');
         return;
     }
     
-    alert('✅ 3. الرقم صحيح: ' + searchId);
-    
     resultsDiv.innerHTML = '<div class="loading" style="text-align: center; padding: 20px;">جاري البحث...</div>';
-    alert('⏳ 4. جاري البحث في Firebase...');
     
     try {
-        alert('📦 5. البحث في مجموعة users');
         const snapshot = await window.db.collection('users')
             .where('shareableId', '==', searchId)
             .get();
         
-        alert('📊 6. عدد النتائج: ' + snapshot.size);
-        
         if (snapshot.empty) {
-            alert('❌ 7. لا توجد نتائج للمعرف: ' + searchId);
             resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">لا يوجد مستخدم بهذا المعرف</div>';
             return;
         }
         
-        alert('✅ 7. تم العثور على ' + snapshot.size + ' نتيجة');
+        const user = snapshot.docs[0].data();
+        const userId = snapshot.docs[0].id;
+        const currentUser = window.auth ? window.auth.currentUser : null;
         
-        // عرض جميع النتائج
-        snapshot.forEach(doc => {
-            const user = doc.data();
-            const userId = doc.id;
-            const currentUser = window.auth ? window.auth.currentUser : null;
-            
-            alert('✅ 8. تم العثور على: ' + user.name + ' - ' + user.shareableId);
-            
-            if (currentUser && userId === currentUser.uid) {
-                alert('ℹ️ 9. هذا هو المستخدم الحالي');
-                resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
-                return;
-            }
-            
-            const avatarEmoji = getEmojiForUser(user);
-            
-            resultsDiv.innerHTML = `
-                <div class="search-result-item">
-                    <div class="search-result-avatar-emoji">${avatarEmoji}</div>
-                    <div class="search-result-info">
-                        <h4>${user.name}</h4>
-                        <p>${user.shareableId}</p>
-                    </div>
-                    ${currentUser ? '<button class="btn btn-primary" onclick="sendFriendRequest(\'' + userId + '\')">إضافة</button>' : ''}
+        if (currentUser && userId === currentUser.uid) {
+            resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
+            return;
+        }
+        
+        const avatarEmoji = getEmojiForUser(user);
+        
+        resultsDiv.innerHTML = `
+            <div class="search-result-item">
+                <div class="search-result-avatar-emoji">${avatarEmoji}</div>
+                <div class="search-result-info">
+                    <h4>${user.name}</h4>
+                    <p>${user.shareableId}</p>
                 </div>
-            `;
-            alert('✅ 9. تم عرض النتيجة');
-        });
-        
+                ${currentUser ? '<button class="btn btn-primary" onclick="sendFriendRequest(\'' + userId + '\')">إضافة</button>' : ''}
+            </div>
+        `;
     } catch (error) {
-        alert('❌ خطأ في البحث: ' + error.message);
-        console.error('❌ خطأ في البحث:', error);
+        console.error('Search error:', error);
         resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">حدث خطأ في البحث</div>';
     }
 }
