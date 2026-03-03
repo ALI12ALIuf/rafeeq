@@ -106,8 +106,9 @@ function setupModals() {
         document.getElementById('languageModal')?.classList.add('active');
     };
     
-    window.openSearchModal = () => {
-        document.getElementById('searchModal')?.classList.add('active');
+    // تغيير اسم الدالة من openSearchModal إلى openFindFriendModal
+    window.openFindFriendModal = () => {
+        document.getElementById('findFriendModal')?.classList.add('active');
     };
     
     window.closeModal = () => {
@@ -122,8 +123,9 @@ function setupModals() {
         });
     });
     
+    // ربط زر البحث بالدالة الجديدة
     const searchBtn = document.querySelector('.search-box button');
-    if (searchBtn) searchBtn.addEventListener('click', openSearchModal);
+    if (searchBtn) searchBtn.addEventListener('click', openFindFriendModal);
     
     document.querySelectorAll('.settings-item').forEach(item => {
         if (item.querySelector('[data-i18n="language"]')) {
