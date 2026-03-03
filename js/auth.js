@@ -248,47 +248,47 @@ function copyId() {
     });
 }
 
-// البحث عن صديق بالمعرف - مع أسطر التشخيص
+// البحث عن صديق بالمعرف - مع تنبيهات للتشخيص
 async function searchFriend() {
-    console.log('🔍 === بدء البحث ===');
-    console.log('window.db موجود؟', !!window.db);
+    alert('🔍 1. بدأ البحث');
     
     const searchInput = document.getElementById('searchInput');
     const resultsDiv = document.getElementById('searchResults');
     
-    console.log('searchInput موجود؟', !!searchInput);
-    console.log('resultsDiv موجود؟', !!resultsDiv);
-    
     if (!searchInput || !resultsDiv) {
-        console.error('❌ عناصر البحث غير موجودة');
+        alert('❌ عناصر البحث غير موجودة');
         return;
     }
     
     const searchId = searchInput.value.trim();
-    console.log('🔍 البحث عن:', searchId);
+    alert('📝 2. الرقم المدخل: ' + searchId);
     
     if (!searchId || searchId.length !== 10 || !/^\d+$/.test(searchId)) {
-        console.log('❌ رقم غير صالح:', searchId);
+        alert('❌ 3. رقم غير صالح: ' + searchId);
         alert('الرجاء إدخال 10 أرقام فقط');
         return;
     }
     
+    alert('✅ 3. الرقم صحيح: ' + searchId);
+    
     resultsDiv.innerHTML = '<div class="loading" style="text-align: center; padding: 20px;">جاري البحث...</div>';
-    console.log('⏳ جاري البحث في Firestore...');
+    alert('⏳ 4. جاري البحث في Firebase...');
     
     try {
-        console.log('📦 Firestore collection: users');
+        alert('📦 5. البحث في مجموعة users');
         const snapshot = await window.db.collection('users')
             .where('shareableId', '==', searchId)
             .get();
         
-        console.log('📊 عدد النتائج:', snapshot.size);
+        alert('📊 6. عدد النتائج: ' + snapshot.size);
         
         if (snapshot.empty) {
-            console.log('❌ لا توجد نتائج للمعرف:', searchId);
+            alert('❌ 7. لا توجد نتائج للمعرف: ' + searchId);
             resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">لا يوجد مستخدم بهذا المعرف</div>';
             return;
         }
+        
+        alert('✅ 7. تم العثور على ' + snapshot.size + ' نتيجة');
         
         // عرض جميع النتائج
         snapshot.forEach(doc => {
@@ -296,10 +296,10 @@ async function searchFriend() {
             const userId = doc.id;
             const currentUser = window.auth ? window.auth.currentUser : null;
             
-            console.log('✅ تم العثور على:', user.name, user.shareableId);
+            alert('✅ 8. تم العثور على: ' + user.name + ' - ' + user.shareableId);
             
             if (currentUser && userId === currentUser.uid) {
-                console.log('ℹ️ هذا هو المستخدم الحالي');
+                alert('ℹ️ 9. هذا هو المستخدم الحالي');
                 resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">هذا معرفك أنت</div>';
                 return;
             }
@@ -316,10 +316,11 @@ async function searchFriend() {
                     ${currentUser ? '<button class="btn btn-primary" onclick="sendFriendRequest(\'' + userId + '\')">إضافة</button>' : ''}
                 </div>
             `;
-            console.log('✅ تم عرض النتيجة');
+            alert('✅ 9. تم عرض النتيجة');
         });
         
     } catch (error) {
+        alert('❌ خطأ في البحث: ' + error.message);
         console.error('❌ خطأ في البحث:', error);
         resultsDiv.innerHTML = '<div class="empty-state" style="text-align: center; padding: 20px;">حدث خطأ في البحث</div>';
     }
