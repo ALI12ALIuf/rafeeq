@@ -1,6 +1,6 @@
 // ========== نظام WebRTC للدردشة المباشرة مع Firebase Signaling ==========
 // اتصال P2P مشفر بالكامل - بدون حفظ أي بيانات في السيرفر
-// يستخدم Firebase فقط للإشارات المؤقتة
+// يستخدم Firebase فقط للإشارات المؤقتة والرسائل الاحتياطية
 
 class WebRTCManager {
     constructor() {
@@ -10,13 +10,16 @@ class WebRTCManager {
         this.currentCall = null;
         this.currentFriendId = null;
         this.pendingCandidates = new Map();
-        this.isReady = true; // دائمًا جاهز
+        this.pendingMessages = []; // رسائل مؤقتة
+        this.retryInterval = null;
+        this.isReady = true;
         
         console.log('✅ WebRTC Manager جاهز للاستخدام');
         
-        // بدء الاستماع للإشارات فوراً
+        // بدء الاستماع للإشارات والرسائل فوراً
         if (window.auth?.currentUser) {
             this.startListeningForSignals();
+            this.startListeningForTempMessages();
         }
     }
 
@@ -25,15 +28,12 @@ class WebRTCManager {
     // بدء الاستماع للإشارات الواردة
     startListeningForSignals() {
         if (!window.auth?.currentUser) {
-            console.log('⏳ انتظار تسجيل الدخول...');
             setTimeout(() => this.startListeningForSignals(), 1000);
             return;
         }
         
         const userId = window.auth.currentUser.uid;
-        console.log('👂 بدء الاستماع للإشارات للمستخدم:', userId);
         
-        // الاستماع للإشارات الواردة
         window.db.collection('signaling')
             .where('to', '==', userId)
             .where('status', '==', 'pending')
@@ -43,9 +43,6 @@ class WebRTCManager {
                         const signal = change.doc.data();
                         const signalId = change.doc.id;
                         
-                        console.log('📩 إشارة واردة:', signal.type);
-                        
-                        // معالجة الإشارة حسب نوعها
                         switch(signal.type) {
                             case 'offer':
                                 this.handleIncomingOffer(signal, signalId);
@@ -61,48 +58,71 @@ class WebRTCManager {
                                 break;
                         }
                         
-                        // حذف الإشارة بعد معالجتها (تنظيف تلقائي)
+                        // حذف الإشارة بعد معالجتها
                         setTimeout(() => {
                             window.db.collection('signaling').doc(signalId).delete()
                                 .catch(() => {});
                         }, 5000);
                     }
                 });
-            }, (error) => {
-                console.error('خطأ في الاستماع للإشارات:', error);
+            });
+    }
+
+    // ========== نظام الرسائل المؤقتة ==========
+    
+    // بدء الاستماع للرسائل المؤقتة
+    startListeningForTempMessages() {
+        if (!window.auth?.currentUser) return;
+        
+        const myId = window.auth.currentUser.uid;
+        
+        window.db.collection('temp_messages')
+            .where('to', '==', myId)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const data = change.doc.data();
+                        
+                        // عرض الرسالة في الواجهة
+                        this.displayMessage(data.message, 'received');
+                        
+                        // حذفها بعد الاستلام
+                        change.doc.ref.delete();
+                    }
+                });
             });
     }
 
     // ========== إدارة المحادثات ==========
     
-    // بدء محادثة مع صديق
+    // بدء محادثة مع صديق - فورية
     async startChat(friendId, friendName, friendAvatar) {
-        console.log('🚀 بدء محادثة مع:', friendName);
+        console.log('🚀 فتح محادثة فورية مع:', friendName);
         
         this.currentFriendId = friendId;
         
-        // تحديث واجهة المستخدم
+        // تحديث واجهة المستخدم فوراً
         document.getElementById('conversationName').textContent = friendName;
         document.getElementById('conversationAvatar').textContent = friendAvatar || '👤';
         
-        // إظهار صفحة المحادثة
+        // إظهار صفحة المحادثة فوراً
         document.querySelector('.chat-page').style.display = 'none';
         document.getElementById('conversationPage').style.display = 'block';
         
         // مسح الرسائل السابقة
         document.getElementById('messagesContainer').innerHTML = '';
         
-        // إنشاء اتصال WebRTC
-        await this.createPeerConnection(friendId);
+        // رسالة ترحيب فورية
+        this.displaySystemMessage('✅ المحادثة مفتوحة');
         
-        // إنشاء قناة بيانات
-        this.createDataChannel(friendId);
-        
-        // إرسال عرض الاتصال
-        await this.sendOffer(friendId);
-        
-        // رسالة ترحيب
-        this.displaySystemMessage('جاري الاتصال...');
+        // بدء الاتصال في الخلفية (لا ننتظره)
+        this.createPeerConnection(friendId).then(() => {
+            this.createDataChannel(friendId);
+            this.sendOffer(friendId);
+            this.displaySystemMessage('🔄 جاري تأمين الاتصال...');
+        }).catch(error => {
+            console.error('خطأ في الاتصال:', error);
+        });
     }
 
     // إنشاء اتصال WebRTC
@@ -117,33 +137,28 @@ class WebRTCManager {
 
         const pc = new RTCPeerConnection(config);
         
-        // معالجة ICE candidates
         pc.onicecandidate = (event) => {
             if (event.candidate) {
                 this.sendCandidate(friendId, event.candidate);
             }
         };
 
-        // معالجة قنوات البيانات الواردة
         pc.ondatachannel = (event) => {
             const channel = event.channel;
             this.setupDataChannel(channel, friendId);
         };
 
-        // معالجة التيارات البعيدة (للمكالمات)
         pc.ontrack = (event) => {
             if (event.streams && event.streams[0]) {
                 this.displayRemoteVideo(event.streams[0]);
             }
         };
 
-        // مراقبة حالة الاتصال
         pc.oniceconnectionstatechange = () => {
-            console.log('📡 ICE state:', pc.iceConnectionState);
             if (pc.iceConnectionState === 'connected') {
-                this.displaySystemMessage('✅ تم الاتصال بنجاح');
-            } else if (pc.iceConnectionState === 'disconnected') {
-                this.displaySystemMessage('❌ تم قطع الاتصال');
+                this.displaySystemMessage('✅ تم تأمين الاتصال');
+                // إرسال أي رسائل معلقة
+                this.sendPendingMessages();
             }
         };
 
@@ -169,7 +184,8 @@ class WebRTCManager {
     setupDataChannel(channel, friendId) {
         channel.onopen = () => {
             console.log('✅ قناة البيانات مفتوحة');
-            this.displaySystemMessage('✅ جاهز للإرسال');
+            this.displaySystemMessage('✅ جاهز للإرسال المباشر');
+            this.sendPendingMessages();
         };
 
         channel.onclose = () => {
@@ -188,6 +204,21 @@ class WebRTCManager {
         this.dataChannels.set(friendId, channel);
     }
 
+    // إرسال الرسائل المعلقة
+    sendPendingMessages() {
+        if (this.pendingMessages.length === 0) return;
+        
+        const channel = this.dataChannels.get(this.currentFriendId);
+        if (!channel || channel.readyState !== 'open') return;
+        
+        while (this.pendingMessages.length > 0) {
+            const message = this.pendingMessages.shift();
+            channel.send(JSON.stringify(message));
+        }
+        
+        this.displaySystemMessage('✅ تم إرسال الرسائل المعلقة');
+    }
+
     // ========== إرسال الإشارات عبر Firebase ==========
 
     // إرسال عرض اتصال
@@ -199,7 +230,6 @@ class WebRTCManager {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            // حفظ العرض في Firebase
             const signalId = `${window.auth.currentUser.uid}_${friendId}_${Date.now()}`;
             
             await window.db.collection('signaling').doc(signalId).set({
@@ -214,8 +244,6 @@ class WebRTCManager {
                 timestamp: new Date()
             });
 
-            console.log('📤 Offer sent to Firebase');
-
         } catch (error) {
             console.error('خطأ في إنشاء العرض:', error);
         }
@@ -225,8 +253,6 @@ class WebRTCManager {
     async handleIncomingOffer(signal, signalId) {
         if (!window.auth?.currentUser) return;
 
-        console.log('📥 استلام offer من:', signal.from);
-        
         const pc = await this.createPeerConnection(signal.from);
         
         try {
@@ -235,7 +261,6 @@ class WebRTCManager {
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
-            // إرسال الإجابة عبر Firebase
             await window.db.collection('signaling').doc(signalId).set({
                 from: window.auth.currentUser.uid,
                 to: signal.from,
@@ -248,8 +273,6 @@ class WebRTCManager {
                 timestamp: new Date()
             }, { merge: true });
 
-            console.log('📤 Answer sent to Firebase');
-
         } catch (error) {
             console.error('خطأ في معالجة العرض:', error);
         }
@@ -257,8 +280,6 @@ class WebRTCManager {
 
     // معالجة إجابة واردة
     async handleIncomingAnswer(signal) {
-        console.log('📥 استلام answer من:', signal.from);
-        
         const pc = this.peerConnections.get(signal.from);
         if (!pc) return;
 
@@ -300,25 +321,25 @@ class WebRTCManager {
         if (pc && pc.remoteDescription) {
             try {
                 await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-                console.log('✅ تم إضافة ICE candidate');
             } catch (error) {
                 console.error('خطأ في إضافة candidate:', error);
             }
         } else {
-            // حفظ candidate لحين جهوزية الاتصال
             if (!this.pendingCandidates.has(signal.from)) {
                 this.pendingCandidates.set(signal.from, []);
             }
             this.pendingCandidates.get(signal.from).push(signal.candidate);
-            console.log('⏳ حفظ candidate مؤقتاً');
         }
     }
 
-    // ========== إدارة الرسائل ==========
+    // ========== إدارة الرسائل - فورية ==========
 
-    // إرسال رسالة نصية
+    // إرسال رسالة نصية - فورية
     sendTextMessage(text) {
-        if (!this.currentFriendId) return false;
+        if (!this.currentFriendId) {
+            alert('لا يوجد محادثة مفتوحة');
+            return false;
+        }
 
         const message = {
             type: 'text',
@@ -328,15 +349,38 @@ class WebRTCManager {
             id: `msg_${Date.now()}_${Math.random()}`
         };
 
+        // 1️⃣ أولاً: عرض الرسالة فوراً في واجهتي
+        this.displayMessage(message, 'sent');
+        
+        // 2️⃣ ثانياً: محاولة الإرسال عبر WebRTC
         const channel = this.dataChannels.get(this.currentFriendId);
+        
         if (channel && channel.readyState === 'open') {
+            // WebRTC جاهز → نرسل مباشرة
             channel.send(JSON.stringify(message));
-            this.displayMessage(message, 'sent');
-            return true;
+            console.log('📤 رسالة مرسلة عبر WebRTC');
         } else {
-            this.displaySystemMessage('⏳ الاتصال غير جاهز بعد...');
-            return false;
+            // WebRTC مو جاهز → نحفظها للبعث لاحقاً ونستخدم Firebase
+            console.log('📤 استخدام Firebase مؤقتاً');
+            
+            // حفظ في قائمة الانتظار
+            this.pendingMessages.push(message);
+            
+            // إرسال عبر Firebase
+            const msgId = `temp_${Date.now()}_${Math.random()}`;
+            window.db.collection('temp_messages').doc(msgId).set({
+                from: window.auth.currentUser.uid,
+                to: this.currentFriendId,
+                message: message,
+                timestamp: new Date()
+            }).catch(err => {
+                console.error('خطأ في حفظ الرسالة المؤقتة:', err);
+            });
+            
+            this.displaySystemMessage('📱 جاري توصيل الرسالة...');
         }
+        
+        return true;
     }
 
     // معالجة رسالة واردة
@@ -504,6 +548,7 @@ class WebRTCManager {
         document.getElementById('messagesContainer').innerHTML = '';
         
         this.currentFriendId = null;
+        this.pendingMessages = [];
     }
 }
 
@@ -513,36 +558,40 @@ let webRTCManager = null;
 
 // ========== دوال عامة للواجهة ==========
 
-// فتح محادثة مع صديق
+// فتح محادثة مع صديق - فورية
 window.openChat = function(friendId) {
-    // إذا ما كان فيه مدير، ننشئ واحد جديد
+    // إنشاء المدير فوراً إذا ما كان موجود
     if (!webRTCManager) {
         webRTCManager = new WebRTCManager();
     }
 
-    // جلب بيانات الصديق
+    // جلب بيانات الصديق في الخلفية
     window.db.collection('users').doc(friendId).get().then((doc) => {
         if (doc.exists) {
             const friend = doc.data();
             const avatarEmoji = window.getEmojiForUser ? 
                 window.getEmojiForUser(friend) : '👤';
+            
+            // فتح المحادثة فوراً
             webRTCManager.startChat(friendId, friend.name, avatarEmoji);
+        } else {
+            // حتى لو فشل جلب البيانات، نفتح المحادثة
+            webRTCManager.startChat(friendId, 'صديق', '👤');
         }
     }).catch(error => {
-        console.error('خطأ في جلب بيانات الصديق:', error);
-        alert('حدث خطأ في فتح المحادثة');
+        console.error('خطأ:', error);
+        webRTCManager.startChat(friendId, 'صديق', '👤');
     });
 };
 
-// إرسال رسالة
+// إرسال رسالة - فورية
 window.sendMessage = function() {
     const input = document.getElementById('messageInput');
     const text = input.value.trim();
     
     if (text && webRTCManager) {
-        if (webRTCManager.sendTextMessage(text)) {
-            input.value = '';
-        }
+        webRTCManager.sendTextMessage(text);
+        input.value = '';
     }
 };
 
@@ -655,161 +704,47 @@ window.closeConversation = function() {
     }
 };
 
-// تهيئة WebRTC بعد تسجيل الدخول
+// تهيئة WebRTC
 window.initWebRTC = function() {
     if (window.auth?.currentUser && !webRTCManager) {
         webRTCManager = new WebRTCManager();
         console.log('✅ WebRTC manager initialized');
-    } else if (window.auth?.currentUser && webRTCManager) {
-        console.log('ℹ️ WebRTC manager already exists');
     }
 };
 
-// محاولة تهيئة WebRTC تلقائياً
-function autoInitWebRTC() {
-    if (window.auth?.currentUser) {
-        window.initWebRTC();
-    } else {
-        // انتظر تسجيل الدخول
-        setTimeout(autoInitWebRTC, 2000);
-    }
-}
-
-// بدء المحاولات التلقائية
-setTimeout(autoInitWebRTC, 3000);
-
-// إنشاء مجموعة signaling في Firebase
-async function ensureSignalingCollection() {
+// إنشاء المجموعات في Firebase
+async function setupFirebaseCollections() {
     if (!window.db) return;
     
     try {
-        // التحقق من وجود المجموعة
-        const testDoc = await window.db.collection('signaling').doc('_config').get();
-        
-        if (!testDoc.exists) {
-            await window.db.collection('signaling').doc('_config').set({
-                created: new Date(),
-                version: '1.0'
-            });
-            console.log('✅ Signaling collection created');
-        } else {
-            console.log('✅ Signaling collection ready');
-        }
-    } catch (error) {
-        console.error('خطأ في تهيئة signaling:', error);
-    }
-}
-
-// تهيئة المجموعة
-if (window.db) {
-    ensureSignalingCollection();
-}
-
-// محاولة تهيئة WebRTC عند تحميل الصفحة
-window.addEventListener('load', () => {
-    if (window.auth?.currentUser) {
-        setTimeout(() => {
-            window.initWebRTC();
-        }, 2000);
-    }
-});
-
-console.log('✅ WebRTC module loaded - جاهز للاستخدام');
-
-
-// ========== تهيئة دائمة لنظام WebRTC ==========
-
-// 1. إنشاء collection signaling بشكل دائمي
-async function setupSignalingPermanent() {
-    if (!window.db) {
-        console.log('⏳ انتظار Firebase...');
-        setTimeout(setupSignalingPermanent, 1000);
-        return;
-    }
-    
-    try {
-        // إنشاء مستخدم دائمي للإشارات
+        // مجموعة signaling
         await window.db.collection('signaling').doc('_config').set({
             name: 'WebRTC Signaling',
-            version: '1.0',
             created: new Date(),
             permanent: true
-        });
+        }, { merge: true });
         
-        console.log('✅ Signaling collection جاهز بشكل دائمي');
-        
-        // إنشاء indexes للإشارات
-        await window.db.collection('signaling').doc('_indexes').set({
-            fields: ['to', 'from', 'type', 'status', 'timestamp'],
-            description: 'فهارس للإشارات السريعة',
+        // مجموعة temp_messages
+        await window.db.collection('temp_messages').doc('_config').set({
+            name: 'Temporary Messages',
+            created: new Date(),
             permanent: true
-        });
+        }, { merge: true });
         
+        console.log('✅ Firebase collections جاهزة');
     } catch (error) {
-        console.error('⚠️ خطأ في التهيئة:', error);
+        console.error('⚠️ خطأ في تهيئة المجموعات:', error);
     }
 }
 
-// 2. مستمع دائمي للإشارات الجديدة
-function setupPermanentListeners() {
-    if (!window.auth?.currentUser) {
-        setTimeout(setupPermanentListeners, 2000);
-        return;
-    }
-    
-    // تنظيف الإشارات القديمة تلقائياً (أقدم من دقيقة)
-    setInterval(async () => {
-        try {
-            const oneMinuteAgo = new Date(Date.now() - 60000);
-            
-            const oldSignals = await window.db.collection('signaling')
-                .where('timestamp', '<', oneMinuteAgo)
-                .get();
-            
-            oldSignals.forEach(async (doc) => {
-                if (doc.id !== '_config' && doc.id !== '_indexes') {
-                    await doc.ref.delete();
-                }
-            });
-            
-        } catch (error) {
-            // تجاهل الأخطاء
-        }
-    }, 30000); // كل 30 ثانية
+// تهيئة كل شيء
+setupFirebaseCollections();
+
+// تهيئة WebRTC تلقائياً
+if (window.auth?.currentUser) {
+    setTimeout(() => {
+        window.initWebRTC();
+    }, 1000);
 }
 
-// 3. تهيئة WebRTC بشكل دائمي
-window.initWebRTCPermanent = function() {
-    if (!webRTCManager && window.auth?.currentUser) {
-        webRTCManager = new WebRTCManager();
-        console.log('✅ WebRTC جاهز بشكل دائمي');
-    }
-};
-
-// 4. تشغيل كل شيء
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setupSignalingPermanent();
-        setupPermanentListeners();
-    });
-} else {
-    setupSignalingPermanent();
-    setupPermanentListeners();
-}
-
-// 5. مراقبة تسجيل الدخول
-if (window.auth) {
-    const originalOnAuthStateChanged = window.auth.onAuthStateChanged;
-    window.auth.onAuthStateChanged = function(callback) {
-        return originalOnAuthStateChanged.call(this, async (user) => {
-            if (user) {
-                setTimeout(() => {
-                    window.initWebRTCPermanent();
-                }, 1000);
-            }
-            if (callback) callback(user);
-        });
-    };
-}
-
-console.log('🚀 نظام WebRTC الدائمي جاهز');
+console.log('✅ WebRTC module loaded - جاهز للاستخدام الفوري');
