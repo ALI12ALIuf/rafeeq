@@ -1327,3 +1327,152 @@ input:checked + .slider:before {
     margin-left: 0;
     margin-right: 1rem;
 }
+
+/* ===== أنماط طلبات الصداقة الجديدة ===== */
+
+/* تنسيق خاص لزر طلبات الصداقة */
+.stat-link .fa-user-friends {
+    color: var(--primary);
+    margin-left: 5px;
+}
+
+/* تنسيق خاص لصفحة طلبات الصداقة */
+#friendRequestsPage .user-item {
+    border-right: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+#friendRequestsPage .user-item:hover {
+    border-right-color: var(--primary);
+}
+
+/* تنسيق أزرار القبول والرفض */
+#friendRequestsPage .action-btn[style*="background: var(--success)"] {
+    background: var(--success) !important;
+    color: white !important;
+    box-shadow: 0 2px 5px rgba(76, 175, 80, 0.3);
+}
+
+#friendRequestsPage .action-btn[style*="background: var(--success)"]:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+}
+
+#friendRequestsPage .action-btn.remove {
+    background: var(--danger) !important;
+    color: white !important;
+    box-shadow: 0 2px 5px rgba(244, 67, 54, 0.3);
+}
+
+#friendRequestsPage .action-btn.remove:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 8px rgba(244, 67, 54, 0.4);
+}
+
+/* تنسيق الوقت في طلبات الصداقة */
+#friendRequestsPage .user-info small {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.7rem;
+    color: var(--text-light);
+    opacity: 0.8;
+}
+
+/* تنسيق خاص عند عدم وجود طلبات */
+#friendRequestsPage .empty-state i {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+}
+
+/* تنسيق عداد طلبات الصداقة */
+#friendRequestsCount {
+    position: relative;
+    display: inline-block;
+}
+
+#friendRequestsCount:not(:empty):after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: var(--danger);
+    border-radius: 50%;
+    animation: blink 1.5s infinite;
+}
+
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* تنسيق نتائج البحث مع حالة الأصدقاء */
+.search-result-item button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--text-light) !important;
+}
+
+.search-result-item button:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* تحسينات للشاشات الصغيرة */
+@media (max-width: 480px) {
+    #friendRequestsPage .user-actions {
+        gap: 0.3rem;
+    }
+    
+    #friendRequestsPage .action-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 0.9rem;
+    }
+    
+    #friendRequestsPage .user-info small {
+        font-size: 0.65rem;
+    }
+}
+
+/* تأثيرات حركية للأزرار */
+#friendRequestsPage .action-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#friendRequestsPage .action-btn:active {
+    transform: scale(0.95);
+}
+
+/* تنسيق خاص للمسافات */
+#friendRequestsPage .users-list {
+    padding-bottom: 2rem;
+}
+
+/* تحسين مظهر العناصر في الوضع الداكن */
+.theme-dark #friendRequestsPage .action-btn[style*="background: var(--success)"] {
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.5);
+}
+
+.theme-dark #friendRequestsPage .action-btn.remove {
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.5);
+}
