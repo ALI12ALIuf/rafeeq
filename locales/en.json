@@ -57,5 +57,29 @@
     "remove_photo": "Remove Photo",
     "report": "Report",
     "block_user": "Block User",
-    "unblock_user": "Unblock User"
+    "unblock_user": "Unblock User",
+    
+    "search_placeholder": "Search for friends",
+    "search_no_user": "No user found",
+    "search_yourself": "This is your account",
+    "search_error": "Search error, please try again",
+    "searching": "Searching...",
+    
+    "friend_requests": "Friend Requests",
+    "no_friend_requests": "No friend requests",
+    "no_friend_requests_desc": "No one has sent you a friend request yet",
+    "request_sent": "Friend request sent successfully",
+    "request_error": "Error sending friend request",
+    "request_pending": "Request pending",
+    "already_friends": "Already friends",
+    "accept_request": "Accept request",
+    "reject_request": "Reject request",
+    "request_accepted": "Friend request accepted successfully",
+    "request_rejected": "Request rejected",
+    "friends": "Friends",
+    "friends_count": "Friends",
+    "friend_added": "Friend added successfully",
+    "friend_removed": "Friend removed",
+    "friend_request_exists": "You have already sent a friend request to this user",
+    "cannot_add_self": "You cannot add yourself as a friend"
 }
