@@ -33,6 +33,9 @@ function getEmojiForUser(userData) {
     return emojiMap[userData.avatarType] || '👤';
 }
 
+// ✅ تعريف مختصر لـ FieldValue
+const FieldValue = firebase.firestore.FieldValue;
+
 // تسجيل الدخول بجوجل
 async function signInWithGoogle() {
     try {
@@ -205,7 +208,7 @@ function showLoginPrompt() {
     document.body.appendChild(loginPrompt);
 }
 
-// ========== نظام الصداقة المتكامل (معدل بالكامل) ==========
+// ========== نظام الصداقة المتكامل ==========
 
 // إظهار صفحة طلبات الصداقة
 window.showFriendRequests = function() {
@@ -241,7 +244,7 @@ function formatDateSafely(timestamp) {
     }
 }
 
-// تحميل طلبات الصداقة (معدلة)
+// تحميل طلبات الصداقة
 async function loadFriendRequests() {
     if (!window.auth || !window.auth.currentUser) {
         console.log('No user logged in');
@@ -349,7 +352,7 @@ async function loadFriendRequests() {
     }
 }
 
-// قبول طلب الصداقة (معدلة)
+// ✅ قبول طلب الصداقة (معدلة - مع استخدام FieldValue)
 window.acceptFriendRequest = async function(requestId, senderId) {
     if (!window.auth || !window.auth.currentUser) {
         alert('الرجاء تسجيل الدخول أولاً');
@@ -365,13 +368,13 @@ window.acceptFriendRequest = async function(requestId, senderId) {
             respondedAt: new Date()
         });
         
-        // إضافة كلا المستخدمين إلى قائمة أصدقاء بعضهما
+        // ✅ استخدام FieldValue المعرف أعلاه
         await window.db.collection('users').doc(currentUserId).update({
-            friends: window.db.FieldValue.arrayUnion(senderId)
+            friends: FieldValue.arrayUnion(senderId)
         });
         
         await window.db.collection('users').doc(senderId).update({
-            friends: window.db.FieldValue.arrayUnion(currentUserId)
+            friends: FieldValue.arrayUnion(currentUserId)
         });
         
         // إزالة الطلب من الواجهة
@@ -403,7 +406,7 @@ window.acceptFriendRequest = async function(requestId, senderId) {
     }
 };
 
-// رفض طلب الصداقة (معدلة)
+// رفض طلب الصداقة
 window.rejectFriendRequest = async function(requestId) {
     if (!window.auth || !window.auth.currentUser) return;
     
@@ -458,7 +461,7 @@ async function updateFriendRequestsCount() {
     }
 }
 
-// إضافة صديق جديد (معدلة - تستخدم new Date بدلاً من serverTimestamp)
+// إضافة صديق جديد
 window.addNewFriend = async function(targetUserId) {
     if (!window.auth || !window.auth.currentUser) {
         alert('الرجاء تسجيل الدخول أولاً');
@@ -495,12 +498,12 @@ window.addNewFriend = async function(targetUserId) {
             }
         }
         
-        // إرسال طلب الصداقة - استخدام new Date بدلاً من serverTimestamp
+        // إرسال طلب الصداقة
         await window.db.collection('friendRequests').add({
             from: currentUserId,
             to: targetUserId,
             status: 'pending',
-            timestamp: new Date() // استخدام تاريخ عادي
+            timestamp: new Date()
         });
         
         // إخفاء نتائج البحث
@@ -522,7 +525,7 @@ window.addNewFriend = async function(targetUserId) {
     }
 };
 
-// إعداد مستمع实时 لطلبات الصداقة (معدل)
+// إعداد مستمع实时 لطلبات الصداقة
 function setupFriendRequestsListener(userId) {
     try {
         const requestsQuery = window.db.collection('friendRequests')
@@ -703,7 +706,7 @@ async function removeFollower(followerId) {
     
     try {
         await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            followers: window.db.FieldValue.arrayRemove(followerId)
+            followers: FieldValue.arrayRemove(followerId)
         });
         
         const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
@@ -720,11 +723,11 @@ async function unfollow(followingId) {
     
     try {
         await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            following: window.db.FieldValue.arrayRemove(followingId)
+            following: FieldValue.arrayRemove(followingId)
         });
         
         await window.db.collection('users').doc(followingId).update({
-            followers: window.db.FieldValue.arrayRemove(window.auth.currentUser.uid)
+            followers: FieldValue.arrayRemove(window.auth.currentUser.uid)
         });
         
         const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
