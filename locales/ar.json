@@ -57,5 +57,29 @@
     "remove_photo": "إزالة الصورة",
     "report": "تبليغ",
     "block_user": "حظر المستخدم",
-    "unblock_user": "إلغاء حظر المستخدم"
+    "unblock_user": "إلغاء حظر المستخدم",
+    
+    "search_placeholder": "البحث عن الأصدقاء",
+    "search_no_user": "لا يوجد مستخدم",
+    "search_yourself": "هذا حسابك الشخصي",
+    "search_error": "حدث خطأ بالبحث حاول مرة ثانية",
+    "searching": "جاري البحث...",
+    
+    "friend_requests": "طلبات الصداقة",
+    "no_friend_requests": "لا توجد طلبات صداقة",
+    "no_friend_requests_desc": "لم يرسل لك أحد طلب صداقة بعد",
+    "request_sent": "تم إرسال طلب الصداقة بنجاح",
+    "request_error": "حدث خطأ في إرسال الطلب",
+    "request_pending": "طلب معلق",
+    "already_friends": "أصدقاء بالفعل",
+    "accept_request": "قبول الطلب",
+    "reject_request": "رفض الطلب",
+    "request_accepted": "تم قبول طلب الصداقة بنجاح",
+    "request_rejected": "تم رفض الطلب",
+    "friends": "أصدقاء",
+    "friends_count": "الأصدقاء",
+    "friend_added": "تمت إضافة الصديق بنجاح",
+    "friend_removed": "تم إزالة الصديق",
+    "friend_request_exists": "لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً",
+    "cannot_add_self": "لا يمكنك إضافة نفسك كصديق"
 }
