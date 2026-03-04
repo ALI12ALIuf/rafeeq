@@ -52,6 +52,7 @@ async function signInWithGoogle() {
         if (!userDoc.exists) {
             const shareableId = generateShareableId();
             
+            // ✅ مستخدم جديد - بدون متابعة
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid,
                 name: (user.displayName || 'مستخدم').substring(0, 25),
@@ -59,18 +60,22 @@ async function signInWithGoogle() {
                 shareableId: shareableId,
                 bio: '',
                 avatarType: 'male',
-                followers: [],
-                following: [],
-                friends: [],
+                friends: [], // فقط الأصدقاء
                 blocked: [],
                 createdAt: new Date()
             });
         } else {
             const userData = userDoc.data();
-            if (!userData.friends) {
-                await window.db.collection('users').doc(user.uid).update({
-                    friends: []
-                });
+            
+            // تحديث المستخدمين القدامى (إزالة المتابعة إذا وجدت)
+            const updates = {};
+            
+            if (!userData.friends) updates.friends = [];
+            if (userData.followers) updates.followers = []; // إزالة المتابعين
+            if (userData.following) updates.following = []; // إزالة المتابَعين
+            
+            if (Object.keys(updates).length > 0) {
+                await window.db.collection('users').doc(user.uid).update(updates);
             }
         }
         
@@ -122,7 +127,7 @@ async function logout() {
     }
 }
 
-// تحميل بيانات المستخدم
+// ✅ تحميل بيانات المستخدم (بدون متابعة)
 async function loadUserData(uid) {
     try {
         const userDoc = await window.db.collection('users').doc(uid).get();
@@ -149,12 +154,13 @@ async function loadUserData(uid) {
             if (menuAvatarEmoji) menuAvatarEmoji.textContent = avatarEmoji;
             if (currentAvatarEmoji) currentAvatarEmoji.textContent = avatarEmoji;
             
-            const followersCount = document.getElementById('followersCount');
-            const followingCount = document.getElementById('followingCount');
+            // ✅ تحديث عدادات الأصدقاء
+            const friendsCount = document.getElementById('friendsCount');
             const friendRequestsCount = document.getElementById('friendRequestsCount');
             
-            if (followersCount) followersCount.textContent = formatNumber((userData.followers || []).length);
-            if (followingCount) followingCount.textContent = formatNumber((userData.following || []).length);
+            if (friendsCount) {
+                friendsCount.textContent = formatNumber((userData.friends || []).length);
+            }
             
             if (friendRequestsCount) {
                 try {
@@ -167,11 +173,6 @@ async function loadUserData(uid) {
                     console.log('No friend requests collection yet');
                     friendRequestsCount.textContent = '0';
                 }
-            }
-            
-            if (typeof loadFollowersList === 'function') {
-                loadFollowersList(uid, userData.followers || []);
-                loadFollowingList(uid, userData.following || []);
             }
         }
     } catch (error) {
@@ -208,7 +209,137 @@ function showLoginPrompt() {
     document.body.appendChild(loginPrompt);
 }
 
-// ========== نظام الصداقة المتكامل ==========
+// ========== نظام الصداقة المتكامل (بدون متابعة) ==========
+
+// ✅ عرض صفحة الأصدقاء
+window.showFriendsList = function() {
+    const profilePage = document.querySelector('.profile-page');
+    const friendsPage = document.getElementById('friendsPage');
+    
+    if (profilePage) profilePage.style.display = 'none';
+    if (friendsPage) friendsPage.style.display = 'block';
+    
+    loadFriendsList();
+};
+
+// ✅ تحميل قائمة الأصدقاء
+async function loadFriendsList() {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    const friendsList = document.getElementById('friendsList');
+    if (!friendsList) return;
+    
+    try {
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+        if (!userDoc.exists) return;
+        
+        const userData = userDoc.data();
+        const friends = userData.friends || [];
+        
+        if (friends.length === 0) {
+            friendsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-friends"></i>
+                    <h3>${i18n ? i18n.t('no_friends') : 'لا يوجد أصدقاء'}</h3>
+                    <p>${i18n ? i18n.t('no_friends_desc') : 'لم تضف أي أصدقاء بعد'}</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        
+        for (const friendId of friends) {
+            try {
+                const friendDoc = await window.db.collection('users').doc(friendId).get();
+                if (friendDoc.exists) {
+                    const friend = friendDoc.data();
+                    const avatarEmoji = getEmojiForUser(friend);
+                    
+                    html += `
+                        <div class="user-item">
+                            <div class="user-avatar-emoji">${avatarEmoji}</div>
+                            <div class="user-info">
+                                <h4>${friend.name || 'مستخدم'}</h4>
+                                <p>${friend.shareableId || ''}</p>
+                            </div>
+                            <div class="user-actions">
+                                <button class="action-btn" onclick="openChat('${friendId}')" title="محادثة">
+                                    <i class="fas fa-comment"></i>
+                                </button>
+                                <button class="action-btn" onclick="removeFriend('${friendId}')" title="حذف الصديق" style="background: var(--danger); color: white;">
+                                    <i class="fas fa-user-minus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('Error loading friend:', e);
+            }
+        }
+        
+        friendsList.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading friends list:', error);
+        friendsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>خطأ في تحميل الأصدقاء</h3>
+                <p>${error.message || 'حدث خطأ، حاول مرة أخرى'}</p>
+            </div>
+        `;
+    }
+}
+
+// ✅ حذف صديق
+window.removeFriend = async function(friendId) {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    if (!confirm('هل أنت متأكد من حذف هذا الصديق؟')) return;
+    
+    try {
+        const currentUserId = window.auth.currentUser.uid;
+        
+        // إزالة الصديق من الطرفين
+        await window.db.collection('users').doc(currentUserId).update({
+            friends: FieldValue.arrayRemove(friendId)
+        });
+        
+        await window.db.collection('users').doc(friendId).update({
+            friends: FieldValue.arrayRemove(currentUserId)
+        });
+        
+        // تحديث القائمة
+        await updateFriendsCount();
+        await loadFriendsList();
+        
+        alert('تم حذف الصديق بنجاح');
+        
+    } catch (error) {
+        console.error('Error removing friend:', error);
+        alert('حدث خطأ في حذف الصديق');
+    }
+};
+
+// ✅ تحديث عداد الأصدقاء
+async function updateFriendsCount() {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    try {
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+        if (userDoc.exists) {
+            const friends = userDoc.data().friends || [];
+            const countElement = document.getElementById('friendsCount');
+            if (countElement) {
+                countElement.textContent = formatNumber(friends.length);
+            }
+        }
+    } catch (error) {
+        console.error('Error updating friends count:', error);
+    }
+}
 
 // إظهار صفحة طلبات الصداقة
 window.showFriendRequests = function() {
@@ -226,16 +357,11 @@ function formatDateSafely(timestamp) {
     try {
         if (!timestamp) return 'تاريخ غير معروف';
         
-        // إذا كان timestamp من Firestore (به seconds)
         if (timestamp.seconds) {
             return new Date(timestamp.seconds * 1000).toLocaleDateString('ar-EG');
-        }
-        // إذا كان timestamp عادي
-        else if (timestamp instanceof Date) {
+        } else if (timestamp instanceof Date) {
             return timestamp.toLocaleDateString('ar-EG');
-        }
-        // إذا كان string أو number
-        else {
+        } else {
             return new Date(timestamp).toLocaleDateString('ar-EG');
         }
     } catch (e) {
@@ -246,32 +372,22 @@ function formatDateSafely(timestamp) {
 
 // تحميل طلبات الصداقة
 async function loadFriendRequests() {
-    if (!window.auth || !window.auth.currentUser) {
-        console.log('No user logged in');
-        return;
-    }
+    if (!window.auth || !window.auth.currentUser) return;
     
     const requestsList = document.getElementById('friendRequestsList');
-    if (!requestsList) {
-        console.log('Requests list element not found');
-        return;
-    }
+    if (!requestsList) return;
     
     try {
-        console.log('Loading friend requests for user:', window.auth.currentUser.uid);
-        
         const snapshot = await window.db.collection('friendRequests')
             .where('to', '==', window.auth.currentUser.uid)
             .where('status', '==', 'pending')
             .get();
         
-        console.log('Found requests:', snapshot.size);
-        
         if (snapshot.empty) {
             requestsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات صداقة'}</h3>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
                     <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
@@ -281,7 +397,6 @@ async function loadFriendRequests() {
         let html = '';
         let requests = [];
         
-        // تجميع الطلبات في مصفوفة أولاً
         snapshot.forEach(doc => {
             requests.push({
                 id: doc.id,
@@ -289,7 +404,6 @@ async function loadFriendRequests() {
             });
         });
         
-        // ترتيب الطلبات يدوياً (الأحدث أولاً)
         requests.sort((a, b) => {
             const timeA = a.timestamp?.seconds || 0;
             const timeB = b.timestamp?.seconds || 0;
@@ -313,10 +427,10 @@ async function loadFriendRequests() {
                                 <small style="color: var(--text-light);">${requestDate}</small>
                             </div>
                             <div class="user-actions">
-                                <button class="action-btn" style="background: var(--success); color: white;" onclick="acceptFriendRequest('${request.id}', '${request.from}')" title="${i18n ? i18n.t('accept') : 'قبول'}">
+                                <button class="action-btn" style="background: var(--success); color: white;" onclick="acceptFriendRequest('${request.id}', '${request.from}')" title="قبول">
                                     <i class="fas fa-check"></i>
                                 </button>
-                                <button class="action-btn remove" onclick="rejectFriendRequest('${request.id}')" title="${i18n ? i18n.t('reject') : 'رفض'}">
+                                <button class="action-btn remove" onclick="rejectFriendRequest('${request.id}')" title="رفض">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </div>
@@ -332,7 +446,7 @@ async function loadFriendRequests() {
             requestsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات صداقة'}</h3>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
                     <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
@@ -352,7 +466,7 @@ async function loadFriendRequests() {
     }
 }
 
-// ✅ قبول طلب الصداقة (معدلة - مع استخدام FieldValue)
+// قبول طلب الصداقة
 window.acceptFriendRequest = async function(requestId, senderId) {
     if (!window.auth || !window.auth.currentUser) {
         alert('الرجاء تسجيل الدخول أولاً');
@@ -362,13 +476,11 @@ window.acceptFriendRequest = async function(requestId, senderId) {
     try {
         const currentUserId = window.auth.currentUser.uid;
         
-        // تحديث حالة الطلب إلى مقبول
         await window.db.collection('friendRequests').doc(requestId).update({
             status: 'accepted',
             respondedAt: new Date()
         });
         
-        // ✅ استخدام FieldValue المعرف أعلاه
         await window.db.collection('users').doc(currentUserId).update({
             friends: FieldValue.arrayUnion(senderId)
         });
@@ -377,24 +489,22 @@ window.acceptFriendRequest = async function(requestId, senderId) {
             friends: FieldValue.arrayUnion(currentUserId)
         });
         
-        // إزالة الطلب من الواجهة
         const requestElement = document.getElementById(`request-${requestId}`);
         if (requestElement) {
             requestElement.remove();
         }
         
-        // تحديث عداد طلبات الصداقة
         await updateFriendRequestsCount();
+        await updateFriendsCount();
         
-        alert(i18n ? i18n.t('request_accepted') : 'تم قبول طلب الصداقة بنجاح');
+        alert('تم قبول طلب الصداقة بنجاح');
         
-        // التحقق من عدم وجود طلبات متبقية
         const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
         if (remainingRequests === 0) {
             document.getElementById('friendRequestsList').innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات صداقة'}</h3>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
                     <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
@@ -423,14 +533,14 @@ window.rejectFriendRequest = async function(requestId) {
         
         await updateFriendRequestsCount();
         
-        alert(i18n ? i18n.t('request_rejected') : 'تم رفض الطلب');
+        alert('تم رفض الطلب');
         
         const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
         if (remainingRequests === 0) {
             document.getElementById('friendRequestsList').innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات صداقة'}</h3>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
                     <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
@@ -442,7 +552,7 @@ window.rejectFriendRequest = async function(requestId) {
     }
 };
 
-// دالة مساعدة لتحديث عداد طلبات الصداقة
+// تحديث عداد طلبات الصداقة
 async function updateFriendRequestsCount() {
     if (!window.auth || !window.auth.currentUser) return;
     
@@ -471,12 +581,11 @@ window.addNewFriend = async function(targetUserId) {
     const currentUserId = window.auth.currentUser.uid;
     
     if (currentUserId === targetUserId) {
-        alert(i18n ? i18n.t('cannot_add_self') : 'لا يمكنك إضافة نفسك كصديق');
+        alert('لا يمكنك إضافة نفسك كصديق');
         return;
     }
     
     try {
-        // التحقق من وجود طلب سابق
         const existingRequest = await window.db.collection('friendRequests')
             .where('from', '==', currentUserId)
             .where('to', '==', targetUserId)
@@ -484,21 +593,19 @@ window.addNewFriend = async function(targetUserId) {
             .get();
         
         if (!existingRequest.empty) {
-            alert(i18n ? i18n.t('friend_request_exists') : 'لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً');
+            alert('لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً');
             return;
         }
         
-        // التحقق من أنهم ليسوا أصدقاء بالفعل
         const currentUserDoc = await window.db.collection('users').doc(currentUserId).get();
         if (currentUserDoc.exists) {
             const friends = currentUserDoc.data().friends || [];
             if (friends.includes(targetUserId)) {
-                alert(i18n ? i18n.t('already_friends') : 'هذا المستخدم صديقك بالفعل');
+                alert('هذا المستخدم صديقك بالفعل');
                 return;
             }
         }
         
-        // إرسال طلب الصداقة
         await window.db.collection('friendRequests').add({
             from: currentUserId,
             to: targetUserId,
@@ -506,18 +613,16 @@ window.addNewFriend = async function(targetUserId) {
             timestamp: new Date()
         });
         
-        // إخفاء نتائج البحث
         const resultsContainer = document.getElementById('searchResultsContainer');
         if (resultsContainer) {
             resultsContainer.style.display = 'none';
             resultsContainer.innerHTML = '';
         }
         
-        // إفراغ حقل البحث
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.value = '';
         
-        alert(i18n ? i18n.t('request_sent') : 'تم إرسال طلب الصداقة بنجاح');
+        alert('تم إرسال طلب الصداقة بنجاح');
         
     } catch (error) {
         console.error('Error sending friend request:', error);
@@ -542,15 +647,8 @@ function setupFriendRequestsListener(userId) {
             if (requestsPage && requestsPage.style.display === 'block') {
                 loadFriendRequests();
             }
-            
-            if (snapshot.docChanges().length > 0) {
-                const change = snapshot.docChanges()[0];
-                if (change.type === 'added') {
-                    console.log('📨 لديك طلب صداقة جديد');
-                }
-            }
         }, (error) => {
-            console.log('Listener error (maybe collection not exists yet):', error);
+            console.log('Listener error:', error);
         });
     } catch (error) {
         console.log('Error setting up listener:', error);
@@ -605,7 +703,7 @@ function copyId() {
     
     const id = idElement.textContent;
     navigator.clipboard.writeText(id).then(() => {
-        alert(i18n ? i18n.t('copied') : 'تم النسخ');
+        alert('تم النسخ');
     }).catch(err => {
         console.error('Copy failed:', err);
     });
@@ -628,7 +726,7 @@ window.findUserById = async function() {
     }
     
     resultsContainer.style.display = 'block';
-    resultsContainer.innerHTML = `<div style="text-align: center; padding: 10px; color: var(--text-light);">${i18n ? i18n.t('searching') : 'جاري البحث...'}</div>`;
+    resultsContainer.innerHTML = `<div style="text-align: center; padding: 10px; color: var(--text-light);">جاري البحث...</div>`;
     
     try {
         const snapshot = await window.db.collection('users')
@@ -636,7 +734,7 @@ window.findUserById = async function() {
             .get();
         
         if (snapshot.empty) {
-            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">${i18n ? i18n.t('search_no_user') : 'لا يوجد مستخدم'}</div>`;
+            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">لا يوجد مستخدم</div>`;
             return;
         }
         
@@ -645,13 +743,13 @@ window.findUserById = async function() {
         const currentUser = window.auth ? window.auth.currentUser : null;
         
         if (currentUser && userId === currentUser.uid) {
-            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">${i18n ? i18n.t('search_yourself') : 'هذا حسابك الشخصي'}</div>`;
+            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">هذا حسابك الشخصي</div>`;
             return;
         }
         
         const avatarEmoji = getEmojiForUser(user);
         
-        let buttonText = i18n ? i18n.t('add_friend') : 'إضافة';
+        let buttonText = 'إضافة';
         let buttonDisabled = '';
         
         if (currentUser) {
@@ -659,7 +757,7 @@ window.findUserById = async function() {
             const currentUserData = currentUserDoc.data();
             
             if (currentUserData.friends && currentUserData.friends.includes(userId)) {
-                buttonText = i18n ? i18n.t('already_friends') : 'أصدقاء';
+                buttonText = 'أصدقاء';
                 buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
             } else {
                 const existingRequest = await window.db.collection('friendRequests')
@@ -669,7 +767,7 @@ window.findUserById = async function() {
                     .get();
                 
                 if (!existingRequest.empty) {
-                    buttonText = i18n ? i18n.t('request_pending') : 'طلب معلق';
+                    buttonText = 'طلب معلق';
                     buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
                 }
             }
@@ -687,7 +785,7 @@ window.findUserById = async function() {
         `;
     } catch (error) {
         console.error('Search error:', error);
-        resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">${i18n ? i18n.t('search_error') : 'حدث خطأ بالبحث حاول مرة ثانية'}</div>`;
+        resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">حدث خطأ بالبحث حاول مرة ثانية</div>`;
     }
 };
 
@@ -699,120 +797,4 @@ window.hideSearchResults = function() {
     }
 };
 
-// ========== دوال المتابعة ==========
-
-async function removeFollower(followerId) {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            followers: FieldValue.arrayRemove(followerId)
-        });
-        
-        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
-        if (userDoc.exists) {
-            loadFollowersList(window.auth.currentUser.uid, userDoc.data().followers || []);
-        }
-    } catch (error) {
-        console.error('Error removing follower:', error);
-    }
-}
-
-async function unfollow(followingId) {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            following: FieldValue.arrayRemove(followingId)
-        });
-        
-        await window.db.collection('users').doc(followingId).update({
-            followers: FieldValue.arrayRemove(window.auth.currentUser.uid)
-        });
-        
-        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
-        if (userDoc.exists) {
-            loadFollowingList(window.auth.currentUser.uid, userDoc.data().following || []);
-        }
-    } catch (error) {
-        console.error('Error unfollowing:', error);
-    }
-}
-
-async function loadFollowersList(currentUid, followers) {
-    const followersList = document.getElementById('followersList');
-    if (!followersList) return;
-    
-    if (!followers || followers.length === 0) {
-        followersList.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>لا يوجد متابعين</h3><p>لم يتابعك أحد بعد</p></div>';
-        return;
-    }
-    
-    let html = '';
-    for (const followerId of followers) {
-        try {
-            const userDoc = await window.db.collection('users').doc(followerId).get();
-            if (userDoc.exists) {
-                const user = userDoc.data();
-                const avatarEmoji = getEmojiForUser(user);
-                
-                html += `
-                    <div class="user-item">
-                        <div class="user-avatar-emoji">${avatarEmoji}</div>
-                        <div class="user-info">
-                            <h4>${user.name}</h4>
-                            <p>${user.shareableId || ''}</p>
-                        </div>
-                        <div class="user-actions">
-                            <button class="action-btn" onclick="openChat('${followerId}')"><i class="fas fa-comment"></i></button>
-                            <button class="action-btn remove" onclick="removeFollower('${followerId}')"><i class="fas fa-user-minus"></i></button>
-                        </div>
-                    </div>
-                `;
-            }
-        } catch (error) {
-            console.error('Error loading follower:', error);
-        }
-    }
-    followersList.innerHTML = html;
-    window.followersData = html;
-}
-
-async function loadFollowingList(currentUid, following) {
-    const followingList = document.getElementById('followingList');
-    if (!followingList) return;
-    
-    if (!following || following.length === 0) {
-        followingList.innerHTML = '<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا تتابع أحداً</h3><p>لم تتابع أي شخص بعد</p></div>';
-        return;
-    }
-    
-    let html = '';
-    for (const followingId of following) {
-        try {
-            const userDoc = await window.db.collection('users').doc(followingId).get();
-            if (userDoc.exists) {
-                const user = userDoc.data();
-                const avatarEmoji = getEmojiForUser(user);
-                
-                html += `
-                    <div class="user-item">
-                        <div class="user-avatar-emoji">${avatarEmoji}</div>
-                        <div class="user-info">
-                            <h4>${user.name}</h4>
-                            <p>${user.shareableId || ''}</p>
-                        </div>
-                        <div class="user-actions">
-                            <button class="action-btn" onclick="openChat('${followingId}')"><i class="fas fa-comment"></i></button>
-                            <button class="action-btn following" onclick="unfollow('${followingId}')"><i class="fas fa-check"></i></button>
-                        </div>
-                    </div>
-                `;
-            }
-        } catch (error) {
-            console.error('Error loading following:', error);
-        }
-    }
-    followingList.innerHTML = html;
-    window.followingData = html;
-}
+// ========== تم إزالة دوال المتابعة بالكامل ==========
