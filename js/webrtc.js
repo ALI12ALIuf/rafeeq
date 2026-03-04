@@ -715,3 +715,101 @@ window.addEventListener('load', () => {
 });
 
 console.log('✅ WebRTC module loaded - جاهز للاستخدام');
+
+
+// ========== تهيئة دائمة لنظام WebRTC ==========
+
+// 1. إنشاء collection signaling بشكل دائمي
+async function setupSignalingPermanent() {
+    if (!window.db) {
+        console.log('⏳ انتظار Firebase...');
+        setTimeout(setupSignalingPermanent, 1000);
+        return;
+    }
+    
+    try {
+        // إنشاء مستخدم دائمي للإشارات
+        await window.db.collection('signaling').doc('_config').set({
+            name: 'WebRTC Signaling',
+            version: '1.0',
+            created: new Date(),
+            permanent: true
+        });
+        
+        console.log('✅ Signaling collection جاهز بشكل دائمي');
+        
+        // إنشاء indexes للإشارات
+        await window.db.collection('signaling').doc('_indexes').set({
+            fields: ['to', 'from', 'type', 'status', 'timestamp'],
+            description: 'فهارس للإشارات السريعة',
+            permanent: true
+        });
+        
+    } catch (error) {
+        console.error('⚠️ خطأ في التهيئة:', error);
+    }
+}
+
+// 2. مستمع دائمي للإشارات الجديدة
+function setupPermanentListeners() {
+    if (!window.auth?.currentUser) {
+        setTimeout(setupPermanentListeners, 2000);
+        return;
+    }
+    
+    // تنظيف الإشارات القديمة تلقائياً (أقدم من دقيقة)
+    setInterval(async () => {
+        try {
+            const oneMinuteAgo = new Date(Date.now() - 60000);
+            
+            const oldSignals = await window.db.collection('signaling')
+                .where('timestamp', '<', oneMinuteAgo)
+                .get();
+            
+            oldSignals.forEach(async (doc) => {
+                if (doc.id !== '_config' && doc.id !== '_indexes') {
+                    await doc.ref.delete();
+                }
+            });
+            
+        } catch (error) {
+            // تجاهل الأخطاء
+        }
+    }, 30000); // كل 30 ثانية
+}
+
+// 3. تهيئة WebRTC بشكل دائمي
+window.initWebRTCPermanent = function() {
+    if (!webRTCManager && window.auth?.currentUser) {
+        webRTCManager = new WebRTCManager();
+        console.log('✅ WebRTC جاهز بشكل دائمي');
+    }
+};
+
+// 4. تشغيل كل شيء
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setupSignalingPermanent();
+        setupPermanentListeners();
+    });
+} else {
+    setupSignalingPermanent();
+    setupPermanentListeners();
+}
+
+// 5. مراقبة تسجيل الدخول
+if (window.auth) {
+    const originalOnAuthStateChanged = window.auth.onAuthStateChanged;
+    window.auth.onAuthStateChanged = function(callback) {
+        return originalOnAuthStateChanged.call(this, async (user) => {
+            if (user) {
+                setTimeout(() => {
+                    window.initWebRTCPermanent();
+                }, 1000);
+            }
+            if (callback) callback(user);
+        });
+    };
+}
+
+console.log('🚀 نظام WebRTC الدائمي جاهز');
