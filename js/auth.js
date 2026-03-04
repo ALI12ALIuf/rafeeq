@@ -62,9 +62,18 @@ async function signInWithGoogle() {
                 avatarType: 'male', // ملصق افتراضي
                 followers: [],
                 following: [],
+                friends: [], // إضافة حقل الأصدقاء الجديد
                 blocked: [],
                 createdAt: new Date()
             });
+        } else {
+            // التأكد من وجود حقل friends للمستخدمين القدامى
+            const userData = userDoc.data();
+            if (!userData.friends) {
+                await window.db.collection('users').doc(user.uid).update({
+                    friends: []
+                });
+            }
         }
         
         // تحديث واجهة المستخدم
@@ -158,9 +167,19 @@ async function loadUserData(uid) {
             // تحديث الإحصائيات مع التنسيق الذكي
             const followersCount = document.getElementById('followersCount');
             const followingCount = document.getElementById('followingCount');
+            const friendRequestsCount = document.getElementById('friendRequestsCount');
             
             if (followersCount) followersCount.textContent = formatNumber((userData.followers || []).length);
             if (followingCount) followingCount.textContent = formatNumber((userData.following || []).length);
+            
+            // تحميل عدد طلبات الصداقة
+            if (friendRequestsCount) {
+                const requestsSnapshot = await window.db.collection('friendRequests')
+                    .where('to', '==', uid)
+                    .where('status', '==', 'pending')
+                    .get();
+                friendRequestsCount.textContent = formatNumber(requestsSnapshot.size);
+            }
             
             // تحميل قوائم المتابعين
             if (typeof loadFollowersList === 'function') {
@@ -203,6 +222,285 @@ function showLoginPrompt() {
     document.body.appendChild(loginPrompt);
 }
 
+// ========== نظام الصداقة المتكامل ==========
+
+// إظهار صفحة طلبات الصداقة
+window.showFriendRequests = function() {
+    document.querySelector('.profile-page').style.display = 'none';
+    document.getElementById('friendRequestsPage').style.display = 'block';
+    loadFriendRequests();
+};
+
+// تحميل طلبات الصداقة
+async function loadFriendRequests() {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    const requestsList = document.getElementById('friendRequestsList');
+    if (!requestsList) return;
+    
+    try {
+        const snapshot = await window.db.collection('friendRequests')
+            .where('to', '==', window.auth.currentUser.uid)
+            .where('status', '==', 'pending')
+            .orderBy('timestamp', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            requestsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-friends"></i>
+                    <h3 data-i18n="no_friend_requests">لا توجد طلبات صداقة</h3>
+                    <p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        
+        for (const doc of snapshot.docs) {
+            const request = doc.data();
+            
+            // جلب بيانات المرسل
+            const senderDoc = await window.db.collection('users').doc(request.from).get();
+            if (senderDoc.exists) {
+                const sender = senderDoc.data();
+                const avatarEmoji = getEmojiForUser(sender);
+                const requestTime = request.timestamp ? new Date(request.timestamp.seconds * 1000) : new Date();
+                
+                html += `
+                    <div class="user-item" id="request-${doc.id}">
+                        <div class="user-avatar-emoji">${avatarEmoji}</div>
+                        <div class="user-info">
+                            <h4>${sender.name}</h4>
+                            <p>${sender.shareableId || ''}</p>
+                            <small style="color: var(--text-light);">${requestTime.toLocaleDateString('ar-EG')}</small>
+                        </div>
+                        <div class="user-actions">
+                            <button class="action-btn" style="background: var(--success); color: white;" onclick="acceptFriendRequest('${doc.id}', '${request.from}')" title="قبول">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="action-btn remove" onclick="rejectFriendRequest('${doc.id}')" title="رفض">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        requestsList.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading friend requests:', error);
+        requestsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>خطأ في تحميل الطلبات</h3>
+                <p>حدث خطأ، حاول مرة أخرى</p>
+            </div>
+        `;
+    }
+}
+
+// قبول طلب الصداقة
+window.acceptFriendRequest = async function(requestId, senderId) {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    try {
+        const currentUserId = window.auth.currentUser.uid;
+        
+        // تحديث حالة الطلب إلى مقبول
+        await window.db.collection('friendRequests').doc(requestId).update({
+            status: 'accepted',
+            respondedAt: new Date()
+        });
+        
+        // إضافة كلا المستخدمين إلى قائمة أصدقاء بعضهما
+        await window.db.collection('users').doc(currentUserId).update({
+            friends: firebase.firestore.FieldValue.arrayUnion(senderId)
+        });
+        
+        await window.db.collection('users').doc(senderId).update({
+            friends: firebase.firestore.FieldValue.arrayUnion(currentUserId)
+        });
+        
+        // إزالة الطلب من الواجهة
+        const requestElement = document.getElementById(`request-${requestId}`);
+        if (requestElement) {
+            requestElement.remove();
+        }
+        
+        // تحديث عداد طلبات الصداقة
+        const friendRequestsCount = document.getElementById('friendRequestsCount');
+        if (friendRequestsCount) {
+            const currentCount = parseInt(friendRequestsCount.textContent) || 0;
+            friendRequestsCount.textContent = formatNumber(Math.max(0, currentCount - 1));
+        }
+        
+        // إظهار رسالة نجاح
+        alert('تم قبول طلب الصداقة بنجاح');
+        
+        // إذا لم يتبق طلبات، أظهر الرسالة المناسبة
+        const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
+        if (remainingRequests === 0) {
+            document.getElementById('friendRequestsList').innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-friends"></i>
+                    <h3 data-i18n="no_friend_requests">لا توجد طلبات صداقة</h3>
+                    <p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Error accepting friend request:', error);
+        alert('حدث خطأ في قبول الطلب');
+    }
+};
+
+// رفض طلب الصداقة
+window.rejectFriendRequest = async function(requestId) {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    try {
+        // تحديث حالة الطلب إلى مرفوض
+        await window.db.collection('friendRequests').doc(requestId).update({
+            status: 'rejected',
+            respondedAt: new Date()
+        });
+        
+        // إزالة الطلب من الواجهة
+        const requestElement = document.getElementById(`request-${requestId}`);
+        if (requestElement) {
+            requestElement.remove();
+        }
+        
+        // تحديث عداد طلبات الصداقة
+        const friendRequestsCount = document.getElementById('friendRequestsCount');
+        if (friendRequestsCount) {
+            const currentCount = parseInt(friendRequestsCount.textContent) || 0;
+            friendRequestsCount.textContent = formatNumber(Math.max(0, currentCount - 1));
+        }
+        
+        alert('تم رفض الطلب');
+        
+        // إذا لم يتبق طلبات، أظهر الرسالة المناسبة
+        const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
+        if (remainingRequests === 0) {
+            document.getElementById('friendRequestsList').innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-friends"></i>
+                    <h3 data-i18n="no_friend_requests">لا توجد طلبات صداقة</h3>
+                    <p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Error rejecting friend request:', error);
+        alert('حدث خطأ في رفض الطلب');
+    }
+};
+
+// تحديث دالة إضافة صديق جديدة
+window.addNewFriend = async function(targetUserId) {
+    if (!window.auth || !window.auth.currentUser) {
+        alert('الرجاء تسجيل الدخول أولاً');
+        return;
+    }
+    
+    const currentUserId = window.auth.currentUser.uid;
+    
+    // التحقق من عدم إرسال طلب لنفس المستخدم
+    if (currentUserId === targetUserId) {
+        alert('لا يمكنك إضافة نفسك كصديق');
+        return;
+    }
+    
+    try {
+        // التحقق من وجود طلب سابق
+        const existingRequest = await window.db.collection('friendRequests')
+            .where('from', '==', currentUserId)
+            .where('to', '==', targetUserId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        if (!existingRequest.empty) {
+            alert('لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً');
+            return;
+        }
+        
+        // التحقق من أنهم ليسوا أصدقاء بالفعل
+        const currentUserDoc = await window.db.collection('users').doc(currentUserId).get();
+        if (currentUserDoc.exists) {
+            const friends = currentUserDoc.data().friends || [];
+            if (friends.includes(targetUserId)) {
+                alert('هذا المستخدم صديقك بالفعل');
+                return;
+            }
+        }
+        
+        // إرسال طلب الصداقة
+        await window.db.collection('friendRequests').add({
+            from: currentUserId,
+            to: targetUserId,
+            status: 'pending',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // إخفاء نتائج البحث
+        const resultsContainer = document.getElementById('searchResultsContainer');
+        if (resultsContainer) {
+            resultsContainer.style.display = 'none';
+            resultsContainer.innerHTML = '';
+        }
+        
+        // إفراغ حقل البحث
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
+        
+        alert('تم إرسال طلب الصداقة بنجاح');
+        
+    } catch (error) {
+        console.error('Error sending friend request:', error);
+        alert('حدث خطأ في إرسال الطلب: ' + error.message);
+    }
+};
+
+// إعداد مستمع实时 لطلبات الصداقة
+function setupFriendRequestsListener(userId) {
+    const requestsQuery = window.db.collection('friendRequests')
+        .where('to', '==', userId)
+        .where('status', '==', 'pending');
+    
+    requestsQuery.onSnapshot((snapshot) => {
+        // تحديث عداد طلبات الصداقة فور وصول طلب جديد
+        const countElement = document.getElementById('friendRequestsCount');
+        if (countElement) {
+            countElement.textContent = formatNumber(snapshot.size);
+        }
+        
+        // إذا كنا في صفحة الطلبات، قم بتحديث القائمة
+        const requestsPage = document.getElementById('friendRequestsPage');
+        if (requestsPage && requestsPage.style.display === 'block') {
+            loadFriendRequests();
+        }
+        
+        // إظهار إشعار للمستخدم عند وصول طلب جديد
+        if (snapshot.docChanges().length > 0) {
+            const change = snapshot.docChanges()[0];
+            if (change.type === 'added') {
+                // يمكن إظهار إشعار للمستخدم
+                console.log('📨 لديك طلب صداقة جديد');
+                // يمكن إضافة إشعار بصري هنا
+            }
+        }
+    });
+}
+
+// ========== نهاية نظام الصداقة ==========
+
 // مراقبة حالة المستخدم
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
@@ -215,6 +513,9 @@ if (typeof window.auth !== 'undefined') {
             // مستخدم مسجل
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
+            
+            // إعداد مستمع طلبات الصداقة
+            setupFriendRequestsListener(user.uid);
             
             if (splash) {
                 splash.classList.add('hide');
@@ -303,6 +604,32 @@ window.findUserById = async function() {
         
         const avatarEmoji = getEmojiForUser(user);
         
+        // التحقق من حالة الصداقة
+        let buttonText = 'إضافة';
+        let buttonDisabled = '';
+        
+        if (currentUser) {
+            const currentUserDoc = await window.db.collection('users').doc(currentUser.uid).get();
+            const currentUserData = currentUserDoc.data();
+            
+            if (currentUserData.friends && currentUserData.friends.includes(userId)) {
+                buttonText = 'أصدقاء ✓';
+                buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+            } else {
+                // التحقق من وجود طلب معلق
+                const existingRequest = await window.db.collection('friendRequests')
+                    .where('from', '==', currentUser.uid)
+                    .where('to', '==', userId)
+                    .where('status', '==', 'pending')
+                    .get();
+                
+                if (!existingRequest.empty) {
+                    buttonText = 'طلب معلق';
+                    buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+                }
+            }
+        }
+        
         resultsContainer.innerHTML = `
             <div class="search-result-item" style="display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border);">
                 <div class="search-result-avatar-emoji" style="width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 1.8rem;">${avatarEmoji}</div>
@@ -310,45 +637,12 @@ window.findUserById = async function() {
                     <h4 style="margin: 0; font-size: 1rem;">${user.name}</h4>
                     <p style="margin: 0; color: var(--text-light); font-size: 0.85rem;">${user.shareableId}</p>
                 </div>
-                ${currentUser ? '<button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85rem;" onclick="addNewFriend(\'' + userId + '\')">' + (i18n ? i18n.t('add_friend') : 'إضافة') + '</button>' : ''}
+                ${currentUser ? '<button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85rem;" onclick="addNewFriend(\'' + userId + '\')" ' + buttonDisabled + '>' + buttonText + '</button>' : ''}
             </div>
         `;
     } catch (error) {
         console.error('Search error:', error);
         resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">${i18n ? i18n.t('search_error') : 'حدث خطأ بالبحث حاول مرة ثانية'}</div>`;
-    }
-};
-
-// إضافة صديق جديد
-window.addNewFriend = async function(targetUserId) {
-    if (!window.auth || !window.auth.currentUser) {
-        alert('الرجاء تسجيل الدخول أولاً');
-        return;
-    }
-    
-    try {
-        await window.db.collection('friendRequests').add({
-            from: window.auth.currentUser.uid,
-            to: targetUserId,
-            status: 'pending',
-            timestamp: new Date()
-        });
-        
-        // إخفاء نتائج البحث
-        const resultsContainer = document.getElementById('searchResultsContainer');
-        if (resultsContainer) {
-            resultsContainer.style.display = 'none';
-            resultsContainer.innerHTML = '';
-        }
-        
-        // إفراغ حقل البحث
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) searchInput.value = '';
-        
-        alert(i18n ? i18n.t('request_sent') : 'تم إرسال طلب الصداقة');
-    } catch (error) {
-        console.error('Error sending request:', error);
-        alert(i18n ? i18n.t('request_error') : 'حدث خطأ في إرسال الطلب');
     }
 };
 
