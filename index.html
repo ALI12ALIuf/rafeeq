@@ -74,7 +74,7 @@
                 </div>
             </div>
 
-            <!-- صفحة الدردشة - مع placeholder مترجم -->
+            <!-- صفحة الدردشة -->
             <div class="page chat-page">
                 <div class="search-container">
                     <div class="search-box">
@@ -126,30 +126,27 @@
                     
                     <p class="profile-bio" id="profileBio"></p>
                     
+                    <!-- ✅ قسم الإحصائيات الجديد (بدون متابعة) -->
                     <div class="profile-stats">
                         <a href="#" class="stat-link" onclick="showUserTrips()">
                             <span class="stat-value" id="tripsCount">0</span>
                             <span data-i18n="trips">رحلات</span>
                         </a>
-                        <a href="#" class="stat-link" onclick="showUserFollowers()">
-                            <span class="stat-value" id="followersCount">0</span>
-                            <span data-i18n="followers">متابعون</span>
+                        <a href="#" class="stat-link" onclick="showFriendsList()">
+                            <span class="stat-value" id="friendsCount">0</span>
+                            <span data-i18n="friends">الأصدقاء</span>
                         </a>
-                        <a href="#" class="stat-link" onclick="showUserFollowing()">
-                            <span class="stat-value" id="followingCount">0</span>
-                            <span data-i18n="following">يتابع</span>
-                        </a>
-                        <!-- زر طلبات الصداقة الجديد -->
                         <a href="#" class="stat-link" onclick="showFriendRequests()">
                             <span class="stat-value" id="friendRequestsCount">0</span>
-                            <span data-i18n="friend_requests">طلبات الصداقة</span>
+                            <span data-i18n="friend_requests">الطلبات</span>
                         </a>
                     </div>
                 </div>
             </div>
 
-            <!-- الصفحات الفرعية -->
+            <!-- ✅ الصفحات الفرعية الجديدة (بدون متابعة) -->
             <div class="profile-pages">
+                <!-- صفحة الرحلات -->
                 <div class="profile-subpage" id="tripsPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
@@ -164,35 +161,22 @@
                     </div>
                 </div>
                 
-                <div class="profile-subpage" id="followersPage" style="display: none;">
+                <!-- ✅ صفحة الأصدقاء الجديدة -->
+                <div class="profile-subpage" id="friendsPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
-                        <h3 data-i18n="followers">المتابعون</h3>
+                        <h3 data-i18n="friends">الأصدقاء</h3>
                     </div>
-                    <div class="users-list" id="followersPageList">
-                        <div class="empty-state">
-                            <i class="fas fa-users"></i>
-                            <h3 data-i18n="no_followers">لا يوجد متابعين</h3>
-                            <p data-i18n="no_followers_desc">لم يتابعك أحد بعد</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="profile-subpage" id="followingPage" style="display: none;">
-                    <div class="subpage-header">
-                        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
-                        <h3 data-i18n="following">يتابع</h3>
-                    </div>
-                    <div class="users-list" id="followingPageList">
+                    <div class="users-list" id="friendsList">
                         <div class="empty-state">
                             <i class="fas fa-user-friends"></i>
-                            <h3 data-i18n="no_following">لا تتابع أحداً</h3>
-                            <p data-i18n="no_following_desc">لم تتابع أي شخص بعد</p>
+                            <h3 data-i18n="no_friends">لا يوجد أصدقاء</h3>
+                            <p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- صفحة طلبات الصداقة الجديدة -->
+                <!-- صفحة طلبات الصداقة -->
                 <div class="profile-subpage" id="friendRequestsPage" style="display: none;">
                     <div class="subpage-header">
                         <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
@@ -201,7 +185,7 @@
                     <div class="users-list" id="friendRequestsList">
                         <div class="empty-state">
                             <i class="fas fa-user-friends"></i>
-                            <h3 data-i18n="no_friend_requests">لا توجد طلبات صداقة</h3>
+                            <h3 data-i18n="no_friend_requests">لا توجد طلبات</h3>
                             <p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p>
                         </div>
                     </div>
@@ -233,6 +217,7 @@
             </div>
         </main>
 
+        <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-page="home">
                 <i class="fas fa-home"></i>
@@ -252,6 +237,7 @@
             </button>
         </nav>
 
+        <!-- القائمة الجانبية -->
         <div class="side-menu" id="sideMenu">
             <div class="menu-header">
                 <div class="menu-avatar-emoji" id="menuAvatarEmoji">👤</div>
