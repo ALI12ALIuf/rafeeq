@@ -139,6 +139,11 @@
                             <span class="stat-value" id="followingCount">0</span>
                             <span data-i18n="following">يتابع</span>
                         </a>
+                        <!-- زر طلبات الصداقة الجديد -->
+                        <a href="#" class="stat-link" onclick="showFriendRequests()">
+                            <span class="stat-value" id="friendRequestsCount">0</span>
+                            <span data-i18n="friend_requests">طلبات الصداقة</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -183,6 +188,21 @@
                             <i class="fas fa-user-friends"></i>
                             <h3 data-i18n="no_following">لا تتابع أحداً</h3>
                             <p data-i18n="no_following_desc">لم تتابع أي شخص بعد</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- صفحة طلبات الصداقة الجديدة -->
+                <div class="profile-subpage" id="friendRequestsPage" style="display: none;">
+                    <div class="subpage-header">
+                        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
+                        <h3 data-i18n="friend_requests">طلبات الصداقة</h3>
+                    </div>
+                    <div class="users-list" id="friendRequestsList">
+                        <div class="empty-state">
+                            <i class="fas fa-user-friends"></i>
+                            <h3 data-i18n="no_friend_requests">لا توجد طلبات صداقة</h3>
+                            <p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p>
                         </div>
                     </div>
                 </div>
@@ -337,8 +357,6 @@
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
-
-    <!-- تم إزالة نافذة البحث المنبثقة (findFriendModal) -->
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
