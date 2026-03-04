@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModals();
     loadStories();
     loadChats();
+    setupChatListeners();
     
     // تحديث عدد الرحلات إذا كانت موجودة
     updateTripsCount();
@@ -87,6 +88,16 @@ function setupNavigation() {
             sp.style.display = 'none';
         });
         
+        // إذا كانت الصفحة المحددة هي الدردشة، قم بتحميل المحادثات
+        if (pageId === 'chat') {
+            loadChats();
+        }
+        
+        // إذا كانت الصفحة المحددة هي المحادثة الفردية، أخفيها
+        if (pageId !== 'conversation') {
+            document.getElementById('conversationPage').style.display = 'none';
+        }
+        
         navItems.forEach(item => {
             item.classList.toggle('active', item.dataset.page === pageId);
         });
@@ -140,8 +151,6 @@ function setupModals() {
         document.getElementById('languageModal')?.classList.add('active');
     };
     
-    // تم إزالة openFindFriendModal لأن النافذة المنبثقة أزيلت
-    
     window.closeModal = () => {
         document.querySelectorAll('.modal').forEach(modal => {
             modal.classList.remove('active');
@@ -154,7 +163,6 @@ function setupModals() {
         });
     });
     
-    // تم إزالة ربط زر البحث
     document.querySelectorAll('.settings-item').forEach(item => {
         if (item.querySelector('[data-i18n="language"]')) {
             item.addEventListener('click', openLanguageModal);
@@ -181,9 +189,101 @@ function loadStories() {
     `).join('');
 }
 
-function loadChats() {
-    // للاستخدام المستقبلي
+// ========== نظام الدردشة الجديد ==========
+
+// تحميل قائمة المحادثات
+async function loadChats() {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    const chatsList = document.getElementById('chatsList');
+    if (!chatsList) return;
+    
+    try {
+        // جلب قائمة الأصدقاء
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+        if (!userDoc.exists) return;
+        
+        const friends = userDoc.data().friends || [];
+        
+        if (friends.length === 0) {
+            chatsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-comments"></i>
+                    <h3>لا توجد محادثات</h3>
+                    <p>أضف أصدقاء لبدء المحادثة</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        
+        for (const friendId of friends) {
+            try {
+                const friendDoc = await window.db.collection('users').doc(friendId).get();
+                if (friendDoc.exists) {
+                    const friend = friendDoc.data();
+                    const avatarEmoji = getEmojiForUser(friend);
+                    
+                    html += `
+                        <div class="chat-item" onclick="openChat('${friendId}')">
+                            <div class="chat-avatar-emoji">${avatarEmoji}</div>
+                            <div class="chat-info">
+                                <h4>${friend.name || 'مستخدم'}</h4>
+                                <p class="last-message">اضغط لبدء المحادثة</p>
+                            </div>
+                            <span class="chat-time">الآن</span>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('Error loading friend:', e);
+            }
+        }
+        
+        chatsList.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading chats:', error);
+        chatsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>خطأ في تحميل المحادثات</h3>
+                <p>حاول مرة أخرى</p>
+            </div>
+        `;
+    }
 }
+
+// إعداد مستمعي الدردشة
+function setupChatListeners() {
+    // إخفاء قائمة المرفقات عند النقر خارجها
+    document.addEventListener('click', (e) => {
+        const menu = document.getElementById('attachmentMenu');
+        const attachBtn = document.querySelector('.attach-btn');
+        if (menu && attachBtn && !menu.contains(e.target) && !attachBtn.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+    
+    // إعداد مستلمي الرسائل (سيتم تفعيلها عند فتح المحادثة)
+}
+
+// تحديث آخر رسالة في القائمة
+function updateLastMessage(friendId, message, time) {
+    const chatItems = document.querySelectorAll('.chat-item');
+    for (const item of chatItems) {
+        if (item.getAttribute('onclick')?.includes(friendId)) {
+            const lastMsg = item.querySelector('.last-message');
+            const chatTime = item.querySelector('.chat-time');
+            if (lastMsg) lastMsg.textContent = message;
+            if (chatTime) chatTime.textContent = time;
+            break;
+        }
+    }
+}
+
+// ========== نهاية نظام الدردشة ==========
 
 // فتح نافذة تعديل الملف الشخصي
 window.openEditProfileModal = function() {
@@ -274,7 +374,6 @@ async function loadUserTrips() {
         snapshot.forEach(doc => {
             const trip = doc.data();
             const startTime = trip.startTime ? new Date(trip.startTime.seconds * 1000) : new Date();
-            const endTime = trip.endTime ? new Date(trip.endTime.seconds * 1000) : null;
             
             html += `
                 <div class="trip-item" onclick="viewTripDetails('${doc.id}')">
@@ -309,42 +408,9 @@ window.viewTripDetails = function(tripId) {
     // يمكن تطويرها لاحقاً
 };
 
-window.showUserFollowers = function() {
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('followersPage').style.display = 'block';
-    
-    const list = document.getElementById('followersPageList');
-    if (window.followersData && window.followersData.trim() !== '') {
-        list.innerHTML = window.followersData;
-    } else {
-        list.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-users"></i>
-                <h3>${i18n ? i18n.t('no_followers') : 'لا يوجد متابعين'}</h3>
-                <p>${i18n ? i18n.t('no_followers_desc') : 'لم يتابعك أحد بعد'}</p>
-            </div>
-        `;
-    }
-};
+// ✅ تم إزالة دوال المتابعة القديمة (showUserFollowers, showUserFollowing)
 
-window.showUserFollowing = function() {
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('followingPage').style.display = 'block';
-    
-    const list = document.getElementById('followingPageList');
-    if (window.followingData && window.followingData.trim() !== '') {
-        list.innerHTML = window.followingData;
-    } else {
-        list.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-user-friends"></i>
-                <h3>${i18n ? i18n.t('no_following') : 'لا تتابع أحداً'}</h3>
-                <p>${i18n ? i18n.t('no_following_desc') : 'لم تتابع أي شخص بعد'}</p>
-            </div>
-        `;
-    }
-};
-
+// دالة الرجوع للخلف
 window.goBack = function() {
     // إخفاء جميع الصفحات الفرعية
     document.querySelectorAll('.profile-subpage').forEach(page => {
@@ -391,6 +457,12 @@ window.selectAvatar = function(type) {
         currentAvatar.textContent = selectedEmoji;
     }
     
+    // تحديث الملصق في القائمة الجانبية
+    const menuAvatar = document.getElementById('menuAvatarEmoji');
+    if (menuAvatar) {
+        menuAvatar.textContent = selectedEmoji;
+    }
+    
     // حفظ الاختيار في Firebase
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
@@ -411,6 +483,52 @@ window.openAvatarModal = function() {
     if (modal) modal.classList.add('active');
 };
 
+// تحديث القوائم عند تغيير اللغة
 document.addEventListener('languageChanged', function() {
     console.log('Language changed');
+    // إعادة تحميل المحادثات إذا كانت الصفحة الحالية هي الدردشة
+    if (document.querySelector('.chat-page').style.display === 'block') {
+        loadChats();
+    }
 });
+
+// دالة للحصول على الملصق المناسب (مشتركة مع auth.js)
+window.getEmojiForUser = function(userData) {
+    const emojiMap = {
+        'male': '👨',
+        'female': '👩',
+        'boy': '🧒',
+        'girl': '👧',
+        'father': '👨‍🦳',
+        'mother': '👩‍🦳',
+        'grandfather': '👴',
+        'grandmother': '👵'
+    };
+    return emojiMap[userData?.avatarType] || '👤';
+};
+
+// دالة مساعدة لمسح رسائل المحادثة عند الإغلاق
+window.clearMessages = function() {
+    const container = document.getElementById('messagesContainer');
+    if (container) {
+        container.innerHTML = '';
+    }
+};
+
+// دالة لعرض إشعار (للمكالمات الواردة)
+window.showNotification = function(title, message) {
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body: message });
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                new Notification(title, { body: message });
+            }
+        });
+    }
+};
+
+// طلب إذن الإشعارات عند تحميل التطبيق
+if ('Notification' in window) {
+    Notification.requestPermission();
+}
