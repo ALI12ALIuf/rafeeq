@@ -1,800 +1,888 @@
-// دالة تنسيق الأرقام (تحويل 1000 → 1K، 1000000 → 1M)
-function formatNumber(num) {
-    if (num >= 1000000) {
-        return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-    }
-    if (num >= 1000) {
-        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-    }
-    return num.toString();
-}
+// ========== نظام WebRTC للدردشة المباشرة ==========
+// اتصال P2P مشفر بالكامل - بدون حفظ أي بيانات في السيرفر
 
-// توليد معرف عشوائي من 10 أرقام (أرقام فقط)
-function generateShareableId() {
-    let id = '';
-    for (let i = 0; i < 10; i++) {
-        id += Math.floor(Math.random() * 10).toString();
-    }
-    return id;
-}
-
-// دالة لتحديد الملصق المناسب
-function getEmojiForUser(userData) {
-    const emojiMap = {
-        'male': '👨',
-        'female': '👩',
-        'boy': '🧒',
-        'girl': '👧',
-        'father': '👨‍🦳',
-        'mother': '👩‍🦳',
-        'grandfather': '👴',
-        'grandmother': '👵'
-    };
-    return emojiMap[userData.avatarType] || '👤';
-}
-
-// ✅ تعريف مختصر لـ FieldValue
-const FieldValue = firebase.firestore.FieldValue;
-
-// تسجيل الدخول بجوجل
-async function signInWithGoogle() {
-    try {
-        if (!window.auth || !window.googleProvider) {
-            alert('مكتبة Firebase لم يتم تحميلها بعد. يرجى تحديث الصفحة.');
-            return false;
-        }
+class WebRTCManager {
+    constructor() {
+        this.peerConnections = new Map(); // تخزين الاتصالات النشطة
+        this.dataChannels = new Map(); // قنوات البيانات
+        localStream = null; // تيار الوسائط المحلي
+        this.currentCall = null; // المكالمة الحالية
+        this.currentFriendId = null; // معرف الصديق الحالي
+        this.pendingCandidates = new Map(); // ICE candidates المعلقة
         
-        const result = await window.auth.signInWithPopup(window.googleProvider);
-        const user = result.user;
+        // إعداد مستمع Firebase للإشارات
+        this.setupSignalingListener();
+    }
+
+    // إعداد مستمع Firebase للإشارات
+    setupSignalingListener() {
+        if (!window.auth?.currentUser) return;
         
-        const userDoc = await window.db.collection('users').doc(user.uid).get();
+        const userId = window.auth.currentUser.uid;
         
-        if (!userDoc.exists) {
-            const shareableId = generateShareableId();
-            
-            // ✅ مستخدم جديد - بدون متابعة
-            await window.db.collection('users').doc(user.uid).set({
-                uid: user.uid,
-                name: (user.displayName || 'مستخدم').substring(0, 25),
-                email: user.email || '',
-                shareableId: shareableId,
-                bio: '',
-                avatarType: 'male',
-                friends: [], // فقط الأصدقاء
-                blocked: [],
-                createdAt: new Date()
+        // الاستماع لعروض الاتصال الواردة
+        window.db.collection('signaling')
+            .where('to', '==', userId)
+            .where('status', '==', 'pending')
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        this.handleIncomingSignal(change.doc.data(), change.doc.id);
+                    }
+                });
             });
-        } else {
-            const userData = userDoc.data();
-            
-            // تحديث المستخدمين القدامى (إزالة المتابعة إذا وجدت)
-            const updates = {};
-            
-            if (!userData.friends) updates.friends = [];
-            if (userData.followers) updates.followers = []; // إزالة المتابعين
-            if (userData.following) updates.following = []; // إزالة المتابَعين
-            
-            if (Object.keys(updates).length > 0) {
-                await window.db.collection('users').doc(user.uid).update(updates);
-            }
+    }
+
+    // معالجة الإشارات الواردة
+    async handleIncomingSignal(signal, signalId) {
+        console.log('📨 إشارة واردة:', signal.type);
+        
+        switch (signal.type) {
+            case 'offer':
+                await this.handleIncomingOffer(signal, signalId);
+                break;
+            case 'answer':
+                await this.handleIncomingAnswer(signal, signalId);
+                break;
+            case 'candidate':
+                await this.handleIncomingCandidate(signal);
+                break;
+            case 'end-call':
+                this.handleEndCall(signal.from);
+                break;
         }
-        
-        updateUserUI();
-        return true;
-    } catch (error) {
-        console.error('Login error:', error);
-        
-        let errorMessage = 'حدث خطأ في تسجيل الدخول';
-        if (error.code === 'auth/popup-closed-by-user') {
-            errorMessage = 'تم إغلاق نافذة تسجيل الدخول';
-        } else if (error.code === 'auth/cancelled-popup-request') {
-            errorMessage = 'تم إلغاء طلب تسجيل الدخول';
-        } else if (error.code === 'auth/network-request-failed') {
-            errorMessage = 'خطأ في الشبكة. تحقق من اتصالك بالإنترنت';
-        } else {
-            errorMessage += ': ' + error.message;
-        }
-        
-        alert(errorMessage);
-        return false;
     }
-}
 
-// تحديث واجهة المستخدم بعد تسجيل الدخول
-function updateUserUI() {
-    const splash = document.getElementById('splash');
-    const app = document.getElementById('app');
-    
-    if (splash) {
-        splash.classList.add('hide');
-        setTimeout(() => {
-            splash.style.display = 'none';
-            if (app) app.style.display = 'flex';
-        }, 500);
+    // بدء محادثة مع صديق
+    async startChat(friendId, friendName, friendAvatar) {
+        this.currentFriendId = friendId;
+        
+        // تحديث واجهة المحادثة
+        document.getElementById('conversationName').textContent = friendName;
+        document.getElementById('conversationAvatar').textContent = friendAvatar || '👤';
+        
+        // إظهار صفحة المحادثة
+        document.querySelector('.chat-page').style.display = 'none';
+        document.getElementById('conversationPage').style.display = 'block';
+        
+        // إنشاء اتصال WebRTC جديد
+        await this.createPeerConnection(friendId);
+        
+        // إنشاء قناة بيانات للرسائل
+        this.createDataChannel(friendId);
+        
+        // إرسال عرض الاتصال
+        await this.sendOffer(friendId);
     }
-    
-    const loginPrompt = document.querySelector('.login-prompt');
-    if (loginPrompt) loginPrompt.remove();
-}
 
-// تسجيل الخروج
-async function logout() {
-    try {
-        await window.auth.signOut();
-        window.location.reload();
-    } catch (error) {
-        console.error('Logout error:', error);
-    }
-}
+    // إنشاء اتصال WebRTC
+    async createPeerConnection(friendId) {
+        const config = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
+        };
 
-// ✅ تحميل بيانات المستخدم (بدون متابعة)
-async function loadUserData(uid) {
-    try {
-        const userDoc = await window.db.collection('users').doc(uid).get();
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            
-            const profileName = document.getElementById('profileName');
-            const profileAvatarEmoji = document.getElementById('profileAvatarEmoji');
-            const menuAvatarEmoji = document.getElementById('menuAvatarEmoji');
-            const menuName = document.getElementById('menuName');
-            const profileBio = document.getElementById('profileBio');
-            const shareableId = document.getElementById('shareableId');
-            const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
-            
-            if (profileName) profileName.textContent = (userData.name || 'مستخدم').substring(0, 25);
-            if (menuName) menuName.textContent = (userData.name || 'مستخدم').substring(0, 25);
-            if (profileBio) profileBio.textContent = userData.bio || '';
-            
-            if (shareableId) shareableId.textContent = userData.shareableId || '0000000000';
-            
-            const avatarEmoji = getEmojiForUser(userData);
-            
-            if (profileAvatarEmoji) profileAvatarEmoji.textContent = avatarEmoji;
-            if (menuAvatarEmoji) menuAvatarEmoji.textContent = avatarEmoji;
-            if (currentAvatarEmoji) currentAvatarEmoji.textContent = avatarEmoji;
-            
-            // ✅ تحديث عدادات الأصدقاء
-            const friendsCount = document.getElementById('friendsCount');
-            const friendRequestsCount = document.getElementById('friendRequestsCount');
-            
-            if (friendsCount) {
-                friendsCount.textContent = formatNumber((userData.friends || []).length);
+        const pc = new RTCPeerConnection(config);
+        
+        // معالجة ICE candidates
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                this.sendCandidate(friendId, event.candidate);
             }
-            
-            if (friendRequestsCount) {
+        };
+
+        // معالجة قنوات البيانات الواردة
+        pc.ondatachannel = (event) => {
+            const channel = event.channel;
+            this.setupDataChannel(channel, friendId);
+        };
+
+        // معالجة التيارات البعيدة (للمكالمات)
+        pc.ontrack = (event) => {
+            if (event.streams && event.streams[0]) {
+                this.displayRemoteVideo(event.streams[0]);
+            }
+        };
+
+        // معالجة حالة الاتصال
+        pc.onconnectionstatechange = () => {
+            console.log('🔄 حالة الاتصال:', pc.connectionState);
+            if (pc.connectionState === 'connected') {
+                this.showConnectionStatus('متصل');
+            } else if (pc.connectionState === 'disconnected') {
+                this.showConnectionStatus('غير متصل');
+            }
+        };
+
+        this.peerConnections.set(friendId, pc);
+        return pc;
+    }
+
+    // إنشاء قناة بيانات
+    createDataChannel(friendId) {
+        const pc = this.peerConnections.get(friendId);
+        if (!pc) return;
+
+        const channel = pc.createDataChannel('chat', {
+            reliable: true
+        });
+
+        this.setupDataChannel(channel, friendId);
+        return channel;
+    }
+
+    // إعداد قناة البيانات
+    setupDataChannel(channel, friendId) {
+        channel.onopen = () => {
+            console.log('📡 قناة البيانات مفتوحة');
+            this.showConnectionStatus('متصل');
+        };
+
+        channel.onclose = () => {
+            console.log('📡 قناة البيانات مغلقة');
+            this.showConnectionStatus('غير متصل');
+        };
+
+        channel.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleIncomingMessage(data);
+            } catch (e) {
+                console.error('خطأ في معالجة الرسالة:', e);
+            }
+        };
+
+        this.dataChannels.set(friendId, channel);
+    }
+
+    // إرسال عرض اتصال
+    async sendOffer(friendId) {
+        const pc = this.peerConnections.get(friendId);
+        if (!pc) return;
+
+        try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            // حفظ العرض في Firebase (مؤقت)
+            const signalId = `${window.auth.currentUser.uid}_${friendId}_${Date.now()}`;
+            await window.db.collection('signaling').doc(signalId).set({
+                from: window.auth.currentUser.uid,
+                to: friendId,
+                type: 'offer',
+                offer: offer,
+                status: 'pending',
+                timestamp: new Date(),
+                expires: new Date(Date.now() + 60000) // تنتهي بعد دقيقة
+            });
+
+            // حذف الإشارة بعد دقيقة
+            setTimeout(async () => {
                 try {
-                    const requestsSnapshot = await window.db.collection('friendRequests')
-                        .where('to', '==', uid)
-                        .where('status', '==', 'pending')
-                        .get();
-                    friendRequestsCount.textContent = formatNumber(requestsSnapshot.size);
-                } catch (e) {
-                    console.log('No friend requests collection yet');
-                    friendRequestsCount.textContent = '0';
-                }
-            }
+                    await window.db.collection('signaling').doc(signalId).delete();
+                } catch (e) {}
+            }, 60000);
+
+        } catch (error) {
+            console.error('خطأ في إنشاء العرض:', error);
         }
-    } catch (error) {
-        console.error('Error loading user data:', error);
     }
-}
 
-// إظهار رسالة تسجيل الدخول
-function showLoginPrompt() {
-    if (document.querySelector('.login-prompt')) return;
-    
-    const loginPrompt = document.createElement('div');
-    loginPrompt.className = 'login-prompt';
-    loginPrompt.style.cssText = `
-        position: fixed;
-        bottom: 80px;
-        left: 20px;
-        right: 20px;
-        background: var(--card-bg);
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        z-index: 1000;
-        text-align: center;
-    `;
-    
-    loginPrompt.innerHTML = `
-        <i class="fas fa-lock" style="font-size: 2rem; color: var(--primary); margin-bottom: 10px;"></i>
-        <h3 style="margin-bottom: 10px;">${i18n ? i18n.t('login') : 'تسجيل الدخول'}</h3>
-        <p style="margin-bottom: 20px; color: var(--text-light);">${i18n ? i18n.t('login_desc') : 'سجل دخولك للوصول إلى جميع الميزات'}</p>
-        <button class="btn btn-primary" onclick="signInWithGoogle()" style="width: 100%;">${i18n ? i18n.t('login_with_google') : 'المتابعة بحساب جوجل'}</button>
-    `;
-    
-    document.body.appendChild(loginPrompt);
-}
+    // معالجة عرض وارد
+    async handleIncomingOffer(signal, signalId) {
+        if (!window.auth?.currentUser) return;
 
-// ========== نظام الصداقة المتكامل (بدون متابعة) ==========
+        const pc = await this.createPeerConnection(signal.from);
+        
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
+            
+            // إنشاء إجابة
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
 
-// ✅ عرض صفحة الأصدقاء
-window.showFriendsList = function() {
-    const profilePage = document.querySelector('.profile-page');
-    const friendsPage = document.getElementById('friendsPage');
-    
-    if (profilePage) profilePage.style.display = 'none';
-    if (friendsPage) friendsPage.style.display = 'block';
-    
-    loadFriendsList();
-};
-
-// ✅ تحميل قائمة الأصدقاء
-async function loadFriendsList() {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    const friendsList = document.getElementById('friendsList');
-    if (!friendsList) return;
-    
-    try {
-        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
-        if (!userDoc.exists) return;
-        
-        const userData = userDoc.data();
-        const friends = userData.friends || [];
-        
-        if (friends.length === 0) {
-            friendsList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friends') : 'لا يوجد أصدقاء'}</h3>
-                    <p>${i18n ? i18n.t('no_friends_desc') : 'لم تضف أي أصدقاء بعد'}</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = '';
-        
-        for (const friendId of friends) {
-            try {
-                const friendDoc = await window.db.collection('users').doc(friendId).get();
-                if (friendDoc.exists) {
-                    const friend = friendDoc.data();
-                    const avatarEmoji = getEmojiForUser(friend);
-                    
-                    html += `
-                        <div class="user-item">
-                            <div class="user-avatar-emoji">${avatarEmoji}</div>
-                            <div class="user-info">
-                                <h4>${friend.name || 'مستخدم'}</h4>
-                                <p>${friend.shareableId || ''}</p>
-                            </div>
-                            <div class="user-actions">
-                                <button class="action-btn" onclick="openChat('${friendId}')" title="محادثة">
-                                    <i class="fas fa-comment"></i>
-                                </button>
-                                <button class="action-btn" onclick="removeFriend('${friendId}')" title="حذف الصديق" style="background: var(--danger); color: white;">
-                                    <i class="fas fa-user-minus"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }
-            } catch (e) {
-                console.error('Error loading friend:', e);
-            }
-        }
-        
-        friendsList.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading friends list:', error);
-        friendsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>خطأ في تحميل الأصدقاء</h3>
-                <p>${error.message || 'حدث خطأ، حاول مرة أخرى'}</p>
-            </div>
-        `;
-    }
-}
-
-// ✅ حذف صديق
-window.removeFriend = async function(friendId) {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    if (!confirm('هل أنت متأكد من حذف هذا الصديق؟')) return;
-    
-    try {
-        const currentUserId = window.auth.currentUser.uid;
-        
-        // إزالة الصديق من الطرفين
-        await window.db.collection('users').doc(currentUserId).update({
-            friends: FieldValue.arrayRemove(friendId)
-        });
-        
-        await window.db.collection('users').doc(friendId).update({
-            friends: FieldValue.arrayRemove(currentUserId)
-        });
-        
-        // تحديث القائمة
-        await updateFriendsCount();
-        await loadFriendsList();
-        
-        alert('تم حذف الصديق بنجاح');
-        
-    } catch (error) {
-        console.error('Error removing friend:', error);
-        alert('حدث خطأ في حذف الصديق');
-    }
-};
-
-// ✅ تحديث عداد الأصدقاء
-async function updateFriendsCount() {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
-        if (userDoc.exists) {
-            const friends = userDoc.data().friends || [];
-            const countElement = document.getElementById('friendsCount');
-            if (countElement) {
-                countElement.textContent = formatNumber(friends.length);
-            }
-        }
-    } catch (error) {
-        console.error('Error updating friends count:', error);
-    }
-}
-
-// إظهار صفحة طلبات الصداقة
-window.showFriendRequests = function() {
-    const profilePage = document.querySelector('.profile-page');
-    const requestsPage = document.getElementById('friendRequestsPage');
-    
-    if (profilePage) profilePage.style.display = 'none';
-    if (requestsPage) requestsPage.style.display = 'block';
-    
-    loadFriendRequests();
-};
-
-// دالة مساعدة لتنسيق التاريخ بأمان
-function formatDateSafely(timestamp) {
-    try {
-        if (!timestamp) return 'تاريخ غير معروف';
-        
-        if (timestamp.seconds) {
-            return new Date(timestamp.seconds * 1000).toLocaleDateString('ar-EG');
-        } else if (timestamp instanceof Date) {
-            return timestamp.toLocaleDateString('ar-EG');
-        } else {
-            return new Date(timestamp).toLocaleDateString('ar-EG');
-        }
-    } catch (e) {
-        console.error('Error formatting date:', e);
-        return 'تاريخ غير معروف';
-    }
-}
-
-// تحميل طلبات الصداقة
-async function loadFriendRequests() {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    const requestsList = document.getElementById('friendRequestsList');
-    if (!requestsList) return;
-    
-    try {
-        const snapshot = await window.db.collection('friendRequests')
-            .where('to', '==', window.auth.currentUser.uid)
-            .where('status', '==', 'pending')
-            .get();
-        
-        if (snapshot.empty) {
-            requestsList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
-                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = '';
-        let requests = [];
-        
-        snapshot.forEach(doc => {
-            requests.push({
-                id: doc.id,
-                ...doc.data()
+            // إرسال الإجابة
+            await window.db.collection('signaling').doc(signalId).update({
+                type: 'answer',
+                answer: answer,
+                status: 'answered'
             });
-        });
-        
-        requests.sort((a, b) => {
-            const timeA = a.timestamp?.seconds || 0;
-            const timeB = b.timestamp?.seconds || 0;
-            return timeB - timeA;
-        });
-        
-        for (const request of requests) {
-            try {
-                const senderDoc = await window.db.collection('users').doc(request.from).get();
-                if (senderDoc.exists) {
-                    const sender = senderDoc.data();
-                    const avatarEmoji = getEmojiForUser(sender);
-                    const requestDate = formatDateSafely(request.timestamp);
-                    
-                    html += `
-                        <div class="user-item" id="request-${request.id}">
-                            <div class="user-avatar-emoji">${avatarEmoji}</div>
-                            <div class="user-info">
-                                <h4>${sender.name || 'مستخدم'}</h4>
-                                <p>${sender.shareableId || ''}</p>
-                                <small style="color: var(--text-light);">${requestDate}</small>
-                            </div>
-                            <div class="user-actions">
-                                <button class="action-btn" style="background: var(--success); color: white;" onclick="acceptFriendRequest('${request.id}', '${request.from}')" title="قبول">
-                                    <i class="fas fa-check"></i>
-                                </button>
-                                <button class="action-btn remove" onclick="rejectFriendRequest('${request.id}')" title="رفض">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
+
+            // معالجة أي candidates معلقة
+            if (this.pendingCandidates.has(signal.from)) {
+                const candidates = this.pendingCandidates.get(signal.from);
+                for (const candidate of candidates) {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
                 }
-            } catch (e) {
-                console.error('Error processing request:', e);
+                this.pendingCandidates.delete(signal.from);
             }
+
+        } catch (error) {
+            console.error('خطأ في معالجة العرض:', error);
         }
+    }
+
+    // معالجة إجابة واردة
+    async handleIncomingAnswer(signal) {
+        const pc = this.peerConnections.get(signal.from);
+        if (!pc) return;
+
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
+            
+            // معالجة أي candidates معلقة
+            if (this.pendingCandidates.has(signal.from)) {
+                const candidates = this.pendingCandidates.get(signal.from);
+                for (const candidate of candidates) {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                this.pendingCandidates.delete(signal.from);
+            }
+
+        } catch (error) {
+            console.error('خطأ في معالجة الإجابة:', error);
+        }
+    }
+
+    // إرسال ICE candidate
+    async sendCandidate(friendId, candidate) {
+        try {
+            await window.db.collection('signaling').add({
+                from: window.auth.currentUser.uid,
+                to: friendId,
+                type: 'candidate',
+                candidate: candidate,
+                timestamp: new Date(),
+                expires: new Date(Date.now() + 60000)
+            });
+        } catch (error) {
+            console.error('خطأ في إرسال candidate:', error);
+        }
+    }
+
+    // معالجة ICE candidate وارد
+    async handleIncomingCandidate(signal) {
+        const pc = this.peerConnections.get(signal.from);
         
-        if (html === '') {
-            requestsList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
-                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
-                </div>
-            `;
+        if (pc && pc.remoteDescription) {
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            } catch (error) {
+                console.error('خطأ في إضافة candidate:', error);
+            }
         } else {
-            requestsList.innerHTML = html;
+            // حفظ candidate لحين جهوزية الاتصال
+            if (!this.pendingCandidates.has(signal.from)) {
+                this.pendingCandidates.set(signal.from, []);
+            }
+            this.pendingCandidates.get(signal.from).push(signal.candidate);
         }
+    }
+
+    // ========== دوال الرسائل ==========
+
+    // إرسال رسالة نصية
+    sendTextMessage() {
+        const input = document.getElementById('messageInput');
+        const text = input.value.trim();
         
-    } catch (error) {
-        console.error('Error loading friend requests:', error);
-        requestsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>خطأ في تحميل الطلبات</h3>
-                <p>${error.message || 'حدث خطأ، حاول مرة أخرى'}</p>
-            </div>
+        if (!text || !this.currentFriendId) return;
+
+        const message = {
+            type: 'text',
+            text: text,
+            sender: window.auth.currentUser.uid,
+            timestamp: Date.now(),
+            messageId: `msg_${Date.now()}_${Math.random()}`
+        };
+
+        // إرسال عبر WebRTC
+        const channel = this.dataChannels.get(this.currentFriendId);
+        if (channel && channel.readyState === 'open') {
+            channel.send(JSON.stringify(message));
+            this.displayMessage(message, 'sent');
+        } else {
+            alert('الاتصال غير متاح');
+        }
+
+        input.value = '';
+    }
+
+    // معالجة رسالة واردة
+    handleIncomingMessage(message) {
+        switch (message.type) {
+            case 'text':
+                this.displayMessage(message, 'received');
+                break;
+            case 'file':
+                this.handleIncomingFile(message);
+                break;
+            case 'voice':
+                this.handleIncomingVoice(message);
+                break;
+            case 'location':
+                this.handleIncomingLocation(message);
+                break;
+        }
+    }
+
+    // عرض الرسالة في الواجهة
+    displayMessage(message, type) {
+        const container = document.getElementById('messagesContainer');
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${type}`;
+        
+        const time = new Date(message.timestamp).toLocaleTimeString('ar-EG', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        messageElement.innerHTML = `
+            <div class="message-content">${this.escapeHtml(message.text)}</div>
+            <div class="message-time">${time}</div>
         `;
-    }
-}
 
-// قبول طلب الصداقة
-window.acceptFriendRequest = async function(requestId, senderId) {
-    if (!window.auth || !window.auth.currentUser) {
-        alert('الرجاء تسجيل الدخول أولاً');
-        return;
+        container.appendChild(messageElement);
+        container.scrollTop = container.scrollHeight;
     }
-    
-    try {
-        const currentUserId = window.auth.currentUser.uid;
-        
-        await window.db.collection('friendRequests').doc(requestId).update({
-            status: 'accepted',
-            respondedAt: new Date()
-        });
-        
-        await window.db.collection('users').doc(currentUserId).update({
-            friends: FieldValue.arrayUnion(senderId)
-        });
-        
-        await window.db.collection('users').doc(senderId).update({
-            friends: FieldValue.arrayUnion(currentUserId)
-        });
-        
-        const requestElement = document.getElementById(`request-${requestId}`);
-        if (requestElement) {
-            requestElement.remove();
-        }
-        
-        await updateFriendRequestsCount();
-        await updateFriendsCount();
-        
-        alert('تم قبول طلب الصداقة بنجاح');
-        
-        const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
-        if (remainingRequests === 0) {
-            document.getElementById('friendRequestsList').innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
-                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
-                </div>
-            `;
-        }
-        
-    } catch (error) {
-        console.error('Error accepting friend request:', error);
-        alert('حدث خطأ في قبول الطلب: ' + error.message);
-    }
-};
 
-// رفض طلب الصداقة
-window.rejectFriendRequest = async function(requestId) {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        await window.db.collection('friendRequests').doc(requestId).update({
-            status: 'rejected',
-            respondedAt: new Date()
-        });
-        
-        const requestElement = document.getElementById(`request-${requestId}`);
-        if (requestElement) {
-            requestElement.remove();
-        }
-        
-        await updateFriendRequestsCount();
-        
-        alert('تم رفض الطلب');
-        
-        const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
-        if (remainingRequests === 0) {
-            document.getElementById('friendRequestsList').innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
-                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
-                </div>
-            `;
-        }
-        
-    } catch (error) {
-        console.error('Error rejecting friend request:', error);
-        alert('حدث خطأ في رفض الطلب');
-    }
-};
+    // ========== دوال المكالمات ==========
 
-// تحديث عداد طلبات الصداقة
-async function updateFriendRequestsCount() {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    try {
-        const snapshot = await window.db.collection('friendRequests')
-            .where('to', '==', window.auth.currentUser.uid)
-            .where('status', '==', 'pending')
-            .get();
-        
-        const countElement = document.getElementById('friendRequestsCount');
-        if (countElement) {
-            countElement.textContent = formatNumber(snapshot.size);
-        }
-    } catch (error) {
-        console.error('Error updating friend requests count:', error);
-    }
-}
+    // بدء مكالمة فيديو
+    async startVideoCall() {
+        if (!this.currentFriendId) return;
 
-// إضافة صديق جديد
-window.addNewFriend = async function(targetUserId) {
-    if (!window.auth || !window.auth.currentUser) {
-        alert('الرجاء تسجيل الدخول أولاً');
-        return;
+        try {
+            // الحصول على تيار الوسائط
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+
+            // عرض الفيديو المحلي
+            const localVideo = document.getElementById('localVideo');
+            localVideo.srcObject = localStream;
+
+            // إضافة التيار إلى الاتصال
+            const pc = this.peerConnections.get(this.currentFriendId);
+            if (pc) {
+                localStream.getTracks().forEach(track => {
+                    pc.addTrack(track, localStream);
+                });
+            }
+
+            // إظهار حاوية الفيديو
+            document.getElementById('videoContainer').style.display = 'flex';
+            this.currentCall = { type: 'video', stream: localStream };
+
+        } catch (error) {
+            console.error('خطأ في بدء المكالمة:', error);
+            alert('لا يمكن الوصول إلى الكاميرا أو الميكروفون');
+        }
     }
-    
-    const currentUserId = window.auth.currentUser.uid;
-    
-    if (currentUserId === targetUserId) {
-        alert('لا يمكنك إضافة نفسك كصديق');
-        return;
+
+    // بدء مكالمة صوتية
+    async startVoiceCall() {
+        if (!this.currentFriendId) return;
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true
+            });
+
+            const pc = this.peerConnections.get(this.currentFriendId);
+            if (pc) {
+                localStream.getTracks().forEach(track => {
+                    pc.addTrack(track, localStream);
+                });
+            }
+
+            // إظهار أيقونة المكالمة فقط
+            document.getElementById('videoContainer').style.display = 'flex';
+            document.getElementById('localVideo').style.display = 'none';
+            
+            this.currentCall = { type: 'voice', stream: localStream };
+
+        } catch (error) {
+            console.error('خطأ في بدء المكالمة:', error);
+            alert('لا يمكن الوصول إلى الميكروفون');
+        }
     }
-    
-    try {
-        const existingRequest = await window.db.collection('friendRequests')
-            .where('from', '==', currentUserId)
-            .where('to', '==', targetUserId)
-            .where('status', '==', 'pending')
-            .get();
+
+    // عرض الفيديو البعيد
+    displayRemoteVideo(stream) {
+        const remoteVideo = document.getElementById('remoteVideo');
+        remoteVideo.srcObject = stream;
+    }
+
+    // إنهاء المكالمة
+    endCall() {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+
+        // إرسال إشارة إنهاء المكالمة
+        if (this.currentFriendId) {
+            window.db.collection('signaling').add({
+                from: window.auth.currentUser.uid,
+                to: this.currentFriendId,
+                type: 'end-call',
+                timestamp: new Date()
+            });
+        }
+
+        // إخفاء حاوية الفيديو
+        document.getElementById('videoContainer').style.display = 'none';
+        document.getElementById('localVideo').style.display = 'block';
         
-        if (!existingRequest.empty) {
-            alert('لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً');
+        this.currentCall = null;
+    }
+
+    // معالجة إنهاء المكالمة
+    handleEndCall(friendId) {
+        if (this.currentCall) {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            document.getElementById('videoContainer').style.display = 'none';
+            this.currentCall = null;
+            alert('انتهت المكالمة');
+        }
+    }
+
+    // ========== دوال الملفات ==========
+
+    // إرسال ملف
+    async sendFile(file) {
+        if (!this.currentFriendId) return;
+
+        const channel = this.dataChannels.get(this.currentFriendId);
+        if (!channel || channel.readyState !== 'open') {
+            alert('الاتصال غير متاح');
             return;
         }
-        
-        const currentUserDoc = await window.db.collection('users').doc(currentUserId).get();
-        if (currentUserDoc.exists) {
-            const friends = currentUserDoc.data().friends || [];
-            if (friends.includes(targetUserId)) {
-                alert('هذا المستخدم صديقك بالفعل');
-                return;
+
+        // قراءة الملف
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            // تقسيم الملف إلى أجزاء
+            const fileData = e.target.result;
+            const chunkSize = 16384; // 16KB
+            const totalChunks = Math.ceil(fileData.byteLength / chunkSize);
+
+            // إرسال معلومات الملف
+            channel.send(JSON.stringify({
+                type: 'file-info',
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                totalChunks: totalChunks,
+                messageId: `file_${Date.now()}`
+            }));
+
+            // إرسال الأجزاء
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, fileData.byteLength);
+                const chunk = fileData.slice(start, end);
+                
+                channel.send(JSON.stringify({
+                    type: 'file-chunk',
+                    index: i,
+                    total: totalChunks,
+                    data: Array.from(new Uint8Array(chunk)),
+                    messageId: `file_${Date.now()}`
+                }));
+            }
+
+            this.displayFileMessage(file.name, 'sent');
+        };
+
+        reader.readAsArrayBuffer(file);
+    }
+
+    // معالجة ملف وارد
+    handleIncomingFile(message) {
+        if (message.type === 'file-info') {
+            // بدء استقبال ملف جديد
+            this.receivingFile = {
+                name: message.name,
+                size: message.size,
+                type: message.type,
+                totalChunks: message.totalChunks,
+                chunks: [],
+                messageId: message.messageId
+            };
+        } else if (message.type === 'file-chunk' && this.receivingFile) {
+            // استقبال جزء من الملف
+            this.receivingFile.chunks[message.index] = new Uint8Array(message.data);
+            
+            // إذا اكتمل الملف
+            if (this.receivingFile.chunks.length === this.receivingFile.totalChunks) {
+                const completeFile = new Blob(this.receivingFile.chunks, {
+                    type: this.receivingFile.type
+                });
+                
+                // إنشاء رابط تحميل
+                const url = URL.createObjectURL(completeFile);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = this.receivingFile.name;
+                a.click();
+                
+                this.displayFileMessage(this.receivingFile.name, 'received');
+                this.receivingFile = null;
             }
         }
+    }
+
+    // ========== دوال الموقع ==========
+
+    // مشاركة الموقع
+    shareLocation() {
+        if (!this.currentFriendId) return;
+
+        if (!navigator.geolocation) {
+            alert('الموقع غير مدعوم في متصفحك');
+            return;
+        }
+
+        navigator.geolocation.watchPosition((position) => {
+            const locationData = {
+                type: 'location',
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: Date.now()
+            };
+
+            const channel = this.dataChannels.get(this.currentFriendId);
+            if (channel && channel.readyState === 'open') {
+                channel.send(JSON.stringify(locationData));
+            }
+
+            // عرض الموقع في الواجهة
+            this.displayLocation(locationData, 'sent');
+
+        }, (error) => {
+            console.error('خطأ في الموقع:', error);
+            alert('لا يمكن الحصول على الموقع');
+        }, {
+            enableHighAccuracy: true,
+            maximumAge: 30000,
+            timeout: 27000
+        });
+    }
+
+    // معالجة موقع وارد
+    handleIncomingLocation(location) {
+        this.displayLocation(location, 'received');
         
-        await window.db.collection('friendRequests').add({
-            from: currentUserId,
-            to: targetUserId,
-            status: 'pending',
+        // فتح الموقع في خرائط جوجل عند النقر
+        const mapUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
+        if (confirm('هل تريد فتح الموقع في الخرائط؟')) {
+            window.open(mapUrl, '_blank');
+        }
+    }
+
+    // عرض الموقع في الواجهة
+    displayLocation(location, type) {
+        const container = document.getElementById('messagesContainer');
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${type} location-message`;
+        
+        const time = new Date(location.timestamp).toLocaleTimeString('ar-EG', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        messageElement.innerHTML = `
+            <div class="location-content" onclick="window.open('https://www.google.com/maps?q=${location.lat},${location.lng}', '_blank')">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>موقع ${type === 'sent' ? 'مرسل' : 'واصل'}</span>
+                <small>الدقة: ${Math.round(location.accuracy)} متر</small>
+            </div>
+            <div class="message-time">${time}</div>
+        `;
+
+        container.appendChild(messageElement);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // ========== دوال مساعدة ==========
+
+    // إظهار حالة الاتصال
+    showConnectionStatus(status) {
+        const header = document.querySelector('.conversation-header');
+        let statusElement = document.getElementById('connectionStatus');
+        
+        if (!statusElement) {
+            statusElement = document.createElement('span');
+            statusElement.id = 'connectionStatus';
+            header.appendChild(statusElement);
+        }
+        
+        statusElement.textContent = status === 'متصل' ? '🟢 متصل' : '🔴 غير متصل';
+    }
+
+    // الهروب من HTML
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // عرض رسالة ملف
+    displayFileMessage(fileName, type) {
+        const container = document.getElementById('messagesContainer');
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${type} file-message`;
+        
+        const time = new Date().toLocaleTimeString('ar-EG', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        messageElement.innerHTML = `
+            <div class="file-content">
+                <i class="fas fa-file"></i>
+                <span>${fileName}</span>
+            </div>
+            <div class="message-time">${time}</div>
+        `;
+
+        container.appendChild(messageElement);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // إغلاق المحادثة
+    closeConversation() {
+        // إنهاء أي مكالمة نشطة
+        if (this.currentCall) {
+            this.endCall();
+        }
+
+        // إغلاق قنوات البيانات
+        if (this.currentFriendId) {
+            const channel = this.dataChannels.get(this.currentFriendId);
+            if (channel) channel.close();
+            
+            const pc = this.peerConnections.get(this.currentFriendId);
+            if (pc) pc.close();
+            
+            this.dataChannels.delete(this.currentFriendId);
+            this.peerConnections.delete(this.currentFriendId);
+        }
+
+        // العودة لصفحة الدردشة
+        document.getElementById('conversationPage').style.display = 'none';
+        document.querySelector('.chat-page').style.display = 'block';
+        
+        this.currentFriendId = null;
+    }
+}
+
+// ========== تهيئة النظام ==========
+
+let webRTCManager = null;
+
+// تهيئة WebRTC بعد تسجيل الدخول
+function initWebRTC() {
+    if (window.auth?.currentUser && !webRTCManager) {
+        webRTCManager = new WebRTCManager();
+        console.log('✅ WebRTC manager initialized');
+    }
+}
+
+// مراقبة تسجيل الدخول لتهيئة WebRTC
+const originalOnAuthStateChanged = window.auth?.onAuthStateChanged;
+if (originalOnAuthStateChanged) {
+    const wrappedOnAuthStateChanged = function(callback) {
+        return originalOnAuthStateChanged.call(this, async (user) => {
+            if (user) {
+                setTimeout(initWebRTC, 1000);
+            }
+            if (callback) callback(user);
+        });
+    };
+    window.auth.onAuthStateChanged = wrappedOnAuthStateChanged;
+}
+
+// ========== دوال عامة للواجهة ==========
+
+// فتح محادثة مع صديق
+window.openChat = function(friendId) {
+    if (!webRTCManager) {
+        alert('جاري تهيئة النظام...');
+        return;
+    }
+
+    // جلب بيانات الصديق
+    window.db.collection('users').doc(friendId).get().then((doc) => {
+        if (doc.exists) {
+            const friend = doc.data();
+            const avatarEmoji = getEmojiForUser(friend);
+            webRTCManager.startChat(friendId, friend.name, avatarEmoji);
+        }
+    });
+};
+
+// إرسال رسالة
+window.sendMessage = function() {
+    if (webRTCManager) {
+        webRTCManager.sendTextMessage();
+    }
+};
+
+// معالجة ضغط Enter
+window.handleMessageKeyPress = function(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+};
+
+// بدء مكالمة فيديو
+window.toggleVideoCall = function() {
+    if (!webRTCManager) return;
+    
+    const btn = document.getElementById('videoCallBtn');
+    if (webRTCManager.currentCall?.type === 'video') {
+        webRTCManager.endCall();
+        btn.innerHTML = '<i class="fas fa-video"></i>';
+    } else {
+        webRTCManager.startVideoCall();
+        btn.innerHTML = '<i class="fas fa-video-slash"></i>';
+    }
+};
+
+// بدء مكالمة صوتية
+window.toggleVoiceCall = function() {
+    if (!webRTCManager) return;
+    
+    const btn = document.getElementById('voiceCallBtn');
+    if (webRTCManager.currentCall?.type === 'voice') {
+        webRTCManager.endCall();
+        btn.innerHTML = '<i class="fas fa-phone"></i>';
+    } else {
+        webRTCManager.startVoiceCall();
+        btn.innerHTML = '<i class="fas fa-phone-slash"></i>';
+    }
+};
+
+// إنهاء المكالمة
+window.endCall = function() {
+    if (webRTCManager) {
+        webRTCManager.endCall();
+        document.getElementById('voiceCallBtn').innerHTML = '<i class="fas fa-phone"></i>';
+        document.getElementById('videoCallBtn').innerHTML = '<i class="fas fa-video"></i>';
+    }
+};
+
+// كتم/تشغيل الميكروفون
+window.toggleMute = function() {
+    if (localStream) {
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            const btn = document.querySelector('.call-controls button:nth-child(2) i');
+            btn.className = audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
+        }
+    }
+};
+
+// تشغيل/إيقاف الكاميرا
+window.toggleCamera = function() {
+    if (localStream) {
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            const btn = document.querySelector('.call-controls button:nth-child(3) i');
+            btn.className = videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
+        }
+    }
+};
+
+// إظهار قائمة المرفقات
+window.showAttachmentMenu = function() {
+    const menu = document.getElementById('attachmentMenu');
+    menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+};
+
+// إرسال صورة
+window.sendImage = function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file && webRTCManager) {
+            webRTCManager.sendFile(file);
+        }
+    };
+    input.click();
+    document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+// إرسال ملف
+window.sendFile = function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file && webRTCManager) {
+            webRTCManager.sendFile(file);
+        }
+    };
+    input.click();
+    document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+// إرسال بصمة صوتية
+window.sendVoiceNote = function() {
+    alert('سيتم إضافة التسجيل الصوتي قريباً');
+    document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+// مشاركة الموقع
+window.shareLocation = function() {
+    if (webRTCManager) {
+        webRTCManager.shareLocation();
+    }
+    document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+// إغلاق المحادثة
+window.closeConversation = function() {
+    if (webRTCManager) {
+        webRTCManager.closeConversation();
+    }
+};
+
+// ========== إنشاء مجموعة signaling في Firebase ==========
+
+// التحقق من وجود مجموعة signaling وإنشائها إذا لزم الأمر
+async function ensureSignalingCollection() {
+    try {
+        // محاولة إنشاء مستند تجريبي (سيتم رفضه إذا كانت المجموعة غير موجودة)
+        await window.db.collection('signaling').doc('_init').set({
+            _init: true,
             timestamp: new Date()
         });
-        
-        const resultsContainer = document.getElementById('searchResultsContainer');
-        if (resultsContainer) {
-            resultsContainer.style.display = 'none';
-            resultsContainer.innerHTML = '';
-        }
-        
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) searchInput.value = '';
-        
-        alert('تم إرسال طلب الصداقة بنجاح');
-        
+        await window.db.collection('signaling').doc('_init').delete();
     } catch (error) {
-        console.error('Error sending friend request:', error);
-        alert('حدث خطأ في إرسال الطلب: ' + error.message);
-    }
-};
-
-// إعداد مستمع实时 لطلبات الصداقة
-function setupFriendRequestsListener(userId) {
-    try {
-        const requestsQuery = window.db.collection('friendRequests')
-            .where('to', '==', userId)
-            .where('status', '==', 'pending');
-        
-        requestsQuery.onSnapshot((snapshot) => {
-            const countElement = document.getElementById('friendRequestsCount');
-            if (countElement) {
-                countElement.textContent = formatNumber(snapshot.size);
-            }
-            
-            const requestsPage = document.getElementById('friendRequestsPage');
-            if (requestsPage && requestsPage.style.display === 'block') {
-                loadFriendRequests();
-            }
-        }, (error) => {
-            console.log('Listener error:', error);
-        });
-    } catch (error) {
-        console.log('Error setting up listener:', error);
+        console.log('مجموعة signaling جاهزة');
     }
 }
 
-// ========== نهاية نظام الصداقة ==========
-
-// مراقبة حالة المستخدم
-if (typeof window.auth !== 'undefined') {
-    window.auth.onAuthStateChanged(async (user) => {
-        console.log('Auth state changed:', user ? 'logged in' : 'logged out');
-        
-        const splash = document.getElementById('splash');
-        const app = document.getElementById('app');
-        
-        if (user) {
-            console.log('Loading user data for:', user.uid);
-            await loadUserData(user.uid);
-            setupFriendRequestsListener(user.uid);
-            
-            if (splash) {
-                splash.classList.add('hide');
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                    if (app) app.style.display = 'flex';
-                }, 500);
-            }
-        } else {
-            console.log('User not logged in, showing content after delay');
-            setTimeout(() => {
-                if (splash) {
-                    splash.classList.add('hide');
-                    setTimeout(() => {
-                        splash.style.display = 'none';
-                        if (app) app.style.display = 'flex';
-                        setTimeout(showLoginPrompt, 1000);
-                    }, 500);
-                }
-            }, 2000);
-        }
-    });
-} else {
-    console.error('auth is not defined. Firebase may not be loaded yet.');
-    setTimeout(showLoginPrompt, 3000);
+// تهيئة المجموعة عند بدء التشغيل
+if (window.db) {
+    ensureSignalingCollection();
 }
 
-// نسخ المعرف
-function copyId() {
-    const idElement = document.getElementById('shareableId');
-    if (!idElement) return;
-    
-    const id = idElement.textContent;
-    navigator.clipboard.writeText(id).then(() => {
-        alert('تم النسخ');
-    }).catch(err => {
-        console.error('Copy failed:', err);
-    });
-}
-
-// ========== دوال البحث ==========
-
-window.findUserById = async function() {
-    const input = document.getElementById('searchInput');
-    const resultsContainer = document.getElementById('searchResultsContainer');
-    
-    if (!input || !resultsContainer) return;
-    
-    const searchText = input.value.trim();
-    
-    if (searchText === '') {
-        resultsContainer.style.display = 'none';
-        resultsContainer.innerHTML = '';
-        return;
-    }
-    
-    resultsContainer.style.display = 'block';
-    resultsContainer.innerHTML = `<div style="text-align: center; padding: 10px; color: var(--text-light);">جاري البحث...</div>`;
-    
-    try {
-        const snapshot = await window.db.collection('users')
-            .where('shareableId', '==', searchText)
-            .get();
-        
-        if (snapshot.empty) {
-            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">لا يوجد مستخدم</div>`;
-            return;
-        }
-        
-        const user = snapshot.docs[0].data();
-        const userId = snapshot.docs[0].id;
-        const currentUser = window.auth ? window.auth.currentUser : null;
-        
-        if (currentUser && userId === currentUser.uid) {
-            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">هذا حسابك الشخصي</div>`;
-            return;
-        }
-        
-        const avatarEmoji = getEmojiForUser(user);
-        
-        let buttonText = 'إضافة';
-        let buttonDisabled = '';
-        
-        if (currentUser) {
-            const currentUserDoc = await window.db.collection('users').doc(currentUser.uid).get();
-            const currentUserData = currentUserDoc.data();
-            
-            if (currentUserData.friends && currentUserData.friends.includes(userId)) {
-                buttonText = 'أصدقاء';
-                buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
-            } else {
-                const existingRequest = await window.db.collection('friendRequests')
-                    .where('from', '==', currentUser.uid)
-                    .where('to', '==', userId)
-                    .where('status', '==', 'pending')
-                    .get();
-                
-                if (!existingRequest.empty) {
-                    buttonText = 'طلب معلق';
-                    buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
-                }
-            }
-        }
-        
-        resultsContainer.innerHTML = `
-            <div class="search-result-item" style="display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border);">
-                <div class="search-result-avatar-emoji" style="width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 1.8rem;">${avatarEmoji}</div>
-                <div style="flex: 1;">
-                    <h4 style="margin: 0; font-size: 1rem;">${user.name}</h4>
-                    <p style="margin: 0; color: var(--text-light); font-size: 0.85rem;">${user.shareableId}</p>
-                </div>
-                ${currentUser ? '<button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85rem;" onclick="addNewFriend(\'' + userId + '\')" ' + buttonDisabled + '>' + buttonText + '</button>' : ''}
-            </div>
-        `;
-    } catch (error) {
-        console.error('Search error:', error);
-        resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">حدث خطأ بالبحث حاول مرة ثانية</div>`;
-    }
-};
-
-window.hideSearchResults = function() {
-    const resultsContainer = document.getElementById('searchResultsContainer');
-    if (resultsContainer) {
-        resultsContainer.style.display = 'none';
-        resultsContainer.innerHTML = '';
-    }
-};
-
-// ========== تم إزالة دوال المتابعة بالكامل ==========
+console.log('✅ WebRTC module loaded');
