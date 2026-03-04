@@ -94,7 +94,27 @@ const i18n = {
             search_placeholder: 'البحث عن الأصدقاء',
             search_no_user: 'لا يوجد مستخدم',
             search_yourself: 'هذا حسابك الشخصي',
-            search_error: 'حدث خطأ بالبحث حاول مرة ثانية'
+            search_error: 'حدث خطأ بالبحث حاول مرة ثانية',
+            searching: 'جاري البحث...',
+            
+            // ===== ترجمات نظام الصداقة الجديدة =====
+            friend_requests: 'طلبات الصداقة',
+            no_friend_requests: 'لا توجد طلبات صداقة',
+            no_friend_requests_desc: 'لم يرسل لك أحد طلب صداقة بعد',
+            request_sent: 'تم إرسال طلب الصداقة بنجاح',
+            request_error: 'حدث خطأ في إرسال الطلب',
+            request_pending: 'طلب معلق',
+            already_friends: 'أصدقاء بالفعل',
+            accept_request: 'قبول الطلب',
+            reject_request: 'رفض الطلب',
+            request_accepted: 'تم قبول طلب الصداقة بنجاح',
+            request_rejected: 'تم رفض الطلب',
+            friends: 'أصدقاء',
+            friends_count: 'الأصدقاء',
+            friend_added: 'تمت إضافة الصديق بنجاح',
+            friend_removed: 'تم إزالة الصديق',
+            friend_request_exists: 'لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً',
+            cannot_add_self: 'لا يمكنك إضافة نفسك كصديق'
         },
         en: {
             app_name: 'Rafeeq',
@@ -187,7 +207,27 @@ const i18n = {
             search_placeholder: 'Search for friends',
             search_no_user: 'No user found',
             search_yourself: 'This is your account',
-            search_error: 'Search error, please try again'
+            search_error: 'Search error, please try again',
+            searching: 'Searching...',
+            
+            // ===== New friendship system translations =====
+            friend_requests: 'Friend Requests',
+            no_friend_requests: 'No friend requests',
+            no_friend_requests_desc: 'No one has sent you a friend request yet',
+            request_sent: 'Friend request sent successfully',
+            request_error: 'Error sending friend request',
+            request_pending: 'Request pending',
+            already_friends: 'Already friends',
+            accept_request: 'Accept request',
+            reject_request: 'Reject request',
+            request_accepted: 'Friend request accepted successfully',
+            request_rejected: 'Request rejected',
+            friends: 'Friends',
+            friends_count: 'Friends',
+            friend_added: 'Friend added successfully',
+            friend_removed: 'Friend removed',
+            friend_request_exists: 'You have already sent a friend request to this user',
+            cannot_add_self: 'You cannot add yourself as a friend'
         }
     },
     
