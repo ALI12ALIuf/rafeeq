@@ -1,6 +1,5 @@
-// ========== نظام WebRTC للدردشة المباشرة مع Firebase Signaling ==========
-// اتصال P2P مشفر بالكامل - بدون حفظ أي بيانات في السيرفر
-// يستخدم Firebase فقط للإشارات المؤقتة والرسائل الاحتياطية
+// ========== نظام WebRTC المتكامل مع تشفير حقيقي وتصحيحات كاملة ==========
+// اتصال P2P مشفر بالكامل - تخزين مؤقت مشفر في Firebase
 
 class WebRTCManager {
     constructor() {
@@ -10,22 +9,453 @@ class WebRTCManager {
         this.currentCall = null;
         this.currentFriendId = null;
         this.pendingCandidates = new Map();
-        this.pendingMessages = []; // رسائل مؤقتة
-        this.retryInterval = null;
+        this.pendingMessages = [];
+        this.encryptionKeys = new Map();
+        selfFriendStatus = new Map();
+        this.heartbeatInterval = null;
         this.isReady = true;
         
-        console.log('✅ WebRTC Manager جاهز للاستخدام');
+        // 🔥 التصحيح 1: التحكم في استماع Firebase
+        this.isDirectConnectionActive = false;
+        this.firebaseListener = null;
+        this.tempMessagesListener = null;
         
-        // بدء الاستماع للإشارات والرسائل فوراً
+        // 🔥 التصحيح 4: سجل آخر اتصال للأصدقاء
+        this.lastSeenMap = new Map();
+        
+        // 🔥 التصحيح 10: تنظيف المفاتيح القديمة
+        this.startKeyCleanup();
+        
+        // 🔐 مفتاح مؤقت للإشارات
+        this.signalingKey = null;
+        
+        console.log('🔐 نظام WebRTC المشفر جاهز');
+        
         if (window.auth?.currentUser) {
+            this.initSignalingKey();
             this.startListeningForSignals();
-            this.startListeningForTempMessages();
+            this.startListeningForTempMessages(); // يبدأ في وضع الاستماع
+            this.startHeartbeat();
         }
     }
 
-    // ========== نظام الإشارات عبر Firebase ==========
+    // ========== تهيئة مفتاح الإشارات المؤقت ==========
     
-    // بدء الاستماع للإشارات الواردة
+    async initSignalingKey() {
+        this.signalingKey = await this.generateEncryptionKey();
+        console.log('🔑 مفتاح الإشارات جاهز');
+    }
+
+    // ========== التصحيح 1: التحكم في استماع Firebase ==========
+    
+    // تشغيل/إيقاف استماع Firebase حسب حالة الاتصال المباشر
+    setDirectConnectionStatus(active) {
+        this.isDirectConnectionActive = active;
+        
+        if (active) {
+            // 🟢 اتصال مباشر ناجح → أوقف استماع Firebase
+            if (this.tempMessagesListener) {
+                this.tempMessagesListener();
+                this.tempMessagesListener = null;
+                console.log('🔇 تم إيقاف استماع Firebase - اتصال مباشر نشط');
+            }
+        } else {
+            // 🔴 انقطع الاتصال المباشر → شغل استماع Firebase
+            if (!this.tempMessagesListener) {
+                this.startListeningForTempMessages();
+                console.log('🎤 تم تشغيل استماع Firebase - اتصال مباشر غير نشط');
+            }
+        }
+    }
+
+    // ========== التصحيح 3: تاريخ انتهاء للرسائل المؤقتة ==========
+    
+    // حساب تاريخ انتهاء الصلاحية (24 ساعة)
+    getExpiryDate() {
+        const expiryDate = new Date();
+        expiryDate.setHours(expiryDate.getHours() + 24);
+        return expiryDate;
+    }
+
+    // ========== التصحيح 7: تشفير البيانات الوصفية ==========
+    
+    // تشفير كامل للبيانات (الرسالة + البيانات الوصفية)
+    async encryptFullData(data, key) {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encoder = new TextEncoder();
+        const jsonString = JSON.stringify(data);
+        const encoded = encoder.encode(jsonString);
+        
+        const encrypted = await crypto.subtle.encrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            key,
+            encoded
+        );
+        
+        return {
+            iv: Array.from(iv),
+            data: Array.from(new Uint8Array(encrypted))
+        };
+    }
+    
+    // فك تشفير كامل للبيانات
+    async decryptFullData(encryptedData, key) {
+        try {
+            const iv = new Uint8Array(encryptedData.iv);
+            const data = new Uint8Array(encryptedData.data);
+            
+            const decrypted = await crypto.subtle.decrypt(
+                {
+                    name: 'AES-GCM',
+                    iv: iv
+                },
+                key,
+                data
+            );
+            
+            const decoder = new TextDecoder();
+            const jsonString = decoder.decode(decrypted);
+            return JSON.parse(jsonString);
+        } catch (error) {
+            console.error('فشل فك تشفير البيانات:', error);
+            return null;
+        }
+    }
+
+    // ========== التصحيح 8: تقنية Pull بدل Push ==========
+    
+    // سحب الرسائل يدوياً (بدل الدفع التلقائي)
+    async pullMessages() {
+        if (!window.auth?.currentUser) return;
+        
+        const myId = window.auth.currentUser.uid;
+        
+        try {
+            // البحث عن الرسائل المخصصة لي
+            const snapshot = await window.db.collection('temp_messages')
+                .where('to', '==', myId)
+                .where('expiresAt', '>', new Date()) // فقط غير منتهية
+                .get();
+            
+            for (const doc of snapshot.docs) {
+                const data = doc.data();
+                
+                // معالجة الرسالة
+                await this.processIncomingMessage(data);
+                
+                // حذف بعد المعالجة
+                await doc.ref.delete();
+            }
+        } catch (error) {
+            console.error('خطأ في سحب الرسائل:', error);
+        }
+    }
+    
+    // بدء السحب الدوري
+    startPullInterval() {
+        setInterval(() => {
+            this.pullMessages();
+        }, 60000); // كل دقيقة
+    }
+
+    // ========== التصحيح 4: التحقق من الاتصال قبل التخزين ==========
+    
+    // تحديث آخر ظهور لصديق
+    updateLastSeen(friendId) {
+        this.lastSeenMap.set(friendId, Date.now());
+    }
+    
+    // التحقق من إمكانية إرسال رسالة
+    canSendMessage(friendId) {
+        // 1. تحقق من وجود الصديق في قائمة الأصدقاء
+        const isFriend = window.friendsList?.includes(friendId);
+        if (!isFriend) return false;
+        
+        // 2. تحقق من آخر اتصال (خلال آخر 5 دقائق)
+        const lastSeen = this.lastSeenMap.get(friendId) || 0;
+        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+        
+        return lastSeen > fiveMinutesAgo;
+    }
+
+    // ========== التصحيح 9: تشفير الإشارات ==========
+    
+    // تشفير الإشارة قبل إرسالها لـ Firebase
+    async encryptSignal(signalData) {
+        if (!this.signalingKey) {
+            await this.initSignalingKey();
+        }
+        
+        const encrypted = await this.encryptFullData(signalData, this.signalingKey);
+        
+        return {
+            encrypted: encrypted
+        };
+    }
+
+    // ========== التصحيح 10: تنظيف المفاتيح القديمة ==========
+    
+    // بدء تنظيف المفاتيح القديمة
+    startKeyCleanup() {
+        setInterval(() => {
+            const now = Date.now();
+            const twoHoursAgo = now - 2 * 60 * 60 * 1000;
+            
+            this.encryptionKeys.forEach((keyData, friendId) => {
+                // إذا كان آخر استخدام من ساعتين أو أكثر
+                if (keyData.lastUsed && keyData.lastUsed < twoHoursAgo) {
+                    this.encryptionKeys.delete(friendId);
+                    console.log(`🧹 تم تنظيف مفتاح الصديق ${friendId} (غير مستخدم)`);
+                }
+            });
+        }, 60 * 60 * 1000); // كل ساعة
+    }
+    
+    // تحديث آخر استخدام للمفتاح
+    updateKeyLastUsed(friendId) {
+        if (this.encryptionKeys.has(friendId)) {
+            const keyData = this.encryptionKeys.get(friendId);
+            keyData.lastUsed = Date.now();
+            this.encryptionKeys.set(friendId, keyData);
+        }
+    }
+
+    // ========== نظام التشفير الحقيقي AES-256-GCM ==========
+    
+    async generateEncryptionKey() {
+        return await crypto.subtle.generateKey(
+            {
+                name: 'AES-GCM',
+                length: 256
+            },
+            true,
+            ['encrypt', 'decrypt']
+        );
+    }
+    
+    async exportKey(key) {
+        return await crypto.subtle.exportKey('raw', key);
+    }
+    
+    async importKey(rawKey) {
+        return await crypto.subtle.importKey(
+            'raw',
+            rawKey,
+            { name: 'AES-GCM', length: 256 },
+            true,
+            ['encrypt', 'decrypt']
+        );
+    }
+    
+    async encryptMessage(text, key) {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text);
+        
+        const encrypted = await crypto.subtle.encrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            key,
+            data
+        );
+        
+        return {
+            iv: Array.from(iv),
+            data: Array.from(new Uint8Array(encrypted))
+        };
+    }
+    
+    async decryptMessage(encryptedData, key) {
+        try {
+            const iv = new Uint8Array(encryptedData.iv);
+            const data = new Uint8Array(encryptedData.data);
+            
+            const decrypted = await crypto.subtle.decrypt(
+                {
+                    name: 'AES-GCM',
+                    iv: iv
+                },
+                key,
+                data
+            );
+            
+            const decoder = new TextDecoder();
+            return decoder.decode(decrypted);
+        } catch (error) {
+            console.error('فشل فك التشفير:', error);
+            return '[رسالة مشفرة لا يمكن فكها]';
+        }
+    }
+    
+    async encryptFile(file, key) {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const fileData = await file.arrayBuffer();
+        
+        const encrypted = await crypto.subtle.encrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            key,
+            fileData
+        );
+        
+        return {
+            iv: Array.from(iv),
+            data: Array.from(new Uint8Array(encrypted)),
+            name: file.name,
+            type: file.type,
+            size: file.size
+        };
+    }
+    
+    async decryptFile(encryptedFile, key) {
+        try {
+            const iv = new Uint8Array(encryptedFile.iv);
+            const data = new Uint8Array(encryptedFile.data);
+            
+            const decrypted = await crypto.subtle.decrypt(
+                {
+                    name: 'AES-GCM',
+                    iv: iv
+                },
+                key,
+                data
+            );
+            
+            return new File(
+                [decrypted],
+                encryptedFile.name,
+                { type: encryptedFile.type }
+            );
+        } catch (error) {
+            console.error('فشل فك تشفير الملف:', error);
+            return null;
+        }
+    }
+
+    // ========== نظام تبادل المفاتيح عبر WebRTC ==========
+    
+    async exchangeKeys(friendId) {
+        const myKey = await this.generateEncryptionKey();
+        this.encryptionKeys.set(friendId, { 
+            key: myKey, 
+            exchanged: false,
+            lastUsed: Date.now() 
+        });
+        
+        const exportedKey = await this.exportKey(myKey);
+        
+        const channel = this.dataChannels.get(friendId);
+        if (channel && channel.readyState === 'open') {
+            channel.send(JSON.stringify({
+                type: 'key-exchange',
+                key: Array.from(exportedKey)
+            }));
+        }
+    }
+    
+    async handleKeyExchange(data, friendId) {
+        try {
+            const friendKey = await this.importKey(new Uint8Array(data.key));
+            
+            if (!this.encryptionKeys.has(friendId)) {
+                this.encryptionKeys.set(friendId, {});
+            }
+            const keyData = this.encryptionKeys.get(friendId);
+            keyData.friendKey = friendKey;
+            keyData.exchanged = true;
+            keyData.lastUsed = Date.now();
+            
+            console.log('🔑 تم تبادل المفاتيح مع', friendId);
+            this.displaySystemMessage('🔐 تم تأمين المحادثة');
+            
+            // 🔥 تحديث حالة الاتصال المباشر
+            this.setDirectConnectionStatus(true);
+            
+            this.sendPendingEncryptedMessages(friendId);
+        } catch (error) {
+            console.error('خطأ في تبادل المفاتيح:', error);
+        }
+    }
+
+    // ========== نظام التحقق من الاتصال ==========
+    
+    startHeartbeat() {
+        this.heartbeatInterval = setInterval(() => {
+            this.checkAllConnections();
+        }, 3000);
+    }
+    
+    checkAllConnections() {
+        this.peerConnections.forEach((pc, friendId) => {
+            const status = this.checkFriendStatus(friendId);
+            selfFriendStatus.set(friendId, status);
+            
+            // تحديث آخر ظهور
+            if (status.includes('🟢')) {
+                this.updateLastSeen(friendId);
+            }
+            
+            if (friendId === this.currentFriendId) {
+                this.updateFriendStatusUI(status);
+            }
+        });
+    }
+    
+    checkFriendStatus(friendId) {
+        const pc = this.peerConnections.get(friendId);
+        const channel = this.dataChannels.get(friendId);
+        const keys = this.encryptionKeys.get(friendId);
+        
+        const checks = {
+            pcConnected: pc && pc.iceConnectionState === 'connected',
+            channelOpen: channel && channel.readyState === 'open',
+            keysExchanged: keys && keys.exchanged === true
+        };
+        
+        if (checks.pcConnected && checks.channelOpen && checks.keysExchanged) {
+            return '🟢 متصل وآمن';
+        } else if (checks.pcConnected && checks.channelOpen) {
+            return '🟡 متصل (غير آمن)';
+        } else if (checks.pcConnected) {
+            return '🔵 جاري التشفير';
+        } else {
+            return '🔴 غير متصل';
+        }
+    }
+    
+    updateFriendStatusUI(status) {
+        let statusElement = document.getElementById('friendStatus');
+        if (!statusElement) {
+            statusElement = document.createElement('span');
+            statusElement.id = 'friendStatus';
+            statusElement.className = 'friend-status';
+            document.querySelector('.conversation-header').appendChild(statusElement);
+        }
+        
+        statusElement.textContent = status;
+        
+        if (status.includes('🟢')) {
+            statusElement.style.color = '#4CAF50';
+        } else if (status.includes('🟡')) {
+            statusElement.style.color = '#FFC107';
+        } else if (status.includes('🔵')) {
+            statusElement.style.color = '#2196F3';
+        } else {
+            statusElement.style.color = '#f44336';
+            // 🔥 إذا كان غير متصل، شغل استماع Firebase
+            this.setDirectConnectionStatus(false);
+        }
+    }
+
+    // ========== نظام الإشارات عبر Firebase (مشفر بالكامل) ==========
+    
     startListeningForSignals() {
         if (!window.auth?.currentUser) {
             setTimeout(() => this.startListeningForSignals(), 1000);
@@ -34,105 +464,164 @@ class WebRTCManager {
         
         const userId = window.auth.currentUser.uid;
         
-        window.db.collection('signaling')
+        this.firebaseListener = window.db.collection('signaling')
             .where('to', '==', userId)
             .where('status', '==', 'pending')
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
+            .onSnapshot(async (snapshot) => {
+                for (const change of snapshot.docChanges()) {
                     if (change.type === 'added') {
                         const signal = change.doc.data();
                         const signalId = change.doc.id;
                         
-                        switch(signal.type) {
-                            case 'offer':
-                                this.handleIncomingOffer(signal, signalId);
-                                break;
-                            case 'answer':
-                                this.handleIncomingAnswer(signal, signalId);
-                                break;
-                            case 'candidate':
-                                this.handleIncomingCandidate(signal, signalId);
-                                break;
-                            case 'end-call':
-                                this.handleEndCall(signal.from);
-                                break;
+                        try {
+                            // 🔓 فك تشفير الإشارة أولاً
+                            if (!signal.encrypted) {
+                                console.error('إشارة غير مشفرة!');
+                                continue;
+                            }
+                            
+                            const decryptedSignal = await this.decryptFullData(
+                                signal.encrypted,
+                                this.signalingKey
+                            );
+                            
+                            if (!decryptedSignal) {
+                                console.error('فشل فك تشفير الإشارة');
+                                continue;
+                            }
+                            
+                            switch(decryptedSignal.type) {
+                                case 'offer':
+                                    await this.handleIncomingOffer(decryptedSignal, signalId);
+                                    break;
+                                case 'answer':
+                                    await this.handleIncomingAnswer(decryptedSignal, signalId);
+                                    break;
+                                case 'candidate':
+                                    await this.handleIncomingCandidate(decryptedSignal, signalId);
+                                    break;
+                                case 'end-call':
+                                    this.handleEndCall(decryptedSignal.from);
+                                    break;
+                            }
+                            
+                            // حذف الإشارة بعد معالجتها
+                            setTimeout(() => {
+                                window.db.collection('signaling').doc(signalId).delete()
+                                    .catch(() => {});
+                            }, 5000);
+                            
+                        } catch (error) {
+                            console.error('خطأ في معالجة الإشارة المشفرة:', error);
                         }
-                        
-                        // حذف الإشارة بعد معالجتها
-                        setTimeout(() => {
-                            window.db.collection('signaling').doc(signalId).delete()
-                                .catch(() => {});
-                        }, 5000);
                     }
-                });
+                }
             });
     }
 
-    // ========== نظام الرسائل المؤقتة ==========
+    // ========== نظام الرسائل المؤقتة المشفرة (معدل) ==========
     
-    // بدء الاستماع للرسائل المؤقتة
     startListeningForTempMessages() {
         if (!window.auth?.currentUser) return;
         
         const myId = window.auth.currentUser.uid;
         
-        window.db.collection('temp_messages')
+        // 🔥 التصحيح 2: تأكد من حذف الرسائل حتى لو قفل الصفحة
+        this.tempMessagesListener = window.db.collection('temp_messages')
             .where('to', '==', myId)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
+            .where('expiresAt', '>', new Date()) // 🔥 التصحيح 3: فقط غير منتهية
+            .onSnapshot(async (snapshot) => {
+                for (const change of snapshot.docChanges()) {
                     if (change.type === 'added') {
                         const data = change.doc.data();
                         
-                        // عرض الرسالة في الواجهة
-                        this.displayMessage(data.message, 'received');
+                        await this.processIncomingMessage(data);
                         
-                        // حذفها بعد الاستلام
-                        change.doc.ref.delete();
+                        // 🔥 التصحيح 2: حذف فوري
+                        await change.doc.ref.delete();
                     }
-                });
+                }
             });
+    }
+    
+    // معالجة الرسالة الواردة
+    async processIncomingMessage(data) {
+        if (data.encrypted && this.encryptionKeys.has(data.from)) {
+            const keyData = this.encryptionKeys.get(data.from);
+            if (keyData.friendKey) {
+                // تحديث آخر استخدام
+                this.updateKeyLastUsed(data.from);
+                
+                // 🔥 التصحيح 7: فك تشفير البيانات الكاملة
+                if (data.fullEncrypted) {
+                    const decryptedData = await this.decryptFullData(
+                        data.fullEncrypted, 
+                        keyData.friendKey
+                    );
+                    if (decryptedData) {
+                        this.displayMessage({
+                            text: decryptedData.text,
+                            timestamp: decryptedData.timestamp,
+                            sender: data.from
+                        }, 'received');
+                        
+                        // 🔥 التصحيح 6: أيقونة الحالة
+                        this.showMessageStatus('📱', 'تم الاستلام');
+                    }
+                } else {
+                    // الطريقة القديمة للتوافق
+                    const decryptedText = await this.decryptMessage(
+                        data.encrypted,
+                        keyData.friendKey
+                    );
+                    
+                    this.displayMessage({
+                        text: decryptedText,
+                        timestamp: data.timestamp,
+                        sender: data.from
+                    }, 'received');
+                }
+            }
+        }
     }
 
     // ========== إدارة المحادثات ==========
     
-    // بدء محادثة مع صديق - فورية
     async startChat(friendId, friendName, friendAvatar) {
-        console.log('🚀 فتح محادثة فورية مع:', friendName);
+        console.log('🚀 فتح محادثة مع:', friendName);
         
         this.currentFriendId = friendId;
         
-        // تحديث واجهة المستخدم فوراً
         document.getElementById('conversationName').textContent = friendName;
         document.getElementById('conversationAvatar').textContent = friendAvatar || '👤';
         
-        // إظهار صفحة المحادثة فوراً
         document.querySelector('.chat-page').style.display = 'none';
         document.getElementById('conversationPage').style.display = 'block';
-        
-        // مسح الرسائل السابقة
         document.getElementById('messagesContainer').innerHTML = '';
         
-        // رسالة ترحيب فورية
-        this.displaySystemMessage('✅ المحادثة مفتوحة');
+        this.displaySystemMessage('🔐 تجهيز الاتصال الآمن...');
         
-        // بدء الاتصال في الخلفية (لا ننتظره)
-        this.createPeerConnection(friendId).then(() => {
-            this.createDataChannel(friendId);
-            this.sendOffer(friendId);
-            this.displaySystemMessage('🔄 جاري تأمين الاتصال...');
-        }).catch(error => {
-            console.error('خطأ في الاتصال:', error);
-        });
+        await this.createPeerConnection(friendId);
+        this.createDataChannel(friendId);
+        await this.sendOffer(friendId);
+        
+        setTimeout(() => {
+            this.exchangeKeys(friendId);
+        }, 1000);
+        
+        // 🔥 بدء سحب الرسائل
+        this.pullMessages();
     }
 
-    // إنشاء اتصال WebRTC
     async createPeerConnection(friendId) {
         const config = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
-            ]
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' }
+            ],
+            iceCandidatePoolSize: 10
         };
 
         const pc = new RTCPeerConnection(config);
@@ -155,10 +644,15 @@ class WebRTCManager {
         };
 
         pc.oniceconnectionstatechange = () => {
+            const status = this.checkFriendStatus(friendId);
+            this.updateFriendStatusUI(status);
+            
             if (pc.iceConnectionState === 'connected') {
-                this.displaySystemMessage('✅ تم تأمين الاتصال');
-                // إرسال أي رسائل معلقة
-                this.sendPendingMessages();
+                this.displaySystemMessage('🔗 تم الاتصال');
+                this.setDirectConnectionStatus(true); // 🔥 اتصال مباشر ناجح
+                this.sendPendingEncryptedMessages(friendId);
+            } else if (pc.iceConnectionState === 'disconnected') {
+                this.setDirectConnectionStatus(false); // 🔥 انقطع الاتصال
             }
         };
 
@@ -166,7 +660,6 @@ class WebRTCManager {
         return pc;
     }
 
-    // إنشاء قناة بيانات
     createDataChannel(friendId) {
         const pc = this.peerConnections.get(friendId);
         if (!pc) return;
@@ -180,22 +673,45 @@ class WebRTCManager {
         return channel;
     }
 
-    // إعداد قناة البيانات
     setupDataChannel(channel, friendId) {
         channel.onopen = () => {
-            console.log('✅ قناة البيانات مفتوحة');
-            this.displaySystemMessage('✅ جاهز للإرسال المباشر');
-            this.sendPendingMessages();
+            console.log('📡 قناة مفتوحة مع', friendId);
+            this.updateLastSeen(friendId);
+            this.exchangeKeys(friendId);
         };
 
         channel.onclose = () => {
-            console.log('❌ قناة البيانات مغلقة');
+            console.log('📡 قناة مغلقة مع', friendId);
+            this.updateFriendStatusUI('🔴 غير متصل');
+            this.setDirectConnectionStatus(false); // 🔥 انقطع الاتصال
         };
 
-        channel.onmessage = (event) => {
+        channel.onmessage = async (event) => {
             try {
                 const data = JSON.parse(event.data);
-                this.handleIncomingMessage(data);
+                
+                if (data.type === 'key-exchange') {
+                    await this.handleKeyExchange(data, friendId);
+                } else if (data.type === 'encrypted-message') {
+                    this.updateKeyLastUsed(friendId);
+                    const keyData = this.encryptionKeys.get(friendId);
+                    if (keyData && keyData.friendKey) {
+                        const decryptedText = await this.decryptMessage(
+                            data.encrypted,
+                            keyData.friendKey
+                        );
+                        
+                        this.displayMessage({
+                            text: decryptedText,
+                            timestamp: data.timestamp,
+                            sender: friendId
+                        }, 'received');
+                        
+                        this.showMessageStatus('✅', 'مرسلة مباشرة');
+                    }
+                } else if (data.type === 'file') {
+                    await this.handleIncomingFile(data, friendId);
+                }
             } catch (e) {
                 console.error('خطأ في معالجة الرسالة:', e);
             }
@@ -204,143 +720,42 @@ class WebRTCManager {
         this.dataChannels.set(friendId, channel);
     }
 
-    // إرسال الرسائل المعلقة
-    sendPendingMessages() {
-        if (this.pendingMessages.length === 0) return;
-        
-        const channel = this.dataChannels.get(this.currentFriendId);
-        if (!channel || channel.readyState !== 'open') return;
-        
-        while (this.pendingMessages.length > 0) {
-            const message = this.pendingMessages.shift();
-            channel.send(JSON.stringify(message));
-        }
-        
-        this.displaySystemMessage('✅ تم إرسال الرسائل المعلقة');
+    // ========== إدارة الرسائل المشفرة ==========
+    
+    // 🔥 التصحيح 6: أيقونات حالة الرسالة
+    showMessageStatus(icon, text) {
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'message-status';
+        statusDiv.innerHTML = `${icon} ${text}`;
+        statusDiv.style.cssText = `
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            opacity: 0.7;
+        `;
+        document.body.appendChild(statusDiv);
+        setTimeout(() => statusDiv.remove(), 2000);
     }
+    
+    async sendEncryptedMessage(text) {
+        if (!this.currentFriendId) return false;
 
-    // ========== إرسال الإشارات عبر Firebase ==========
-
-    // إرسال عرض اتصال
-    async sendOffer(friendId) {
-        const pc = this.peerConnections.get(friendId);
-        if (!pc) return;
-
-        try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-
-            const signalId = `${window.auth.currentUser.uid}_${friendId}_${Date.now()}`;
-            
-            await window.db.collection('signaling').doc(signalId).set({
-                from: window.auth.currentUser.uid,
-                to: friendId,
-                type: 'offer',
-                offer: {
-                    type: offer.type,
-                    sdp: offer.sdp
-                },
-                status: 'pending',
-                timestamp: new Date()
-            });
-
-        } catch (error) {
-            console.error('خطأ في إنشاء العرض:', error);
-        }
-    }
-
-    // معالجة عرض وارد
-    async handleIncomingOffer(signal, signalId) {
-        if (!window.auth?.currentUser) return;
-
-        const pc = await this.createPeerConnection(signal.from);
-        
-        try {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
-            
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-
-            await window.db.collection('signaling').doc(signalId).set({
-                from: window.auth.currentUser.uid,
-                to: signal.from,
-                type: 'answer',
-                answer: {
-                    type: answer.type,
-                    sdp: answer.sdp
-                },
-                status: 'answered',
-                timestamp: new Date()
-            }, { merge: true });
-
-        } catch (error) {
-            console.error('خطأ في معالجة العرض:', error);
-        }
-    }
-
-    // معالجة إجابة واردة
-    async handleIncomingAnswer(signal) {
-        const pc = this.peerConnections.get(signal.from);
-        if (!pc) return;
-
-        try {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
-            console.log('✅ تم تأكيد الاتصال');
-            
-        } catch (error) {
-            console.error('خطأ في معالجة الإجابة:', error);
-        }
-    }
-
-    // إرسال ICE candidate
-    async sendCandidate(friendId, candidate) {
-        try {
-            const signalId = `${window.auth.currentUser.uid}_${friendId}_cand_${Date.now()}`;
-            
-            await window.db.collection('signaling').doc(signalId).set({
-                from: window.auth.currentUser.uid,
-                to: friendId,
-                type: 'candidate',
-                candidate: {
-                    candidate: candidate.candidate,
-                    sdpMid: candidate.sdpMid,
-                    sdpMLineIndex: candidate.sdpMLineIndex
-                },
-                timestamp: new Date()
-            });
-            
-        } catch (error) {
-            console.error('خطأ في إرسال candidate:', error);
-        }
-    }
-
-    // معالجة ICE candidate وارد
-    async handleIncomingCandidate(signal) {
-        const pc = this.peerConnections.get(signal.from);
-        
-        if (pc && pc.remoteDescription) {
-            try {
-                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-            } catch (error) {
-                console.error('خطأ في إضافة candidate:', error);
-            }
-        } else {
-            if (!this.pendingCandidates.has(signal.from)) {
-                this.pendingCandidates.set(signal.from, []);
-            }
-            this.pendingCandidates.get(signal.from).push(signal.candidate);
-        }
-    }
-
-    // ========== إدارة الرسائل - فورية ==========
-
-    // إرسال رسالة نصية - فورية
-    sendTextMessage(text) {
-        if (!this.currentFriendId) {
-            alert('لا يوجد محادثة مفتوحة');
+        // 🔥 التصحيح 4: التحقق من إمكانية الإرسال
+        if (!this.canSendMessage(this.currentFriendId)) {
+            this.displaySystemMessage('⚠️ الصديق غير متصل حالياً');
+            this.showMessageStatus('⏳', 'بانتظار اتصال الصديق');
             return false;
         }
 
+        const keyData = this.encryptionKeys.get(this.currentFriendId);
+        
         const message = {
             type: 'text',
             text: text,
@@ -349,91 +764,173 @@ class WebRTCManager {
             id: `msg_${Date.now()}_${Math.random()}`
         };
 
-        // 1️⃣ أولاً: عرض الرسالة فوراً في واجهتي
         this.displayMessage(message, 'sent');
-        
-        // 2️⃣ ثانياً: محاولة الإرسال عبر WebRTC
-        const channel = this.dataChannels.get(this.currentFriendId);
-        
-        if (channel && channel.readyState === 'open') {
-            // WebRTC جاهز → نرسل مباشرة
-            channel.send(JSON.stringify(message));
-            console.log('📤 رسالة مرسلة عبر WebRTC');
-        } else {
-            // WebRTC مو جاهز → نحفظها للبعث لاحقاً ونستخدم Firebase
-            console.log('📤 استخدام Firebase مؤقتاً');
+
+        if (keyData && keyData.friendKey) {
+            this.updateKeyLastUsed(this.currentFriendId);
             
-            // حفظ في قائمة الانتظار
-            this.pendingMessages.push(message);
+            const encrypted = await this.encryptMessage(text, keyData.friendKey);
             
-            // إرسال عبر Firebase
-            const msgId = `temp_${Date.now()}_${Math.random()}`;
-            window.db.collection('temp_messages').doc(msgId).set({
-                from: window.auth.currentUser.uid,
-                to: this.currentFriendId,
-                message: message,
-                timestamp: new Date()
-            }).catch(err => {
-                console.error('خطأ في حفظ الرسالة المؤقتة:', err);
-            });
-            
-            this.displaySystemMessage('📱 جاري توصيل الرسالة...');
+            const channel = this.dataChannels.get(this.currentFriendId);
+            if (channel && channel.readyState === 'open') {
+                channel.send(JSON.stringify({
+                    type: 'encrypted-message',
+                    encrypted: encrypted,
+                    timestamp: message.timestamp,
+                    id: message.id
+                }));
+                console.log('📤 رسالة مشفرة مرسلة عبر WebRTC');
+                this.showMessageStatus('✅', 'مرسلة مباشرة');
+                return true;
+            }
         }
+        
+        // 🔥 التصحيح 5: حد أقصى للرسائل المؤقتة
+        await this.saveToFirebaseWithLimit(message);
+        this.showMessageStatus('⏳', 'مخزنة مؤقتاً');
         
         return true;
     }
-
-    // معالجة رسالة واردة
-    handleIncomingMessage(message) {
-        if (message.type === 'text') {
-            this.displayMessage(message, 'received');
+    
+    // 🔥 التصحيح 5: حفظ مع حد أقصى
+    async saveToFirebaseWithLimit(message) {
+        const keyData = this.encryptionKeys.get(this.currentFriendId);
+        
+        let encryptedData = null;
+        let fullEncrypted = null;
+        
+        if (keyData && keyData.friendKey) {
+            // 🔥 التصحيح 7: تشفير البيانات الكاملة
+            const fullData = {
+                text: message.text,
+                timestamp: message.timestamp,
+                id: message.id
+            };
+            fullEncrypted = await this.encryptFullData(fullData, keyData.friendKey);
+        }
+        
+        const msgId = `temp_${Date.now()}_${Math.random()}`;
+        
+        // 🔥 التصحيح 3: إضافة تاريخ انتهاء
+        const expiryDate = this.getExpiryDate();
+        
+        await window.db.collection('temp_messages').doc(msgId).set({
+            from: window.auth.currentUser.uid,
+            to: this.currentFriendId,
+            fullEncrypted: fullEncrypted,
+            encrypted: encryptedData,
+            timestamp: new Date(),
+            expiresAt: expiryDate, // 🔥 تنتهي بعد 24 ساعة
+            type: 'text'
+        });
+        
+        // 🔥 التصحيح 5: التحقق من عدد الرسائل
+        await this.cleanupOldMessages(this.currentFriendId);
+    }
+    
+    // 🔥 التصحيح 5: تنظيف الرسائل القديمة
+    async cleanupOldMessages(friendId) {
+        const myId = window.auth.currentUser.uid;
+        
+        const snapshot = await window.db.collection('temp_messages')
+            .where('to', '==', myId)
+            .orderBy('timestamp', 'desc')
+            .get();
+        
+        if (snapshot.size > 50) { // احتفظ بآخر 50 رسالة
+            let count = 0;
+            for (const doc of snapshot.docs) {
+                count++;
+                if (count > 50) {
+                    await doc.ref.delete();
+                }
+            }
         }
     }
-
-    // عرض الرسالة في الواجهة
-    displayMessage(message, type) {
-        const container = document.getElementById('messagesContainer');
-        const messageElement = document.createElement('div');
-        messageElement.className = `message ${type}`;
+    
+    async sendPendingEncryptedMessages(friendId) {
+        if (this.pendingMessages.length === 0) return;
         
-        const time = new Date(message.timestamp).toLocaleTimeString('ar-EG', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        messageElement.innerHTML = `
-            <div class="message-content">${this.escapeHtml(message.text)}</div>
-            <div class="message-time">${time}</div>
-        `;
-
-        container.appendChild(messageElement);
-        container.scrollTop = container.scrollHeight;
+        const keyData = this.encryptionKeys.get(friendId);
+        if (!keyData || !keyData.friendKey) return;
+        
+        const channel = this.dataChannels.get(friendId);
+        if (!channel || channel.readyState !== 'open') return;
+        
+        for (const msg of this.pendingMessages) {
+            const encrypted = await this.encryptMessage(msg.text, keyData.friendKey);
+            channel.send(JSON.stringify({
+                type: 'encrypted-message',
+                encrypted: encrypted,
+                timestamp: msg.timestamp,
+                id: msg.id
+            }));
+        }
+        
+        this.pendingMessages = [];
+        this.displaySystemMessage('✅ تم إرسال الرسائل المعلقة');
     }
 
-    // عرض رسالة نظام
-    displaySystemMessage(text) {
-        const container = document.getElementById('messagesContainer');
-        const messageElement = document.createElement('div');
-        messageElement.className = 'message system';
+    // ========== إدارة الملفات ==========
+    
+    async sendEncryptedFile(file) {
+        if (!this.currentFriendId) return;
         
-        messageElement.innerHTML = `
-            <div class="system-content">${text}</div>
-        `;
-
-        container.appendChild(messageElement);
-        container.scrollTop = container.scrollHeight;
+        const keyData = this.encryptionKeys.get(this.currentFriendId);
+        if (!keyData || !keyData.friendKey) {
+            this.displaySystemMessage('⏳ انتظار تبادل المفاتيح...');
+            return;
+        }
+        
+        this.updateKeyLastUsed(this.currentFriendId);
+        
+        const encryptedFile = await this.encryptFile(file, keyData.friendKey);
+        
+        const channel = this.dataChannels.get(this.currentFriendId);
+        if (channel && channel.readyState === 'open') {
+            channel.send(JSON.stringify({
+                type: 'file',
+                file: encryptedFile,
+                timestamp: Date.now()
+            }));
+            
+            this.displaySystemMessage(`📁 تم إرسال: ${file.name}`);
+            this.showMessageStatus('✅', 'ملف مرسل');
+        } else {
+            if (file.size < 1024 * 1024) { // أقل من 1MB
+                await this.saveFileToFirebase(encryptedFile);
+                this.showMessageStatus('⏳', 'ملف مخزن مؤقتاً');
+            } else {
+                this.displaySystemMessage('⚠️ الملف كبير جداً للإرسال حالياً');
+            }
+        }
     }
-
-    // الهروب من HTML
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    
+    async handleIncomingFile(data, friendId) {
+        this.updateKeyLastUsed(friendId);
+        const keyData = this.encryptionKeys.get(friendId);
+        if (!keyData || !keyData.friendKey) return;
+        
+        const file = await this.decryptFile(data.file, keyData.friendKey);
+        
+        if (file) {
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name;
+            a.textContent = `📁 استلام: ${file.name}`;
+            
+            this.displaySystemMessage(`📥 تم استلام ملف: ${file.name}`);
+            this.showMessageStatus('📱', 'ملف واصل');
+            
+            if (file.type.startsWith('image/')) {
+                window.open(url, '_blank');
+            }
+        }
     }
 
     // ========== إدارة المكالمات ==========
 
-    // بدء مكالمة فيديو
     async startVideoCall() {
         if (!this.currentFriendId) return;
 
@@ -456,7 +953,7 @@ class WebRTCManager {
             document.getElementById('videoContainer').style.display = 'flex';
             this.currentCall = { type: 'video', stream: this.localStream };
             
-            this.displaySystemMessage('📹 بدأت مكالمة فيديو');
+            this.displaySystemMessage('📹 مكالمة فيديو آمنة');
 
         } catch (error) {
             console.error('خطأ في بدء المكالمة:', error);
@@ -464,7 +961,6 @@ class WebRTCManager {
         }
     }
 
-    // بدء مكالمة صوتية
     async startVoiceCall() {
         if (!this.currentFriendId) return;
 
@@ -486,7 +982,7 @@ class WebRTCManager {
             
             this.currentCall = { type: 'voice', stream: this.localStream };
             
-            this.displaySystemMessage('🎤 بدأت مكالمة صوتية');
+            this.displaySystemMessage('🎤 مكالمة صوتية آمنة');
 
         } catch (error) {
             console.error('خطأ في بدء المكالمة:', error);
@@ -494,13 +990,11 @@ class WebRTCManager {
         }
     }
 
-    // عرض الفيديو البعيد
     displayRemoteVideo(stream) {
         const remoteVideo = document.getElementById('remoteVideo');
         remoteVideo.srcObject = stream;
     }
 
-    // إنهاء المكالمة
     endCall() {
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
@@ -517,16 +1011,54 @@ class WebRTCManager {
         this.currentCall = null;
     }
 
-    // معالجة إنهاء المكالمة
     handleEndCall(friendId) {
         if (this.currentCall) {
             this.endCall();
         }
     }
 
+    // ========== دوال مساعدة ==========
+
+    displayMessage(message, type) {
+        const container = document.getElementById('messagesContainer');
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${type}`;
+        
+        const time = new Date(message.timestamp).toLocaleTimeString('ar-EG', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        messageElement.innerHTML = `
+            <div class="message-content">${this.escapeHtml(message.text)}</div>
+            <div class="message-time">${time}</div>
+        `;
+
+        container.appendChild(messageElement);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    displaySystemMessage(text) {
+        const container = document.getElementById('messagesContainer');
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message system';
+        
+        messageElement.innerHTML = `
+            <div class="system-content">${text}</div>
+        `;
+
+        container.appendChild(messageElement);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     // ========== إنهاء المحادثة ==========
 
-    // إغلاق المحادثة
     closeConversation() {
         if (this.currentCall) {
             this.endCall();
@@ -539,8 +1071,19 @@ class WebRTCManager {
             const pc = this.peerConnections.get(this.currentFriendId);
             if (pc) pc.close();
             
-            this.dataChannels.delete(this.currentFriendId);
             this.peerConnections.delete(this.currentFriendId);
+            this.dataChannels.delete(this.currentFriendId);
+        }
+
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+
+        // 🔥 إيقاف استماع Firebase إذا كان نشط
+        if (this.tempMessagesListener) {
+            this.tempMessagesListener();
+            this.tempMessagesListener = null;
         }
 
         document.getElementById('conversationPage').style.display = 'none';
@@ -549,6 +1092,156 @@ class WebRTCManager {
         
         this.currentFriendId = null;
         this.pendingMessages = [];
+        this.setDirectConnectionStatus(false);
+    }
+
+    // ========== إرسال الإشارات عبر Firebase (مشفرة) ==========
+
+    async sendOffer(friendId) {
+        const pc = this.peerConnections.get(friendId);
+        if (!pc) return;
+
+        try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            const signalId = `${window.auth.currentUser.uid}_${friendId}_${Date.now()}`;
+            
+            // تجهيز بيانات العرض
+            const signalData = {
+                from: window.auth.currentUser.uid,
+                to: friendId,
+                type: 'offer',
+                offer: {
+                    type: offer.type,
+                    sdp: offer.sdp
+                },
+                timestamp: new Date()
+            };
+            
+            // 🔐 تشفير الإشارة قبل الإرسال
+            const encryptedSignal = await this.encryptSignal(signalData);
+            
+            // إرسال البيانات المشفرة فقط
+            await window.db.collection('signaling').doc(signalId).set({
+                encrypted: encryptedSignal.encrypted,
+                status: 'pending',
+                to: friendId, // نحتاج هذا للاستعلام
+                expiresAt: new Date(Date.now() + 60000) // تنتهي بعد دقيقة
+            });
+
+            console.log('📤 عرض مشفر مرسل');
+
+        } catch (error) {
+            console.error('خطأ في إنشاء العرض:', error);
+        }
+    }
+
+    async handleIncomingOffer(signal, signalId) {
+        if (!window.auth?.currentUser) return;
+
+        try {
+            const pc = await this.createPeerConnection(signal.from);
+            
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
+            
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            // تجهيز بيانات الإجابة
+            const answerData = {
+                from: window.auth.currentUser.uid,
+                to: signal.from,
+                type: 'answer',
+                answer: {
+                    type: answer.type,
+                    sdp: answer.sdp
+                },
+                timestamp: new Date()
+            };
+            
+            // 🔐 تشفير الإجابة
+            const encryptedAnswer = await this.encryptSignal(answerData);
+            
+            // إرسال الإجابة المشفرة
+            await window.db.collection('signaling').doc(signalId).set({
+                encrypted: encryptedAnswer.encrypted,
+                status: 'answered',
+                to: signal.from,
+                expiresAt: new Date(Date.now() + 60000)
+            }, { merge: true });
+
+            console.log('📤 إجابة مشفرة مرسلة');
+
+        } catch (error) {
+            console.error('خطأ في معالجة العرض:', error);
+        }
+    }
+
+    async handleIncomingAnswer(signal) {
+        try {
+            const pc = this.peerConnections.get(signal.from);
+            if (!pc) return;
+
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
+            console.log('✅ تم تأكيد الاتصال المشفر');
+            
+        } catch (error) {
+            console.error('خطأ في معالجة الإجابة:', error);
+        }
+    }
+
+    async sendCandidate(friendId, candidate) {
+        try {
+            const signalId = `${window.auth.currentUser.uid}_${friendId}_cand_${Date.now()}`;
+            
+            // تجهيز بيانات المرشح
+            const candidateData = {
+                from: window.auth.currentUser.uid,
+                to: friendId,
+                type: 'candidate',
+                candidate: {
+                    candidate: candidate.candidate,
+                    sdpMid: candidate.sdpMid,
+                    sdpMLineIndex: candidate.sdpMLineIndex
+                },
+                timestamp: new Date()
+            };
+            
+            // 🔐 تشفير المرشح
+            const encryptedCandidate = await this.encryptSignal(candidateData);
+            
+            await window.db.collection('signaling').doc(signalId).set({
+                encrypted: encryptedCandidate.encrypted,
+                to: friendId,
+                expiresAt: new Date(Date.now() + 60000)
+            });
+            
+            console.log('📤 مرشح مشفر مرسل');
+            
+        } catch (error) {
+            console.error('خطأ في إرسال candidate:', error);
+        }
+    }
+
+    async handleIncomingCandidate(signal) {
+        try {
+            const pc = this.peerConnections.get(signal.from);
+            
+            if (pc && pc.remoteDescription) {
+                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                console.log('✅ تم إضافة مرشح مشفر');
+            } else {
+                // حفظ المرشح لحين جهوزية الاتصال
+                if (!this.pendingCandidates.has(signal.from)) {
+                    this.pendingCandidates.set(signal.from, []);
+                }
+                this.pendingCandidates.get(signal.from).push(signal.candidate);
+                console.log('⏳ حفظ مرشح مؤقتاً');
+            }
+        } catch (error) {
+            console.error('خطأ في معالجة المرشح:', error);
+        }
     }
 }
 
@@ -558,24 +1251,19 @@ let webRTCManager = null;
 
 // ========== دوال عامة للواجهة ==========
 
-// فتح محادثة مع صديق - فورية
 window.openChat = function(friendId) {
-    // إنشاء المدير فوراً إذا ما كان موجود
     if (!webRTCManager) {
         webRTCManager = new WebRTCManager();
     }
 
-    // جلب بيانات الصديق في الخلفية
     window.db.collection('users').doc(friendId).get().then((doc) => {
         if (doc.exists) {
             const friend = doc.data();
             const avatarEmoji = window.getEmojiForUser ? 
                 window.getEmojiForUser(friend) : '👤';
             
-            // فتح المحادثة فوراً
             webRTCManager.startChat(friendId, friend.name, avatarEmoji);
         } else {
-            // حتى لو فشل جلب البيانات، نفتح المحادثة
             webRTCManager.startChat(friendId, 'صديق', '👤');
         }
     }).catch(error => {
@@ -584,25 +1272,22 @@ window.openChat = function(friendId) {
     });
 };
 
-// إرسال رسالة - فورية
 window.sendMessage = function() {
     const input = document.getElementById('messageInput');
     const text = input.value.trim();
     
     if (text && webRTCManager) {
-        webRTCManager.sendTextMessage(text);
+        webRTCManager.sendEncryptedMessage(text);
         input.value = '';
     }
 };
 
-// معالجة ضغط Enter
 window.handleMessageKeyPress = function(event) {
     if (event.key === 'Enter') {
         window.sendMessage();
     }
 };
 
-// بدء مكالمة فيديو
 window.toggleVideoCall = function() {
     if (!webRTCManager) {
         webRTCManager = new WebRTCManager();
@@ -618,7 +1303,6 @@ window.toggleVideoCall = function() {
     }
 };
 
-// بدء مكالمة صوتية
 window.toggleVoiceCall = function() {
     if (!webRTCManager) {
         webRTCManager = new WebRTCManager();
@@ -634,7 +1318,6 @@ window.toggleVoiceCall = function() {
     }
 };
 
-// إنهاء المكالمة
 window.endCall = function() {
     if (webRTCManager) {
         webRTCManager.endCall();
@@ -643,7 +1326,6 @@ window.endCall = function() {
     }
 };
 
-// كتم/تشغيل الميكروفون
 window.toggleMute = function() {
     if (webRTCManager?.localStream) {
         const audioTrack = webRTCManager.localStream.getAudioTracks()[0];
@@ -655,7 +1337,6 @@ window.toggleMute = function() {
     }
 };
 
-// تشغيل/إيقاف الكاميرا
 window.toggleCamera = function() {
     if (webRTCManager?.localStream) {
         const videoTrack = webRTCManager.localStream.getVideoTracks()[0];
@@ -667,44 +1348,59 @@ window.toggleCamera = function() {
     }
 };
 
-// إظهار قائمة المرفقات
 window.showAttachmentMenu = function() {
     const menu = document.getElementById('attachmentMenu');
     menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
 };
 
-// إرسال صورة
 window.sendImage = function() {
-    alert('سيتم إضافة إرسال الصور قريباً');
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file && webRTCManager) {
+            webRTCManager.sendEncryptedFile(file);
+        }
+    };
+    input.click();
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-// إرسال ملف
 window.sendFile = function() {
-    alert('سيتم إضافة إرسال الملفات قريباً');
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file && webRTCManager) {
+            webRTCManager.sendEncryptedFile(file);
+        }
+    };
+    input.click();
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-// إرسال بصمة صوتية
 window.sendVoiceNote = function() {
-    alert('سيتم إضافة التسجيل الصوتي قريباً');
+    alert('📱 ميزة التسجيل الصوتي قيد التطوير');
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-// مشاركة الموقع
 window.shareLocation = function() {
-    alert('سيتم إضافة مشاركة الموقع قريباً');
+    if (webRTCManager && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            const locationText = `📍 موقعي: https://maps.google.com/?q=${position.coords.latitude},${position.coords.longitude}`;
+            webRTCManager.sendEncryptedMessage(locationText);
+        });
+    }
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-// إغلاق المحادثة
 window.closeConversation = function() {
     if (webRTCManager) {
         webRTCManager.closeConversation();
     }
 };
 
-// تهيئة WebRTC
 window.initWebRTC = function() {
     if (window.auth?.currentUser && !webRTCManager) {
         webRTCManager = new WebRTCManager();
@@ -712,19 +1408,17 @@ window.initWebRTC = function() {
     }
 };
 
-// إنشاء المجموعات في Firebase
+// إنشاء المجموعات في Firebase مع تاريخ انتهاء تلقائي
 async function setupFirebaseCollections() {
     if (!window.db) return;
     
     try {
-        // مجموعة signaling
         await window.db.collection('signaling').doc('_config').set({
             name: 'WebRTC Signaling',
             created: new Date(),
             permanent: true
         }, { merge: true });
         
-        // مجموعة temp_messages
         await window.db.collection('temp_messages').doc('_config').set({
             name: 'Temporary Messages',
             created: new Date(),
@@ -737,14 +1431,39 @@ async function setupFirebaseCollections() {
     }
 }
 
-// تهيئة كل شيء
+// 🔥 تنظيف الرسائل منتهية الصلاحية تلقائياً
+async function cleanupExpiredMessages() {
+    if (!window.db) return;
+    
+    try {
+        const now = new Date();
+        const expired = await window.db.collection('temp_messages')
+            .where('expiresAt', '<', now)
+            .get();
+        
+        let count = 0;
+        for (const doc of expired.docs) {
+            await doc.ref.delete();
+            count++;
+        }
+        
+        if (count > 0) {
+            console.log(`🧹 تم تنظيف ${count} رسالة منتهية الصلاحية`);
+        }
+    } catch (error) {
+        console.error('خطأ في تنظيف الرسائل:', error);
+    }
+}
+
+// تشغيل التنظيف كل ساعة
+setInterval(cleanupExpiredMessages, 60 * 60 * 1000);
+
 setupFirebaseCollections();
 
-// تهيئة WebRTC تلقائياً
 if (window.auth?.currentUser) {
     setTimeout(() => {
         window.initWebRTC();
     }, 1000);
 }
 
-console.log('✅ WebRTC module loaded - جاهز للاستخدام الفوري');
+console.log('🔐 نظام WebRTC المشفر جاهز مع جميع التصحيحات وتشفير الإشارات');
