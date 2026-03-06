@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTripsCount();
 });
 
-// دالة تنسيق الأرقام (يجب أن تكون متطابقة مع الموجودة في auth.js)
+// دالة تنسيق الأرقام
 function formatNumber(num) {
     if (num >= 1000000) {
         return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
@@ -28,7 +28,6 @@ async function updateTripsCount() {
     if (!window.auth || !window.auth.currentUser) return;
     
     try {
-        // حساب عدد الرحلات المنتهية للمستخدم الحالي
         const snapshot = await window.db.collection('trips')
             .where('userId', '==', window.auth.currentUser.uid)
             .where('status', '==', 'ended')
@@ -48,16 +47,9 @@ function ensureSinglePage() {
     const pages = document.querySelectorAll('.page');
     const subpages = document.querySelectorAll('.profile-subpage');
     
-    subpages.forEach(page => {
-        page.style.display = 'none';
-    });
-    
+    subpages.forEach(page => page.style.display = 'none');
     pages.forEach(page => {
-        if (page.classList.contains('active')) {
-            page.style.display = 'block';
-        } else {
-            page.style.display = 'none';
-        }
+        page.style.display = page.classList.contains('active') ? 'block' : 'none';
     });
 }
 
@@ -76,41 +68,24 @@ function setupNavigation() {
             targetPage.style.display = 'block';
         }
         
-        // إخفاء الصفحات الأخرى
         pages.forEach(page => {
-            if (!page.classList.contains('active')) {
-                page.style.display = 'none';
-            }
+            if (!page.classList.contains('active')) page.style.display = 'none';
         });
         
-        // إخفاء الصفحات الفرعية
-        document.querySelectorAll('.profile-subpage').forEach(sp => {
-            sp.style.display = 'none';
-        });
+        document.querySelectorAll('.profile-subpage').forEach(sp => sp.style.display = 'none');
         
-        // إذا كانت الصفحة المحددة هي الدردشة، قم بتحميل المحادثات
-        if (pageId === 'chat') {
-            loadChats();
-        }
+        if (pageId === 'chat') loadChats();
         
-        // إخفاء صفحة المحادثة الفردية عند التبديل
         const conversationPage = document.getElementById('conversationPage');
-        if (conversationPage) {
-            conversationPage.style.display = 'none';
-        }
+        if (conversationPage) conversationPage.style.display = 'none';
         
-        navItems.forEach(item => {
-            item.classList.toggle('active', item.dataset.page === pageId);
-        });
+        navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
         
         const sideMenu = document.getElementById('sideMenu');
         if (sideMenu) sideMenu.classList.remove('open');
     }
     
-    navItems.forEach(item => {
-        item.addEventListener('click', () => switchPage(item.dataset.page));
-    });
-    
+    navItems.forEach(item => item.addEventListener('click', () => switchPage(item.dataset.page)));
     menuLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -153,9 +128,7 @@ function setupModals() {
     };
     
     window.closeModal = () => {
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.classList.remove('active');
-        });
+        document.querySelectorAll('.modal').forEach(modal => modal.classList.remove('active'));
     };
     
     document.querySelectorAll('.modal').forEach(modal => {
@@ -190,16 +163,42 @@ function loadStories() {
     `).join('');
 }
 
-// ========== نظام الدردشة الجديد (بسيط مثل واتساب) ==========
+// ========== نظام الدردشة المتكامل (مع مكالمات + صور + بصمات) ==========
 
-// نظام المحادثات المحلي
+// نظام المحادثات المتكامل
 const ChatSystem = {
     currentChat: null,
     messages: {},
+    peer: null,
+    currentCall: null,
+    localStream: null,
     
     // تهيئة النظام
     init() {
         this.loadAllChats();
+        this.initPeer();
+    },
+    
+    // تهيئة PeerJS للمكالمات
+    initPeer() {
+        if (!window.auth?.currentUser) return;
+        
+        this.peer = new Peer(window.auth.currentUser.uid);
+        
+        this.peer.on('call', (call) => {
+            // استقبال مكالمة
+            if (confirm('مكالمة واردة. هل تريد الرد؟')) {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                    .then(stream => {
+                        this.localStream = stream;
+                        call.answer(stream);
+                        this.currentCall = call;
+                        this.showVideoCall(call, stream);
+                    });
+            } else {
+                call.close();
+            }
+        });
     },
     
     // تحميل كل المحادثات من localStorage
@@ -221,24 +220,18 @@ const ChatSystem = {
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
-        // تحديث واجهة المحادثة
         const nameElement = document.getElementById('conversationName');
         const avatarElement = document.getElementById('conversationAvatar');
         
         if (nameElement) nameElement.textContent = friendName;
         if (avatarElement) avatarElement.textContent = friendAvatar || '👤';
         
-        // إظهار صفحة المحادثة
         document.querySelector('.chat-page').style.display = 'none';
         document.getElementById('conversationPage').style.display = 'block';
         
-        // مسح وعرض الرسائل
         this.displayMessages(friendId);
-        
-        // بدء الاستماع للرسائل الجديدة
         this.listenForNewMessages(friendId);
         
-        // تمرير لآخر رسالة
         setTimeout(() => {
             const container = document.getElementById('messagesContainer');
             if (container) container.scrollTop = container.scrollHeight;
@@ -251,7 +244,6 @@ const ChatSystem = {
         if (!container) return;
         
         container.innerHTML = '';
-        
         const messages = this.messages[friendId] || [];
         messages.forEach(msg => this.displayMessage(msg));
     },
@@ -264,51 +256,128 @@ const ChatSystem = {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
         
-        const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        
-        messageDiv.innerHTML = `
-            <div class="message-content">${this.escapeHtml(msg.text)}</div>
-            <div class="message-time">${time}</div>
-        `;
+        if (msg.type === 'text') {
+            const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">${this.escapeHtml(msg.text)}</div>
+                <div class="message-time">${time}</div>
+            `;
+        } else if (msg.type === 'image') {
+            messageDiv.innerHTML = `
+                <img src="${msg.data}" class="message-image" onclick="window.open('${msg.data}')">
+                <div class="message-time">${new Date(msg.time).toLocaleTimeString()}</div>
+            `;
+        } else if (msg.type === 'voice') {
+            messageDiv.innerHTML = `
+                <audio controls src="${msg.data}" class="message-audio"></audio>
+                <div class="message-time">${new Date(msg.time).toLocaleTimeString()}</div>
+            `;
+        }
         
         container.appendChild(messageDiv);
         container.scrollTop = container.scrollHeight;
     },
     
-    // إرسال رسالة
+    // إرسال رسالة نصية
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
         const message = {
+            type: 'text',
             text: text,
             sender: 'me',
             time: new Date().toISOString(),
             id: Date.now()
         };
         
-        // حفظ عندي
         this.saveMessage(this.currentChat, message);
-        
-        // عرض فوراً
         this.displayMessage(message);
         
-        // إرسال عبر Firebase (مؤقت)
         try {
             await window.db.collection('temp_messages').add({
                 to: this.currentChat,
                 from: window.auth.currentUser.uid,
                 message: message,
                 timestamp: new Date(),
-                expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // أسبوع
+                expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
         } catch (error) {
             console.error('خطأ في إرسال الرسالة:', error);
         }
         
         return true;
+    },
+    
+    // إرسال صورة
+    async sendImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const message = {
+                    type: 'image',
+                    data: e.target.result,
+                    sender: 'me',
+                    time: new Date().toISOString(),
+                    id: Date.now()
+                };
+                
+                this.saveMessage(this.currentChat, message);
+                this.displayMessage(message);
+                
+                try {
+                    await window.db.collection('temp_messages').add({
+                        to: this.currentChat,
+                        from: window.auth.currentUser.uid,
+                        message: message,
+                        timestamp: new Date(),
+                        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                    });
+                } catch (error) {
+                    console.error('خطأ في إرسال الصورة:', error);
+                }
+                
+                resolve();
+            };
+            reader.readAsDataURL(file);
+        });
+    },
+    
+    // إرسال بصمة صوتية
+    async sendVoiceNote(audioBlob) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const message = {
+                    type: 'voice',
+                    data: e.target.result,
+                    sender: 'me',
+                    time: new Date().toISOString(),
+                    id: Date.now()
+                };
+                
+                this.saveMessage(this.currentChat, message);
+                this.displayMessage(message);
+                
+                try {
+                    await window.db.collection('temp_messages').add({
+                        to: this.currentChat,
+                        from: window.auth.currentUser.uid,
+                        message: message,
+                        timestamp: new Date(),
+                        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                    });
+                } catch (error) {
+                    console.error('خطأ في إرسال البصمة:', error);
+                }
+                
+                resolve();
+            };
+            reader.readAsDataURL(audioBlob);
+        });
     },
     
     // حفظ رسالة في localStorage
@@ -323,8 +392,6 @@ const ChatSystem = {
         }
         
         history.push(message);
-        
-        // احتفظ بآخر 100 رسالة فقط
         if (history.length > 100) history = history.slice(-100);
         
         localStorage.setItem(key, JSON.stringify(history));
@@ -348,18 +415,14 @@ const ChatSystem = {
                             sender: 'friend'
                         };
                         
-                        // حفظ عندي
                         this.saveMessage(friendId, message);
                         
-                        // إذا كنت في هذه المحادثة، اعرضها
                         if (this.currentChat === friendId) {
                             this.displayMessage(message);
                         } else {
-                            // تحديث آخر رسالة في قائمة المحادثات
-                            this.updateLastMessage(friendId, message.text);
+                            this.updateLastMessage(friendId, message.text || '📷 صورة' || '🎤 بصمة');
                         }
                         
-                        // حذف من Firebase بعد الاستلام
                         change.doc.ref.delete();
                     }
                 });
@@ -380,8 +443,136 @@ const ChatSystem = {
         }
     },
     
+    // ========== دوال المكالمات ==========
+    
+    // بدء مكالمة فيديو
+    async startVideoCall() {
+        if (!this.currentChat || !this.peer) return;
+        
+        try {
+            this.localStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+            
+            const call = this.peer.call(this.currentChat, this.localStream);
+            this.currentCall = call;
+            
+            this.showVideoCall(call, this.localStream);
+            
+        } catch (error) {
+            console.error('خطأ في بدء المكالمة:', error);
+            alert('لا يمكن الوصول إلى الكاميرا');
+        }
+    },
+    
+    // بدء مكالمة صوتية
+    async startVoiceCall() {
+        if (!this.currentChat || !this.peer) return;
+        
+        try {
+            this.localStream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true
+            });
+            
+            const call = this.peer.call(this.currentChat, this.localStream);
+            this.currentCall = call;
+            
+            this.showVoiceCall(call, this.localStream);
+            
+        } catch (error) {
+            console.error('خطأ في بدء المكالمة:', error);
+            alert('لا يمكن الوصول إلى الميكروفون');
+        }
+    },
+    
+    // عرض مكالمة فيديو
+    showVideoCall(call, stream) {
+        const videoContainer = document.getElementById('videoContainer');
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        
+        localVideo.srcObject = stream;
+        
+        call.on('stream', (remoteStream) => {
+            remoteVideo.srcObject = remoteStream;
+        });
+        
+        videoContainer.style.display = 'flex';
+        
+        call.on('close', () => {
+            videoContainer.style.display = 'none';
+            this.currentCall = null;
+            if (this.localStream) {
+                this.localStream.getTracks().forEach(track => track.stop());
+                this.localStream = null;
+            }
+        });
+    },
+    
+    // عرض مكالمة صوتية
+    showVoiceCall(call, stream) {
+        const videoContainer = document.getElementById('videoContainer');
+        const localVideo = document.getElementById('localVideo');
+        
+        localVideo.style.display = 'none';
+        
+        call.on('stream', (remoteStream) => {
+            // صوت فقط
+        });
+        
+        videoContainer.style.display = 'flex';
+        
+        call.on('close', () => {
+            videoContainer.style.display = 'none';
+            localVideo.style.display = 'block';
+            this.currentCall = null;
+            if (this.localStream) {
+                this.localStream.getTracks().forEach(track => track.stop());
+                this.localStream = null;
+            }
+        });
+    },
+    
+    // إنهاء المكالمة
+    endCall() {
+        if (this.currentCall) {
+            this.currentCall.close();
+        }
+        document.getElementById('videoContainer').style.display = 'none';
+        document.getElementById('localVideo').style.display = 'block';
+    },
+    
+    // كتم الميكروفون
+    toggleMute() {
+        if (this.localStream) {
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                const btn = document.querySelector('.call-controls button:nth-child(2) i');
+                if (btn) btn.className = audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
+            }
+        }
+    },
+    
+    // تشغيل/إيقاف الكاميرا
+    toggleCamera() {
+        if (this.localStream) {
+            const videoTrack = this.localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                const btn = document.querySelector('.call-controls button:nth-child(3) i');
+                if (btn) btn.className = videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
+            }
+        }
+    },
+    
     // إغلاق المحادثة
     closeChat() {
+        if (this.currentCall) {
+            this.endCall();
+        }
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
         this.currentChat = null;
@@ -406,7 +597,6 @@ async function loadChats() {
     if (!chatsList) return;
     
     try {
-        // جلب قائمة الأصدقاء
         const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
         if (!userDoc.exists) return;
         
@@ -432,7 +622,6 @@ async function loadChats() {
                     const friend = friendDoc.data();
                     const avatarEmoji = getEmojiForUser(friend);
                     
-                    // جلب آخر رسالة من localStorage
                     const key = `chat_${friendId}`;
                     let lastMessage = 'اضغط لبدء المحادثة';
                     let lastTime = '';
@@ -441,7 +630,9 @@ async function loadChats() {
                         const history = JSON.parse(localStorage.getItem(key)) || [];
                         if (history.length > 0) {
                             const last = history[history.length - 1];
-                            lastMessage = last.text;
+                            if (last.type === 'text') lastMessage = last.text;
+                            else if (last.type === 'image') lastMessage = '📷 صورة';
+                            else if (last.type === 'voice') lastMessage = '🎤 بصمة';
                             lastTime = new Date(last.time).toLocaleTimeString('ar-EG', {
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -481,7 +672,6 @@ async function loadChats() {
 
 // إعداد مستمعي الدردشة
 function setupChatListeners() {
-    // إخفاء قائمة المرفقات عند النقر خارجها
     document.addEventListener('click', (e) => {
         const menu = document.getElementById('attachmentMenu');
         const attachBtn = document.querySelector('.attach-btn');
@@ -490,16 +680,12 @@ function setupChatListeners() {
         }
     });
     
-    // مستمع للرسائل من Firebase (عام)
     if (window.auth?.currentUser) {
         window.db.collection('temp_messages')
             .where('to', '==', window.auth.currentUser.uid)
             .onSnapshot((snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
-                        const data = change.doc.data();
-                        
-                        // تحديث قائمة المحادثات إذا لزم الأمر
                         loadChats();
                     }
                 });
@@ -507,7 +693,8 @@ function setupChatListeners() {
     }
 }
 
-// دوال عامة للواجهة
+// ========== دوال عامة للواجهة ==========
+
 window.openChat = function(friendId) {
     window.db.collection('users').doc(friendId).get().then((doc) => {
         if (doc.exists) {
@@ -539,33 +726,113 @@ window.handleMessageKeyPress = function(event) {
     }
 };
 
+// دوال المرفقات
+window.showAttachmentMenu = function() {
+    const menu = document.getElementById('attachmentMenu');
+    menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+};
+
+window.sendImage = function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file && ChatSystem.currentChat) {
+            ChatSystem.sendImage(file);
+        }
+    };
+    input.click();
+    document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+window.sendVoiceNote = function() {
+    // طلب إذن الميكروفون
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            const mediaRecorder = new MediaRecorder(stream);
+            const chunks = [];
+            
+            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                ChatSystem.sendVoiceNote(blob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            mediaRecorder.start();
+            
+            // تسجيل لمدة 10 ثواني كحد أقصى
+            setTimeout(() => {
+                if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+            }, 10000);
+            
+            alert('جاري التسجيل... اضغط OK للإيقاف');
+            mediaRecorder.stop();
+        });
+    
+    document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+window.shareLocation = function() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            const locationUrl = `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`;
+            ChatSystem.sendMessage(`📍 موقعي: ${locationUrl}`);
+        });
+    }
+    document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+// دوال المكالمات
+window.toggleVoiceCall = function() {
+    if (ChatSystem.currentCall) {
+        ChatSystem.endCall();
+    } else {
+        ChatSystem.startVoiceCall();
+    }
+};
+
+window.toggleVideoCall = function() {
+    if (ChatSystem.currentCall) {
+        ChatSystem.endCall();
+    } else {
+        ChatSystem.startVideoCall();
+    }
+};
+
+window.endCall = function() {
+    ChatSystem.endCall();
+};
+
+window.toggleMute = function() {
+    ChatSystem.toggleMute();
+};
+
+window.toggleCamera = function() {
+    ChatSystem.toggleCamera();
+};
+
 window.closeConversation = function() {
     ChatSystem.closeChat();
 };
 
-// ========== نهاية نظام الدردشة ==========
+// ========== باقي الدوال (بدون تغيير) ==========
 
-// فتح نافذة تعديل الملف الشخصي
 window.openEditProfileModal = function() {
-    // تعبئة البيانات الحالية
     const currentName = document.getElementById('profileName').textContent;
     const currentNameInput = document.getElementById('editName');
-    if (currentNameInput) {
-        currentNameInput.value = currentName;
-    }
+    if (currentNameInput) currentNameInput.value = currentName;
     
-    // تحديث الملصق الحالي
     const currentEmoji = document.getElementById('profileAvatarEmoji').textContent;
     const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
-    if (currentAvatarEmoji) {
-        currentAvatarEmoji.textContent = currentEmoji;
-    }
+    if (currentAvatarEmoji) currentAvatarEmoji.textContent = currentEmoji;
     
-    // فتح النافذة
     document.getElementById('editProfileModal').classList.add('active');
 };
 
-// حفظ التغييرات
 window.saveProfile = function() {
     const newName = document.getElementById('editName').value.trim();
     
@@ -579,15 +846,12 @@ window.saveProfile = function() {
         return;
     }
     
-    // حفظ في Firebase
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
             name: newName
         }).then(() => {
-            // تحديث واجهة المستخدم
             document.getElementById('profileName').textContent = newName;
             document.getElementById('menuName').textContent = newName;
-            
             closeModal();
             alert('تم حفظ التغييرات');
         }).catch(error => {
@@ -597,16 +861,12 @@ window.saveProfile = function() {
     }
 };
 
-// دوال الملف الشخصي
 window.showUserTrips = function() {
     document.querySelector('.profile-page').style.display = 'none';
     document.getElementById('tripsPage').style.display = 'block';
-    
-    // هنا تجيب بيانات الرحلات من Firebase
     loadUserTrips();
 };
 
-// تحميل بيانات الرحلات
 async function loadUserTrips() {
     if (!window.auth || !window.auth.currentUser) return;
     
@@ -647,8 +907,6 @@ async function loadUserTrips() {
         });
         
         tripsGrid.innerHTML = html;
-        
-        // تحديث عدد الرحلات في الملف الشخصي
         updateTripsCount();
         
     } catch (error) {
@@ -662,24 +920,18 @@ async function loadUserTrips() {
     }
 }
 
-// عرض تفاصيل رحلة
 window.viewTripDetails = function(tripId) {
     alert('تفاصيل الرحلة - معرف: ' + tripId);
-    // يمكن تطويرها لاحقاً
 };
 
-// دالة الرجوع للخلف
 window.goBack = function() {
-    // إخفاء جميع الصفحات الفرعية
     document.querySelectorAll('.profile-subpage').forEach(page => {
         page.style.display = 'none';
     });
     
-    // إظهار صفحة الملف الشخصي الرئيسية
     document.querySelector('.profile-page').style.display = 'block';
     document.querySelector('.profile-page').classList.add('active');
     
-    // التأكد من أن باقي الصفحات الرئيسية مخفية
     document.querySelectorAll('.page').forEach(page => {
         if (!page.classList.contains('profile-page')) {
             page.style.display = 'none';
@@ -688,92 +940,57 @@ window.goBack = function() {
     });
 };
 
-// دالة اختيار الملصق
 window.selectAvatar = function(type) {
     const emojiMap = {
-        'male': '👨',
-        'female': '👩',
-        'boy': '🧒',
-        'girl': '👧',
-        'father': '👨‍🦳',
-        'mother': '👩‍🦳',
-        'grandfather': '👴',
-        'grandmother': '👵'
+        'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧',
+        'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵'
     };
     
     const selectedEmoji = emojiMap[type] || '👤';
     
-    // تحديث الملصق في الملف الشخصي
     const profileAvatar = document.getElementById('profileAvatarEmoji');
-    if (profileAvatar) {
-        profileAvatar.textContent = selectedEmoji;
-    }
+    if (profileAvatar) profileAvatar.textContent = selectedEmoji;
     
-    // تحديث الملصق في نافذة التعديل
     const currentAvatar = document.getElementById('currentAvatarEmoji');
-    if (currentAvatar) {
-        currentAvatar.textContent = selectedEmoji;
-    }
+    if (currentAvatar) currentAvatar.textContent = selectedEmoji;
     
-    // تحديث الملصق في القائمة الجانبية
     const menuAvatar = document.getElementById('menuAvatarEmoji');
-    if (menuAvatar) {
-        menuAvatar.textContent = selectedEmoji;
-    }
+    if (menuAvatar) menuAvatar.textContent = selectedEmoji;
     
-    // حفظ الاختيار في Firebase
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
             avatarType: type
-        }).then(() => {
-            console.log('Avatar updated successfully');
-        }).catch(error => {
-            console.error('Error updating avatar:', error);
-        });
+        }).catch(error => console.error('Error updating avatar:', error));
     }
     
     closeModal();
 };
 
-// فتح نافذة اختيار الملصق
 window.openAvatarModal = function() {
     const modal = document.getElementById('avatarModal');
     if (modal) modal.classList.add('active');
 };
 
-// تحديث القوائم عند تغيير اللغة
 document.addEventListener('languageChanged', function() {
     console.log('Language changed');
-    // إعادة تحميل المحادثات إذا كانت الصفحة الحالية هي الدردشة
     if (document.querySelector('.chat-page').style.display === 'block') {
         loadChats();
     }
 });
 
-// دالة للحصول على الملصق المناسب (مشتركة مع auth.js)
 window.getEmojiForUser = function(userData) {
     const emojiMap = {
-        'male': '👨',
-        'female': '👩',
-        'boy': '🧒',
-        'girl': '👧',
-        'father': '👨‍🦳',
-        'mother': '👩‍🦳',
-        'grandfather': '👴',
-        'grandmother': '👵'
+        'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧',
+        'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵'
     };
     return emojiMap[userData?.avatarType] || '👤';
 };
 
-// دالة مساعدة لمسح رسائل المحادثة عند الإغلاق
 window.clearMessages = function() {
     const container = document.getElementById('messagesContainer');
-    if (container) {
-        container.innerHTML = '';
-    }
+    if (container) container.innerHTML = '';
 };
 
-// دالة لعرض إشعار
 window.showNotification = function(title, message) {
     if (Notification.permission === 'granted') {
         new Notification(title, { body: message });
@@ -786,14 +1003,8 @@ window.showNotification = function(title, message) {
     }
 };
 
-// طلب إذن الإشعارات عند تحميل التطبيق
 if ('Notification' in window) {
     Notification.requestPermission();
 }
 
-// ========== إزالة جميع دوال WebRTC القديمة ==========
-// تم إزالة: toggleVideoCall, toggleVoiceCall, endCall, toggleMute, toggleCamera,
-// showAttachmentMenu, sendImage, sendFile, sendVoiceNote, shareLocation
-// وكل ما يتعلق بـ WebRTC
-
-console.log('✅ app.js محدث - نظام دردشة بسيط مثل واتساب');
+console.log('✅ app.js محدث - نظام متكامل مع مكالمات وصور وبصمات');
