@@ -93,9 +93,10 @@ function setupNavigation() {
             loadChats();
         }
         
-        // إذا كانت الصفحة المحددة هي المحادثة الفردية، أخفيها
-        if (pageId !== 'conversation') {
-            document.getElementById('conversationPage').style.display = 'none';
+        // إخفاء صفحة المحادثة الفردية عند التبديل
+        const conversationPage = document.getElementById('conversationPage');
+        if (conversationPage) {
+            conversationPage.style.display = 'none';
         }
         
         navItems.forEach(item => {
@@ -189,7 +190,213 @@ function loadStories() {
     `).join('');
 }
 
-// ========== نظام الدردشة الجديد ==========
+// ========== نظام الدردشة الجديد (بسيط مثل واتساب) ==========
+
+// نظام المحادثات المحلي
+const ChatSystem = {
+    currentChat: null,
+    messages: {},
+    
+    // تهيئة النظام
+    init() {
+        this.loadAllChats();
+    },
+    
+    // تحميل كل المحادثات من localStorage
+    loadAllChats() {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('chat_')) {
+                const friendId = key.replace('chat_', '');
+                try {
+                    this.messages[friendId] = JSON.parse(localStorage.getItem(key)) || [];
+                } catch (e) {
+                    this.messages[friendId] = [];
+                }
+            }
+        }
+    },
+    
+    // فتح محادثة مع صديق
+    openChat(friendId, friendName, friendAvatar) {
+        this.currentChat = friendId;
+        
+        // تحديث واجهة المحادثة
+        const nameElement = document.getElementById('conversationName');
+        const avatarElement = document.getElementById('conversationAvatar');
+        
+        if (nameElement) nameElement.textContent = friendName;
+        if (avatarElement) avatarElement.textContent = friendAvatar || '👤';
+        
+        // إظهار صفحة المحادثة
+        document.querySelector('.chat-page').style.display = 'none';
+        document.getElementById('conversationPage').style.display = 'block';
+        
+        // مسح وعرض الرسائل
+        this.displayMessages(friendId);
+        
+        // بدء الاستماع للرسائل الجديدة
+        this.listenForNewMessages(friendId);
+        
+        // تمرير لآخر رسالة
+        setTimeout(() => {
+            const container = document.getElementById('messagesContainer');
+            if (container) container.scrollTop = container.scrollHeight;
+        }, 100);
+    },
+    
+    // عرض رسائل محادثة
+    displayMessages(friendId) {
+        const container = document.getElementById('messagesContainer');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        const messages = this.messages[friendId] || [];
+        messages.forEach(msg => this.displayMessage(msg));
+    },
+    
+    // عرض رسالة واحدة
+    displayMessage(msg) {
+        const container = document.getElementById('messagesContainer');
+        if (!container) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
+        
+        const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        messageDiv.innerHTML = `
+            <div class="message-content">${this.escapeHtml(msg.text)}</div>
+            <div class="message-time">${time}</div>
+        `;
+        
+        container.appendChild(messageDiv);
+        container.scrollTop = container.scrollHeight;
+    },
+    
+    // إرسال رسالة
+    async sendMessage(text) {
+        if (!this.currentChat || !text.trim()) return false;
+        
+        const message = {
+            text: text,
+            sender: 'me',
+            time: new Date().toISOString(),
+            id: Date.now()
+        };
+        
+        // حفظ عندي
+        this.saveMessage(this.currentChat, message);
+        
+        // عرض فوراً
+        this.displayMessage(message);
+        
+        // إرسال عبر Firebase (مؤقت)
+        try {
+            await window.db.collection('temp_messages').add({
+                to: this.currentChat,
+                from: window.auth.currentUser.uid,
+                message: message,
+                timestamp: new Date(),
+                expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // أسبوع
+            });
+        } catch (error) {
+            console.error('خطأ في إرسال الرسالة:', error);
+        }
+        
+        return true;
+    },
+    
+    // حفظ رسالة في localStorage
+    saveMessage(friendId, message) {
+        const key = `chat_${friendId}`;
+        let history = [];
+        
+        try {
+            history = JSON.parse(localStorage.getItem(key)) || [];
+        } catch (e) {
+            history = [];
+        }
+        
+        history.push(message);
+        
+        // احتفظ بآخر 100 رسالة فقط
+        if (history.length > 100) history = history.slice(-100);
+        
+        localStorage.setItem(key, JSON.stringify(history));
+        this.messages[friendId] = history;
+    },
+    
+    // الاستماع للرسائل الجديدة
+    listenForNewMessages(friendId) {
+        if (!window.auth?.currentUser) return;
+        
+        window.db.collection('temp_messages')
+            .where('from', '==', friendId)
+            .where('to', '==', window.auth.currentUser.uid)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const data = change.doc.data();
+                        
+                        const message = {
+                            ...data.message,
+                            sender: 'friend'
+                        };
+                        
+                        // حفظ عندي
+                        this.saveMessage(friendId, message);
+                        
+                        // إذا كنت في هذه المحادثة، اعرضها
+                        if (this.currentChat === friendId) {
+                            this.displayMessage(message);
+                        } else {
+                            // تحديث آخر رسالة في قائمة المحادثات
+                            this.updateLastMessage(friendId, message.text);
+                        }
+                        
+                        // حذف من Firebase بعد الاستلام
+                        change.doc.ref.delete();
+                    }
+                });
+            });
+    },
+    
+    // تحديث آخر رسالة في قائمة المحادثات
+    updateLastMessage(friendId, lastMessage) {
+        const chatItems = document.querySelectorAll('.chat-item');
+        for (const item of chatItems) {
+            if (item.getAttribute('onclick')?.includes(friendId)) {
+                const lastMsgEl = item.querySelector('.last-message');
+                const timeEl = item.querySelector('.chat-time');
+                if (lastMsgEl) lastMsgEl.textContent = lastMessage;
+                if (timeEl) timeEl.textContent = 'الآن';
+                break;
+            }
+        }
+    },
+    
+    // إغلاق المحادثة
+    closeChat() {
+        document.getElementById('conversationPage').style.display = 'none';
+        document.querySelector('.chat-page').style.display = 'block';
+        this.currentChat = null;
+    },
+    
+    // الهروب من HTML
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+};
+
+// تهيئة نظام الدردشة
+ChatSystem.init();
 
 // تحميل قائمة المحادثات
 async function loadChats() {
@@ -225,14 +432,31 @@ async function loadChats() {
                     const friend = friendDoc.data();
                     const avatarEmoji = getEmojiForUser(friend);
                     
+                    // جلب آخر رسالة من localStorage
+                    const key = `chat_${friendId}`;
+                    let lastMessage = 'اضغط لبدء المحادثة';
+                    let lastTime = '';
+                    
+                    try {
+                        const history = JSON.parse(localStorage.getItem(key)) || [];
+                        if (history.length > 0) {
+                            const last = history[history.length - 1];
+                            lastMessage = last.text;
+                            lastTime = new Date(last.time).toLocaleTimeString('ar-EG', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        }
+                    } catch (e) {}
+                    
                     html += `
                         <div class="chat-item" onclick="openChat('${friendId}')">
                             <div class="chat-avatar-emoji">${avatarEmoji}</div>
                             <div class="chat-info">
                                 <h4>${friend.name || 'مستخدم'}</h4>
-                                <p class="last-message">اضغط لبدء المحادثة</p>
+                                <p class="last-message">${lastMessage}</p>
                             </div>
-                            <span class="chat-time">الآن</span>
+                            <span class="chat-time">${lastTime || ''}</span>
                         </div>
                     `;
                 }
@@ -266,22 +490,58 @@ function setupChatListeners() {
         }
     });
     
-    // إعداد مستلمي الرسائل (سيتم تفعيلها عند فتح المحادثة)
-}
-
-// تحديث آخر رسالة في القائمة
-function updateLastMessage(friendId, message, time) {
-    const chatItems = document.querySelectorAll('.chat-item');
-    for (const item of chatItems) {
-        if (item.getAttribute('onclick')?.includes(friendId)) {
-            const lastMsg = item.querySelector('.last-message');
-            const chatTime = item.querySelector('.chat-time');
-            if (lastMsg) lastMsg.textContent = message;
-            if (chatTime) chatTime.textContent = time;
-            break;
-        }
+    // مستمع للرسائل من Firebase (عام)
+    if (window.auth?.currentUser) {
+        window.db.collection('temp_messages')
+            .where('to', '==', window.auth.currentUser.uid)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const data = change.doc.data();
+                        
+                        // تحديث قائمة المحادثات إذا لزم الأمر
+                        loadChats();
+                    }
+                });
+            });
     }
 }
+
+// دوال عامة للواجهة
+window.openChat = function(friendId) {
+    window.db.collection('users').doc(friendId).get().then((doc) => {
+        if (doc.exists) {
+            const friend = doc.data();
+            const avatarEmoji = window.getEmojiForUser ? 
+                window.getEmojiForUser(friend) : '👤';
+            
+            ChatSystem.openChat(friendId, friend.name, avatarEmoji);
+        }
+    }).catch(error => {
+        console.error('خطأ في فتح المحادثة:', error);
+    });
+};
+
+window.sendMessage = function() {
+    const input = document.getElementById('messageInput');
+    const text = input.value.trim();
+    
+    if (text) {
+        ChatSystem.sendMessage(text).then(sent => {
+            if (sent) input.value = '';
+        });
+    }
+};
+
+window.handleMessageKeyPress = function(event) {
+    if (event.key === 'Enter') {
+        window.sendMessage();
+    }
+};
+
+window.closeConversation = function() {
+    ChatSystem.closeChat();
+};
 
 // ========== نهاية نظام الدردشة ==========
 
@@ -408,8 +668,6 @@ window.viewTripDetails = function(tripId) {
     // يمكن تطويرها لاحقاً
 };
 
-// ✅ تم إزالة دوال المتابعة القديمة (showUserFollowers, showUserFollowing)
-
 // دالة الرجوع للخلف
 window.goBack = function() {
     // إخفاء جميع الصفحات الفرعية
@@ -515,7 +773,7 @@ window.clearMessages = function() {
     }
 };
 
-// دالة لعرض إشعار (للمكالمات الواردة)
+// دالة لعرض إشعار
 window.showNotification = function(title, message) {
     if (Notification.permission === 'granted') {
         new Notification(title, { body: message });
@@ -532,3 +790,10 @@ window.showNotification = function(title, message) {
 if ('Notification' in window) {
     Notification.requestPermission();
 }
+
+// ========== إزالة جميع دوال WebRTC القديمة ==========
+// تم إزالة: toggleVideoCall, toggleVoiceCall, endCall, toggleMute, toggleCamera,
+// showAttachmentMenu, sendImage, sendFile, sendVoiceNote, shareLocation
+// وكل ما يتعلق بـ WebRTC
+
+console.log('✅ app.js محدث - نظام دردشة بسيط مثل واتساب');
