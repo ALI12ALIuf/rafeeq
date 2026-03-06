@@ -179,26 +179,70 @@ const ChatSystem = {
         this.initPeer();
     },
     
-    // تهيئة PeerJS للمكالمات
-    initPeer() {
+    // ✅ تهيئة PeerJS للمكالمات (معدل)
+    async initPeer() {
         if (!window.auth?.currentUser) return;
         
-        this.peer = new Peer(window.auth.currentUser.uid);
+        // انتظر حتى يتم تحميل PeerJS
+        if (typeof Peer === 'undefined') {
+            console.log('⏳ انتظار تحميل PeerJS...');
+            setTimeout(() => this.initPeer(), 1000);
+            return;
+        }
         
-        this.peer.on('call', (call) => {
-            // استقبال مكالمة
-            if (confirm('مكالمة واردة. هل تريد الرد؟')) {
-                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                    .then(stream => {
-                        this.localStream = stream;
-                        call.answer(stream);
-                        this.currentCall = call;
-                        this.showVideoCall(call, stream);
+        try {
+            // استخدام معرف فريد للمستخدم
+            const peerId = `rafeeq_${window.auth.currentUser.uid}`;
+            this.peer = new Peer(peerId);
+            
+            this.peer.on('open', async (id) => {
+                console.log('✅ PeerJS جاهز:', id);
+                // حفظ معرف Peer في Firebase
+                try {
+                    await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                        peerId: id,
+                        lastSeen: new Date()
                     });
-            } else {
-                call.close();
-            }
-        });
+                } catch (e) {
+                    console.error('خطأ في حفظ peerId:', e);
+                }
+            });
+            
+            this.peer.on('call', (call) => {
+                // استقبال مكالمة
+                if (confirm('📞 مكالمة واردة. هل تريد الرد؟')) {
+                    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                        .then(stream => {
+                            this.localStream = stream;
+                            call.answer(stream);
+                            this.currentCall = call;
+                            this.showVideoCall(call, stream);
+                        }).catch(err => {
+                            alert('لا يمكن الوصول للكاميرا: ' + err.message);
+                        });
+                } else {
+                    call.close();
+                }
+            });
+            
+            this.peer.on('error', (err) => {
+                console.error('❌ خطأ PeerJS:', err);
+            });
+            
+        } catch (error) {
+            console.error('❌ فشل تهيئة PeerJS:', error);
+        }
+    },
+    
+    // ✅ الحصول على معرف Peer للصديق
+    async getFriendPeerId(friendId) {
+        try {
+            const doc = await window.db.collection('users').doc(friendId).get();
+            return doc.exists ? doc.data().peerId : null;
+        } catch (error) {
+            console.error('خطأ في جلب peerId:', error);
+            return null;
+        }
     },
     
     // تحميل كل المحادثات من localStorage
@@ -248,7 +292,7 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
-    // عرض رسالة واحدة
+    // ✅ عرض رسالة واحدة (معدل لدعم الموقع)
     displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -257,15 +301,40 @@ const ChatSystem = {
         messageDiv.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
         
         if (msg.type === 'text') {
-            const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            
-            messageDiv.innerHTML = `
-                <div class="message-content">${this.escapeHtml(msg.text)}</div>
-                <div class="message-time">${time}</div>
-            `;
+            // التحقق إذا كان النص يحتوي على رابط موقع
+            if (msg.text.includes('maps.google.com') || msg.text.includes('📍 موقعي:')) {
+                const match = msg.text.match(/q=([0-9.-]+),([0-9.-]+)/);
+                if (match) {
+                    const lat = match[1];
+                    const lng = match[2];
+                    messageDiv.innerHTML = `
+                        <div class="location-message" onclick="window.open('https://www.google.com/maps?q=${lat},${lng}')">
+                            <img src="https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=300x150&markers=color:red%7C${lat},${lng}&key=AIzaSyApCsnS6CjnzfMPjNsvidLiuX0ZlJ11szU" 
+                                 style="width:100%; border-radius:10px; cursor:pointer;">
+                            <div style="text-align:center; padding:5px; font-size:12px;">📍 موقع المستخدم</div>
+                        </div>
+                        <div class="message-time">${new Date(msg.time).toLocaleTimeString()}</div>
+                    `;
+                } else {
+                    const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    messageDiv.innerHTML = `
+                        <div class="message-content">${this.escapeHtml(msg.text)}</div>
+                        <div class="message-time">${time}</div>
+                    `;
+                }
+            } else {
+                const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                messageDiv.innerHTML = `
+                    <div class="message-content">${this.escapeHtml(msg.text)}</div>
+                    <div class="message-time">${time}</div>
+                `;
+            }
         } else if (msg.type === 'image') {
             messageDiv.innerHTML = `
                 <img src="${msg.data}" class="message-image" onclick="window.open('${msg.data}')">
@@ -420,7 +489,11 @@ const ChatSystem = {
                         if (this.currentChat === friendId) {
                             this.displayMessage(message);
                         } else {
-                            this.updateLastMessage(friendId, message.text || '📷 صورة' || '🎤 بصمة');
+                            let displayText = message.text || '';
+                            if (message.type === 'image') displayText = '📷 صورة';
+                            else if (message.type === 'voice') displayText = '🎤 بصمة';
+                            else if (message.text?.includes('maps.google.com')) displayText = '📍 موقع';
+                            this.updateLastMessage(friendId, displayText);
                         }
                         
                         change.doc.ref.delete();
@@ -443,11 +516,20 @@ const ChatSystem = {
         }
     },
     
-    // ========== دوال المكالمات ==========
+    // ========== دوال المكالمات (معدلة) ==========
     
-    // بدء مكالمة فيديو
+    // ✅ بدء مكالمة فيديو
     async startVideoCall() {
-        if (!this.currentChat || !this.peer) return;
+        if (!this.currentChat || !this.peer) {
+            alert('نظام المكالمات لم يكتمل بعد');
+            return;
+        }
+        
+        const friendPeerId = await this.getFriendPeerId(this.currentChat);
+        if (!friendPeerId) {
+            alert('الصديق غير متصل حالياً');
+            return;
+        }
         
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -455,7 +537,7 @@ const ChatSystem = {
                 audio: true
             });
             
-            const call = this.peer.call(this.currentChat, this.localStream);
+            const call = this.peer.call(friendPeerId, this.localStream);
             this.currentCall = call;
             
             this.showVideoCall(call, this.localStream);
@@ -466,9 +548,18 @@ const ChatSystem = {
         }
     },
     
-    // بدء مكالمة صوتية
+    // ✅ بدء مكالمة صوتية
     async startVoiceCall() {
-        if (!this.currentChat || !this.peer) return;
+        if (!this.currentChat || !this.peer) {
+            alert('نظام المكالمات لم يكتمل بعد');
+            return;
+        }
+        
+        const friendPeerId = await this.getFriendPeerId(this.currentChat);
+        if (!friendPeerId) {
+            alert('الصديق غير متصل حالياً');
+            return;
+        }
         
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -476,7 +567,7 @@ const ChatSystem = {
                 audio: true
             });
             
-            const call = this.peer.call(this.currentChat, this.localStream);
+            const call = this.peer.call(friendPeerId, this.localStream);
             this.currentCall = call;
             
             this.showVoiceCall(call, this.localStream);
@@ -503,11 +594,12 @@ const ChatSystem = {
         
         call.on('close', () => {
             videoContainer.style.display = 'none';
-            this.currentCall = null;
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => track.stop());
-                this.localStream = null;
-            }
+            this.endCall();
+        });
+        
+        call.on('error', (err) => {
+            console.error('خطأ في المكالمة:', err);
+            this.endCall();
         });
     },
     
@@ -527,11 +619,12 @@ const ChatSystem = {
         call.on('close', () => {
             videoContainer.style.display = 'none';
             localVideo.style.display = 'block';
-            this.currentCall = null;
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => track.stop());
-                this.localStream = null;
-            }
+            this.endCall();
+        });
+        
+        call.on('error', (err) => {
+            console.error('خطأ في المكالمة:', err);
+            this.endCall();
         });
     },
     
@@ -540,8 +633,13 @@ const ChatSystem = {
         if (this.currentCall) {
             this.currentCall.close();
         }
+        if (this.localStream) {
+            this.localStream.getTracks().forEach(track => track.stop());
+            this.localStream = null;
+        }
         document.getElementById('videoContainer').style.display = 'none';
         document.getElementById('localVideo').style.display = 'block';
+        this.currentCall = null;
     },
     
     // كتم الميكروفون
@@ -630,8 +728,13 @@ async function loadChats() {
                         const history = JSON.parse(localStorage.getItem(key)) || [];
                         if (history.length > 0) {
                             const last = history[history.length - 1];
-                            if (last.type === 'text') lastMessage = last.text;
-                            else if (last.type === 'image') lastMessage = '📷 صورة';
+                            if (last.type === 'text') {
+                                if (last.text?.includes('maps.google.com')) {
+                                    lastMessage = '📍 موقع';
+                                } else {
+                                    lastMessage = last.text;
+                                }
+                            } else if (last.type === 'image') lastMessage = '📷 صورة';
                             else if (last.type === 'voice') lastMessage = '🎤 بصمة';
                             lastTime = new Date(last.time).toLocaleTimeString('ar-EG', {
                                 hour: '2-digit',
@@ -769,19 +872,33 @@ window.sendVoiceNote = function() {
                 }
             }, 10000);
             
-            alert('جاري التسجيل... اضغط OK للإيقاف');
-            mediaRecorder.stop();
+            alert('🎤 جاري التسجيل... اضغط OK للإيقاف');
+        }).catch(err => {
+            alert('لا يمكن الوصول للميكروفون');
         });
     
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
+// ✅ مشاركة الموقع (معدلة)
 window.shareLocation = function() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((position) => {
-            const locationUrl = `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`;
+            const { latitude, longitude } = position.coords;
+            const locationUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
             ChatSystem.sendMessage(`📍 موقعي: ${locationUrl}`);
+            
+            // عرض الخريطة مباشرة
+            ChatSystem.displayMessage({
+                type: 'text',
+                text: `📍 موقعي: ${locationUrl}`,
+                time: new Date().toISOString()
+            });
+        }, (error) => {
+            alert('خطأ في الحصول على الموقع: ' + error.message);
         });
+    } else {
+        alert('الموقع غير مدعوم في متصفحك');
     }
     document.getElementById('attachmentMenu').style.display = 'none';
 };
@@ -1007,4 +1124,4 @@ if ('Notification' in window) {
     Notification.requestPermission();
 }
 
-console.log('✅ app.js محدث - نظام متكامل مع مكالمات وصور وبصمات');
+console.log('✅ app.js محدث - نظام متكامل مع مكالمات وصور وبصمات وخرائط');
