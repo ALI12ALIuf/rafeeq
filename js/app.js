@@ -59,8 +59,14 @@ function setupNavigation() {
         });
         document.querySelectorAll('.profile-subpage').forEach(sp => sp.style.display = 'none');
         if (pageId === 'chat') loadChats();
+        
+        // إخفاء صفحة المحادثة وإزالة كلاس conversation-open
         const conversationPage = document.getElementById('conversationPage');
-        if (conversationPage) conversationPage.style.display = 'none';
+        if (conversationPage) {
+            conversationPage.style.display = 'none';
+            document.body.classList.remove('conversation-open');
+        }
+        
         navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
         const sideMenu = document.getElementById('sideMenu');
         if (sideMenu) sideMenu.classList.remove('open');
@@ -142,7 +148,7 @@ function loadStories() {
     `).join('');
 }
 
-// ========== نظام الدردشة المتكامل ==========
+// ========== نظام الدردشة المتكامل (مثل واتساب) ==========
 
 const ChatSystem = {
     currentChat: null,
@@ -188,19 +194,36 @@ const ChatSystem = {
         }
     },
     
+    // فتح المحادثة (معدل)
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
+        
+        // إضافة كلاس للـ body لإخفاء القوائم
+        document.body.classList.add('conversation-open');
+        
+        // تحديث واجهة المحادثة
         const nameElement = document.getElementById('conversationName');
         const avatarElement = document.getElementById('conversationAvatar');
+        const statusElement = document.getElementById('conversationStatus');
+        
         if (nameElement) nameElement.textContent = friendName;
         if (avatarElement) avatarElement.textContent = friendAvatar || '👤';
+        if (statusElement) statusElement.textContent = 'متصل الآن';
         
+        // إظهار صفحة المحادثة
         document.querySelector('.chat-page').style.display = 'none';
-        document.getElementById('conversationPage').style.display = 'block';
+        document.getElementById('conversationPage').style.display = 'flex';
         
         this.displayMessages(friendId);
         this.listenForNewMessages(friendId);
         
+        // التركيز على حقل الإدخال
+        setTimeout(() => {
+            const input = document.getElementById('messageInput');
+            if (input) input.focus();
+        }, 300);
+        
+        // التمرير لآخر رسالة
         setTimeout(() => {
             const container = document.getElementById('messagesContainer');
             if (container) container.scrollTop = container.scrollHeight;
@@ -215,31 +238,69 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
+    // عرض الرسالة مع الحالة (معدل)
     displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
         
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
+        messageDiv.id = `msg-${msg.id}`;
+        
+        const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // إضافة حالة الرسالة
+        let statusHtml = '';
+        if (msg.sender === 'me') {
+            let statusIcon = '';
+            let statusClass = '';
+            
+            if (msg.status === 'sending') {
+                statusIcon = '⏳';
+                statusClass = 'sending';
+            } else if (msg.status === 'sent') {
+                statusIcon = '✓';
+                statusClass = 'sent';
+            } else if (msg.status === 'delivered') {
+                statusIcon = '✓✓';
+                statusClass = 'delivered';
+            } else if (msg.status === 'read') {
+                statusIcon = '✓✓';
+                statusClass = 'read';
+            } else {
+                statusIcon = '✓';
+                statusClass = 'sent';
+            }
+            
+            statusHtml = `<span class="message-status ${statusClass}">${statusIcon}</span>`;
+        }
         
         if (msg.type === 'text') {
-            const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
             messageDiv.innerHTML = `
                 <div class="message-content">${this.escapeHtml(msg.text)}</div>
-                <div class="message-time">${time}</div>
+                <div class="message-info">
+                    <span class="message-time">${time}</span>
+                    ${statusHtml}
+                </div>
             `;
         } else if (msg.type === 'image') {
             messageDiv.innerHTML = `
                 <img src="${msg.data}" class="message-image" onclick="window.open('${msg.data}')">
-                <div class="message-time">${new Date(msg.time).toLocaleTimeString()}</div>
+                <div class="message-info">
+                    <span class="message-time">${time}</span>
+                    ${statusHtml}
+                </div>
             `;
         } else if (msg.type === 'voice') {
             messageDiv.innerHTML = `
                 <audio controls src="${msg.data}" class="message-audio"></audio>
-                <div class="message-time">${new Date(msg.time).toLocaleTimeString()}</div>
+                <div class="message-info">
+                    <span class="message-time">${time}</span>
+                    ${statusHtml}
+                </div>
             `;
         }
         
@@ -247,58 +308,83 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
+    // إرسال رسالة مع حالة (معدل)
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
+        const messageId = Date.now().toString();
         const message = {
+            id: messageId,
             type: 'text',
             text: text,
             sender: 'me',
             time: new Date().toISOString(),
-            id: Date.now()
+            status: 'sending'
         };
         
-        this.saveMessage(this.currentChat, message);
+        // عرض الرسالة فوراً
         this.displayMessage(message);
         
+        // حفظ في localStorage
+        this.saveMessage(this.currentChat, message);
+        
+        // محاولة الإرسال عبر Firebase
         try {
-            await window.db.collection('temp_messages').add({
+            const docRef = await window.db.collection('temp_messages').add({
                 to: this.currentChat,
                 from: window.auth.currentUser.uid,
                 message: message,
                 timestamp: new Date(),
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
+            
+            // تحديث حالة الرسالة إلى "مرسلة"
+            this.updateMessageStatus(messageId, 'sent');
+            
+            // مراقبة وصول الرسالة
+            this.waitForDelivery(messageId, docRef.id);
+            
         } catch (error) {
             console.error('خطأ في إرسال الرسالة:', error);
+            this.updateMessageStatus(messageId, 'error');
         }
+        
         return true;
     },
     
+    // إرسال صورة مع حالة
     async sendImage(file) {
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = async (e) => {
+                const messageId = Date.now().toString();
                 const message = {
+                    id: messageId,
                     type: 'image',
                     data: e.target.result,
                     sender: 'me',
                     time: new Date().toISOString(),
-                    id: Date.now()
+                    status: 'sending'
                 };
-                this.saveMessage(this.currentChat, message);
+                
                 this.displayMessage(message);
+                this.saveMessage(this.currentChat, message);
                 
                 try {
-                    await window.db.collection('temp_messages').add({
+                    const docRef = await window.db.collection('temp_messages').add({
                         to: this.currentChat,
                         from: window.auth.currentUser.uid,
                         message: message,
                         timestamp: new Date(),
                         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
                     });
+                    
+                    this.updateMessageStatus(messageId, 'sent');
+                    this.waitForDelivery(messageId, docRef.id);
+                    
                 } catch (error) {
                     console.error('خطأ في إرسال الصورة:', error);
+                    this.updateMessageStatus(messageId, 'error');
                 }
                 resolve();
             };
@@ -306,35 +392,114 @@ const ChatSystem = {
         });
     },
     
+    // إرسال بصمة صوتية مع حالة
     async sendVoiceNote(audioBlob) {
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = async (e) => {
+                const messageId = Date.now().toString();
                 const message = {
+                    id: messageId,
                     type: 'voice',
                     data: e.target.result,
                     sender: 'me',
                     time: new Date().toISOString(),
-                    id: Date.now()
+                    status: 'sending'
                 };
-                this.saveMessage(this.currentChat, message);
+                
                 this.displayMessage(message);
+                this.saveMessage(this.currentChat, message);
                 
                 try {
-                    await window.db.collection('temp_messages').add({
+                    const docRef = await window.db.collection('temp_messages').add({
                         to: this.currentChat,
                         from: window.auth.currentUser.uid,
                         message: message,
                         timestamp: new Date(),
                         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
                     });
+                    
+                    this.updateMessageStatus(messageId, 'sent');
+                    this.waitForDelivery(messageId, docRef.id);
+                    
                 } catch (error) {
                     console.error('خطأ في إرسال البصمة:', error);
+                    this.updateMessageStatus(messageId, 'error');
                 }
                 resolve();
             };
             reader.readAsDataURL(audioBlob);
         });
+    },
+    
+    // تحديث حالة الرسالة
+    updateMessageStatus(messageId, status) {
+        const messageElement = document.getElementById(`msg-${messageId}`);
+        if (!messageElement) return;
+        
+        const statusElement = messageElement.querySelector('.message-status');
+        if (!statusElement) return;
+        
+        statusElement.className = `message-status ${status}`;
+        
+        if (status === 'sending') {
+            statusElement.innerHTML = '⏳';
+        } else if (status === 'sent') {
+            statusElement.innerHTML = '✓';
+        } else if (status === 'delivered') {
+            statusElement.innerHTML = '✓✓';
+        } else if (status === 'read') {
+            statusElement.innerHTML = '✓✓';
+            statusElement.style.color = '#4fc3f7';
+        } else if (status === 'error') {
+            statusElement.innerHTML = '⚠️';
+            statusElement.style.color = '#f44336';
+        }
+        
+        // تحديث في localStorage
+        this.updateMessageStatusInStorage(messageId, status);
+    },
+    
+    // تحديث حالة الرسالة في localStorage
+    updateMessageStatusInStorage(messageId, status) {
+        const key = `chat_${this.currentChat}`;
+        try {
+            let history = JSON.parse(localStorage.getItem(key)) || [];
+            history = history.map(msg => {
+                if (msg.id === messageId) {
+                    return { ...msg, status: status };
+                }
+                return msg;
+            });
+            localStorage.setItem(key, JSON.stringify(history));
+            this.messages[this.currentChat] = history;
+        } catch (e) {
+            console.error('خطأ في تحديث الحالة:', e);
+        }
+    },
+    
+    // انتظار وصول الرسالة
+    waitForDelivery(messageId, firebaseDocId) {
+        // مراقبة تغييرات حالة الرسالة
+        const unsubscribe = window.db.collection('temp_messages')
+            .doc(firebaseDocId)
+            .onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data.delivered) {
+                        this.updateMessageStatus(messageId, 'delivered');
+                    }
+                    if (data.read) {
+                        this.updateMessageStatus(messageId, 'read');
+                        unsubscribe();
+                    }
+                }
+            });
+        
+        // إذا لم تصل بعد 5 ثواني، اعتبر أنها وصلت
+        setTimeout(() => {
+            this.updateMessageStatus(messageId, 'delivered');
+        }, 5000);
     },
     
     saveMessage(friendId, message) {
@@ -360,17 +525,83 @@ const ChatSystem = {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
                         const data = change.doc.data();
+                        
+                        // تحديث حالة الرسالة إلى "تم التوصيل"
+                        if (data.message && data.message.id) {
+                            this.updateMessageStatusFromFriend(data.message.id, 'delivered');
+                        }
+                        
                         const message = { ...data.message, sender: 'friend' };
                         this.saveMessage(friendId, message);
+                        
                         if (this.currentChat === friendId) {
                             this.displayMessage(message);
+                            
+                            // إرسال إشعار بالقراءة
+                            setTimeout(() => {
+                                this.markAsRead(data.message.id, change.doc.id);
+                            }, 1000);
+                            
                         } else {
                             this.updateLastMessage(friendId, message.text || '📷 صورة' || '🎤 بصمة');
                         }
+                        
                         change.doc.ref.delete();
                     }
                 });
             });
+    },
+    
+    // تحديث حالة الرسالة من الصديق
+    updateMessageStatusFromFriend(messageId, status) {
+        const key = `chat_${this.currentChat}`;
+        try {
+            let history = JSON.parse(localStorage.getItem(key)) || [];
+            let updated = false;
+            
+            history = history.map(msg => {
+                if (msg.id === messageId && msg.sender === 'me') {
+                    updated = true;
+                    return { ...msg, status: status };
+                }
+                return msg;
+            });
+            
+            if (updated) {
+                localStorage.setItem(key, JSON.stringify(history));
+                this.messages[this.currentChat] = history;
+                
+                // تحديث الواجهة
+                const msgElement = document.getElementById(`msg-${messageId}`);
+                if (msgElement) {
+                    const statusElement = msgElement.querySelector('.message-status');
+                    if (statusElement) {
+                        statusElement.className = `message-status ${status}`;
+                        if (status === 'delivered') {
+                            statusElement.innerHTML = '✓✓';
+                        } else if (status === 'read') {
+                            statusElement.innerHTML = '✓✓';
+                            statusElement.style.color = '#4fc3f7';
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('خطأ في تحديث الحالة:', e);
+        }
+    },
+    
+    // تحديد الرسالة كمقروءة
+    async markAsRead(messageId, firebaseDocId) {
+        try {
+            await window.db.collection('temp_messages').doc(firebaseDocId).update({
+                read: true,
+                readAt: new Date()
+            });
+            this.updateMessageStatus(messageId, 'read');
+        } catch (error) {
+            console.error('خطأ في تحديث حالة القراءة:', error);
+        }
     },
     
     updateLastMessage(friendId, lastMessage) {
@@ -484,8 +715,13 @@ const ChatSystem = {
         }
     },
     
+    // إغلاق المحادثة (معدل)
     closeChat() {
         if (this.currentCall) this.endCall();
+        
+        // إزالة كلاس الـ body
+        document.body.classList.remove('conversation-open');
+        
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
         this.currentChat = null;
@@ -535,6 +771,7 @@ async function loadChats() {
                     const key = `chat_${friendId}`;
                     let lastMessage = 'اضغط لبدء المحادثة';
                     let lastTime = '';
+                    let unreadCount = 0;
                     
                     try {
                         const history = JSON.parse(localStorage.getItem(key)) || [];
@@ -547,8 +784,16 @@ async function loadChats() {
                                 hour: '2-digit',
                                 minute: '2-digit'
                             });
+                            
+                            // حساب الرسائل غير المقروءة
+                            unreadCount = history.filter(msg => 
+                                msg.sender === 'friend' && msg.status !== 'read'
+                            ).length;
                         }
                     } catch (e) {}
+                    
+                    const unreadBadge = unreadCount > 0 ? 
+                        `<span class="unread-badge">${unreadCount}</span>` : '';
                     
                     html += `
                         <div class="chat-item" onclick="openChat('${friendId}')">
@@ -557,7 +802,10 @@ async function loadChats() {
                                 <h4>${friend.name || 'مستخدم'}</h4>
                                 <p class="last-message">${lastMessage}</p>
                             </div>
-                            <span class="chat-time">${lastTime || ''}</span>
+                            <div class="chat-meta">
+                                <span class="chat-time">${lastTime || ''}</span>
+                                ${unreadBadge}
+                            </div>
                         </div>
                     `;
                 }
@@ -586,6 +834,12 @@ function setupChatListeners() {
         const attachBtn = document.querySelector('.attach-btn');
         if (menu && attachBtn && !menu.contains(e.target) && !attachBtn.contains(e.target)) {
             menu.style.display = 'none';
+        }
+        
+        const emojiPicker = document.getElementById('emojiPicker');
+        const emojiBtn = document.querySelector('.emoji-btn');
+        if (emojiPicker && emojiBtn && !emojiPicker.contains(e.target) && !emojiBtn.contains(e.target)) {
+            emojiPicker.style.display = 'none';
         }
     });
     
@@ -628,13 +882,53 @@ window.sendMessage = function() {
 };
 
 window.handleMessageKeyPress = function(event) {
-    if (event.key === 'Enter') window.sendMessage();
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        window.sendMessage();
+    }
 };
 
 window.showAttachmentMenu = function() {
     const menu = document.getElementById('attachmentMenu');
     menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+    
+    // إخفاء منتقي الإيموجي إذا كان ظاهراً
+    const emojiPicker = document.getElementById('emojiPicker');
+    if (emojiPicker) emojiPicker.style.display = 'none';
 };
+
+window.showEmojiPicker = function() {
+    const picker = document.getElementById('emojiPicker');
+    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+    
+    // إخفاء قائمة المرفقات إذا كانت ظاهرة
+    const menu = document.getElementById('attachmentMenu');
+    if (menu) menu.style.display = 'none';
+    
+    // تحميل الإيموجيات إذا كانت فارغة
+    if (picker.querySelector('.emoji-grid').children.length === 0) {
+        loadEmojis();
+    }
+};
+
+// تحميل الإيموجيات
+function loadEmojis() {
+    const emojis = ['😊', '😂', '❤️', '👍', '🎉', '😢', '😡', '😍', '🤔', '👌', '🙏', '🔥', '✨', '⭐', '🌙', '☀️'];
+    const grid = document.querySelector('.emoji-grid');
+    if (!grid) return;
+    
+    emojis.forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.textContent = emoji;
+        btn.onclick = () => {
+            const input = document.getElementById('messageInput');
+            input.value += emoji;
+            input.focus();
+            document.getElementById('emojiPicker').style.display = 'none';
+        };
+        grid.appendChild(btn);
+    });
+}
 
 window.sendImage = function() {
     const input = document.createElement('input');
@@ -662,12 +956,30 @@ window.sendVoiceNote = function() {
             };
             
             mediaRecorder.start();
-            setTimeout(() => {
-                if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-            }, 10000);
             
-            alert('جاري التسجيل... اضغط OK للإيقاف');
-            mediaRecorder.stop();
+            // تغيير زر الإرسال إلى زر إيقاف
+            const sendBtn = document.querySelector('.send-btn');
+            const voiceBtn = document.querySelector('.voice-btn');
+            if (sendBtn) sendBtn.style.display = 'none';
+            if (voiceBtn) {
+                voiceBtn.style.display = 'flex';
+                voiceBtn.onclick = () => {
+                    if (mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        sendBtn.style.display = 'flex';
+                        voiceBtn.style.display = 'none';
+                    }
+                };
+            }
+            
+            // إيقاف التسجيل تلقائياً بعد 60 ثانية
+            setTimeout(() => {
+                if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    if (sendBtn) sendBtn.style.display = 'flex';
+                    if (voiceBtn) voiceBtn.style.display = 'none';
+                }
+            }, 60000);
         });
     document.getElementById('attachmentMenu').style.display = 'none';
 };
@@ -679,6 +991,11 @@ window.shareLocation = function() {
             ChatSystem.sendMessage(`📍 موقعي: ${locationUrl}`);
         });
     }
+    document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+window.sendDocument = function() {
+    alert('ميزة إرسال المستندات قيد التطوير');
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
@@ -696,6 +1013,12 @@ window.endCall = function() { ChatSystem.endCall(); };
 window.toggleMute = function() { ChatSystem.toggleMute(); };
 window.toggleCamera = function() { ChatSystem.toggleCamera(); };
 window.closeConversation = function() { ChatSystem.closeChat(); };
+window.viewContactInfo = function() {
+    alert('معلومات الاتصال - قيد التطوير');
+};
+window.showMoreOptions = function() {
+    alert('خيارات إضافية - قيد التطوير');
+};
 
 // ========== باقي الدوال (بدون تغيير) ==========
 
@@ -860,4 +1183,4 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - نظام متكامل مع مكالمات وصور وبصمات');
+console.log('✅ app.js محدث - نظام متكامل مثل واتساب');
