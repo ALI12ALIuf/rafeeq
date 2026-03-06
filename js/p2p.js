@@ -1,4 +1,5 @@
-// js/p2p.js - نظام اتصال P2P متكامل
+// ========== نظام اتصال P2P متكامل ==========
+
 class P2PCallSystem {
     constructor() {
         this.peerConnection = null;
