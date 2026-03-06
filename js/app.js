@@ -216,94 +216,18 @@ const CallSystem = {
     }
 };
 
-// ========== نظام الدردشة المتكامل ==========
+// ========== نظام الدردشة المتكامل (بدون PeerJS) ==========
 
 const ChatSystem = {
     currentChat: null,
     messages: {},
-    peer: null,
     currentCall: null,
     localStream: null,
-    callConnected: false,
+    callActive: false,
     
     init() {
         this.loadAllChats();
         CallSystem.init();
-        this.initPeer();
-    },
-    
-    async initPeer() {
-        if (!window.auth?.currentUser) return;
-        
-        if (typeof Peer === 'undefined') {
-            console.log('⏳ انتظار تحميل PeerJS...');
-            setTimeout(() => this.initPeer(), 1000);
-            return;
-        }
-        
-        try {
-            const peerId = `rafeeq_${window.auth.currentUser.uid}`;
-            this.peer = new Peer(peerId);
-            
-            this.peer.on('open', async (id) => {
-                console.log('✅ PeerJS جاهز:', id);
-                
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    peerId: id,
-                    online: true,
-                    lastSeen: new Date()
-                });
-            });
-            
-            this.peer.on('call', (call) => {
-                // اهتزاز
-                if (navigator.vibrate) {
-                    navigator.vibrate([1000, 500, 1000]);
-                }
-                
-                // إشعار
-                if (Notification.permission === 'granted') {
-                    new Notification('📞 مكالمة واردة', {
-                        body: 'شخص يتصل بك...',
-                        icon: '/icon.png'
-                    });
-                }
-                
-                const answer = confirm('📞 مكالمة واردة. هل تريد الرد؟');
-                
-                if (answer) {
-                    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                        .then(stream => {
-                            this.localStream = stream;
-                            call.answer(stream);
-                            this.currentCall = call;
-                            this.callConnected = true;
-                            this.showVideoCall(call, stream);
-                        }).catch(err => {
-                            alert('لا يمكن الوصول للكاميرا: ' + err.message);
-                        });
-                } else {
-                    call.close();
-                }
-            });
-            
-            this.peer.on('error', (err) => {
-                console.error('❌ خطأ PeerJS:', err);
-            });
-            
-        } catch (error) {
-            console.error('❌ فشل تهيئة PeerJS:', error);
-        }
-    },
-    
-    async getFriendPeerId(friendId) {
-        try {
-            const doc = await window.db.collection('users').doc(friendId).get();
-            return doc.exists ? doc.data().peerId : null;
-        } catch (error) {
-            console.error('خطأ في جلب peerId:', error);
-            return null;
-        }
     },
     
     loadAllChats() {
@@ -566,181 +490,10 @@ const ChatSystem = {
         }
     },
     
-    // ========== دوال المكالمات المتطورة ==========
-    
-    async startVideoCall() {
-        if (!this.currentChat || !this.peer) {
-            alert('❌ نظام المكالمات لم يكتمل بعد');
-            return;
-        }
-        
-        if (!CallSystem.isFriendOnline(this.currentChat)) {
-            alert('⚠️ الصديق غير متصل حالياً');
-            return;
-        }
-        
-        const friendPeerId = await this.getFriendPeerId(this.currentChat);
-        if (!friendPeerId) {
-            alert('⚠️ الصديق غير متصل (لا يوجد معرف مكالمات)');
-            return;
-        }
-        
-        try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true
-            });
-            
-            const call = this.peer.call(friendPeerId, this.localStream);
-            this.currentCall = call;
-            this.callConnected = false;
-            
-            this.showVideoCall(call, this.localStream);
-            
-            // مهلة 30 ثانية
-            setTimeout(() => {
-                if (this.currentCall && !this.callConnected) {
-                    this.endCall();
-                    alert('⏰ لم يتم الرد على المكالمة');
-                }
-            }, 30000);
-            
-        } catch (error) {
-            console.error('خطأ في بدء المكالمة:', error);
-            alert('❌ لا يمكن الوصول إلى الكاميرا');
-        }
-    },
-    
-    async startVoiceCall() {
-        if (!this.currentChat || !this.peer) {
-            alert('❌ نظام المكالمات لم يكتمل بعد');
-            return;
-        }
-        
-        if (!CallSystem.isFriendOnline(this.currentChat)) {
-            alert('⚠️ الصديق غير متصل حالياً');
-            return;
-        }
-        
-        const friendPeerId = await this.getFriendPeerId(this.currentChat);
-        if (!friendPeerId) {
-            alert('⚠️ الصديق غير متصل');
-            return;
-        }
-        
-        try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: false,
-                audio: true
-            });
-            
-            const call = this.peer.call(friendPeerId, this.localStream);
-            this.currentCall = call;
-            this.callConnected = false;
-            
-            this.showVoiceCall(call, this.localStream);
-            
-            setTimeout(() => {
-                if (this.currentCall && !this.callConnected) {
-                    this.endCall();
-                    alert('⏰ لم يتم الرد على المكالمة');
-                }
-            }, 30000);
-            
-        } catch (error) {
-            console.error('خطأ في بدء المكالمة:', error);
-            alert('❌ لا يمكن الوصول إلى الميكروفون');
-        }
-    },
-    
-    showVideoCall(call, stream) {
-        const videoContainer = document.getElementById('videoContainer');
-        const localVideo = document.getElementById('localVideo');
-        const remoteVideo = document.getElementById('remoteVideo');
-        
-        localVideo.srcObject = stream;
-        
-        call.on('stream', (remoteStream) => {
-            remoteVideo.srcObject = remoteStream;
-            this.callConnected = true;
-        });
-        
-        videoContainer.style.display = 'flex';
-        
-        call.on('close', () => {
-            videoContainer.style.display = 'none';
-            this.endCall();
-        });
-        
-        call.on('error', (err) => {
-            console.error('خطأ في المكالمة:', err);
-            this.endCall();
-        });
-    },
-    
-    showVoiceCall(call, stream) {
-        const videoContainer = document.getElementById('videoContainer');
-        const localVideo = document.getElementById('localVideo');
-        
-        localVideo.style.display = 'none';
-        
-        call.on('stream', (remoteStream) => {
-            this.callConnected = true;
-        });
-        
-        videoContainer.style.display = 'flex';
-        
-        call.on('close', () => {
-            videoContainer.style.display = 'none';
-            localVideo.style.display = 'block';
-            this.endCall();
-        });
-        
-        call.on('error', (err) => {
-            console.error('خطأ في المكالمة:', err);
-            this.endCall();
-        });
-    },
-    
-    endCall() {
-        if (this.currentCall) {
-            this.currentCall.close();
-        }
-        if (this.localStream) {
-            this.localStream.getTracks().forEach(track => track.stop());
-            this.localStream = null;
-        }
-        document.getElementById('videoContainer').style.display = 'none';
-        document.getElementById('localVideo').style.display = 'block';
-        this.currentCall = null;
-        this.callConnected = false;
-    },
-    
-    toggleMute() {
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                const btn = document.querySelector('.call-controls button:nth-child(2) i');
-                if (btn) btn.className = audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
-            }
-        }
-    },
-    
-    toggleCamera() {
-        if (this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                const btn = document.querySelector('.call-controls button:nth-child(3) i');
-                if (btn) btn.className = videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
-            }
-        }
-    },
-    
+    // إغلاق المحادثة
     closeChat() {
-        if (this.currentCall) {
-            this.endCall();
+        if (this.callActive && typeof p2pCall !== 'undefined') {
+            p2pCall.endCall();
         }
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
@@ -969,33 +722,48 @@ window.shareLocation = function() {
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-// دوال المكالمات
-window.toggleVoiceCall = function() {
-    if (ChatSystem.currentCall) {
-        ChatSystem.endCall();
+// ========== دوال المكالمات (مربوطة مع p2p.js) ==========
+
+window.startVideoCall = function() {
+    if (ChatSystem.currentChat) {
+        if (typeof p2pCall !== 'undefined') {
+            p2pCall.startVideoCall(ChatSystem.currentChat);
+        } else {
+            alert('نظام المكالمات قيد التحميل...');
+        }
     } else {
-        ChatSystem.startVoiceCall();
+        alert('لا توجد محادثة مفتوحة');
     }
 };
 
-window.toggleVideoCall = function() {
-    if (ChatSystem.currentCall) {
-        ChatSystem.endCall();
+window.startVoiceCall = function() {
+    if (ChatSystem.currentChat) {
+        if (typeof p2pCall !== 'undefined') {
+            p2pCall.startVoiceCall(ChatSystem.currentChat);
+        } else {
+            alert('نظام المكالمات قيد التحميل...');
+        }
     } else {
-        ChatSystem.startVideoCall();
+        alert('لا توجد محادثة مفتوحة');
     }
 };
 
 window.endCall = function() {
-    ChatSystem.endCall();
+    if (typeof p2pCall !== 'undefined') {
+        p2pCall.endCall();
+    }
 };
 
 window.toggleMute = function() {
-    ChatSystem.toggleMute();
+    if (typeof p2pCall !== 'undefined') {
+        p2pCall.toggleMute();
+    }
 };
 
 window.toggleCamera = function() {
-    ChatSystem.toggleCamera();
+    if (typeof p2pCall !== 'undefined') {
+        p2pCall.toggleCamera();
+    }
 };
 
 window.closeConversation = function() {
@@ -1190,4 +958,4 @@ if ('Notification' in window) {
     Notification.requestPermission();
 }
 
-console.log('✅ app.js محدث - نظام متكامل مع مكالمات متطورة');
+console.log('✅ app.js محدث - نظام متكامل مع P2P مبسط');
