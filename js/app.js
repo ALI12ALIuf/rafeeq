@@ -1,3 +1,38 @@
+// ========== تهيئة نظام P2P ==========
+let p2pCall = null;
+
+// تهيئة نظام المكالمات
+function initP2PCallSystem() {
+    // التأكد من وجود الكلاس
+    if (typeof P2PCallSystem !== 'undefined' && !p2pCall) {
+        try {
+            p2pCall = new P2PCallSystem();
+            console.log('✅ نظام P2P جاهز');
+        } catch (error) {
+            console.error('❌ خطأ في تهيئة P2P:', error);
+        }
+    } else if (typeof P2PCallSystem === 'undefined') {
+        console.log('⏳ P2PCallSystem غير موجود بعد، انتظر...');
+        setTimeout(initP2PCallSystem, 1000);
+    }
+}
+
+// محاولة التهيئة بعد تحميل الصفحة
+setTimeout(initP2PCallSystem, 2000);
+
+// وإذا المستخدم سجل دخول، حاول مرة أخرى
+if (window.auth) {
+    const originalOnAuthStateChanged = window.auth.onAuthStateChanged;
+    window.auth.onAuthStateChanged = function(callback) {
+        return originalOnAuthStateChanged.call(this, async (user) => {
+            if (user) {
+                setTimeout(initP2PCallSystem, 3000);
+            }
+            if (callback) callback(user);
+        });
+    };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('App loaded, setting up navigation...');
     ensureSinglePage();
@@ -725,43 +760,69 @@ window.shareLocation = function() {
 // ========== دوال المكالمات (مربوطة مع p2p.js) ==========
 
 window.startVideoCall = function() {
-    if (ChatSystem.currentChat) {
-        if (typeof p2pCall !== 'undefined') {
-            p2pCall.startVideoCall(ChatSystem.currentChat);
-        } else {
-            alert('نظام المكالمات قيد التحميل...');
-        }
-    } else {
-        alert('لا توجد محادثة مفتوحة');
+    console.log('🚀 محاولة بدء مكالمة فيديو');
+    
+    if (!ChatSystem.currentChat) {
+        alert('❌ لا توجد محادثة مفتوحة');
+        return;
     }
+    
+    if (!p2pCall) {
+        console.log('⏳ نظام P2P ليس جاهزاً، محاولة التهيئة...');
+        initP2PCallSystem();
+        
+        setTimeout(() => {
+            if (p2pCall) {
+                p2pCall.startVideoCall(ChatSystem.currentChat);
+            } else {
+                alert('❌ نظام المكالمات لم يكتمل بعد، حاول مرة أخرى');
+            }
+        }, 1500);
+        return;
+    }
+    
+    p2pCall.startVideoCall(ChatSystem.currentChat);
 };
 
 window.startVoiceCall = function() {
-    if (ChatSystem.currentChat) {
-        if (typeof p2pCall !== 'undefined') {
-            p2pCall.startVoiceCall(ChatSystem.currentChat);
-        } else {
-            alert('نظام المكالمات قيد التحميل...');
-        }
-    } else {
-        alert('لا توجد محادثة مفتوحة');
+    console.log('🚀 محاولة بدء مكالمة صوتية');
+    
+    if (!ChatSystem.currentChat) {
+        alert('❌ لا توجد محادثة مفتوحة');
+        return;
     }
+    
+    if (!p2pCall) {
+        console.log('⏳ نظام P2P ليس جاهزاً، محاولة التهيئة...');
+        initP2PCallSystem();
+        
+        setTimeout(() => {
+            if (p2pCall) {
+                p2pCall.startVoiceCall(ChatSystem.currentChat);
+            } else {
+                alert('❌ نظام المكالمات لم يكتمل بعد، حاول مرة أخرى');
+            }
+        }, 1500);
+        return;
+    }
+    
+    p2pCall.startVoiceCall(ChatSystem.currentChat);
 };
 
 window.endCall = function() {
-    if (typeof p2pCall !== 'undefined') {
+    if (p2pCall) {
         p2pCall.endCall();
     }
 };
 
 window.toggleMute = function() {
-    if (typeof p2pCall !== 'undefined') {
+    if (p2pCall) {
         p2pCall.toggleMute();
     }
 };
 
 window.toggleCamera = function() {
-    if (typeof p2pCall !== 'undefined') {
+    if (p2pCall) {
         p2pCall.toggleCamera();
     }
 };
