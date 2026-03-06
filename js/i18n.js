@@ -1,4 +1,3 @@
-// نظام الترجمة
 const i18n = {
     currentLang: localStorage.getItem('language') || 'ar',
     
@@ -38,7 +37,7 @@ const i18n = {
             accept: 'قبول',
             reject: 'رفض',
             friends_list: 'قائمة الأصدقاء',
-            no_friends: 'لا يوجد أصدقاء بعد',
+            no_friends: 'لا يوجد أصدقاء',
             add_first_friend: 'أضف أول صديق',
             no_requests: 'لا توجد طلبات صداقة',
             connecting: 'جاري الاتصال...',
@@ -66,13 +65,11 @@ const i18n = {
             arabic: 'العربية',
             english: 'English',
             
-            // ترجمات نافذة التعديل
             name: 'الاسم',
             avatar: 'الصورة الرمزية',
             change_avatar: 'تغيير',
             choose_avatar: 'اختر صورتك الرمزية',
             
-            // ترجمات الأفاتار
             male: 'رجل',
             female: 'امرأة',
             boy: 'ولد',
@@ -82,7 +79,6 @@ const i18n = {
             grandfather: 'جد',
             grandmother: 'جدة',
             
-            // الترجمات القديمة
             no_trips: 'لا توجد رحلات',
             no_trips_desc: 'لم تقم بأي رحلة بعد',
             no_followers: 'لا يوجد متابعين',
@@ -90,11 +86,29 @@ const i18n = {
             no_following: 'لا تتابع أحداً',
             no_following_desc: 'لم تتابع أي شخص بعد',
             
-            // ترجمات البحث الجديدة - بالعربية
             search_placeholder: 'البحث عن الأصدقاء',
             search_no_user: 'لا يوجد مستخدم',
             search_yourself: 'هذا حسابك الشخصي',
-            search_error: 'حدث خطأ بالبحث حاول مرة ثانية'
+            search_error: 'حدث خطأ بالبحث حاول مرة ثانية',
+            searching: 'جاري البحث...',
+            
+            friend_requests: 'طلبات الصداقة',
+            no_friend_requests: 'لا توجد طلبات صداقة',
+            no_friend_requests_desc: 'لم يرسل لك أحد طلب صداقة بعد',
+            request_sent: 'تم إرسال طلب الصداقة بنجاح',
+            request_error: 'حدث خطأ في إرسال الطلب',
+            request_pending: 'طلب معلق',
+            already_friends: 'أصدقاء بالفعل',
+            accept_request: 'قبول الطلب',
+            reject_request: 'رفض الطلب',
+            request_accepted: 'تم قبول طلب الصداقة بنجاح',
+            request_rejected: 'تم رفض الطلب',
+            friends: 'أصدقاء',
+            friends_count: 'الأصدقاء',
+            friend_added: 'تمت إضافة الصديق بنجاح',
+            friend_removed: 'تم إزالة الصديق',
+            friend_request_exists: 'لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً',
+            cannot_add_self: 'لا يمكنك إضافة نفسك كصديق'
         },
         en: {
             app_name: 'Rafeeq',
@@ -159,13 +173,11 @@ const i18n = {
             arabic: 'Arabic',
             english: 'English',
             
-            // Edit window translations
             name: 'Name',
             avatar: 'Avatar',
             change_avatar: 'Change',
             choose_avatar: 'Choose Avatar',
             
-            // Avatar translations
             male: 'Male',
             female: 'Female',
             boy: 'Boy',
@@ -175,7 +187,6 @@ const i18n = {
             grandfather: 'Grandfather',
             grandmother: 'Grandmother',
             
-            // Old translations
             no_trips: 'No Trips',
             no_trips_desc: "You haven't taken any trips yet",
             no_followers: 'No Followers',
@@ -183,11 +194,29 @@ const i18n = {
             no_following: 'Not Following',
             no_following_desc: "You aren't following anyone yet",
             
-            // New search translations - English
             search_placeholder: 'Search for friends',
             search_no_user: 'No user found',
             search_yourself: 'This is your account',
-            search_error: 'Search error, please try again'
+            search_error: 'Search error, please try again',
+            searching: 'Searching...',
+            
+            friend_requests: 'Friend Requests',
+            no_friend_requests: 'No friend requests',
+            no_friend_requests_desc: 'No one has sent you a friend request yet',
+            request_sent: 'Friend request sent successfully',
+            request_error: 'Error sending friend request',
+            request_pending: 'Request pending',
+            already_friends: 'Already friends',
+            accept_request: 'Accept request',
+            reject_request: 'Reject request',
+            request_accepted: 'Friend request accepted successfully',
+            request_rejected: 'Request rejected',
+            friends: 'Friends',
+            friends_count: 'Friends',
+            friend_added: 'Friend added successfully',
+            friend_removed: 'Friend removed',
+            friend_request_exists: 'You have already sent a friend request to this user',
+            cannot_add_self: 'You cannot add yourself as a friend'
         }
     },
     
@@ -202,37 +231,30 @@ const i18n = {
     },
     
     applyLanguage() {
-        // تحديث جميع العناصر التي تحمل data-i18n
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             el.textContent = this.t(key);
         });
         
-        // تحديث placeholders
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             const key = el.getAttribute('data-i18n-placeholder');
             el.placeholder = this.t(key);
         });
         
-        // تحديث سمات مثل title
         document.querySelectorAll('[data-i18n-title]').forEach(el => {
             const key = el.getAttribute('data-i18n-title');
             el.title = this.t(key);
         });
         
         localStorage.setItem('language', this.currentLang);
-        
-        // إرسال حدث تغيير اللغة
         document.dispatchEvent(new Event('languageChanged'));
     },
     
     setupLanguageObserver() {
-        // مراقبة العناصر الجديدة
         const observer = new MutationObserver((mutations) => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === 1) {
-                        // تطبيق الترجمة على العنصر الجديد نفسه
                         if (node.hasAttribute && node.hasAttribute('data-i18n')) {
                             const key = node.getAttribute('data-i18n');
                             node.textContent = this.t(key);
@@ -241,8 +263,6 @@ const i18n = {
                             const key = node.getAttribute('data-i18n-placeholder');
                             node.placeholder = this.t(key);
                         }
-                        
-                        // تطبيق الترجمة على العناصر الفرعية
                         if (node.querySelectorAll) {
                             node.querySelectorAll('[data-i18n]').forEach(el => {
                                 const key = el.getAttribute('data-i18n');
@@ -257,18 +277,12 @@ const i18n = {
                 });
             });
         });
-        
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 };
 
-// تهيئة الترجمة
 i18n.init();
 
-// دالة تغيير اللغة
 window.changeLanguage = function(lang) {
     if (i18n.translations[lang]) {
         i18n.currentLang = lang;
