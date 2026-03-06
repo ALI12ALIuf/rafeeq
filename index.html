@@ -88,13 +88,19 @@
                 <div class="chats-list" id="chatsList"></div>
             </div>
 
-            <!-- صفحة المحادثة الفردية -->
-            <div class="page conversation-page" id="conversationPage" style="display: none;">
+            <!-- صفحة المحادثة الفردية (مثل واتساب) -->
+            <div class="conversation-page" id="conversationPage" style="display: none;">
+                <!-- رأس المحادثة -->
                 <div class="conversation-header">
-                    <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
-                    <div class="conversation-user-info">
+                    <button class="back-btn" onclick="closeConversation()">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <div class="conversation-user-info" onclick="viewContactInfo()">
                         <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
-                        <h3 id="conversationName"></h3>
+                        <div class="conversation-user-details">
+                            <h3 id="conversationName"></h3>
+                            <span class="conversation-status" id="conversationStatus">آخر زيارة اليوم</span>
+                        </div>
                     </div>
                     <div class="conversation-actions">
                         <button class="icon-btn" onclick="toggleVoiceCall()" title="مكالمة صوتية">
@@ -102,6 +108,9 @@
                         </button>
                         <button class="icon-btn" onclick="toggleVideoCall()" title="مكالمة فيديو">
                             <i class="fas fa-video"></i>
+                        </button>
+                        <button class="icon-btn" onclick="showMoreOptions()" title="خيارات أكثر">
+                            <i class="fas fa-ellipsis-vertical"></i>
                         </button>
                     </div>
                 </div>
@@ -120,19 +129,59 @@
                 <!-- منطقة الرسائل -->
                 <div class="messages-container" id="messagesContainer"></div>
 
-                <!-- منطقة الإدخال -->
+                <!-- شريط الإدخال (ثابت مثل واتساب) -->
                 <div class="message-input-container">
                     <div class="message-input-wrapper">
-                        <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
-                        <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)">
-                        <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+                        <button class="attach-btn" onclick="showAttachmentMenu()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <div class="input-area">
+                            <input type="text" 
+                                   id="messageInput" 
+                                   placeholder="اكتب رسالتك..." 
+                                   onkeypress="handleMessageKeyPress(event)"
+                                   autocomplete="off">
+                            <button class="emoji-btn" onclick="showEmojiPicker()">
+                                <i class="far fa-smile"></i>
+                            </button>
+                        </div>
+                        <button class="send-btn" onclick="sendMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                        <button class="voice-btn" onclick="startVoiceRecording()" style="display: none;">
+                            <i class="fas fa-microphone"></i>
+                        </button>
                     </div>
                     
                     <!-- قائمة المرفقات -->
                     <div class="attachment-menu" id="attachmentMenu" style="display: none;">
-                        <button onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
-                        <button onclick="sendVoiceNote()"><i class="fas fa-microphone"></i> بصمة صوت</button>
-                        <button onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
+                        <button onclick="sendImage()">
+                            <i class="fas fa-image"></i> صورة
+                        </button>
+                        <button onclick="sendVoiceNote()">
+                            <i class="fas fa-microphone"></i> بصمة صوت
+                        </button>
+                        <button onclick="shareLocation()">
+                            <i class="fas fa-map-marker-alt"></i> موقع
+                        </button>
+                        <button onclick="sendDocument()">
+                            <i class="fas fa-file"></i> مستند
+                        </button>
+                    </div>
+
+                    <!-- قائمة الإيموجي -->
+                    <div class="emoji-picker" id="emojiPicker" style="display: none;">
+                        <div class="emoji-categories">
+                            <button class="active">😊</button>
+                            <button>❤️</button>
+                            <button>👍</button>
+                            <button>🎉</button>
+                            <button>😢</button>
+                            <button>😡</button>
+                        </div>
+                        <div class="emoji-grid">
+                            <!-- الإيموجيات ستضاف هنا ديناميكياً -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -321,38 +370,14 @@
         <div class="modal-content">
             <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
             <div class="avatar-options">
-                <button class="avatar-option" onclick="selectAvatar('male')">
-                    <span>👨</span>
-                    <span data-i18n="male">رجل</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('female')">
-                    <span>👩</span>
-                    <span data-i18n="female">امرأة</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('boy')">
-                    <span>🧒</span>
-                    <span data-i18n="boy">ولد</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('girl')">
-                    <span>👧</span>
-                    <span data-i18n="girl">بنت</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('father')">
-                    <span>👨‍🦳</span>
-                    <span data-i18n="father">أب</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('mother')">
-                    <span>👩‍🦳</span>
-                    <span data-i18n="mother">أم</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('grandfather')">
-                    <span>👴</span>
-                    <span data-i18n="grandfather">جد</span>
-                </button>
-                <button class="avatar-option" onclick="selectAvatar('grandmother')">
-                    <span>👵</span>
-                    <span data-i18n="grandmother">جدة</span>
-                </button>
+                <button class="avatar-option" onclick="selectAvatar('male')"><span>👨</span><span data-i18n="male">رجل</span></button>
+                <button class="avatar-option" onclick="selectAvatar('female')"><span>👩</span><span data-i18n="female">امرأة</span></button>
+                <button class="avatar-option" onclick="selectAvatar('boy')"><span>🧒</span><span data-i18n="boy">ولد</span></button>
+                <button class="avatar-option" onclick="selectAvatar('girl')"><span>👧</span><span data-i18n="girl">بنت</span></button>
+                <button class="avatar-option" onclick="selectAvatar('father')"><span>👨‍🦳</span><span data-i18n="father">أب</span></button>
+                <button class="avatar-option" onclick="selectAvatar('mother')"><span>👩‍🦳</span><span data-i18n="mother">أم</span></button>
+                <button class="avatar-option" onclick="selectAvatar('grandfather')"><span>👴</span><span data-i18n="grandfather">جد</span></button>
+                <button class="avatar-option" onclick="selectAvatar('grandmother')"><span>👵</span><span data-i18n="grandmother">جدة</span></button>
             </div>
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
@@ -427,7 +452,6 @@
         
         if (nameInput && charCounter) {
             charCounter.textContent = '0/25';
-            
             nameInput.addEventListener('input', function(e) {
                 let value = this.value;
                 if (value.length > 25) this.value = value.slice(0, 25);
