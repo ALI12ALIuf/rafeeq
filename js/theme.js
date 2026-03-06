@@ -1,4 +1,3 @@
-// نظام الثيم
 const theme = {
     currentTheme: localStorage.getItem('theme') || 'light',
     
@@ -12,7 +11,6 @@ const theme = {
         document.body.className = `theme-${this.currentTheme}`;
         localStorage.setItem('theme', this.currentTheme);
         
-        // تحديث لون شريط العنوان
         const metaThemeColor = document.querySelector('meta[name="theme-color"]');
         if (metaThemeColor) {
             metaThemeColor.content = this.currentTheme === 'light' ? '#2196F3' : '#1a1a1a';
@@ -31,12 +29,9 @@ const theme = {
                 this.currentTheme = e.target.checked ? 'dark' : 'light';
                 this.applyTheme();
             });
-            
-            // ضبط حالة الزر
             toggleBtn.checked = this.currentTheme === 'dark';
         }
     }
 };
 
-// تهيئة الثيم
 theme.init();
