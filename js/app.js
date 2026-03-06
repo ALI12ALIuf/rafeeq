@@ -163,27 +163,78 @@ function loadStories() {
     `).join('');
 }
 
-// ========== نظام الدردشة المتكامل (مع مكالمات + صور + بصمات) ==========
+// ========== نظام المكالمات المتقدم ==========
 
-// نظام المحادثات المتكامل
+const CallSystem = {
+    onlineFriends: new Set(),
+    
+    init() {
+        if (!window.auth?.currentUser) return;
+        
+        this.updateMyStatus(true);
+        this.watchFriendsStatus();
+        
+        window.addEventListener('beforeunload', () => {
+            this.updateMyStatus(false);
+        });
+    },
+    
+    async updateMyStatus(online) {
+        if (!window.auth?.currentUser) return;
+        
+        try {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                online: online,
+                lastSeen: new Date()
+            });
+        } catch (error) {
+            console.error('خطأ في تحديث الحالة:', error);
+        }
+    },
+    
+    watchFriendsStatus() {
+        if (!window.auth?.currentUser) return;
+        
+        window.db.collection('users')
+            .where('friends', 'array-contains', window.auth.currentUser.uid)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const user = change.doc.data();
+                    if (change.type === 'added' || change.type === 'modified') {
+                        if (user.online) {
+                            this.onlineFriends.add(change.doc.id);
+                        } else {
+                            this.onlineFriends.delete(change.doc.id);
+                        }
+                    }
+                });
+            });
+    },
+    
+    isFriendOnline(friendId) {
+        return this.onlineFriends.has(friendId);
+    }
+};
+
+// ========== نظام الدردشة المتكامل ==========
+
 const ChatSystem = {
     currentChat: null,
     messages: {},
     peer: null,
     currentCall: null,
     localStream: null,
+    callConnected: false,
     
-    // تهيئة النظام
     init() {
         this.loadAllChats();
+        CallSystem.init();
         this.initPeer();
     },
     
-    // ✅ تهيئة PeerJS للمكالمات (معدل)
     async initPeer() {
         if (!window.auth?.currentUser) return;
         
-        // انتظر حتى يتم تحميل PeerJS
         if (typeof Peer === 'undefined') {
             console.log('⏳ انتظار تحميل PeerJS...');
             setTimeout(() => this.initPeer(), 1000);
@@ -191,31 +242,42 @@ const ChatSystem = {
         }
         
         try {
-            // استخدام معرف فريد للمستخدم
             const peerId = `rafeeq_${window.auth.currentUser.uid}`;
             this.peer = new Peer(peerId);
             
             this.peer.on('open', async (id) => {
                 console.log('✅ PeerJS جاهز:', id);
-                // حفظ معرف Peer في Firebase
-                try {
-                    await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                        peerId: id,
-                        lastSeen: new Date()
-                    });
-                } catch (e) {
-                    console.error('خطأ في حفظ peerId:', e);
-                }
+                
+                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    peerId: id,
+                    online: true,
+                    lastSeen: new Date()
+                });
             });
             
             this.peer.on('call', (call) => {
-                // استقبال مكالمة
-                if (confirm('📞 مكالمة واردة. هل تريد الرد؟')) {
+                // اهتزاز
+                if (navigator.vibrate) {
+                    navigator.vibrate([1000, 500, 1000]);
+                }
+                
+                // إشعار
+                if (Notification.permission === 'granted') {
+                    new Notification('📞 مكالمة واردة', {
+                        body: 'شخص يتصل بك...',
+                        icon: '/icon.png'
+                    });
+                }
+                
+                const answer = confirm('📞 مكالمة واردة. هل تريد الرد؟');
+                
+                if (answer) {
                     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
                         .then(stream => {
                             this.localStream = stream;
                             call.answer(stream);
                             this.currentCall = call;
+                            this.callConnected = true;
                             this.showVideoCall(call, stream);
                         }).catch(err => {
                             alert('لا يمكن الوصول للكاميرا: ' + err.message);
@@ -234,7 +296,6 @@ const ChatSystem = {
         }
     },
     
-    // ✅ الحصول على معرف Peer للصديق
     async getFriendPeerId(friendId) {
         try {
             const doc = await window.db.collection('users').doc(friendId).get();
@@ -245,7 +306,6 @@ const ChatSystem = {
         }
     },
     
-    // تحميل كل المحادثات من localStorage
     loadAllChats() {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -260,7 +320,6 @@ const ChatSystem = {
         }
     },
     
-    // فتح محادثة مع صديق
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
@@ -282,7 +341,6 @@ const ChatSystem = {
         }, 100);
     },
     
-    // عرض رسائل محادثة
     displayMessages(friendId) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -292,7 +350,6 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
-    // ✅ عرض رسالة واحدة (معدل لدعم الموقع)
     displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -301,7 +358,6 @@ const ChatSystem = {
         messageDiv.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
         
         if (msg.type === 'text') {
-            // التحقق إذا كان النص يحتوي على رابط موقع
             if (msg.text.includes('maps.google.com') || msg.text.includes('📍 موقعي:')) {
                 const match = msg.text.match(/q=([0-9.-]+),([0-9.-]+)/);
                 if (match) {
@@ -351,7 +407,6 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // إرسال رسالة نصية
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
@@ -381,7 +436,6 @@ const ChatSystem = {
         return true;
     },
     
-    // إرسال صورة
     async sendImage(file) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -415,7 +469,6 @@ const ChatSystem = {
         });
     },
     
-    // إرسال بصمة صوتية
     async sendVoiceNote(audioBlob) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -449,7 +502,6 @@ const ChatSystem = {
         });
     },
     
-    // حفظ رسالة في localStorage
     saveMessage(friendId, message) {
         const key = `chat_${friendId}`;
         let history = [];
@@ -467,7 +519,6 @@ const ChatSystem = {
         this.messages[friendId] = history;
     },
     
-    // الاستماع للرسائل الجديدة
     listenForNewMessages(friendId) {
         if (!window.auth?.currentUser) return;
         
@@ -502,7 +553,6 @@ const ChatSystem = {
             });
     },
     
-    // تحديث آخر رسالة في قائمة المحادثات
     updateLastMessage(friendId, lastMessage) {
         const chatItems = document.querySelectorAll('.chat-item');
         for (const item of chatItems) {
@@ -516,18 +566,22 @@ const ChatSystem = {
         }
     },
     
-    // ========== دوال المكالمات (معدلة) ==========
+    // ========== دوال المكالمات المتطورة ==========
     
-    // ✅ بدء مكالمة فيديو
     async startVideoCall() {
         if (!this.currentChat || !this.peer) {
-            alert('نظام المكالمات لم يكتمل بعد');
+            alert('❌ نظام المكالمات لم يكتمل بعد');
+            return;
+        }
+        
+        if (!CallSystem.isFriendOnline(this.currentChat)) {
+            alert('⚠️ الصديق غير متصل حالياً');
             return;
         }
         
         const friendPeerId = await this.getFriendPeerId(this.currentChat);
         if (!friendPeerId) {
-            alert('الصديق غير متصل حالياً');
+            alert('⚠️ الصديق غير متصل (لا يوجد معرف مكالمات)');
             return;
         }
         
@@ -539,25 +593,38 @@ const ChatSystem = {
             
             const call = this.peer.call(friendPeerId, this.localStream);
             this.currentCall = call;
+            this.callConnected = false;
             
             this.showVideoCall(call, this.localStream);
             
+            // مهلة 30 ثانية
+            setTimeout(() => {
+                if (this.currentCall && !this.callConnected) {
+                    this.endCall();
+                    alert('⏰ لم يتم الرد على المكالمة');
+                }
+            }, 30000);
+            
         } catch (error) {
             console.error('خطأ في بدء المكالمة:', error);
-            alert('لا يمكن الوصول إلى الكاميرا');
+            alert('❌ لا يمكن الوصول إلى الكاميرا');
         }
     },
     
-    // ✅ بدء مكالمة صوتية
     async startVoiceCall() {
         if (!this.currentChat || !this.peer) {
-            alert('نظام المكالمات لم يكتمل بعد');
+            alert('❌ نظام المكالمات لم يكتمل بعد');
+            return;
+        }
+        
+        if (!CallSystem.isFriendOnline(this.currentChat)) {
+            alert('⚠️ الصديق غير متصل حالياً');
             return;
         }
         
         const friendPeerId = await this.getFriendPeerId(this.currentChat);
         if (!friendPeerId) {
-            alert('الصديق غير متصل حالياً');
+            alert('⚠️ الصديق غير متصل');
             return;
         }
         
@@ -569,16 +636,23 @@ const ChatSystem = {
             
             const call = this.peer.call(friendPeerId, this.localStream);
             this.currentCall = call;
+            this.callConnected = false;
             
             this.showVoiceCall(call, this.localStream);
             
+            setTimeout(() => {
+                if (this.currentCall && !this.callConnected) {
+                    this.endCall();
+                    alert('⏰ لم يتم الرد على المكالمة');
+                }
+            }, 30000);
+            
         } catch (error) {
             console.error('خطأ في بدء المكالمة:', error);
-            alert('لا يمكن الوصول إلى الميكروفون');
+            alert('❌ لا يمكن الوصول إلى الميكروفون');
         }
     },
     
-    // عرض مكالمة فيديو
     showVideoCall(call, stream) {
         const videoContainer = document.getElementById('videoContainer');
         const localVideo = document.getElementById('localVideo');
@@ -588,6 +662,7 @@ const ChatSystem = {
         
         call.on('stream', (remoteStream) => {
             remoteVideo.srcObject = remoteStream;
+            this.callConnected = true;
         });
         
         videoContainer.style.display = 'flex';
@@ -603,7 +678,6 @@ const ChatSystem = {
         });
     },
     
-    // عرض مكالمة صوتية
     showVoiceCall(call, stream) {
         const videoContainer = document.getElementById('videoContainer');
         const localVideo = document.getElementById('localVideo');
@@ -611,7 +685,7 @@ const ChatSystem = {
         localVideo.style.display = 'none';
         
         call.on('stream', (remoteStream) => {
-            // صوت فقط
+            this.callConnected = true;
         });
         
         videoContainer.style.display = 'flex';
@@ -628,7 +702,6 @@ const ChatSystem = {
         });
     },
     
-    // إنهاء المكالمة
     endCall() {
         if (this.currentCall) {
             this.currentCall.close();
@@ -640,9 +713,9 @@ const ChatSystem = {
         document.getElementById('videoContainer').style.display = 'none';
         document.getElementById('localVideo').style.display = 'block';
         this.currentCall = null;
+        this.callConnected = false;
     },
     
-    // كتم الميكروفون
     toggleMute() {
         if (this.localStream) {
             const audioTrack = this.localStream.getAudioTracks()[0];
@@ -654,7 +727,6 @@ const ChatSystem = {
         }
     },
     
-    // تشغيل/إيقاف الكاميرا
     toggleCamera() {
         if (this.localStream) {
             const videoTrack = this.localStream.getVideoTracks()[0];
@@ -666,7 +738,6 @@ const ChatSystem = {
         }
     },
     
-    // إغلاق المحادثة
     closeChat() {
         if (this.currentCall) {
             this.endCall();
@@ -676,7 +747,6 @@ const ChatSystem = {
         this.currentChat = null;
     },
     
-    // الهروب من HTML
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -850,7 +920,6 @@ window.sendImage = function() {
 };
 
 window.sendVoiceNote = function() {
-    // طلب إذن الميكروفون
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
             const mediaRecorder = new MediaRecorder(stream);
@@ -865,7 +934,6 @@ window.sendVoiceNote = function() {
             
             mediaRecorder.start();
             
-            // تسجيل لمدة 10 ثواني كحد أقصى
             setTimeout(() => {
                 if (mediaRecorder.state === 'recording') {
                     mediaRecorder.stop();
@@ -880,7 +948,6 @@ window.sendVoiceNote = function() {
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-// ✅ مشاركة الموقع (معدلة)
 window.shareLocation = function() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((position) => {
@@ -888,7 +955,6 @@ window.shareLocation = function() {
             const locationUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
             ChatSystem.sendMessage(`📍 موقعي: ${locationUrl}`);
             
-            // عرض الخريطة مباشرة
             ChatSystem.displayMessage({
                 type: 'text',
                 text: `📍 موقعي: ${locationUrl}`,
@@ -936,7 +1002,7 @@ window.closeConversation = function() {
     ChatSystem.closeChat();
 };
 
-// ========== باقي الدوال (بدون تغيير) ==========
+// ========== باقي الدوال ==========
 
 window.openEditProfileModal = function() {
     const currentName = document.getElementById('profileName').textContent;
@@ -1124,4 +1190,4 @@ if ('Notification' in window) {
     Notification.requestPermission();
 }
 
-console.log('✅ app.js محدث - نظام متكامل مع مكالمات وصور وبصمات وخرائط');
+console.log('✅ app.js محدث - نظام متكامل مع مكالمات متطورة');
