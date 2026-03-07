@@ -149,35 +149,14 @@ function loadStories() {
 }
 
 // ========== نظام الدردشة المتكامل (مثل واتساب) ==========
+// تم إزالة جميع دوال WebRTC (مكالمات صوت/فيديو)
 
 const ChatSystem = {
     currentChat: null,
     messages: {},
-    peer: null,
-    currentCall: null,
-    localStream: null,
     
     init() {
         this.loadAllChats();
-        this.initPeer();
-    },
-    
-    initPeer() {
-        if (!window.auth?.currentUser) return;
-        this.peer = new Peer(window.auth.currentUser.uid);
-        this.peer.on('call', (call) => {
-            if (confirm('مكالمة واردة. هل تريد الرد؟')) {
-                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                    .then(stream => {
-                        this.localStream = stream;
-                        call.answer(stream);
-                        this.currentCall = call;
-                        this.showVideoCall(call, stream);
-                    });
-            } else {
-                call.close();
-            }
-        });
     },
     
     loadAllChats() {
@@ -194,7 +173,7 @@ const ChatSystem = {
         }
     },
     
-    // فتح المحادثة (معدل)
+    // فتح المحادثة
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
@@ -208,7 +187,7 @@ const ChatSystem = {
         
         if (nameElement) nameElement.textContent = friendName;
         if (avatarElement) avatarElement.textContent = friendAvatar || '👤';
-        if (statusElement) statusElement.textContent = 'متصل الآن';
+        if (statusElement) statusElement.textContent = 'آخر زيارة اليوم';
         
         // إظهار صفحة المحادثة
         document.querySelector('.chat-page').style.display = 'none';
@@ -238,7 +217,7 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
-    // عرض الرسالة مع الحالة (معدل)
+    // عرض الرسالة مع الحالة
     displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -308,7 +287,7 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // إرسال رسالة مع حالة (معدل)
+    // إرسال رسالة مع حالة
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
@@ -617,108 +596,8 @@ const ChatSystem = {
         }
     },
     
-    async startVideoCall() {
-        if (!this.currentChat || !this.peer) return;
-        try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true
-            });
-            const call = this.peer.call(this.currentChat, this.localStream);
-            this.currentCall = call;
-            this.showVideoCall(call, this.localStream);
-        } catch (error) {
-            console.error('خطأ في بدء المكالمة:', error);
-            alert('لا يمكن الوصول إلى الكاميرا');
-        }
-    },
-    
-    async startVoiceCall() {
-        if (!this.currentChat || !this.peer) return;
-        try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: false,
-                audio: true
-            });
-            const call = this.peer.call(this.currentChat, this.localStream);
-            this.currentCall = call;
-            this.showVoiceCall(call, this.localStream);
-        } catch (error) {
-            console.error('خطأ في بدء المكالمة:', error);
-            alert('لا يمكن الوصول إلى الميكروفون');
-        }
-    },
-    
-    showVideoCall(call, stream) {
-        const videoContainer = document.getElementById('videoContainer');
-        const localVideo = document.getElementById('localVideo');
-        const remoteVideo = document.getElementById('remoteVideo');
-        
-        localVideo.srcObject = stream;
-        call.on('stream', (remoteStream) => {
-            remoteVideo.srcObject = remoteStream;
-        });
-        videoContainer.style.display = 'flex';
-        
-        call.on('close', () => {
-            videoContainer.style.display = 'none';
-            this.currentCall = null;
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => track.stop());
-                this.localStream = null;
-            }
-        });
-    },
-    
-    showVoiceCall(call, stream) {
-        const videoContainer = document.getElementById('videoContainer');
-        const localVideo = document.getElementById('localVideo');
-        localVideo.style.display = 'none';
-        videoContainer.style.display = 'flex';
-        
-        call.on('close', () => {
-            videoContainer.style.display = 'none';
-            localVideo.style.display = 'block';
-            this.currentCall = null;
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => track.stop());
-                this.localStream = null;
-            }
-        });
-    },
-    
-    endCall() {
-        if (this.currentCall) this.currentCall.close();
-        document.getElementById('videoContainer').style.display = 'none';
-        document.getElementById('localVideo').style.display = 'block';
-    },
-    
-    toggleMute() {
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                const btn = document.querySelector('.call-controls button:nth-child(2) i');
-                if (btn) btn.className = audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
-            }
-        }
-    },
-    
-    toggleCamera() {
-        if (this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                const btn = document.querySelector('.call-controls button:nth-child(3) i');
-                if (btn) btn.className = videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
-            }
-        }
-    },
-    
-    // إغلاق المحادثة (معدل)
+    // إغلاق المحادثة
     closeChat() {
-        if (this.currentCall) this.endCall();
-        
         // إزالة كلاس الـ body
         document.body.classList.remove('conversation-open');
         
@@ -994,30 +873,15 @@ window.shareLocation = function() {
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-window.sendDocument = function() {
-    alert('ميزة إرسال المستندات قيد التطوير');
-    document.getElementById('attachmentMenu').style.display = 'none';
+// تم إزالة دوال المكالمات: toggleVoiceCall, toggleVideoCall, endCall, toggleMute, toggleCamera
+
+window.closeConversation = function() {
+    ChatSystem.closeChat();
 };
 
-window.toggleVoiceCall = function() {
-    if (ChatSystem.currentCall) ChatSystem.endCall();
-    else ChatSystem.startVoiceCall();
-};
-
-window.toggleVideoCall = function() {
-    if (ChatSystem.currentCall) ChatSystem.endCall();
-    else ChatSystem.startVideoCall();
-};
-
-window.endCall = function() { ChatSystem.endCall(); };
-window.toggleMute = function() { ChatSystem.toggleMute(); };
-window.toggleCamera = function() { ChatSystem.toggleCamera(); };
-window.closeConversation = function() { ChatSystem.closeChat(); };
+// دوال إضافية (يمكن إضافتها لاحقاً)
 window.viewContactInfo = function() {
     alert('معلومات الاتصال - قيد التطوير');
-};
-window.showMoreOptions = function() {
-    alert('خيارات إضافية - قيد التطوير');
 };
 
 // ========== باقي الدوال (بدون تغيير) ==========
@@ -1183,4 +1047,4 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - نظام متكامل مثل واتساب');
+console.log('✅ app.js محدث - نظام متكامل مثل واتساب (بدون مكالمات)');
