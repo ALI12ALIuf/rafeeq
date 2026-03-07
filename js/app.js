@@ -147,170 +147,7 @@ function loadStories() {
     `).join('');
 }
 
-// ========== نظام الإشارات (Signaling System) ==========
-
-class SignalingSystem {
-    constructor() {
-        this.peerConnections = new Map();
-        this.dataChannels = new Map();
-        this.localStream = null;
-        this.currentCall = null;
-        this.currentFriendId = null;
-        this.pendingCandidates = new Map();
-        this.isReady = true;
-        
-        console.log('🔧 نظام الإشارات جاهز');
-        
-        if (window.auth?.currentUser) {
-            this.startListeningForSignals();
-        }
-    }
-
-    startListeningForSignals() {
-        if (!window.auth?.currentUser) {
-            setTimeout(() => this.startListeningForSignals(), 1000);
-            return;
-        }
-        
-        const userId = window.auth.currentUser.uid;
-        console.log('👂 بدء الاستماع للإشارات للمستخدم:', userId);
-        
-        window.db.collection('signaling')
-            .where('to', '==', userId)
-            .where('status', '==', 'pending')
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added') {
-                        const signal = change.doc.data();
-                        const signalId = change.doc.id;
-                        
-                        console.log('📩 إشارة واردة:', signal.type);
-                        
-                        switch(signal.type) {
-                            case 'offer':
-                                this.handleIncomingOffer(signal, signalId);
-                                break;
-                            case 'answer':
-                                this.handleIncomingAnswer(signal, signalId);
-                                break;
-                            case 'candidate':
-                                this.handleIncomingCandidate(signal, signalId);
-                                break;
-                            case 'end-call':
-                                this.handleEndCall(signal.from);
-                                break;
-                        }
-                        
-                        setTimeout(() => {
-                            window.db.collection('signaling').doc(signalId).delete()
-                                .catch(() => {});
-                        }, 5000);
-                    }
-                });
-            }, (error) => {
-                console.error('خطأ في الاستماع للإشارات:', error);
-            });
-    }
-
-    async sendOffer(friendId, offer) {
-        try {
-            const signalId = `${window.auth.currentUser.uid}_${friendId}_${Date.now()}`;
-            
-            await window.db.collection('signaling').doc(signalId).set({
-                from: window.auth.currentUser.uid,
-                to: friendId,
-                type: 'offer',
-                offer: {
-                    type: offer.type,
-                    sdp: offer.sdp
-                },
-                status: 'pending',
-                timestamp: new Date(),
-                expiresAt: new Date(Date.now() + 60000)
-            });
-
-            console.log('📤 عرض اتصال مرسل');
-
-        } catch (error) {
-            console.error('خطأ في إرسال العرض:', error);
-        }
-    }
-
-    async sendAnswer(friendId, answer, signalId) {
-        try {
-            await window.db.collection('signaling').doc(signalId).set({
-                from: window.auth.currentUser.uid,
-                to: friendId,
-                type: 'answer',
-                answer: {
-                    type: answer.type,
-                    sdp: answer.sdp
-                },
-                status: 'answered',
-                timestamp: new Date()
-            }, { merge: true });
-
-            console.log('📤 إجابة اتصال مرسلة');
-
-        } catch (error) {
-            console.error('خطأ في إرسال الإجابة:', error);
-        }
-    }
-
-    async sendCandidate(friendId, candidate) {
-        try {
-            const signalId = `${window.auth.currentUser.uid}_${friendId}_cand_${Date.now()}`;
-            
-            await window.db.collection('signaling').doc(signalId).set({
-                from: window.auth.currentUser.uid,
-                to: friendId,
-                type: 'candidate',
-                candidate: {
-                    candidate: candidate.candidate,
-                    sdpMid: candidate.sdpMid,
-                    sdpMLineIndex: candidate.sdpMLineIndex
-                },
-                timestamp: new Date(),
-                expiresAt: new Date(Date.now() + 60000)
-            });
-            
-            console.log('📤 مرشح ICE مرسل');
-            
-        } catch (error) {
-            console.error('خطأ في إرسال candidate:', error);
-        }
-    }
-
-    async handleIncomingOffer(signal, signalId) {
-        console.log('📥 استلام عرض من:', signal.from);
-        if (window.ChatSystem && window.ChatSystem.handleIncomingOffer) {
-            window.ChatSystem.handleIncomingOffer(signal, signalId);
-        }
-    }
-
-    async handleIncomingAnswer(signal, signalId) {
-        console.log('📥 استلام إجابة من:', signal.from);
-        if (window.ChatSystem && window.ChatSystem.handleIncomingAnswer) {
-            window.ChatSystem.handleIncomingAnswer(signal, signalId);
-        }
-    }
-
-    async handleIncomingCandidate(signal, signalId) {
-        console.log('📥 استلام مرشح من:', signal.from);
-        if (window.ChatSystem && window.ChatSystem.handleIncomingCandidate) {
-            window.ChatSystem.handleIncomingCandidate(signal, signalId);
-        }
-    }
-
-    handleEndCall(friendId) {
-        console.log('📞 إنهاء مكالمة من:', friendId);
-        if (window.ChatSystem && window.ChatSystem.handleEndCall) {
-            window.ChatSystem.handleEndCall(friendId);
-        }
-    }
-}
-
-// ========== نظام الدردشة المتكامل (مثل واتساب) ==========
+// ========== نظام الدردشة المتكامل (نسخة نهائية) ==========
 
 const ChatSystem = {
     currentChat: null,
@@ -318,33 +155,70 @@ const ChatSystem = {
     peer: null,
     currentCall: null,
     localStream: null,
-    signaling: null,
     
     init() {
         this.loadAllChats();
         this.initPeer();
-        this.initSignaling();
-    },
-    
-    initSignaling() {
-        this.signaling = new SignalingSystem();
-        window.ChatSystem = this;
     },
     
     initPeer() {
-        if (!window.auth?.currentUser) return;
-        this.peer = new Peer(window.auth.currentUser.uid);
+        if (!window.auth?.currentUser) {
+            console.log('⏳ انتظار تسجيل الدخول...');
+            setTimeout(() => this.initPeer(), 1000);
+            return;
+        }
+        
+        // استخدام معرف Firebase نفسه كمعرف PeerJS
+        const peerId = window.auth.currentUser.uid;
+        console.log('🔧 تهيئة PeerJS بالمعرف:', peerId);
+        
+        this.peer = new Peer(peerId);
+        
+        this.peer.on('open', (id) => {
+            console.log('✅ PeerJS متصل بالمعرف:', id);
+        });
+        
         this.peer.on('call', (call) => {
-            if (confirm('مكالمة واردة. هل تريد الرد؟')) {
-                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                    .then(stream => {
-                        this.localStream = stream;
-                        call.answer(stream);
-                        this.currentCall = call;
+            console.log('📞 مكالمة واردة من:', call.peer);
+            
+            if (confirm(`مكالمة ${call.metadata?.type === 'video' ? 'فيديو' : 'صوتية'} واردة. هل تريد الرد؟`)) {
+                navigator.mediaDevices.getUserMedia({ 
+                    video: call.metadata?.type === 'video', 
+                    audio: true 
+                })
+                .then(stream => {
+                    this.localStream = stream;
+                    call.answer(stream);
+                    this.currentCall = call;
+                    
+                    if (call.metadata?.type === 'video') {
                         this.showVideoCall(call, stream);
+                    } else {
+                        this.showVoiceCall(call, stream);
+                    }
+                    
+                    // عند استلام تيار الصوت/الفيديو من الطرف الآخر
+                    call.on('stream', (remoteStream) => {
+                        console.log('📡 تم استلام تيار الوسائط');
+                        if (call.metadata?.type === 'video') {
+                            const remoteVideo = document.getElementById('remoteVideo');
+                            if (remoteVideo) remoteVideo.srcObject = remoteStream;
+                        }
                     });
+                })
+                .catch(error => {
+                    console.error('❌ خطأ في الوصول للوسائط:', error);
+                    call.close();
+                });
             } else {
                 call.close();
+            }
+        });
+        
+        this.peer.on('error', (error) => {
+            console.error('❌ خطأ في PeerJS:', error);
+            if (error.type === 'peer-unavailable') {
+                alert('⚠️ المستخدم غير متصل حالياً');
             }
         });
     },
@@ -758,83 +632,148 @@ const ChatSystem = {
         }
     },
     
-    // ========== دوال المكالمات (مصححة) ==========
-    
-    async startVideoCall() {
-        console.log('📹 بدء مكالمة فيديو مع:', this.currentChat);
-        
-        if (!this.currentChat) {
-            alert('❌ لم يتم تحديد صديق للمكالمة');
-            return;
-        }
-        
-        if (!this.peer) {
-            alert('⏳ جاري تهيئة نظام الاتصال...');
-            this.initPeer();
-            setTimeout(() => {
-                if (this.peer) {
-                    this.startVideoCall();
-                } else {
-                    alert('❌ فشل تهيئة الاتصال');
-                }
-            }, 1500);
-            return;
-        }
-        
-        try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true
-            });
-            
-            const call = this.peer.call(this.currentChat, this.localStream);
-            this.currentCall = call;
-            this.showVideoCall(call, this.localStream);
-            
-            console.log('📹 مكالمة فيديو بدأت بنجاح');
-            
-        } catch (error) {
-            console.error('❌ خطأ في بدء المكالمة:', error);
-            alert('لا يمكن الوصول إلى الكاميرا');
-        }
-    },
+    // ========== دوال المكالمات النهائية ==========
     
     async startVoiceCall() {
         console.log('🎤 بدء مكالمة صوتية مع:', this.currentChat);
         
         if (!this.currentChat) {
-            alert('❌ لم يتم تحديد صديق للمكالمة');
+            alert('❌ الرجاء فتح محادثة مع صديق أولاً');
             return;
         }
         
         if (!this.peer) {
             alert('⏳ جاري تهيئة نظام الاتصال...');
             this.initPeer();
-            setTimeout(() => {
-                if (this.peer) {
-                    this.startVoiceCall();
-                } else {
-                    alert('❌ فشل تهيئة الاتصال');
-                }
-            }, 1500);
+            setTimeout(() => this.startVoiceCall(), 1500);
             return;
         }
         
         try {
+            // طلب إذن الميكروفون
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 video: false,
                 audio: true
             });
             
-            const call = this.peer.call(this.currentChat, this.localStream);
+            console.log('🎤 تم الحصول على إذن الميكروفون');
+            
+            // إعداد بيانات المكالمة
+            const callOptions = {
+                metadata: { type: 'voice' }
+            };
+            
+            // بدء المكالمة
+            const call = this.peer.call(this.currentChat, this.localStream, callOptions);
             this.currentCall = call;
+            
+            console.log('📞 جاري الاتصال بـ:', this.currentChat);
+            
             this.showVoiceCall(call, this.localStream);
             
-            console.log('🎤 مكالمة صوتية بدأت بنجاح');
+            // عند انتهاء المكالمة
+            call.on('close', () => {
+                console.log('📞 انتهت المكالمة');
+                this.endCall();
+            });
+            
+            // عند استلام تيار الصوت من الطرف الآخر
+            call.on('stream', (remoteStream) => {
+                console.log('📡 تم استلام تيار الصوت');
+                // يمكن إضافة عنصر audio هنا إذا أردت
+            });
+            
+            // عند حدوث خطأ
+            call.on('error', (error) => {
+                console.error('❌ خطأ في المكالمة:', error);
+                if (error.type === 'peer-unavailable') {
+                    alert('⚠️ المستخدم غير متصل حالياً');
+                }
+                this.endCall();
+            });
             
         } catch (error) {
             console.error('❌ خطأ في بدء المكالمة:', error);
-            alert('لا يمكن الوصول إلى الميكروفون');
+            if (error.name === 'NotAllowedError') {
+                alert('❌ تم رفض إذن الميكروفون');
+            } else if (error.name === 'NotFoundError') {
+                alert('❌ لا يوجد ميكروفون متصل');
+            } else {
+                alert('❌ لا يمكن الوصول إلى الميكروفون');
+            }
+        }
+    },
+    
+    async startVideoCall() {
+        console.log('📹 بدء مكالمة فيديو مع:', this.currentChat);
+        
+        if (!this.currentChat) {
+            alert('❌ الرجاء فتح محادثة مع صديق أولاً');
+            return;
+        }
+        
+        if (!this.peer) {
+            alert('⏳ جاري تهيئة نظام الاتصال...');
+            this.initPeer();
+            setTimeout(() => this.startVideoCall(), 1500);
+            return;
+        }
+        
+        try {
+            // طلب إذن الكاميرا والميكروفون
+            this.localStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+            
+            console.log('📹 تم الحصول على إذن الكاميرا والميكروفون');
+            
+            // إعداد بيانات المكالمة
+            const callOptions = {
+                metadata: { type: 'video' }
+            };
+            
+            // بدء المكالمة
+            const call = this.peer.call(this.currentChat, this.localStream, callOptions);
+            this.currentCall = call;
+            
+            console.log('📞 جاري الاتصال بـ:', this.currentChat);
+            
+            this.showVideoCall(call, this.localStream);
+            
+            // عند انتهاء المكالمة
+            call.on('close', () => {
+                console.log('📞 انتهت المكالمة');
+                this.endCall();
+            });
+            
+            // عند استلام تيار الفيديو من الطرف الآخر
+            call.on('stream', (remoteStream) => {
+                console.log('📡 تم استلام تيار الفيديو');
+                const remoteVideo = document.getElementById('remoteVideo');
+                if (remoteVideo) {
+                    remoteVideo.srcObject = remoteStream;
+                }
+            });
+            
+            // عند حدوث خطأ
+            call.on('error', (error) => {
+                console.error('❌ خطأ في المكالمة:', error);
+                if (error.type === 'peer-unavailable') {
+                    alert('⚠️ المستخدم غير متصل حالياً');
+                }
+                this.endCall();
+            });
+            
+        } catch (error) {
+            console.error('❌ خطأ في بدء المكالمة:', error);
+            if (error.name === 'NotAllowedError') {
+                alert('❌ تم رفض إذن الكاميرا/الميكروفون');
+            } else if (error.name === 'NotFoundError') {
+                alert('❌ لا توجد كاميرا متصلة');
+            } else {
+                alert('❌ لا يمكن الوصول إلى الكاميرا');
+            }
         }
     },
     
@@ -843,37 +782,17 @@ const ChatSystem = {
         const localVideo = document.getElementById('localVideo');
         const remoteVideo = document.getElementById('remoteVideo');
         
-        localVideo.srcObject = stream;
-        call.on('stream', (remoteStream) => {
-            remoteVideo.srcObject = remoteStream;
-        });
-        videoContainer.style.display = 'flex';
-        
-        call.on('close', () => {
-            videoContainer.style.display = 'none';
-            this.currentCall = null;
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => track.stop());
-                this.localStream = null;
-            }
-        });
+        if (videoContainer) videoContainer.style.display = 'flex';
+        if (localVideo) localVideo.srcObject = stream;
+        if (remoteVideo) remoteVideo.srcObject = null;
     },
     
     showVoiceCall(call, stream) {
         const videoContainer = document.getElementById('videoContainer');
         const localVideo = document.getElementById('localVideo');
-        localVideo.style.display = 'none';
-        videoContainer.style.display = 'flex';
         
-        call.on('close', () => {
-            videoContainer.style.display = 'none';
-            localVideo.style.display = 'block';
-            this.currentCall = null;
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => track.stop());
-                this.localStream = null;
-            }
-        });
+        if (videoContainer) videoContainer.style.display = 'flex';
+        if (localVideo) localVideo.style.display = 'none';
     },
     
     endCall() {
@@ -887,8 +806,17 @@ const ChatSystem = {
             this.localStream = null;
         }
         
-        document.getElementById('videoContainer').style.display = 'none';
-        document.getElementById('localVideo').style.display = 'block';
+        const videoContainer = document.getElementById('videoContainer');
+        const localVideo = document.getElementById('localVideo');
+        
+        if (videoContainer) videoContainer.style.display = 'none';
+        if (localVideo) {
+            localVideo.style.display = 'block';
+            localVideo.srcObject = null;
+        }
+        
+        const remoteVideo = document.getElementById('remoteVideo');
+        if (remoteVideo) remoteVideo.srcObject = null;
         
         console.log('📞 تم إنهاء المكالمة');
     },
@@ -915,25 +843,6 @@ const ChatSystem = {
         }
     },
     
-    handleIncomingOffer(signal, signalId) {
-        console.log('📞 معالجة عرض وارد:', signal);
-    },
-    
-    handleIncomingAnswer(signal, signalId) {
-        console.log('📞 معالجة إجابة واردة:', signal);
-    },
-    
-    handleIncomingCandidate(signal, signalId) {
-        console.log('📞 معالجة مرشح وارد:', signal);
-    },
-    
-    handleEndCall(friendId) {
-        console.log('📞 معالجة إنهاء مكالمة من:', friendId);
-        if (this.currentCall) {
-            this.endCall();
-        }
-    },
-    
     closeChat() {
         if (this.currentCall) this.endCall();
         
@@ -952,6 +861,7 @@ const ChatSystem = {
     }
 };
 
+// تهيئة النظام
 ChatSystem.init();
 
 // ========== دوال تحميل المحادثات ==========
@@ -1075,7 +985,7 @@ function setupChatListeners() {
     }
 }
 
-// ========== دوال عامة للواجهة (مصححة) ==========
+// ========== دوال عامة للواجهة ==========
 
 window.openChat = function(friendId) {
     window.db.collection('users').doc(friendId).get().then((doc) => {
@@ -1212,31 +1122,9 @@ window.sendDocument = function() {
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-// ========== دوال المكالمات العامة (مصححة) ==========
+// ========== دوال المكالمات العامة ==========
 
 window.toggleVoiceCall = function() {
-    console.log('🔊 محاولة بدء مكالمة صوتية');
-    console.log('currentChat:', ChatSystem.currentChat);
-    console.log('peer:', ChatSystem.peer);
-    
-    if (!ChatSystem.currentChat) {
-        alert('❌ الرجاء فتح محادثة مع صديق أولاً');
-        return;
-    }
-    
-    if (!ChatSystem.peer) {
-        alert('⏳ جاري تجهيز نظام الاتصال...');
-        ChatSystem.initPeer();
-        setTimeout(() => {
-            if (ChatSystem.peer) {
-                ChatSystem.startVoiceCall();
-            } else {
-                alert('❌ فشل تجهيز الاتصال، تأكد من اتصال الإنترنت');
-            }
-        }, 1500);
-        return;
-    }
-    
     if (ChatSystem.currentCall) {
         ChatSystem.endCall();
     } else {
@@ -1245,28 +1133,6 @@ window.toggleVoiceCall = function() {
 };
 
 window.toggleVideoCall = function() {
-    console.log('📹 محاولة بدء مكالمة فيديو');
-    console.log('currentChat:', ChatSystem.currentChat);
-    console.log('peer:', ChatSystem.peer);
-    
-    if (!ChatSystem.currentChat) {
-        alert('❌ الرجاء فتح محادثة مع صديق أولاً');
-        return;
-    }
-    
-    if (!ChatSystem.peer) {
-        alert('⏳ جاري تجهيز نظام الاتصال...');
-        ChatSystem.initPeer();
-        setTimeout(() => {
-            if (ChatSystem.peer) {
-                ChatSystem.startVideoCall();
-            } else {
-                alert('❌ فشل تجهيز الاتصال، تأكد من اتصال الإنترنت');
-            }
-        }, 1500);
-        return;
-    }
-    
     if (ChatSystem.currentCall) {
         ChatSystem.endCall();
     } else {
@@ -1285,7 +1151,7 @@ window.showMoreOptions = function() {
     alert('خيارات إضافية - قيد التطوير');
 };
 
-// ========== باقي الدوال (بدون تغيير) ==========
+// ========== باقي الدوال ==========
 
 window.openEditProfileModal = function() {
     const currentName = document.getElementById('profileName').textContent;
@@ -1448,59 +1314,4 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-// ========== إنشاء مجموعة signaling في Firebase ==========
-
-async function ensureSignalingCollection() {
-    if (!window.db) return;
-    
-    try {
-        const testDoc = await window.db.collection('signaling').doc('_config').get();
-        
-        if (!testDoc.exists) {
-            await window.db.collection('signaling').doc('_config').set({
-                name: 'WebRTC Signaling',
-                created: new Date(),
-                version: '1.0',
-                permanent: true
-            });
-            console.log('✅ مجموعة signaling جاهزة');
-        }
-    } catch (error) {
-        console.error('خطأ في تهيئة signaling:', error);
-    }
-}
-
-// ========== تنظيف الإشارات منتهية الصلاحية ==========
-
-async function cleanupExpiredSignals() {
-    if (!window.db) return;
-    
-    try {
-        const now = new Date();
-        const expired = await window.db.collection('signaling')
-            .where('expiresAt', '<', now)
-            .get();
-        
-        let count = 0;
-        for (const doc of expired.docs) {
-            await doc.ref.delete();
-            count++;
-        }
-        
-        if (count > 0) {
-            console.log(`🧹 تم تنظيف ${count} إشارة منتهية الصلاحية`);
-        }
-    } catch (error) {
-        console.error('خطأ في تنظيف الإشارات:', error);
-    }
-}
-
-// تهيئة المجموعة
-if (window.db) {
-    ensureSignalingCollection();
-}
-
-// تشغيل التنظيف كل ساعة
-setInterval(cleanupExpiredSignals, 60 * 60 * 1000);
-
-console.log('✅ app.js محدث - نظام متكامل مع الإشارات');
+console.log('✅ app.js - النسخة النهائية جاهزة للاستخدام');
