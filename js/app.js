@@ -156,6 +156,7 @@ const ChatSystem = {
     peer: null,
     currentCall: null,
     localStream: null,
+    pendingReadUpdates: new Set(), // لتتبع الرسائل التي انتظرت قراءتها
     
     init() {
         this.loadAllChats();
@@ -194,7 +195,7 @@ const ChatSystem = {
         }
     },
     
-    // فتح المحادثة (معدل)
+    // فتح المحادثة
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
@@ -214,6 +215,9 @@ const ChatSystem = {
         document.querySelector('.chat-page').style.display = 'none';
         document.getElementById('conversationPage').style.display = 'flex';
         
+        // تحديث جميع رسائل الصديق إلى مقروءة
+        this.markAllAsRead(friendId);
+        
         this.displayMessages(friendId);
         this.listenForNewMessages(friendId);
         
@@ -228,6 +232,17 @@ const ChatSystem = {
             const container = document.getElementById('messagesContainer');
             if (container) container.scrollTop = container.scrollHeight;
         }, 100);
+    },
+    
+    // تحديث جميع الرسائل إلى مقروءة
+    markAllAsRead(friendId) {
+        const messages = this.messages[friendId] || [];
+        messages.forEach(msg => {
+            if (msg.sender === 'friend' && msg.status !== 'read') {
+                msg.status = 'read';
+                this.updateMessageStatusInStorage(msg.id, 'read');
+            }
+        });
     },
     
     displayMessages(friendId) {
@@ -252,7 +267,7 @@ const ChatSystem = {
             minute: '2-digit'
         });
         
-        // إضافة حالة الرسالة
+        // إضافة حالة الرسالة (داخل الفقاعة)
         let statusHtml = '';
         if (msg.sender === 'me') {
             let statusIcon = '';
@@ -288,7 +303,9 @@ const ChatSystem = {
             `;
         } else if (msg.type === 'image') {
             messageDiv.innerHTML = `
-                <img src="${msg.data}" class="message-image" onclick="window.open('${msg.data}')">
+                <div class="message-content">
+                    <img src="${msg.data}" class="message-image" onclick="window.open('${msg.data}')">
+                </div>
                 <div class="message-info">
                     <span class="message-time">${time}</span>
                     ${statusHtml}
@@ -296,7 +313,9 @@ const ChatSystem = {
             `;
         } else if (msg.type === 'voice') {
             messageDiv.innerHTML = `
-                <audio controls src="${msg.data}" class="message-audio"></audio>
+                <div class="message-content">
+                    <audio controls src="${msg.data}" class="message-audio" onplay="pauseOtherAudio(this)"></audio>
+                </div>
                 <div class="message-info">
                     <span class="message-time">${time}</span>
                     ${statusHtml}
@@ -312,7 +331,7 @@ const ChatSystem = {
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
-        const messageId = Date.now().toString();
+        const messageId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
         const message = {
             id: messageId,
             type: 'text',
@@ -335,6 +354,8 @@ const ChatSystem = {
                 from: window.auth.currentUser.uid,
                 message: message,
                 timestamp: new Date(),
+                delivered: false,
+                read: false,
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
             
@@ -357,7 +378,7 @@ const ChatSystem = {
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const messageId = Date.now().toString();
+                const messageId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                 const message = {
                     id: messageId,
                     type: 'image',
@@ -376,6 +397,8 @@ const ChatSystem = {
                         from: window.auth.currentUser.uid,
                         message: message,
                         timestamp: new Date(),
+                        delivered: false,
+                        read: false,
                         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
                     });
                     
@@ -397,7 +420,7 @@ const ChatSystem = {
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const messageId = Date.now().toString();
+                const messageId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                 const message = {
                     id: messageId,
                     type: 'voice',
@@ -416,6 +439,8 @@ const ChatSystem = {
                         from: window.auth.currentUser.uid,
                         message: message,
                         timestamp: new Date(),
+                        delivered: false,
+                        read: false,
                         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
                     });
                     
@@ -440,17 +465,22 @@ const ChatSystem = {
         const statusElement = messageElement.querySelector('.message-status');
         if (!statusElement) return;
         
-        statusElement.className = `message-status ${status}`;
+        // إزالة الكلاسات القديمة
+        statusElement.className = 'message-status';
+        statusElement.classList.add(status);
         
         if (status === 'sending') {
             statusElement.innerHTML = '⏳';
+            statusElement.style.color = '';
         } else if (status === 'sent') {
             statusElement.innerHTML = '✓';
+            statusElement.style.color = '#8e8e93'; // رمادي غامق
         } else if (status === 'delivered') {
             statusElement.innerHTML = '✓✓';
+            statusElement.style.color = '#8e8e93'; // رمادي غامق
         } else if (status === 'read') {
             statusElement.innerHTML = '✓✓';
-            statusElement.style.color = '#4fc3f7';
+            statusElement.style.color = '#34b7f1'; // أزرق واتساب
         } else if (status === 'error') {
             statusElement.innerHTML = '⚠️';
             statusElement.style.color = '#f44336';
@@ -526,26 +556,31 @@ const ChatSystem = {
                     if (change.type === 'added') {
                         const data = change.doc.data();
                         
-                        // تحديث حالة الرسالة إلى "تم التوصيل"
+                        // تحديث حالة الرسالة إلى "تم التوصيل" للرسائل السابقة
                         if (data.message && data.message.id) {
                             this.updateMessageStatusFromFriend(data.message.id, 'delivered');
                         }
                         
-                        const message = { ...data.message, sender: 'friend' };
+                        const message = { ...data.message, sender: 'friend', status: 'delivered' };
                         this.saveMessage(friendId, message);
                         
                         if (this.currentChat === friendId) {
                             this.displayMessage(message);
                             
-                            // إرسال إشعار بالقراءة
+                            // إذا كانت المحادثة مفتوحة، أرسل إشعار بالقراءة
                             setTimeout(() => {
                                 this.markAsRead(data.message.id, change.doc.id);
+                                this.updateMessageStatus(message.id, 'read');
                             }, 1000);
                             
                         } else {
                             this.updateLastMessage(friendId, message.text || '📷 صورة' || '🎤 بصمة');
+                            
+                            // إظهار إشعار للمستخدم
+                            this.showNotification('رسالة جديدة', message.text || 'صورة' || 'بصمة صوتية');
                         }
                         
+                        // حذف من Firebase بعد المعالجة
                         change.doc.ref.delete();
                     }
                 });
@@ -554,6 +589,8 @@ const ChatSystem = {
     
     // تحديث حالة الرسالة من الصديق
     updateMessageStatusFromFriend(messageId, status) {
+        if (!this.currentChat) return;
+        
         const key = `chat_${this.currentChat}`;
         try {
             let history = JSON.parse(localStorage.getItem(key)) || [];
@@ -576,12 +613,15 @@ const ChatSystem = {
                 if (msgElement) {
                     const statusElement = msgElement.querySelector('.message-status');
                     if (statusElement) {
-                        statusElement.className = `message-status ${status}`;
+                        statusElement.className = 'message-status';
+                        statusElement.classList.add(status);
+                        
                         if (status === 'delivered') {
                             statusElement.innerHTML = '✓✓';
+                            statusElement.style.color = '#8e8e93';
                         } else if (status === 'read') {
                             statusElement.innerHTML = '✓✓';
-                            statusElement.style.color = '#4fc3f7';
+                            statusElement.style.color = '#34b7f1';
                         }
                     }
                 }
@@ -731,6 +771,12 @@ const ChatSystem = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+    
+    showNotification(title, message) {
+        if (Notification.permission === 'granted') {
+            new Notification(title, { body: message });
+        }
     }
 };
 
@@ -785,7 +831,7 @@ async function loadChats() {
                                 minute: '2-digit'
                             });
                             
-                            // حساب الرسائل غير المقروءة
+                            // حساب الرسائل غير المقروءة (التي لم تصلها read)
                             unreadCount = history.filter(msg => 
                                 msg.sender === 'friend' && msg.status !== 'read'
                             ).length;
@@ -853,6 +899,11 @@ function setupChatListeners() {
                     }
                 });
             });
+    }
+    
+    // طلب إذن الإشعارات
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
     }
 }
 
@@ -1020,6 +1071,15 @@ window.showMoreOptions = function() {
     alert('خيارات إضافية - قيد التطوير');
 };
 
+// إيقاف البصمات المتعددة
+window.pauseOtherAudio = function(currentAudio) {
+    document.querySelectorAll('audio').forEach(audio => {
+        if (audio !== currentAudio && !audio.paused) {
+            audio.pause();
+        }
+    });
+};
+
 // ========== باقي الدوال (بدون تغيير) ==========
 
 window.openEditProfileModal = function() {
@@ -1171,16 +1231,4 @@ window.clearMessages = function() {
     if (container) container.innerHTML = '';
 };
 
-window.showNotification = function(title, message) {
-    if (Notification.permission === 'granted') {
-        new Notification(title, { body: message });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') new Notification(title, { body: message });
-        });
-    }
-};
-
-if ('Notification' in window) Notification.requestPermission();
-
-console.log('✅ app.js محدث - نظام متكامل مثل واتساب');
+console.log('✅ app.js محدث - نظام متكامل مثل واتساب مع علامات الصح الصحيحة');
