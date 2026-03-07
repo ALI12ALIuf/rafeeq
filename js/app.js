@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupChatListeners();
     
     updateTripsCount();
+    loadBlockedUsers();
 });
 
 function formatNumber(num) {
@@ -59,6 +60,7 @@ function setupNavigation() {
         });
         document.querySelectorAll('.profile-subpage').forEach(sp => sp.style.display = 'none');
         if (pageId === 'chat') loadChats();
+        if (pageId === 'settings') loadBlockedUsers();
         
         // إخفاء صفحة المحادثة وإزالة كلاس conversation-open
         const conversationPage = document.getElementById('conversationPage');
@@ -152,20 +154,29 @@ function loadStories() {
 
 const ChatSystem = {
     currentChat: null,
+    currentFriendData: null,
     messages: {},
     peer: null,
     currentCall: null,
     localStream: null,
+    blockedUsers: [],
     
     init() {
         this.loadAllChats();
         this.initPeer();
+        this.loadBlockedUsers();
     },
     
     initPeer() {
         if (!window.auth?.currentUser) return;
         this.peer = new Peer(window.auth.currentUser.uid);
         this.peer.on('call', (call) => {
+            // التحقق من أن المتصل ليس محظوراً
+            if (this.blockedUsers.includes(call.peer)) {
+                call.close();
+                return;
+            }
+            
             if (confirm('مكالمة واردة. هل تريد الرد؟')) {
                 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
                     .then(stream => {
@@ -178,6 +189,16 @@ const ChatSystem = {
                 call.close();
             }
         });
+    },
+    
+    loadBlockedUsers() {
+        if (!window.auth?.currentUser) return;
+        window.db.collection('users').doc(window.auth.currentUser.uid).get()
+            .then(doc => {
+                if (doc.exists) {
+                    this.blockedUsers = doc.data().blocked || [];
+                }
+            });
     },
     
     loadAllChats() {
@@ -194,9 +215,19 @@ const ChatSystem = {
         }
     },
     
-    // فتح المحادثة (معدل)
-    openChat(friendId, friendName, friendAvatar) {
+    // فتح المحادثة
+    async openChat(friendId, friendName, friendAvatar) {
+        // التحقق من الحظر
+        if (this.blockedUsers.includes(friendId)) {
+            alert('لا يمكنك فتح المحادثة مع مستخدم محظور');
+            return;
+        }
+        
         this.currentChat = friendId;
+        
+        // جلب بيانات الصديق
+        const friendDoc = await window.db.collection('users').doc(friendId).get();
+        this.currentFriendData = friendDoc.data();
         
         // إضافة كلاس للـ body لإخفاء القوائم
         document.body.classList.add('conversation-open');
@@ -208,7 +239,9 @@ const ChatSystem = {
         
         if (nameElement) nameElement.textContent = friendName;
         if (avatarElement) avatarElement.textContent = friendAvatar || '👤';
-        if (statusElement) statusElement.textContent = 'متصل الآن';
+        
+        // التحقق من حالة الاتصال
+        this.checkFriendStatus(friendId);
         
         // إظهار صفحة المحادثة
         document.querySelector('.chat-page').style.display = 'none';
@@ -230,6 +263,25 @@ const ChatSystem = {
         }, 100);
     },
     
+    // التحقق من حالة الصديق
+    checkFriendStatus(friendId) {
+        const statusElement = document.getElementById('conversationStatus');
+        if (!statusElement) return;
+        
+        // التحقق من اتصال WebRTC
+        const peer = this.peer?.connections[friendId];
+        if (peer && peer[0]?.open) {
+            statusElement.textContent = 'متصل';
+            statusElement.className = 'conversation-status online';
+        } else {
+            statusElement.textContent = 'آخر زيارة اليوم';
+            statusElement.className = 'conversation-status offline';
+        }
+        
+        // تحديث كل 10 ثواني
+        setTimeout(() => this.checkFriendStatus(friendId), 10000);
+    },
+    
     displayMessages(friendId) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -238,7 +290,7 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
-    // عرض الرسالة مع الحالة (معدل)
+    // عرض الرسالة مع الحالة
     displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -252,7 +304,7 @@ const ChatSystem = {
             minute: '2-digit'
         });
         
-        // إضافة حالة الرسالة
+        // إضافة حالة الرسالة (داخل الفقاعة)
         let statusHtml = '';
         if (msg.sender === 'me') {
             let statusIcon = '';
@@ -279,16 +331,35 @@ const ChatSystem = {
         }
         
         if (msg.type === 'text') {
-            messageDiv.innerHTML = `
-                <div class="message-content">${this.escapeHtml(msg.text)}</div>
-                <div class="message-info">
-                    <span class="message-time">${time}</span>
-                    ${statusHtml}
-                </div>
-            `;
+            // التحقق إذا كان الرابط رابط خريطة
+            if (msg.text.includes('maps.google.com') || msg.text.includes('📍')) {
+                const url = msg.text.match(/https?:\/\/[^\s]+/g)?.[0] || '';
+                messageDiv.innerHTML = `
+                    <div class="message-content">
+                        <a href="${url}" target="_blank" class="location-link">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span>الموقع على الخريطة</span>
+                        </a>
+                    </div>
+                    <div class="message-info">
+                        <span class="message-time">${time}</span>
+                        ${statusHtml}
+                    </div>
+                `;
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="message-content">${this.escapeHtml(msg.text)}</div>
+                    <div class="message-info">
+                        <span class="message-time">${time}</span>
+                        ${statusHtml}
+                    </div>
+                `;
+            }
         } else if (msg.type === 'image') {
             messageDiv.innerHTML = `
-                <img src="${msg.data}" class="message-image" onclick="window.open('${msg.data}')">
+                <div class="message-content">
+                    <img src="${msg.data}" class="message-image" onclick="openImageViewer('${msg.data}')">
+                </div>
                 <div class="message-info">
                     <span class="message-time">${time}</span>
                     ${statusHtml}
@@ -296,7 +367,9 @@ const ChatSystem = {
             `;
         } else if (msg.type === 'voice') {
             messageDiv.innerHTML = `
-                <audio controls src="${msg.data}" class="message-audio"></audio>
+                <div class="message-content">
+                    <audio controls src="${msg.data}" class="message-audio" onplay="pauseOtherAudio(this)"></audio>
+                </div>
                 <div class="message-info">
                     <span class="message-time">${time}</span>
                     ${statusHtml}
@@ -308,9 +381,15 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // إرسال رسالة مع حالة (معدل)
+    // إرسال رسالة مع حالة
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
+        
+        // التحقق من الحظر
+        if (this.blockedUsers.includes(this.currentChat)) {
+            alert('لا يمكنك إرسال رسالة إلى مستخدم محظور');
+            return false;
+        }
         
         const messageId = Date.now().toString();
         const message = {
@@ -335,6 +414,8 @@ const ChatSystem = {
                 from: window.auth.currentUser.uid,
                 message: message,
                 timestamp: new Date(),
+                delivered: false,
+                read: false,
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
             
@@ -354,6 +435,11 @@ const ChatSystem = {
     
     // إرسال صورة مع حالة
     async sendImage(file) {
+        if (this.blockedUsers.includes(this.currentChat)) {
+            alert('لا يمكنك إرسال صورة إلى مستخدم محظور');
+            return;
+        }
+        
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = async (e) => {
@@ -376,6 +462,8 @@ const ChatSystem = {
                         from: window.auth.currentUser.uid,
                         message: message,
                         timestamp: new Date(),
+                        delivered: false,
+                        read: false,
                         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
                     });
                     
@@ -394,6 +482,11 @@ const ChatSystem = {
     
     // إرسال بصمة صوتية مع حالة
     async sendVoiceNote(audioBlob) {
+        if (this.blockedUsers.includes(this.currentChat)) {
+            alert('لا يمكنك إرسال بصمة صوتية إلى مستخدم محظور');
+            return;
+        }
+        
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = async (e) => {
@@ -416,6 +509,8 @@ const ChatSystem = {
                         from: window.auth.currentUser.uid,
                         message: message,
                         timestamp: new Date(),
+                        delivered: false,
+                        read: false,
                         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
                     });
                     
@@ -518,6 +613,10 @@ const ChatSystem = {
     
     listenForNewMessages(friendId) {
         if (!window.auth?.currentUser) return;
+        
+        // التحقق من الحظر
+        if (this.blockedUsers.includes(friendId)) return;
+        
         window.db.collection('temp_messages')
             .where('from', '==', friendId)
             .where('to', '==', window.auth.currentUser.uid)
@@ -544,6 +643,7 @@ const ChatSystem = {
                             
                         } else {
                             this.updateLastMessage(friendId, message.text || '📷 صورة' || '🎤 بصمة');
+                            this.showNotification('رسالة جديدة', message.text || 'صورة' || 'بصمة صوتية');
                         }
                         
                         change.doc.ref.delete();
@@ -619,6 +719,13 @@ const ChatSystem = {
     
     async startVideoCall() {
         if (!this.currentChat || !this.peer) return;
+        
+        // التحقق من الحظر
+        if (this.blockedUsers.includes(this.currentChat)) {
+            alert('لا يمكنك إجراء مكالمة مع مستخدم محظور');
+            return;
+        }
+        
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
@@ -635,6 +742,13 @@ const ChatSystem = {
     
     async startVoiceCall() {
         if (!this.currentChat || !this.peer) return;
+        
+        // التحقق من الحظر
+        if (this.blockedUsers.includes(this.currentChat)) {
+            alert('لا يمكنك إجراء مكالمة مع مستخدم محظور');
+            return;
+        }
+        
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 video: false,
@@ -715,7 +829,7 @@ const ChatSystem = {
         }
     },
     
-    // إغلاق المحادثة (معدل)
+    // إغلاق المحادثة
     closeChat() {
         if (this.currentCall) this.endCall();
         
@@ -725,6 +839,141 @@ const ChatSystem = {
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
         this.currentChat = null;
+        this.currentFriendData = null;
+    },
+    
+    // حظر مستخدم
+    async blockUser(userId) {
+        if (!window.auth?.currentUser) return;
+        
+        if (!confirm('هل أنت متأكد من حظر هذا المستخدم؟')) return;
+        
+        try {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                blocked: firebase.firestore.FieldValue.arrayUnion(userId)
+            });
+            
+            this.blockedUsers.push(userId);
+            
+            // إذا كان هذا المستخدم هو المحادثة الحالية، أغلقها
+            if (this.currentChat === userId) {
+                this.closeChat();
+            }
+            
+            alert('تم حظر المستخدم بنجاح');
+            
+        } catch (error) {
+            console.error('خطأ في حظر المستخدم:', error);
+            alert('حدث خطأ في حظر المستخدم');
+        }
+    },
+    
+    // إلغاء حظر مستخدم
+    async unblockUser(userId) {
+        if (!window.auth?.currentUser) return;
+        
+        try {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                blocked: firebase.firestore.FieldValue.arrayRemove(userId)
+            });
+            
+            this.blockedUsers = this.blockedUsers.filter(id => id !== userId);
+            
+            alert('تم إلغاء حظر المستخدم بنجاح');
+            
+        } catch (error) {
+            console.error('خطأ في إلغاء الحظر:', error);
+            alert('حدث خطأ في إلغاء الحظر');
+        }
+    },
+    
+    // مسح المحادثة
+    clearChat(friendId) {
+        const confirmDiv = document.querySelector('.clear-chat-confirm');
+        if (confirmDiv) {
+            confirmDiv.classList.add('active');
+            
+            const confirmBtn = confirmDiv.querySelector('.confirm');
+            const cancelBtn = confirmDiv.querySelector('.cancel');
+            
+            const handleConfirm = () => {
+                const key = `chat_${friendId}`;
+                localStorage.removeItem(key);
+                this.messages[friendId] = [];
+                
+                if (this.currentChat === friendId) {
+                    document.getElementById('messagesContainer').innerHTML = '';
+                }
+                
+                confirmDiv.classList.remove('active');
+                confirmBtn.removeEventListener('click', handleConfirm);
+                cancelBtn.removeEventListener('click', handleCancel);
+                
+                alert('تم مسح المحادثة بنجاح');
+            };
+            
+            const handleCancel = () => {
+                confirmDiv.classList.remove('active');
+                confirmBtn.removeEventListener('click', handleConfirm);
+                cancelBtn.removeEventListener('click', handleCancel);
+            };
+            
+            confirmBtn.addEventListener('click', handleConfirm);
+            cancelBtn.addEventListener('click', handleCancel);
+        }
+    },
+    
+    // عرض معلومات الاتصال
+    async showContactInfo() {
+        if (!this.currentFriendData) return;
+        
+        const contactPage = document.getElementById('contactInfoPage');
+        if (!contactPage) return;
+        
+        // تحديث المعلومات
+        const avatar = contactPage.querySelector('.avatar-emoji');
+        const name = contactPage.querySelector('h2');
+        const id = contactPage.querySelector('.contact-id');
+        const status = contactPage.querySelector('.contact-status .value');
+        
+        if (avatar) avatar.textContent = this.currentFriendData.avatarEmoji || '👤';
+        if (name) name.textContent = this.currentFriendData.name || 'مستخدم';
+        if (id) id.textContent = this.currentFriendData.shareableId || '0000000000';
+        
+        // حالة الاتصال
+        const statusElement = contactPage.querySelector('.contact-status .value');
+        if (statusElement) {
+            const isOnline = this.checkFriendStatus(this.currentChat);
+            statusElement.textContent = isOnline ? 'متصل' : 'غير متصل';
+            statusElement.className = `value ${isOnline ? 'online' : 'offline'}`;
+        }
+        
+        // أزرار الإجراءات
+        const blockBtn = contactPage.querySelector('.block-btn');
+        if (blockBtn) {
+            const isBlocked = this.blockedUsers.includes(this.currentChat);
+            blockBtn.textContent = isBlocked ? 'إلغاء الحظر' : 'حظر';
+            blockBtn.className = isBlocked ? 'unblock-btn' : 'block-btn';
+            
+            blockBtn.onclick = () => {
+                if (isBlocked) {
+                    this.unblockUser(this.currentChat);
+                } else {
+                    this.blockUser(this.currentChat);
+                }
+                contactPage.classList.remove('active');
+            };
+        }
+        
+        const clearChatBtn = contactPage.querySelector('.clear-chat-btn');
+        if (clearChatBtn) {
+            clearChatBtn.onclick = () => {
+                this.clearChat(this.currentChat);
+                contactPage.classList.remove('active');
+            };
+        }
+        
+        contactPage.classList.add('active');
     },
     
     escapeHtml(text) {
@@ -736,6 +985,8 @@ const ChatSystem = {
 
 ChatSystem.init();
 
+// ========== تحميل قائمة المحادثات ==========
+
 async function loadChats() {
     if (!window.auth || !window.auth.currentUser) return;
     
@@ -746,7 +997,9 @@ async function loadChats() {
         const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
         if (!userDoc.exists) return;
         
-        const friends = userDoc.data().friends || [];
+        const userData = userDoc.data();
+        const friends = userData.friends || [];
+        const blocked = userData.blocked || [];
         
         if (friends.length === 0) {
             chatsList.innerHTML = `
@@ -766,6 +1019,11 @@ async function loadChats() {
                 const friendDoc = await window.db.collection('users').doc(friendId).get();
                 if (friendDoc.exists) {
                     const friend = friendDoc.data();
+                    
+                    // إذا كان محظوراً، أضف علامة
+                    const isBlocked = blocked.includes(friendId);
+                    const blockedClass = isBlocked ? 'blocked' : '';
+                    
                     const avatarEmoji = window.getEmojiForUser(friend);
                     
                     const key = `chat_${friendId}`;
@@ -795,16 +1053,19 @@ async function loadChats() {
                     const unreadBadge = unreadCount > 0 ? 
                         `<span class="unread-badge">${unreadCount}</span>` : '';
                     
+                    const blockedBadge = isBlocked ? 
+                        `<span class="blocked-badge"><i class="fas fa-ban"></i> محظور</span>` : '';
+                    
                     html += `
-                        <div class="chat-item" onclick="openChat('${friendId}')">
+                        <div class="chat-item ${blockedClass}" onclick="${!isBlocked ? `openChat('${friendId}')` : 'alert(\'لا يمكن فتح محادثة مع مستخدم محظور\')'}">
                             <div class="chat-avatar-emoji">${avatarEmoji}</div>
                             <div class="chat-info">
                                 <h4>${friend.name || 'مستخدم'}</h4>
-                                <p class="last-message">${lastMessage}</p>
+                                <p class="last-message">${blockedBadge || lastMessage}</p>
                             </div>
                             <div class="chat-meta">
-                                <span class="chat-time">${lastTime || ''}</span>
-                                ${unreadBadge}
+                                ${!isBlocked ? `<span class="chat-time">${lastTime || ''}</span>` : ''}
+                                ${!isBlocked ? unreadBadge : ''}
                             </div>
                         </div>
                     `;
@@ -828,31 +1089,63 @@ async function loadChats() {
     }
 }
 
-function setupChatListeners() {
-    document.addEventListener('click', (e) => {
-        const menu = document.getElementById('attachmentMenu');
-        const attachBtn = document.querySelector('.attach-btn');
-        if (menu && attachBtn && !menu.contains(e.target) && !attachBtn.contains(e.target)) {
-            menu.style.display = 'none';
+// ========== تحميل قائمة المحظورين ==========
+
+async function loadBlockedUsers() {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    const blockedList = document.getElementById('blockedUsersList');
+    if (!blockedList) return;
+    
+    try {
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+        if (!userDoc.exists) return;
+        
+        const blockedIds = userDoc.data().blocked || [];
+        
+        if (blockedIds.length === 0) {
+            blockedList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-ban"></i>
+                    <h3>لا يوجد محظورين</h3>
+                    <p>لم تقم بحظر أي مستخدم بعد</p>
+                </div>
+            `;
+            return;
         }
         
-        const emojiPicker = document.getElementById('emojiPicker');
-        const emojiBtn = document.querySelector('.emoji-btn');
-        if (emojiPicker && emojiBtn && !emojiPicker.contains(e.target) && !emojiBtn.contains(e.target)) {
-            emojiPicker.style.display = 'none';
+        let html = '<div class="blocked-users-list">';
+        
+        for (const userId of blockedIds) {
+            try {
+                const userDoc = await window.db.collection('users').doc(userId).get();
+                if (userDoc.exists) {
+                    const user = userDoc.data();
+                    const avatarEmoji = window.getEmojiForUser(user);
+                    
+                    html += `
+                        <div class="blocked-user-item">
+                            <div class="user-avatar-emoji">${avatarEmoji}</div>
+                            <div class="blocked-user-info">
+                                <h4>${user.name || 'مستخدم'}</h4>
+                                <p>${user.shareableId || ''}</p>
+                            </div>
+                            <button class="unblock-btn" onclick="unblockUser('${userId}')">
+                                <i class="fas fa-ban"></i> إلغاء الحظر
+                            </button>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('Error loading blocked user:', e);
+            }
         }
-    });
-    
-    if (window.auth?.currentUser) {
-        window.db.collection('temp_messages')
-            .where('to', '==', window.auth.currentUser.uid)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added') {
-                        loadChats();
-                    }
-                });
-            });
+        
+        html += '</div>';
+        blockedList.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading blocked users:', error);
     }
 }
 
@@ -892,7 +1185,6 @@ window.showAttachmentMenu = function() {
     const menu = document.getElementById('attachmentMenu');
     menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
     
-    // إخفاء منتقي الإيموجي إذا كان ظاهراً
     const emojiPicker = document.getElementById('emojiPicker');
     if (emojiPicker) emojiPicker.style.display = 'none';
 };
@@ -901,17 +1193,14 @@ window.showEmojiPicker = function() {
     const picker = document.getElementById('emojiPicker');
     picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
     
-    // إخفاء قائمة المرفقات إذا كانت ظاهرة
     const menu = document.getElementById('attachmentMenu');
     if (menu) menu.style.display = 'none';
     
-    // تحميل الإيموجيات إذا كانت فارغة
     if (picker.querySelector('.emoji-grid').children.length === 0) {
         loadEmojis();
     }
 };
 
-// تحميل الإيموجيات
 function loadEmojis() {
     const emojis = ['😊', '😂', '❤️', '👍', '🎉', '😢', '😡', '😍', '🤔', '👌', '🙏', '🔥', '✨', '⭐', '🌙', '☀️'];
     const grid = document.querySelector('.emoji-grid');
@@ -942,46 +1231,85 @@ window.sendImage = function() {
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
+let mediaRecorder = null;
+let recordingChunks = [];
+
 window.sendVoiceNote = function() {
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
-            const mediaRecorder = new MediaRecorder(stream);
-            const chunks = [];
+            mediaRecorder = new MediaRecorder(stream);
+            recordingChunks = [];
             
-            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
+            
             mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' });
+                const blob = new Blob(recordingChunks, { type: 'audio/webm' });
                 ChatSystem.sendVoiceNote(blob);
                 stream.getTracks().forEach(track => track.stop());
             };
             
             mediaRecorder.start();
             
-            // تغيير زر الإرسال إلى زر إيقاف
-            const sendBtn = document.querySelector('.send-btn');
-            const voiceBtn = document.querySelector('.voice-btn');
-            if (sendBtn) sendBtn.style.display = 'none';
-            if (voiceBtn) {
-                voiceBtn.style.display = 'flex';
-                voiceBtn.onclick = () => {
-                    if (mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                        sendBtn.style.display = 'flex';
-                        voiceBtn.style.display = 'none';
-                    }
-                };
-            }
+            // إظهار مؤشر التسجيل
+            const inputWrapper = document.querySelector('.message-input-wrapper');
+            const recordingIndicator = document.createElement('div');
+            recordingIndicator.className = 'recording-indicator';
+            recordingIndicator.innerHTML = `
+                <i class="fas fa-microphone"></i>
+                <span class="recording-timer">00:00</span>
+                <div class="recording-controls">
+                    <button class="recording-cancel" onclick="cancelRecording()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button class="recording-send" onclick="stopRecording()">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+            `;
             
-            // إيقاف التسجيل تلقائياً بعد 60 ثانية
-            setTimeout(() => {
-                if (mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
-                    if (sendBtn) sendBtn.style.display = 'flex';
-                    if (voiceBtn) voiceBtn.style.display = 'none';
-                }
-            }, 60000);
+            inputWrapper.style.display = 'none';
+            inputWrapper.parentNode.insertBefore(recordingIndicator, inputWrapper.nextSibling);
+            
+            // تحديث التايمر
+            let seconds = 0;
+            const timer = setInterval(() => {
+                seconds++;
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                recordingIndicator.querySelector('.recording-timer').textContent = 
+                    `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }, 1000);
+            
+            // حفظ المراجع للإلغاء
+            window.currentRecording = {
+                mediaRecorder,
+                timer,
+                indicator: recordingIndicator,
+                inputWrapper
+            };
         });
+    
     document.getElementById('attachmentMenu').style.display = 'none';
+};
+
+window.cancelRecording = function() {
+    if (window.currentRecording) {
+        window.currentRecording.mediaRecorder.stop();
+        clearInterval(window.currentRecording.timer);
+        window.currentRecording.indicator.remove();
+        window.currentRecording.inputWrapper.style.display = 'flex';
+        window.currentRecording = null;
+    }
+};
+
+window.stopRecording = function() {
+    if (window.currentRecording) {
+        window.currentRecording.mediaRecorder.stop();
+        clearInterval(window.currentRecording.timer);
+        window.currentRecording.indicator.remove();
+        window.currentRecording.inputWrapper.style.display = 'flex';
+        window.currentRecording = null;
+    }
 };
 
 window.shareLocation = function() {
@@ -991,11 +1319,6 @@ window.shareLocation = function() {
             ChatSystem.sendMessage(`📍 موقعي: ${locationUrl}`);
         });
     }
-    document.getElementById('attachmentMenu').style.display = 'none';
-};
-
-window.sendDocument = function() {
-    alert('ميزة إرسال المستندات قيد التطوير');
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
@@ -1013,11 +1336,66 @@ window.endCall = function() { ChatSystem.endCall(); };
 window.toggleMute = function() { ChatSystem.toggleMute(); };
 window.toggleCamera = function() { ChatSystem.toggleCamera(); };
 window.closeConversation = function() { ChatSystem.closeChat(); };
+
 window.viewContactInfo = function() {
-    alert('معلومات الاتصال - قيد التطوير');
+    ChatSystem.showContactInfo();
 };
+
 window.showMoreOptions = function() {
-    alert('خيارات إضافية - قيد التطوير');
+    const menu = document.getElementById('moreOptionsMenu');
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+};
+
+window.closeContactInfo = function() {
+    document.getElementById('contactInfoPage').classList.remove('active');
+};
+
+window.blockUser = function(userId) {
+    ChatSystem.blockUser(userId);
+};
+
+window.unblockUser = function(userId) {
+    ChatSystem.unblockUser(userId).then(() => {
+        loadBlockedUsers();
+        loadChats();
+    });
+};
+
+window.clearChat = function() {
+    if (ChatSystem.currentChat) {
+        ChatSystem.clearChat(ChatSystem.currentChat);
+    }
+};
+
+// نافذة عرض الصور
+window.openImageViewer = function(imageSrc) {
+    const viewer = document.getElementById('imageViewer');
+    const img = viewer.querySelector('img');
+    img.src = imageSrc;
+    viewer.classList.add('active');
+};
+
+window.closeImageViewer = function() {
+    document.getElementById('imageViewer').classList.remove('active');
+};
+
+window.downloadImage = function() {
+    const img = document.querySelector('#imageViewer img');
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = 'image.jpg';
+    a.click();
+};
+
+// إيقاف البصمات المتعددة
+window.pauseOtherAudio = function(currentAudio) {
+    document.querySelectorAll('audio').forEach(audio => {
+        if (audio !== currentAudio && !audio.paused) {
+            audio.pause();
+        }
+    });
 };
 
 // ========== باقي الدوال (بدون تغيير) ==========
@@ -1183,4 +1561,4 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - نظام متكامل مثل واتساب');
+console.log('✅ app.js محدث - نظام متكامل مثل واتساب مع جميع الميزات');
