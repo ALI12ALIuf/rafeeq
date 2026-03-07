@@ -148,6 +148,177 @@ function loadStories() {
     `).join('');
 }
 
+// ========== نظام الإشارات (Signaling System) ==========
+
+class SignalingSystem {
+    constructor() {
+        this.peerConnections = new Map();
+        this.dataChannels = new Map();
+        this.localStream = null;
+        this.currentCall = null;
+        this.currentFriendId = null;
+        this.pendingCandidates = new Map();
+        this.isReady = true;
+        
+        console.log('🔧 نظام الإشارات جاهز');
+        
+        if (window.auth?.currentUser) {
+            this.startListeningForSignals();
+        }
+    }
+
+    // بدء الاستماع للإشارات الواردة
+    startListeningForSignals() {
+        if (!window.auth?.currentUser) {
+            setTimeout(() => this.startListeningForSignals(), 1000);
+            return;
+        }
+        
+        const userId = window.auth.currentUser.uid;
+        console.log('👂 بدء الاستماع للإشارات للمستخدم:', userId);
+        
+        window.db.collection('signaling')
+            .where('to', '==', userId)
+            .where('status', '==', 'pending')
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const signal = change.doc.data();
+                        const signalId = change.doc.id;
+                        
+                        console.log('📩 إشارة واردة:', signal.type);
+                        
+                        switch(signal.type) {
+                            case 'offer':
+                                this.handleIncomingOffer(signal, signalId);
+                                break;
+                            case 'answer':
+                                this.handleIncomingAnswer(signal, signalId);
+                                break;
+                            case 'candidate':
+                                this.handleIncomingCandidate(signal, signalId);
+                                break;
+                            case 'end-call':
+                                this.handleEndCall(signal.from);
+                                break;
+                        }
+                        
+                        setTimeout(() => {
+                            window.db.collection('signaling').doc(signalId).delete()
+                                .catch(() => {});
+                        }, 5000);
+                    }
+                });
+            }, (error) => {
+                console.error('خطأ في الاستماع للإشارات:', error);
+            });
+    }
+
+    // إرسال عرض اتصال
+    async sendOffer(friendId, offer) {
+        try {
+            const signalId = `${window.auth.currentUser.uid}_${friendId}_${Date.now()}`;
+            
+            await window.db.collection('signaling').doc(signalId).set({
+                from: window.auth.currentUser.uid,
+                to: friendId,
+                type: 'offer',
+                offer: {
+                    type: offer.type,
+                    sdp: offer.sdp
+                },
+                status: 'pending',
+                timestamp: new Date(),
+                expiresAt: new Date(Date.now() + 60000)
+            });
+
+            console.log('📤 عرض اتصال مرسل');
+
+        } catch (error) {
+            console.error('خطأ في إرسال العرض:', error);
+        }
+    }
+
+    // إرسال إجابة اتصال
+    async sendAnswer(friendId, answer, signalId) {
+        try {
+            await window.db.collection('signaling').doc(signalId).set({
+                from: window.auth.currentUser.uid,
+                to: friendId,
+                type: 'answer',
+                answer: {
+                    type: answer.type,
+                    sdp: answer.sdp
+                },
+                status: 'answered',
+                timestamp: new Date()
+            }, { merge: true });
+
+            console.log('📤 إجابة اتصال مرسلة');
+
+        } catch (error) {
+            console.error('خطأ في إرسال الإجابة:', error);
+        }
+    }
+
+    // إرسال ICE candidate
+    async sendCandidate(friendId, candidate) {
+        try {
+            const signalId = `${window.auth.currentUser.uid}_${friendId}_cand_${Date.now()}`;
+            
+            await window.db.collection('signaling').doc(signalId).set({
+                from: window.auth.currentUser.uid,
+                to: friendId,
+                type: 'candidate',
+                candidate: {
+                    candidate: candidate.candidate,
+                    sdpMid: candidate.sdpMid,
+                    sdpMLineIndex: candidate.sdpMLineIndex
+                },
+                timestamp: new Date(),
+                expiresAt: new Date(Date.now() + 60000)
+            });
+            
+            console.log('📤 مرشح ICE مرسل');
+            
+        } catch (error) {
+            console.error('خطأ في إرسال candidate:', error);
+        }
+    }
+
+    // معالجة عرض وارد
+    async handleIncomingOffer(signal, signalId) {
+        console.log('📥 استلام عرض من:', signal.from);
+        if (window.ChatSystem && window.ChatSystem.handleIncomingOffer) {
+            window.ChatSystem.handleIncomingOffer(signal, signalId);
+        }
+    }
+
+    // معالجة إجابة واردة
+    async handleIncomingAnswer(signal, signalId) {
+        console.log('📥 استلام إجابة من:', signal.from);
+        if (window.ChatSystem && window.ChatSystem.handleIncomingAnswer) {
+            window.ChatSystem.handleIncomingAnswer(signal, signalId);
+        }
+    }
+
+    // معالجة مرشح وارد
+    async handleIncomingCandidate(signal, signalId) {
+        console.log('📥 استلام مرشح من:', signal.from);
+        if (window.ChatSystem && window.ChatSystem.handleIncomingCandidate) {
+            window.ChatSystem.handleIncomingCandidate(signal, signalId);
+        }
+    }
+
+    // معالجة إنهاء المكالمة
+    handleEndCall(friendId) {
+        console.log('📞 إنهاء مكالمة من:', friendId);
+        if (window.ChatSystem && window.ChatSystem.handleEndCall) {
+            window.ChatSystem.handleEndCall(friendId);
+        }
+    }
+}
+
 // ========== نظام الدردشة المتكامل (مثل واتساب) ==========
 
 const ChatSystem = {
@@ -156,10 +327,17 @@ const ChatSystem = {
     peer: null,
     currentCall: null,
     localStream: null,
+    signaling: null,
     
     init() {
         this.loadAllChats();
         this.initPeer();
+        this.initSignaling();
+    },
+    
+    initSignaling() {
+        this.signaling = new SignalingSystem();
+        window.ChatSystem = this; // ربط مع نظام الإشارات
     },
     
     initPeer() {
@@ -194,14 +372,12 @@ const ChatSystem = {
         }
     },
     
-    // فتح المحادثة (معدل)
+    // فتح المحادثة
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
-        // إضافة كلاس للـ body لإخفاء القوائم
         document.body.classList.add('conversation-open');
         
-        // تحديث واجهة المحادثة
         const nameElement = document.getElementById('conversationName');
         const avatarElement = document.getElementById('conversationAvatar');
         const statusElement = document.getElementById('conversationStatus');
@@ -210,20 +386,17 @@ const ChatSystem = {
         if (avatarElement) avatarElement.textContent = friendAvatar || '👤';
         if (statusElement) statusElement.textContent = 'متصل الآن';
         
-        // إظهار صفحة المحادثة
         document.querySelector('.chat-page').style.display = 'none';
         document.getElementById('conversationPage').style.display = 'flex';
         
         this.displayMessages(friendId);
         this.listenForNewMessages(friendId);
         
-        // التركيز على حقل الإدخال
         setTimeout(() => {
             const input = document.getElementById('messageInput');
             if (input) input.focus();
         }, 300);
         
-        // التمرير لآخر رسالة
         setTimeout(() => {
             const container = document.getElementById('messagesContainer');
             if (container) container.scrollTop = container.scrollHeight;
@@ -238,7 +411,7 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
-    // عرض الرسالة مع الحالة (معدل)
+    // عرض الرسالة مع الحالة
     displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -252,7 +425,6 @@ const ChatSystem = {
             minute: '2-digit'
         });
         
-        // إضافة حالة الرسالة
         let statusHtml = '';
         if (msg.sender === 'me') {
             let statusIcon = '';
@@ -308,7 +480,7 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // إرسال رسالة مع حالة (معدل)
+    // إرسال رسالة مع حالة
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
@@ -322,13 +494,9 @@ const ChatSystem = {
             status: 'sending'
         };
         
-        // عرض الرسالة فوراً
         this.displayMessage(message);
-        
-        // حفظ في localStorage
         this.saveMessage(this.currentChat, message);
         
-        // محاولة الإرسال عبر Firebase
         try {
             const docRef = await window.db.collection('temp_messages').add({
                 to: this.currentChat,
@@ -338,10 +506,7 @@ const ChatSystem = {
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
             
-            // تحديث حالة الرسالة إلى "مرسلة"
             this.updateMessageStatus(messageId, 'sent');
-            
-            // مراقبة وصول الرسالة
             this.waitForDelivery(messageId, docRef.id);
             
         } catch (error) {
@@ -456,11 +621,9 @@ const ChatSystem = {
             statusElement.style.color = '#f44336';
         }
         
-        // تحديث في localStorage
         this.updateMessageStatusInStorage(messageId, status);
     },
     
-    // تحديث حالة الرسالة في localStorage
     updateMessageStatusInStorage(messageId, status) {
         const key = `chat_${this.currentChat}`;
         try {
@@ -478,9 +641,7 @@ const ChatSystem = {
         }
     },
     
-    // انتظار وصول الرسالة
     waitForDelivery(messageId, firebaseDocId) {
-        // مراقبة تغييرات حالة الرسالة
         const unsubscribe = window.db.collection('temp_messages')
             .doc(firebaseDocId)
             .onSnapshot((doc) => {
@@ -496,7 +657,6 @@ const ChatSystem = {
                 }
             });
         
-        // إذا لم تصل بعد 5 ثواني، اعتبر أنها وصلت
         setTimeout(() => {
             this.updateMessageStatus(messageId, 'delivered');
         }, 5000);
@@ -526,7 +686,6 @@ const ChatSystem = {
                     if (change.type === 'added') {
                         const data = change.doc.data();
                         
-                        // تحديث حالة الرسالة إلى "تم التوصيل"
                         if (data.message && data.message.id) {
                             this.updateMessageStatusFromFriend(data.message.id, 'delivered');
                         }
@@ -537,7 +696,6 @@ const ChatSystem = {
                         if (this.currentChat === friendId) {
                             this.displayMessage(message);
                             
-                            // إرسال إشعار بالقراءة
                             setTimeout(() => {
                                 this.markAsRead(data.message.id, change.doc.id);
                             }, 1000);
@@ -552,7 +710,6 @@ const ChatSystem = {
             });
     },
     
-    // تحديث حالة الرسالة من الصديق
     updateMessageStatusFromFriend(messageId, status) {
         const key = `chat_${this.currentChat}`;
         try {
@@ -571,7 +728,6 @@ const ChatSystem = {
                 localStorage.setItem(key, JSON.stringify(history));
                 this.messages[this.currentChat] = history;
                 
-                // تحديث الواجهة
                 const msgElement = document.getElementById(`msg-${messageId}`);
                 if (msgElement) {
                     const statusElement = msgElement.querySelector('.message-status');
@@ -591,7 +747,6 @@ const ChatSystem = {
         }
     },
     
-    // تحديد الرسالة كمقروءة
     async markAsRead(messageId, firebaseDocId) {
         try {
             await window.db.collection('temp_messages').doc(firebaseDocId).update({
@@ -617,6 +772,8 @@ const ChatSystem = {
         }
     },
     
+    // ========== دوال المكالمات ==========
+    
     async startVideoCall() {
         if (!this.currentChat || !this.peer) return;
         try {
@@ -627,6 +784,13 @@ const ChatSystem = {
             const call = this.peer.call(this.currentChat, this.localStream);
             this.currentCall = call;
             this.showVideoCall(call, this.localStream);
+            
+            // إرسال إشارة عبر Firebase
+            if (this.signaling) {
+                const offer = await this.peer._lastOffer;
+                this.signaling.sendOffer(this.currentChat, offer);
+            }
+            
         } catch (error) {
             console.error('خطأ في بدء المكالمة:', error);
             alert('لا يمكن الوصول إلى الكاميرا');
@@ -643,6 +807,13 @@ const ChatSystem = {
             const call = this.peer.call(this.currentChat, this.localStream);
             this.currentCall = call;
             this.showVoiceCall(call, this.localStream);
+            
+            // إرسال إشارة عبر Firebase
+            if (this.signaling) {
+                const offer = await this.peer._lastOffer;
+                this.signaling.sendOffer(this.currentChat, offer);
+            }
+            
         } catch (error) {
             console.error('خطأ في بدء المكالمة:', error);
             alert('لا يمكن الوصول إلى الميكروفون');
@@ -691,6 +862,11 @@ const ChatSystem = {
         if (this.currentCall) this.currentCall.close();
         document.getElementById('videoContainer').style.display = 'none';
         document.getElementById('localVideo').style.display = 'block';
+        
+        // إرسال إشارة إنهاء المكالمة
+        if (this.signaling && this.currentChat) {
+            this.signaling.sendCandidate(this.currentChat, { type: 'end-call' });
+        }
     },
     
     toggleMute() {
@@ -715,11 +891,33 @@ const ChatSystem = {
         }
     },
     
-    // إغلاق المحادثة (معدل)
+    // معالجة الإشارات الواردة من نظام الإشارات
+    handleIncomingOffer(signal, signalId) {
+        console.log('📞 معالجة عرض وارد:', signal);
+        // سيتم تنفيذها عند استقبال عرض
+    },
+    
+    handleIncomingAnswer(signal, signalId) {
+        console.log('📞 معالجة إجابة واردة:', signal);
+        // سيتم تنفيذها عند استقبال إجابة
+    },
+    
+    handleIncomingCandidate(signal, signalId) {
+        console.log('📞 معالجة مرشح وارد:', signal);
+        // سيتم تنفيذها عند استقبال مرشح
+    },
+    
+    handleEndCall(friendId) {
+        console.log('📞 معالجة إنهاء مكالمة من:', friendId);
+        if (this.currentCall) {
+            this.endCall();
+        }
+    },
+    
+    // إغلاق المحادثة
     closeChat() {
         if (this.currentCall) this.endCall();
         
-        // إزالة كلاس الـ body
         document.body.classList.remove('conversation-open');
         
         document.getElementById('conversationPage').style.display = 'none';
@@ -734,7 +932,10 @@ const ChatSystem = {
     }
 };
 
+// تهيئة النظام
 ChatSystem.init();
+
+// ========== دوال تحميل المحادثات ==========
 
 async function loadChats() {
     if (!window.auth || !window.auth.currentUser) return;
@@ -785,7 +986,6 @@ async function loadChats() {
                                 minute: '2-digit'
                             });
                             
-                            // حساب الرسائل غير المقروءة
                             unreadCount = history.filter(msg => 
                                 msg.sender === 'friend' && msg.status !== 'read'
                             ).length;
@@ -892,7 +1092,6 @@ window.showAttachmentMenu = function() {
     const menu = document.getElementById('attachmentMenu');
     menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
     
-    // إخفاء منتقي الإيموجي إذا كان ظاهراً
     const emojiPicker = document.getElementById('emojiPicker');
     if (emojiPicker) emojiPicker.style.display = 'none';
 };
@@ -901,17 +1100,14 @@ window.showEmojiPicker = function() {
     const picker = document.getElementById('emojiPicker');
     picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
     
-    // إخفاء قائمة المرفقات إذا كانت ظاهرة
     const menu = document.getElementById('attachmentMenu');
     if (menu) menu.style.display = 'none';
     
-    // تحميل الإيموجيات إذا كانت فارغة
     if (picker.querySelector('.emoji-grid').children.length === 0) {
         loadEmojis();
     }
 };
 
-// تحميل الإيموجيات
 function loadEmojis() {
     const emojis = ['😊', '😂', '❤️', '👍', '🎉', '😢', '😡', '😍', '🤔', '👌', '🙏', '🔥', '✨', '⭐', '🌙', '☀️'];
     const grid = document.querySelector('.emoji-grid');
@@ -957,7 +1153,6 @@ window.sendVoiceNote = function() {
             
             mediaRecorder.start();
             
-            // تغيير زر الإرسال إلى زر إيقاف
             const sendBtn = document.querySelector('.send-btn');
             const voiceBtn = document.querySelector('.voice-btn');
             if (sendBtn) sendBtn.style.display = 'none';
@@ -972,7 +1167,6 @@ window.sendVoiceNote = function() {
                 };
             }
             
-            // إيقاف التسجيل تلقائياً بعد 60 ثانية
             setTimeout(() => {
                 if (mediaRecorder.state === 'recording') {
                     mediaRecorder.stop();
@@ -1183,4 +1377,59 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - نظام متكامل مثل واتساب');
+// ========== إنشاء مجموعة signaling في Firebase ==========
+
+async function ensureSignalingCollection() {
+    if (!window.db) return;
+    
+    try {
+        const testDoc = await window.db.collection('signaling').doc('_config').get();
+        
+        if (!testDoc.exists) {
+            await window.db.collection('signaling').doc('_config').set({
+                name: 'WebRTC Signaling',
+                created: new Date(),
+                version: '1.0',
+                permanent: true
+            });
+            console.log('✅ مجموعة signaling جاهزة');
+        }
+    } catch (error) {
+        console.error('خطأ في تهيئة signaling:', error);
+    }
+}
+
+// ========== تنظيف الإشارات منتهية الصلاحية ==========
+
+async function cleanupExpiredSignals() {
+    if (!window.db) return;
+    
+    try {
+        const now = new Date();
+        const expired = await window.db.collection('signaling')
+            .where('expiresAt', '<', now)
+            .get();
+        
+        let count = 0;
+        for (const doc of expired.docs) {
+            await doc.ref.delete();
+            count++;
+        }
+        
+        if (count > 0) {
+            console.log(`🧹 تم تنظيف ${count} إشارة منتهية الصلاحية`);
+        }
+    } catch (error) {
+        console.error('خطأ في تنظيف الإشارات:', error);
+    }
+}
+
+// تهيئة المجموعة
+if (window.db) {
+    ensureSignalingCollection();
+}
+
+// تشغيل التنظيف كل ساعة
+setInterval(cleanupExpiredSignals, 60 * 60 * 1000);
+
+console.log('✅ app.js محدث - نظام متكامل مع الإشارات');
