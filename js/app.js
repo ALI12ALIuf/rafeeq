@@ -60,7 +60,6 @@ function setupNavigation() {
         document.querySelectorAll('.profile-subpage').forEach(sp => sp.style.display = 'none');
         if (pageId === 'chat') loadChats();
         
-        // إخفاء صفحة المحادثة وإزالة كلاس conversation-open
         const conversationPage = document.getElementById('conversationPage');
         if (conversationPage) {
             conversationPage.style.display = 'none';
@@ -167,7 +166,6 @@ class SignalingSystem {
         }
     }
 
-    // بدء الاستماع للإشارات الواردة
     startListeningForSignals() {
         if (!window.auth?.currentUser) {
             setTimeout(() => this.startListeningForSignals(), 1000);
@@ -214,7 +212,6 @@ class SignalingSystem {
             });
     }
 
-    // إرسال عرض اتصال
     async sendOffer(friendId, offer) {
         try {
             const signalId = `${window.auth.currentUser.uid}_${friendId}_${Date.now()}`;
@@ -239,7 +236,6 @@ class SignalingSystem {
         }
     }
 
-    // إرسال إجابة اتصال
     async sendAnswer(friendId, answer, signalId) {
         try {
             await window.db.collection('signaling').doc(signalId).set({
@@ -261,7 +257,6 @@ class SignalingSystem {
         }
     }
 
-    // إرسال ICE candidate
     async sendCandidate(friendId, candidate) {
         try {
             const signalId = `${window.auth.currentUser.uid}_${friendId}_cand_${Date.now()}`;
@@ -286,7 +281,6 @@ class SignalingSystem {
         }
     }
 
-    // معالجة عرض وارد
     async handleIncomingOffer(signal, signalId) {
         console.log('📥 استلام عرض من:', signal.from);
         if (window.ChatSystem && window.ChatSystem.handleIncomingOffer) {
@@ -294,7 +288,6 @@ class SignalingSystem {
         }
     }
 
-    // معالجة إجابة واردة
     async handleIncomingAnswer(signal, signalId) {
         console.log('📥 استلام إجابة من:', signal.from);
         if (window.ChatSystem && window.ChatSystem.handleIncomingAnswer) {
@@ -302,7 +295,6 @@ class SignalingSystem {
         }
     }
 
-    // معالجة مرشح وارد
     async handleIncomingCandidate(signal, signalId) {
         console.log('📥 استلام مرشح من:', signal.from);
         if (window.ChatSystem && window.ChatSystem.handleIncomingCandidate) {
@@ -310,7 +302,6 @@ class SignalingSystem {
         }
     }
 
-    // معالجة إنهاء المكالمة
     handleEndCall(friendId) {
         console.log('📞 إنهاء مكالمة من:', friendId);
         if (window.ChatSystem && window.ChatSystem.handleEndCall) {
@@ -337,7 +328,7 @@ const ChatSystem = {
     
     initSignaling() {
         this.signaling = new SignalingSystem();
-        window.ChatSystem = this; // ربط مع نظام الإشارات
+        window.ChatSystem = this;
     },
     
     initPeer() {
@@ -372,7 +363,6 @@ const ChatSystem = {
         }
     },
     
-    // فتح المحادثة
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
@@ -411,7 +401,6 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
-    // عرض الرسالة مع الحالة
     displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -480,7 +469,6 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // إرسال رسالة مع حالة
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
@@ -517,7 +505,6 @@ const ChatSystem = {
         return true;
     },
     
-    // إرسال صورة مع حالة
     async sendImage(file) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -557,7 +544,6 @@ const ChatSystem = {
         });
     },
     
-    // إرسال بصمة صوتية مع حالة
     async sendVoiceNote(audioBlob) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -597,7 +583,6 @@ const ChatSystem = {
         });
     },
     
-    // تحديث حالة الرسالة
     updateMessageStatus(messageId, status) {
         const messageElement = document.getElementById(`msg-${messageId}`);
         if (!messageElement) return;
@@ -772,24 +757,24 @@ const ChatSystem = {
         }
     },
     
-    // ========== دوال المكالمات ==========
+    // ========== دوال المكالمات (مصححة) ==========
     
     async startVideoCall() {
-        if (!this.currentChat || !this.peer) return;
+        if (!this.currentChat || !this.peer) {
+            alert('الرجاء فتح محادثة أولاً');
+            return;
+        }
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: true
             });
+            
             const call = this.peer.call(this.currentChat, this.localStream);
             this.currentCall = call;
             this.showVideoCall(call, this.localStream);
             
-            // إرسال إشارة عبر Firebase
-            if (this.signaling) {
-                const offer = await this.peer._lastOffer;
-                this.signaling.sendOffer(this.currentChat, offer);
-            }
+            console.log('📹 بدء مكالمة فيديو');
             
         } catch (error) {
             console.error('خطأ في بدء المكالمة:', error);
@@ -798,21 +783,21 @@ const ChatSystem = {
     },
     
     async startVoiceCall() {
-        if (!this.currentChat || !this.peer) return;
+        if (!this.currentChat || !this.peer) {
+            alert('الرجاء فتح محادثة أولاً');
+            return;
+        }
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 video: false,
                 audio: true
             });
+            
             const call = this.peer.call(this.currentChat, this.localStream);
             this.currentCall = call;
             this.showVoiceCall(call, this.localStream);
             
-            // إرسال إشارة عبر Firebase
-            if (this.signaling) {
-                const offer = await this.peer._lastOffer;
-                this.signaling.sendOffer(this.currentChat, offer);
-            }
+            console.log('🎤 بدء مكالمة صوتية');
             
         } catch (error) {
             console.error('خطأ في بدء المكالمة:', error);
@@ -859,14 +844,20 @@ const ChatSystem = {
     },
     
     endCall() {
-        if (this.currentCall) this.currentCall.close();
+        if (this.currentCall) {
+            this.currentCall.close();
+            this.currentCall = null;
+        }
+        
+        if (this.localStream) {
+            this.localStream.getTracks().forEach(track => track.stop());
+            this.localStream = null;
+        }
+        
         document.getElementById('videoContainer').style.display = 'none';
         document.getElementById('localVideo').style.display = 'block';
         
-        // إرسال إشارة إنهاء المكالمة
-        if (this.signaling && this.currentChat) {
-            this.signaling.sendCandidate(this.currentChat, { type: 'end-call' });
-        }
+        console.log('📞 تم إنهاء المكالمة');
     },
     
     toggleMute() {
@@ -891,20 +882,16 @@ const ChatSystem = {
         }
     },
     
-    // معالجة الإشارات الواردة من نظام الإشارات
     handleIncomingOffer(signal, signalId) {
         console.log('📞 معالجة عرض وارد:', signal);
-        // سيتم تنفيذها عند استقبال عرض
     },
     
     handleIncomingAnswer(signal, signalId) {
         console.log('📞 معالجة إجابة واردة:', signal);
-        // سيتم تنفيذها عند استقبال إجابة
     },
     
     handleIncomingCandidate(signal, signalId) {
         console.log('📞 معالجة مرشح وارد:', signal);
-        // سيتم تنفيذها عند استقبال مرشح
     },
     
     handleEndCall(friendId) {
@@ -914,7 +901,6 @@ const ChatSystem = {
         }
     },
     
-    // إغلاق المحادثة
     closeChat() {
         if (this.currentCall) this.endCall();
         
@@ -932,7 +918,6 @@ const ChatSystem = {
     }
 };
 
-// تهيئة النظام
 ChatSystem.init();
 
 // ========== دوال تحميل المحادثات ==========
