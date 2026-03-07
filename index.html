@@ -88,9 +88,9 @@
                 <div class="chats-list" id="chatsList"></div>
             </div>
 
-            <!-- صفحة المحادثة الفردية (مثل واتساب) -->
+            <!-- صفحة المحادثة الفردية (مثل واتساب) - بدون أزرار مكالمات -->
             <div class="conversation-page" id="conversationPage" style="display: none;">
-                <!-- رأس المحادثة -->
+                <!-- رأس المحادثة (بدون أزرار مكالمات) -->
                 <div class="conversation-header">
                     <button class="back-btn" onclick="closeConversation()">
                         <i class="fas fa-arrow-right"></i>
@@ -102,28 +102,7 @@
                             <span class="conversation-status" id="conversationStatus">آخر زيارة اليوم</span>
                         </div>
                     </div>
-                    <div class="conversation-actions">
-                        <button class="icon-btn" onclick="toggleVoiceCall()" title="مكالمة صوتية">
-                            <i class="fas fa-phone"></i>
-                        </button>
-                        <button class="icon-btn" onclick="toggleVideoCall()" title="مكالمة فيديو">
-                            <i class="fas fa-video"></i>
-                        </button>
-                        <button class="icon-btn" onclick="showMoreOptions()" title="خيارات أكثر">
-                            <i class="fas fa-ellipsis-vertical"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- منطقة عرض الفيديو -->
-                <div class="video-container" id="videoContainer" style="display: none;">
-                    <video id="localVideo" autoplay muted playsinline></video>
-                    <video id="remoteVideo" autoplay playsinline></video>
-                    <div class="call-controls">
-                        <button class="call-btn end-call" onclick="endCall()"><i class="fas fa-phone-slash"></i></button>
-                        <button class="call-btn" onclick="toggleMute()"><i class="fas fa-microphone"></i></button>
-                        <button class="call-btn" onclick="toggleCamera()"><i class="fas fa-video"></i></button>
-                    </div>
+                    <!-- تم إزالة أزرار المكالمات الصوتية والفيديو -->
                 </div>
 
                 <!-- منطقة الرسائل -->
@@ -163,9 +142,6 @@
                         </button>
                         <button onclick="shareLocation()">
                             <i class="fas fa-map-marker-alt"></i> موقع
-                        </button>
-                        <button onclick="sendDocument()">
-                            <i class="fas fa-file"></i> مستند
                         </button>
                     </div>
 
@@ -400,8 +376,7 @@
         </div>
     </div>
 
-    <!-- PeerJS للمكالمات -->
-    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- تم إزالة PeerJS -->
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
