@@ -365,6 +365,7 @@ const ChatSystem = {
     
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
+        console.log('✅ تم فتح محادثة مع:', friendName, 'ID:', friendId);
         
         document.body.classList.add('conversation-open');
         
@@ -760,10 +761,26 @@ const ChatSystem = {
     // ========== دوال المكالمات (مصححة) ==========
     
     async startVideoCall() {
-        if (!this.currentChat || !this.peer) {
-            alert('الرجاء فتح محادثة أولاً');
+        console.log('📹 بدء مكالمة فيديو مع:', this.currentChat);
+        
+        if (!this.currentChat) {
+            alert('❌ لم يتم تحديد صديق للمكالمة');
             return;
         }
+        
+        if (!this.peer) {
+            alert('⏳ جاري تهيئة نظام الاتصال...');
+            this.initPeer();
+            setTimeout(() => {
+                if (this.peer) {
+                    this.startVideoCall();
+                } else {
+                    alert('❌ فشل تهيئة الاتصال');
+                }
+            }, 1500);
+            return;
+        }
+        
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
@@ -774,19 +791,35 @@ const ChatSystem = {
             this.currentCall = call;
             this.showVideoCall(call, this.localStream);
             
-            console.log('📹 بدء مكالمة فيديو');
+            console.log('📹 مكالمة فيديو بدأت بنجاح');
             
         } catch (error) {
-            console.error('خطأ في بدء المكالمة:', error);
+            console.error('❌ خطأ في بدء المكالمة:', error);
             alert('لا يمكن الوصول إلى الكاميرا');
         }
     },
     
     async startVoiceCall() {
-        if (!this.currentChat || !this.peer) {
-            alert('الرجاء فتح محادثة أولاً');
+        console.log('🎤 بدء مكالمة صوتية مع:', this.currentChat);
+        
+        if (!this.currentChat) {
+            alert('❌ لم يتم تحديد صديق للمكالمة');
             return;
         }
+        
+        if (!this.peer) {
+            alert('⏳ جاري تهيئة نظام الاتصال...');
+            this.initPeer();
+            setTimeout(() => {
+                if (this.peer) {
+                    this.startVoiceCall();
+                } else {
+                    alert('❌ فشل تهيئة الاتصال');
+                }
+            }, 1500);
+            return;
+        }
+        
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 video: false,
@@ -797,10 +830,10 @@ const ChatSystem = {
             this.currentCall = call;
             this.showVoiceCall(call, this.localStream);
             
-            console.log('🎤 بدء مكالمة صوتية');
+            console.log('🎤 مكالمة صوتية بدأت بنجاح');
             
         } catch (error) {
-            console.error('خطأ في بدء المكالمة:', error);
+            console.error('❌ خطأ في بدء المكالمة:', error);
             alert('لا يمكن الوصول إلى الميكروفون');
         }
     },
@@ -909,6 +942,7 @@ const ChatSystem = {
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
         this.currentChat = null;
+        console.log('🚪 تم إغلاق المحادثة');
     },
     
     escapeHtml(text) {
@@ -1041,7 +1075,7 @@ function setupChatListeners() {
     }
 }
 
-// ========== دوال عامة للواجهة ==========
+// ========== دوال عامة للواجهة (مصححة) ==========
 
 window.openChat = function(friendId) {
     window.db.collection('users').doc(friendId).get().then((doc) => {
@@ -1178,14 +1212,66 @@ window.sendDocument = function() {
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
+// ========== دوال المكالمات العامة (مصححة) ==========
+
 window.toggleVoiceCall = function() {
-    if (ChatSystem.currentCall) ChatSystem.endCall();
-    else ChatSystem.startVoiceCall();
+    console.log('🔊 محاولة بدء مكالمة صوتية');
+    console.log('currentChat:', ChatSystem.currentChat);
+    console.log('peer:', ChatSystem.peer);
+    
+    if (!ChatSystem.currentChat) {
+        alert('❌ الرجاء فتح محادثة مع صديق أولاً');
+        return;
+    }
+    
+    if (!ChatSystem.peer) {
+        alert('⏳ جاري تجهيز نظام الاتصال...');
+        ChatSystem.initPeer();
+        setTimeout(() => {
+            if (ChatSystem.peer) {
+                ChatSystem.startVoiceCall();
+            } else {
+                alert('❌ فشل تجهيز الاتصال، تأكد من اتصال الإنترنت');
+            }
+        }, 1500);
+        return;
+    }
+    
+    if (ChatSystem.currentCall) {
+        ChatSystem.endCall();
+    } else {
+        ChatSystem.startVoiceCall();
+    }
 };
 
 window.toggleVideoCall = function() {
-    if (ChatSystem.currentCall) ChatSystem.endCall();
-    else ChatSystem.startVideoCall();
+    console.log('📹 محاولة بدء مكالمة فيديو');
+    console.log('currentChat:', ChatSystem.currentChat);
+    console.log('peer:', ChatSystem.peer);
+    
+    if (!ChatSystem.currentChat) {
+        alert('❌ الرجاء فتح محادثة مع صديق أولاً');
+        return;
+    }
+    
+    if (!ChatSystem.peer) {
+        alert('⏳ جاري تجهيز نظام الاتصال...');
+        ChatSystem.initPeer();
+        setTimeout(() => {
+            if (ChatSystem.peer) {
+                ChatSystem.startVideoCall();
+            } else {
+                alert('❌ فشل تجهيز الاتصال، تأكد من اتصال الإنترنت');
+            }
+        }, 1500);
+        return;
+    }
+    
+    if (ChatSystem.currentCall) {
+        ChatSystem.endCall();
+    } else {
+        ChatSystem.startVideoCall();
+    }
 };
 
 window.endCall = function() { ChatSystem.endCall(); };
