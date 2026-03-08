@@ -1151,75 +1151,6 @@ button:focus,
     box-shadow: none !important;
 }
 
-@media (min-width: 768px) {
-    .bottom-nav {
-        display: none;
-    }
-}
-
-@media (max-width: 480px) {
-    .subpage-header h3 {
-        font-size: 1rem;
-    }
-    
-    .empty-state i {
-        font-size: 3rem;
-    }
-    
-    .empty-state h3 {
-        font-size: 1.2rem;
-    }
-    
-    .empty-state p {
-        font-size: 0.9rem;
-    }
-    
-    .avatar-option span:first-child {
-        font-size: 2rem;
-    }
-    
-    .profile-cover {
-        height: 120px;
-    }
-    
-    .profile-avatar-center {
-        width: 80px;
-        height: 80px;
-    }
-    
-    .profile-avatar-emoji {
-        font-size: 4rem;
-    }
-    
-    .edit-profile-btn-left {
-        width: 36px;
-        height: 36px;
-        top: 10px;
-        left: 10px;
-        font-size: 1.1rem;
-    }
-    
-    .profile-info-container {
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .profile-id-row {
-        width: 100%;
-        min-width: auto;
-    }
-    
-    .edit-field input {
-        max-width: 100%;
-    }
-    
-    .modal-btn {
-        max-width: 120px;
-        padding: 0.8rem 1.2rem;
-        font-size: 0.95rem;
-    }
-}
-
 /* ===== أنماط تثبيت الأيقونات ===== */
 .bottom-nav .nav-item i,
 .settings-item-left i,
@@ -1670,7 +1601,317 @@ body.conversation-open .conversation-page {
     transform: scale(1.1);
 }
 
-/* تنسيق للشاشات الصغيرة */
+/* ============================================ */
+/* =====      التعديلات الجديدة المطلوبة        ===== */
+/* ============================================ */
+
+/* 1. تنسيق الصور داخل إطار */
+.message-image-frame {
+    border-radius: 16px;
+    border: 3px solid var(--primary);
+    padding: 4px;
+    background: white;
+    max-width: 220px;
+    max-height: 220px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.message-image-frame:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+/* الصور المرسلة من الطرف الآخر (لون مختلف) */
+.message.received .message-image-frame {
+    border-color: var(--success);
+}
+
+/* 2. نافذة عرض الصورة داخل التطبيق */
+.image-viewer-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.image-viewer-modal.active {
+    display: flex;
+}
+
+.image-viewer-content {
+    max-width: 90%;
+    max-height: 80%;
+    position: relative;
+}
+
+.image-viewer-content img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 12px;
+    border: 2px solid white;
+}
+
+.image-viewer-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.image-viewer-close:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.1);
+}
+
+.image-viewer-download {
+    position: absolute;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.image-viewer-download:hover {
+    background: var(--primary-dark);
+    transform: translateX(-50%) scale(1.05);
+}
+
+/* 3. تنسيق الموقع */
+.location-message-card {
+    background: var(--light);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 260px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: var(--shadow);
+}
+
+.location-message-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.location-map-preview {
+    width: 100%;
+    height: 130px;
+    background: linear-gradient(135deg, var(--primary-light, #64B5F6) 0%, var(--primary) 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.location-map-preview i {
+    font-size: 3rem;
+    color: white;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.location-map-preview::after {
+    content: "📍";
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 2rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.location-details-preview {
+    padding: 12px;
+    background: var(--card-bg);
+}
+
+.location-title-preview {
+    font-weight: bold;
+    font-size: 0.95rem;
+    color: var(--text);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.location-address-preview {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.location-coords-preview {
+    font-size: 0.7rem;
+    color: var(--primary);
+    direction: ltr;
+    text-align: left;
+    font-family: monospace;
+    background: var(--light);
+    padding: 4px 8px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+.location-open-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin-top: 8px;
+    width: 100%;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.location-open-btn:hover {
+    background: var(--primary-dark);
+}
+
+/* 4. تنسيق البصمات الصوتية */
+.voice-message-card {
+    display: flex;
+    align-items: center;
+    background: var(--light);
+    border-radius: 30px;
+    padding: 8px 12px;
+    min-width: 220px;
+    max-width: 280px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    transition: all 0.2s;
+}
+
+.voice-message-card:hover {
+    background: var(--card-bg);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.voice-play-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.voice-play-btn:hover {
+    background: var(--primary-dark);
+    transform: scale(1.1);
+}
+
+.voice-play-btn.playing {
+    background: var(--danger);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+}
+
+.voice-info {
+    flex: 1;
+    margin: 0 10px;
+}
+
+.voice-waveform {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 30px;
+    margin-bottom: 4px;
+}
+
+.voice-waveform span {
+    width: 4px;
+    height: 15px;
+    background: var(--primary);
+    border-radius: 2px;
+    animation: waveform 1s infinite ease-in-out;
+}
+
+.voice-waveform span:nth-child(2) { height: 25px; animation-delay: 0.1s; }
+.voice-waveform span:nth-child(3) { height: 20px; animation-delay: 0.2s; }
+.voice-waveform span:nth-child(4) { height: 30px; animation-delay: 0.3s; }
+.voice-waveform span:nth-child(5) { height: 18px; animation-delay: 0.4s; }
+.voice-waveform span:nth-child(6) { height: 22px; animation-delay: 0.5s; }
+.voice-waveform span:nth-child(7) { height: 15px; animation-delay: 0.6s; }
+.voice-waveform span:nth-child(8) { height: 25px; animation-delay: 0.7s; }
+.voice-waveform span:nth-child(9) { height: 20px; animation-delay: 0.8s; }
+
+@keyframes waveform {
+    0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
+    50% { transform: scaleY(1.5); opacity: 1; background: var(--primary-dark); }
+}
+
+.voice-time {
+    font-size: 0.7rem;
+    color: var(--text-light);
+    display: flex;
+    justify-content: space-between;
+}
+
+.voice-duration {
+    font-weight: 500;
+}
+
+.voice-timestamp {
+    font-size: 0.65rem;
+}
+
+/* تحسينات للشاشات الصغيرة */
 @media (max-width: 480px) {
     .conversation-header {
         padding: 8px 12px;
@@ -1699,7 +1940,8 @@ body.conversation-open .conversation-page {
         padding: 10px 14px;
     }
     
-    .message-image {
+    .message-image,
+    .message-image-frame {
         max-width: 150px;
         max-height: 150px;
     }
@@ -1737,6 +1979,40 @@ body.conversation-open .conversation-page {
         left: 10px;
         min-width: 160px;
     }
+    
+    /* تحسينات للعناصر الجديدة على الشاشات الصغيرة */
+    .location-message-card {
+        width: 220px;
+    }
+    
+    .location-map-preview {
+        height: 110px;
+    }
+    
+    .voice-message-card {
+        min-width: 180px;
+        max-width: 240px;
+        padding: 6px 10px;
+    }
+    
+    .voice-play-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+    
+    .image-viewer-close {
+        top: -30px;
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+    }
+    
+    .image-viewer-download {
+        bottom: -40px;
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
 }
 
 /* تحسينات للوضع الداكن */
@@ -1758,9 +2034,19 @@ body.conversation-open .conversation-page {
 }
 
 .theme-dark .emoji-picker,
-.theme-dark .attachment-menu {
+.theme-dark .attachment-menu,
+.theme-dark .location-message-card,
+.theme-dark .voice-message-card {
     background: #2d2d2d;
     border-color: #444;
+}
+
+.theme-dark .location-details-preview {
+    background: #2d2d2d;
+}
+
+.theme-dark .location-coords-preview {
+    background: #444;
 }
 
 .theme-dark .emoji-categories {
@@ -1773,6 +2059,14 @@ body.conversation-open .conversation-page {
 
 .theme-dark .emoji-grid button:hover {
     background: #444;
+}
+
+.theme-dark .voice-waveform span {
+    background: var(--primary);
+}
+
+.theme-dark .voice-message-card:hover {
+    background: #3d3d3d;
 }
 
 /* تأثيرات الحركة */
@@ -1801,4 +2095,73 @@ body.conversation-open .conversation-page {
 
 .messages-container::-webkit-scrollbar-thumb:hover {
     background: var(--text-light);
+}
+
+@media (min-width: 768px) {
+    .bottom-nav {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .subpage-header h3 {
+        font-size: 1rem;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+    }
+    
+    .empty-state h3 {
+        font-size: 1.2rem;
+    }
+    
+    .empty-state p {
+        font-size: 0.9rem;
+    }
+    
+    .avatar-option span:first-child {
+        font-size: 2rem;
+    }
+    
+    .profile-cover {
+        height: 120px;
+    }
+    
+    .profile-avatar-center {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .profile-avatar-emoji {
+        font-size: 4rem;
+    }
+    
+    .edit-profile-btn-left {
+        width: 36px;
+        height: 36px;
+        top: 10px;
+        left: 10px;
+        font-size: 1.1rem;
+    }
+    
+    .profile-info-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .profile-id-row {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .edit-field input {
+        max-width: 100%;
+    }
+    
+    .modal-btn {
+        max-width: 120px;
+        padding: 0.8rem 1.2rem;
+        font-size: 0.95rem;
+    }
 }
