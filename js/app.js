@@ -2,9 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('App loaded, setting up navigation...');
     ensureSinglePage();
     setupNavigation();
-    setupSideMenu();
     setupModals();
-    loadStories();
     loadChats();
     setupChatListeners();
     
@@ -42,7 +40,6 @@ function ensureSinglePage() {
 
 function setupNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
-    const menuLinks = document.querySelectorAll('.menu-items a');
     const pages = document.querySelectorAll('.page');
     
     if (!navItems.length || !pages.length) return;
@@ -68,45 +65,11 @@ function setupNavigation() {
         }
         
         navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
-        const sideMenu = document.getElementById('sideMenu');
-        if (sideMenu) sideMenu.classList.remove('open');
     }
     
     navItems.forEach(item => item.addEventListener('click', () => switchPage(item.dataset.page)));
-    menuLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (link.dataset.page) switchPage(link.dataset.page);
-        });
-    });
     
-    const menuBtn = document.getElementById('menuBtn');
-    const sideMenu = document.getElementById('sideMenu');
-    
-    if (menuBtn && sideMenu) {
-        menuBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            sideMenu.classList.toggle('open');
-        });
-    }
-    
-    document.addEventListener('click', (e) => {
-        const menu = document.getElementById('sideMenu');
-        const btn = document.getElementById('menuBtn');
-        if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
-            menu.classList.remove('open');
-        }
-    });
-}
-
-function setupSideMenu() {
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (typeof logout === 'function') logout();
-        });
-    }
+    // تم إزالة كود القائمة الجانبية و menuBtn
 }
 
 function setupModals() {
@@ -131,25 +94,9 @@ function setupModals() {
     });
 }
 
-function loadStories() {
-    const container = document.getElementById('storiesContainer');
-    if (!container) return;
-    const stories = [
-        { name: 'قصتك', emoji: '👤' },
-        { name: 'محمد', emoji: '👨' },
-        { name: 'أحمد', emoji: '👨‍🦳' },
-        { name: 'سارة', emoji: '👩' },
-    ];
-    container.innerHTML = stories.map(story => `
-        <div class="story-item">
-            <div class="story-avatar-emoji">${story.emoji}</div>
-            <span class="story-name">${story.name}</span>
-        </div>
-    `).join('');
-}
+// تم إزالة دالة loadStories بالكامل
 
 // ========== نظام الدردشة المتكامل (مثل واتساب) ==========
-// تم إزالة جميع دوال WebRTC (مكالمات صوت/فيديو)
 
 const ChatSystem = {
     currentChat: null,
@@ -873,13 +820,11 @@ window.shareLocation = function() {
     document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-// تم إزالة دوال المكالمات: toggleVoiceCall, toggleVideoCall, endCall, toggleMute, toggleCamera
-
 window.closeConversation = function() {
     ChatSystem.closeChat();
 };
 
-// دوال إضافية (يمكن إضافتها لاحقاً)
+// دوال إضافية
 window.viewContactInfo = function() {
     alert('معلومات الاتصال - قيد التطوير');
 };
@@ -908,7 +853,6 @@ window.saveProfile = function() {
             name: newName
         }).then(() => {
             document.getElementById('profileName').textContent = newName;
-            document.getElementById('menuName').textContent = newName;
             closeModal();
             alert('تم حفظ التغييرات');
         }).catch(error => {
@@ -1002,8 +946,6 @@ window.selectAvatar = function(type) {
     if (profileAvatar) profileAvatar.textContent = selectedEmoji;
     const currentAvatar = document.getElementById('currentAvatarEmoji');
     if (currentAvatar) currentAvatar.textContent = selectedEmoji;
-    const menuAvatar = document.getElementById('menuAvatarEmoji');
-    if (menuAvatar) menuAvatar.textContent = selectedEmoji;
     
     if (auth && auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
@@ -1047,4 +989,4 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - نظام متكامل مثل واتساب (بدون مكالمات)');
+console.log('✅ app.js محدث - نسخة نظيفة بدون قصص أو قوائم جانبية');
