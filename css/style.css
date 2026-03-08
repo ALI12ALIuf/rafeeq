@@ -199,110 +199,9 @@ body {
     color: var(--primary);
 }
 
-/* القائمة الجانبية */
-.side-menu {
-    position: fixed;
-    top: 0;
-    left: -300px;
-    bottom: 0;
-    width: 280px;
-    background: var(--card-bg);
-    border-right: 1px solid var(--border);
-    z-index: 1000;
-    transition: left 0.3s;
-    padding: 2rem 1rem;
-    overflow-y: auto;
-}
+/* ===== تم إزالة القائمة الجانبية (side-menu) بالكامل ===== */
 
-.side-menu.open {
-    left: 0;
-}
-
-.menu-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.menu-avatar-emoji {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    margin: 0 auto 1rem;
-    background: var(--light);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 4rem;
-}
-
-.menu-items {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.menu-items a {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
-    color: var(--text);
-    text-decoration: none;
-    border-radius: var(--radius);
-    transition: background 0.3s;
-}
-
-.menu-items a:hover {
-    background: var(--light);
-}
-
-.menu-items hr {
-    margin: 1rem 0;
-    border: none;
-    border-top: 1px solid var(--border);
-}
-
-/* الصفحة الرئيسية - قصص */
-.stories-section {
-    margin-bottom: 1.5rem;
-}
-
-.stories-container {
-    display: flex;
-    gap: 1rem;
-    overflow-x: auto;
-    padding: 0.5rem 0;
-    scrollbar-width: none;
-}
-
-.stories-container::-webkit-scrollbar {
-    display: none;
-}
-
-.story-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    min-width: 70px;
-}
-
-.story-avatar-emoji {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: var(--light);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3rem;
-    border: 2px solid var(--primary);
-}
-
-.story-name {
-    font-size: 0.8rem;
-    color: var(--text-light);
-}
+/* الصفحة الرئيسية - تم إزالة قسم القصص بالكامل */
 
 /* بطاقات المنشورات */
 .post-card {
@@ -1217,22 +1116,44 @@ input:checked + .slider:before {
     transform: translateX(26px);
 }
 
+/* ===== إزالة تأثير اللمس (الظل الأزرق) ===== */
+* {
+    -webkit-tap-highlight-color: transparent !important;
+    tap-highlight-color: transparent !important;
+    outline: none !important;
+}
+
+button, 
+.nav-item, 
+.chat-item, 
+.user-item, 
+.action-btn, 
+.icon-btn, 
+.back-btn, 
+.stat-link, 
+.menu-items a {
+    -webkit-tap-highlight-color: transparent !important;
+    tap-highlight-color: transparent !important;
+    outline: none !important;
+}
+
+/* إزالة تأثير التركيز على الأزرار */
+button:focus, 
+.nav-item:focus, 
+.chat-item:focus, 
+.user-item:focus, 
+.action-btn:focus, 
+.icon-btn:focus, 
+.back-btn:focus, 
+.stat-link:focus, 
+.menu-items a:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
 @media (min-width: 768px) {
     .bottom-nav {
         display: none;
-    }
-    
-    .side-menu {
-        left: 0;
-    }
-    
-    .app-content {
-        margin-right: 280px;
-    }
-    
-    .app-header {
-        right: 0;
-        left: 280px;
     }
 }
 
@@ -1301,10 +1222,8 @@ input:checked + .slider:before {
 
 /* ===== أنماط تثبيت الأيقونات ===== */
 .bottom-nav .nav-item i,
-.side-menu .menu-items a i,
 .settings-item-left i,
 .header-left i,
-.header-right i,
 .post-action i,
 .action-btn i,
 .icon-btn i,
@@ -1320,12 +1239,6 @@ input:checked + .slider:before {
 [dir="rtl"] .bottom-nav .nav-item i,
 [dir="ltr"] .bottom-nav .nav-item i {
     margin: 0 0 4px 0;
-}
-
-[dir="rtl"] .side-menu .menu-items a i,
-[dir="ltr"] .side-menu .menu-items a i {
-    margin-left: 0;
-    margin-right: 1rem;
 }
 
 /* ========== صفحة المحادثة المنعزلة (مثل واتساب) ========== */
@@ -1422,8 +1335,6 @@ body.conversation-open .conversation-page {
     font-size: 0.75rem;
     color: var(--text-light);
 }
-
-/* تم إزالة أزرار الاتصال */
 
 /* منطقة الرسائل */
 .messages-container {
