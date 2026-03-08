@@ -1,12 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('App loaded, setting up navigation...');
+    console.log('App loaded - منصة وظائف واستثمار');
     ensureSinglePage();
     setupNavigation();
     setupModals();
     loadChats();
     setupChatListeners();
     
-    updateTripsCount();
+    // تحميل البيانات الأولية
+    loadJobs();
+    loadInvestments();
+    updateUserStats();
 });
 
 function formatNumber(num) {
@@ -15,19 +18,7 @@ function formatNumber(num) {
     return num.toString();
 }
 
-async function updateTripsCount() {
-    if (!window.auth || !window.auth.currentUser) return;
-    try {
-        const snapshot = await window.db.collection('trips')
-            .where('userId', '==', window.auth.currentUser.uid)
-            .where('status', '==', 'ended')
-            .get();
-        const tripsCount = document.getElementById('tripsCount');
-        if (tripsCount) tripsCount.textContent = formatNumber(snapshot.size);
-    } catch (error) {
-        console.error('Error updating trips count:', error);
-    }
-}
+// ========== إدارة الصفحات ==========
 
 function ensureSinglePage() {
     const pages = document.querySelectorAll('.page');
@@ -55,26 +46,41 @@ function setupNavigation() {
             if (!page.classList.contains('active')) page.style.display = 'none';
         });
         document.querySelectorAll('.profile-subpage').forEach(sp => sp.style.display = 'none');
-        if (pageId === 'chat') loadChats();
         
-        // إخفاء صفحة المحادثة وإزالة كلاس conversation-open
+        // إخفاء صفحات التفاصيل والنشر
+        document.getElementById('jobDetailsPage').style.display = 'none';
+        document.getElementById('investmentDetailsPage').style.display = 'none';
+        document.getElementById('postJobPage').style.display = 'none';
+        document.getElementById('postInvestmentPage').style.display = 'none';
+        
+        // إخفاء صفحة المحادثة
         const conversationPage = document.getElementById('conversationPage');
         if (conversationPage) {
             conversationPage.style.display = 'none';
             document.body.classList.remove('conversation-open');
         }
         
+        // تحميل البيانات حسب الصفحة
+        if (pageId === 'home') {
+            loadJobs();
+            loadInvestments();
+        } else if (pageId === 'profile') {
+            loadUserProfile();
+        }
+        
         navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
     }
     
     navItems.forEach(item => item.addEventListener('click', () => switchPage(item.dataset.page)));
-    
-    // تم إزالة كود القائمة الجانبية و menuBtn
 }
 
 function setupModals() {
     window.openLanguageModal = () => {
         document.getElementById('languageModal')?.classList.add('active');
+    };
+    
+    window.openAccountTypeModal = () => {
+        document.getElementById('accountTypeModal')?.classList.add('active');
     };
     
     window.closeModal = () => {
@@ -94,9 +100,297 @@ function setupModals() {
     });
 }
 
-// تم إزالة دالة loadStories بالكامل
+// ========== نظام الوظائف ==========
 
-// ========== نظام الدردشة المتكامل (مثل واتساب) ==========
+let currentJobs = [];
+let currentFilter = {
+    governorate: '',
+    category: ''
+};
+
+// تحميل الوظائف
+async function loadJobs() {
+    const jobsList = document.getElementById('jobsList');
+    if (!jobsList) return;
+    
+    try {
+        let query = window.db.collection('jobs').orderBy('createdAt', 'desc');
+        
+        // تطبيق الفلترة
+        if (currentFilter.governorate) {
+            query = query.where('governorate', '==', currentFilter.governorate);
+        }
+        if (currentFilter.category) {
+            query = query.where('category', '==', currentFilter.category);
+        }
+        
+        const snapshot = await query.limit(20).get();
+        
+        if (snapshot.empty) {
+            jobsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-briefcase"></i>
+                    <h3>لا توجد وظائف</h3>
+                    <p>لا توجد وظائف متاحة حالياً</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        currentJobs = [];
+        
+        snapshot.forEach(doc => {
+            const job = { id: doc.id, ...doc.data() };
+            currentJobs.push(job);
+            
+            const time = job.createdAt ? new Date(job.createdAt.seconds * 1000) : new Date();
+            const timeAgo = getTimeAgo(time);
+            
+            html += `
+                <div class="job-card" onclick="showJobDetails('${doc.id}')">
+                    <div class="job-header">
+                        <div class="job-avatar-emoji">💼</div>
+                        <div class="job-title">
+                            <h3>${job.title || 'وظيفة'}</h3>
+                            <span class="job-company">
+                                <i class="fas fa-building"></i>
+                                ${job.company || 'شركة غير محددة'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="job-details">
+                        <span class="job-detail">
+                            <i class="fas fa-map-marker-alt"></i>
+                            ${job.governorate || 'غير محدد'} ${job.area ? `- ${job.area}` : ''}
+                        </span>
+                        <span class="job-detail">
+                            <i class="fas fa-clock"></i>
+                            ${getJobTypeText(job.type)}
+                        </span>
+                        <span class="job-detail">
+                            <i class="fas fa-briefcase"></i>
+                            ${getExperienceText(job.experience)}
+                        </span>
+                    </div>
+                    
+                    <div class="job-description">
+                        ${job.description?.substring(0, 100)}...
+                    </div>
+                    
+                    ${job.skills?.length ? `
+                        <div class="job-tags">
+                            ${job.skills.slice(0, 3).map(skill => `<span class="tag">${skill}</span>`).join('')}
+                            ${job.skills.length > 3 ? `<span class="tag">+${job.skills.length - 3}</span>` : ''}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="job-footer">
+                        <span class="job-salary">${job.salary || 'راتب غير محدد'}</span>
+                        <span class="job-time">${timeAgo}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        jobsList.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading jobs:', error);
+        jobsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>خطأ في تحميل الوظائف</h3>
+                <p>حاول مرة أخرى</p>
+            </div>
+        `;
+    }
+}
+
+// تحميل الاستثمارات
+async function loadInvestments() {
+    const investmentsList = document.getElementById('investmentsList');
+    if (!investmentsList) return;
+    
+    try {
+        const snapshot = await window.db.collection('investments')
+            .orderBy('createdAt', 'desc')
+            .limit(20)
+            .get();
+        
+        if (snapshot.empty) {
+            investmentsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-chart-line"></i>
+                    <h3>لا توجد فرص استثمارية</h3>
+                    <p>لا توجد فرص استثمارية متاحة حالياً</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        
+        snapshot.forEach(doc => {
+            const investment = doc.data();
+            const time = investment.createdAt ? new Date(investment.createdAt.seconds * 1000) : new Date();
+            const timeAgo = getTimeAgo(time);
+            
+            html += `
+                <div class="investment-card" onclick="showInvestmentDetails('${doc.id}')">
+                    <div class="investment-header">
+                        <div class="investment-avatar-emoji">💰</div>
+                        <div class="investment-title">
+                            <h3>${investment.title || 'فرصة استثمارية'}</h3>
+                            <span class="investment-owner">
+                                <i class="fas fa-user"></i>
+                                ${investment.ownerName || 'مستثمر'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="investment-details">
+                        <span class="investment-detail">
+                            <i class="fas fa-map-marker-alt"></i>
+                            ${investment.governorate || 'غير محدد'} ${investment.area ? `- ${investment.area}` : ''}
+                        </span>
+                        <span class="investment-detail">
+                            <i class="fas fa-tag"></i>
+                            ${getInvestmentFieldText(investment.field)}
+                        </span>
+                        <span class="investment-detail">
+                            <i class="fas fa-clock"></i>
+                            ${investment.duration || 'مدة غير محددة'}
+                        </span>
+                    </div>
+                    
+                    <div class="investment-description">
+                        ${investment.description?.substring(0, 100)}...
+                    </div>
+                    
+                    <div class="investment-footer">
+                        <span class="investment-capital">
+                            💰 رأس المال: ${formatNumber(investment.capital)} د.ع
+                        </span>
+                        <span class="investment-profit">
+                            📈 أرباح: ${investment.profit || 'غير محددة'}
+                        </span>
+                        <span class="investment-time">${timeAgo}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        investmentsList.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading investments:', error);
+        investmentsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>خطأ في تحميل الفرص الاستثمارية</h3>
+                <p>حاول مرة أخرى</p>
+            </div>
+        `;
+    }
+}
+
+// ========== دوال الفلترة والتبويب ==========
+
+window.switchTab = function(tab) {
+    const jobsList = document.getElementById('jobsList');
+    const investmentsList = document.getElementById('investmentsList');
+    const tabs = document.querySelectorAll('.tab');
+    
+    tabs.forEach(t => t.classList.remove('active'));
+    event.target.closest('.tab').classList.add('active');
+    
+    if (tab === 'jobs') {
+        jobsList.style.display = 'block';
+        investmentsList.style.display = 'none';
+        loadJobs();
+    } else {
+        jobsList.style.display = 'none';
+        investmentsList.style.display = 'block';
+        loadInvestments();
+    }
+};
+
+window.applyFilters = function() {
+    const governorate = document.getElementById('governorateFilter').value;
+    const category = document.getElementById('categoryFilter').value;
+    
+    currentFilter = { governorate, category };
+    loadJobs();
+};
+
+// ========== دوال مساعدة ==========
+
+function getJobTypeText(type) {
+    const types = {
+        'full-time': 'دوام كامل',
+        'part-time': 'دوام جزئي',
+        'remote': 'عن بعد',
+        'freelance': 'حر',
+        'internship': 'تدريب'
+    };
+    return types[type] || 'دوام كامل';
+}
+
+function getExperienceText(exp) {
+    const exps = {
+        '0': 'بدون خبرة',
+        '1': 'سنة - سنتين',
+        '3': '٣ - ٥ سنوات',
+        '5': '٥+ سنوات'
+    };
+    return exps[exp] || 'خبرة غير محددة';
+}
+
+function getInvestmentFieldText(field) {
+    const fields = {
+        'industrial': 'صناعي',
+        'commercial': 'تجاري',
+        'agricultural': 'زراعي',
+        'service': 'خدماتي',
+        'tech': 'تقني'
+    };
+    return fields[field] || 'غير محدد';
+}
+
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    if (seconds < 60) return 'الآن';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} دقيقة`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} ساعة`;
+    return `${Math.floor(seconds / 86400)} يوم`;
+}
+
+// ========== دوال النشر ==========
+
+window.showPostJobModal = function() {
+    document.querySelector('.home-page').style.display = 'none';
+    document.getElementById('postJobPage').style.display = 'block';
+};
+
+window.showPostInvestmentModal = function() {
+    document.querySelector('.home-page').style.display = 'none';
+    document.getElementById('postInvestmentPage').style.display = 'block';
+};
+
+window.goBack = function() {
+    document.querySelectorAll('.page').forEach(page => {
+        if (page.id !== 'home-page' && page.id !== 'profile-page') {
+            page.style.display = 'none';
+        }
+    });
+    document.querySelector('.home-page').style.display = 'block';
+    document.querySelector('.home-page').classList.add('active');
+};
+
+// ========== نظام الدردشة (مثل واتساب) ==========
 
 const ChatSystem = {
     currentChat: null,
@@ -120,14 +414,10 @@ const ChatSystem = {
         }
     },
     
-    // فتح المحادثة
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
-        
-        // إضافة كلاس للـ body لإخفاء القوائم
         document.body.classList.add('conversation-open');
         
-        // تحديث واجهة المحادثة
         const nameElement = document.getElementById('conversationName');
         const avatarElement = document.getElementById('conversationAvatar');
         const statusElement = document.getElementById('conversationStatus');
@@ -136,24 +426,16 @@ const ChatSystem = {
         if (avatarElement) avatarElement.textContent = friendAvatar || '👤';
         if (statusElement) statusElement.textContent = 'آخر زيارة اليوم';
         
-        // إظهار صفحة المحادثة
         document.querySelector('.chat-page').style.display = 'none';
         document.getElementById('conversationPage').style.display = 'flex';
         
         this.displayMessages(friendId);
         this.listenForNewMessages(friendId);
         
-        // التركيز على حقل الإدخال
         setTimeout(() => {
             const input = document.getElementById('messageInput');
             if (input) input.focus();
         }, 300);
-        
-        // التمرير لآخر رسالة
-        setTimeout(() => {
-            const container = document.getElementById('messagesContainer');
-            if (container) container.scrollTop = container.scrollHeight;
-        }, 100);
     },
     
     displayMessages(friendId) {
@@ -164,7 +446,6 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
-    // عرض الرسالة مع الحالة
     displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
@@ -178,29 +459,13 @@ const ChatSystem = {
             minute: '2-digit'
         });
         
-        // إضافة حالة الرسالة
         let statusHtml = '';
         if (msg.sender === 'me') {
-            let statusIcon = '';
-            let statusClass = '';
-            
-            if (msg.status === 'sending') {
-                statusIcon = '⏳';
-                statusClass = 'sending';
-            } else if (msg.status === 'sent') {
-                statusIcon = '✓';
-                statusClass = 'sent';
-            } else if (msg.status === 'delivered') {
-                statusIcon = '✓✓';
-                statusClass = 'delivered';
-            } else if (msg.status === 'read') {
-                statusIcon = '✓✓';
-                statusClass = 'read';
-            } else {
-                statusIcon = '✓';
-                statusClass = 'sent';
-            }
-            
+            let statusIcon = msg.status === 'sending' ? '⏳' : 
+                            msg.status === 'sent' ? '✓' : 
+                            msg.status === 'delivered' ? '✓✓' : 
+                            msg.status === 'read' ? '✓✓' : '✓';
+            let statusClass = msg.status || 'sent';
             statusHtml = `<span class="message-status ${statusClass}">${statusIcon}</span>`;
         }
         
@@ -234,7 +499,6 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // إرسال رسالة مع حالة
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
@@ -248,13 +512,9 @@ const ChatSystem = {
             status: 'sending'
         };
         
-        // عرض الرسالة فوراً
         this.displayMessage(message);
-        
-        // حفظ في localStorage
         this.saveMessage(this.currentChat, message);
         
-        // محاولة الإرسال عبر Firebase
         try {
             const docRef = await window.db.collection('temp_messages').add({
                 to: this.currentChat,
@@ -264,10 +524,7 @@ const ChatSystem = {
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
             
-            // تحديث حالة الرسالة إلى "مرسلة"
             this.updateMessageStatus(messageId, 'sent');
-            
-            // مراقبة وصول الرسالة
             this.waitForDelivery(messageId, docRef.id);
             
         } catch (error) {
@@ -278,87 +535,6 @@ const ChatSystem = {
         return true;
     },
     
-    // إرسال صورة مع حالة
-    async sendImage(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const messageId = Date.now().toString();
-                const message = {
-                    id: messageId,
-                    type: 'image',
-                    data: e.target.result,
-                    sender: 'me',
-                    time: new Date().toISOString(),
-                    status: 'sending'
-                };
-                
-                this.displayMessage(message);
-                this.saveMessage(this.currentChat, message);
-                
-                try {
-                    const docRef = await window.db.collection('temp_messages').add({
-                        to: this.currentChat,
-                        from: window.auth.currentUser.uid,
-                        message: message,
-                        timestamp: new Date(),
-                        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-                    });
-                    
-                    this.updateMessageStatus(messageId, 'sent');
-                    this.waitForDelivery(messageId, docRef.id);
-                    
-                } catch (error) {
-                    console.error('خطأ في إرسال الصورة:', error);
-                    this.updateMessageStatus(messageId, 'error');
-                }
-                resolve();
-            };
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    // إرسال بصمة صوتية مع حالة
-    async sendVoiceNote(audioBlob) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const messageId = Date.now().toString();
-                const message = {
-                    id: messageId,
-                    type: 'voice',
-                    data: e.target.result,
-                    sender: 'me',
-                    time: new Date().toISOString(),
-                    status: 'sending'
-                };
-                
-                this.displayMessage(message);
-                this.saveMessage(this.currentChat, message);
-                
-                try {
-                    const docRef = await window.db.collection('temp_messages').add({
-                        to: this.currentChat,
-                        from: window.auth.currentUser.uid,
-                        message: message,
-                        timestamp: new Date(),
-                        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-                    });
-                    
-                    this.updateMessageStatus(messageId, 'sent');
-                    this.waitForDelivery(messageId, docRef.id);
-                    
-                } catch (error) {
-                    console.error('خطأ في إرسال البصمة:', error);
-                    this.updateMessageStatus(messageId, 'error');
-                }
-                resolve();
-            };
-            reader.readAsDataURL(audioBlob);
-        });
-    },
-    
-    // تحديث حالة الرسالة
     updateMessageStatus(messageId, status) {
         const messageElement = document.getElementById(`msg-${messageId}`);
         if (!messageElement) return;
@@ -367,26 +543,20 @@ const ChatSystem = {
         if (!statusElement) return;
         
         statusElement.className = `message-status ${status}`;
+        statusElement.innerHTML = status === 'sending' ? '⏳' :
+                                 status === 'sent' ? '✓' :
+                                 status === 'delivered' ? '✓✓' :
+                                 status === 'read' ? '✓✓' : '✓';
         
-        if (status === 'sending') {
-            statusElement.innerHTML = '⏳';
-        } else if (status === 'sent') {
-            statusElement.innerHTML = '✓';
-        } else if (status === 'delivered') {
-            statusElement.innerHTML = '✓✓';
-        } else if (status === 'read') {
-            statusElement.innerHTML = '✓✓';
-            statusElement.style.color = '#4fc3f7';
-        } else if (status === 'error') {
+        if (status === 'read') statusElement.style.color = '#4fc3f7';
+        else if (status === 'error') {
             statusElement.innerHTML = '⚠️';
             statusElement.style.color = '#f44336';
         }
         
-        // تحديث في localStorage
         this.updateMessageStatusInStorage(messageId, status);
     },
     
-    // تحديث حالة الرسالة في localStorage
     updateMessageStatusInStorage(messageId, status) {
         const key = `chat_${this.currentChat}`;
         try {
@@ -404,17 +574,13 @@ const ChatSystem = {
         }
     },
     
-    // انتظار وصول الرسالة
     waitForDelivery(messageId, firebaseDocId) {
-        // مراقبة تغييرات حالة الرسالة
         const unsubscribe = window.db.collection('temp_messages')
             .doc(firebaseDocId)
             .onSnapshot((doc) => {
                 if (doc.exists) {
                     const data = doc.data();
-                    if (data.delivered) {
-                        this.updateMessageStatus(messageId, 'delivered');
-                    }
+                    if (data.delivered) this.updateMessageStatus(messageId, 'delivered');
                     if (data.read) {
                         this.updateMessageStatus(messageId, 'read');
                         unsubscribe();
@@ -422,7 +588,6 @@ const ChatSystem = {
                 }
             });
         
-        // إذا لم تصل بعد 5 ثواني، اعتبر أنها وصلت
         setTimeout(() => {
             this.updateMessageStatus(messageId, 'delivered');
         }, 5000);
@@ -452,7 +617,6 @@ const ChatSystem = {
                     if (change.type === 'added') {
                         const data = change.doc.data();
                         
-                        // تحديث حالة الرسالة إلى "تم التوصيل"
                         if (data.message && data.message.id) {
                             this.updateMessageStatusFromFriend(data.message.id, 'delivered');
                         }
@@ -462,12 +626,9 @@ const ChatSystem = {
                         
                         if (this.currentChat === friendId) {
                             this.displayMessage(message);
-                            
-                            // إرسال إشعار بالقراءة
                             setTimeout(() => {
                                 this.markAsRead(data.message.id, change.doc.id);
                             }, 1000);
-                            
                         } else {
                             this.updateLastMessage(friendId, message.text || '📷 صورة' || '🎤 بصمة');
                         }
@@ -478,7 +639,6 @@ const ChatSystem = {
             });
     },
     
-    // تحديث حالة الرسالة من الصديق
     updateMessageStatusFromFriend(messageId, status) {
         const key = `chat_${this.currentChat}`;
         try {
@@ -497,18 +657,13 @@ const ChatSystem = {
                 localStorage.setItem(key, JSON.stringify(history));
                 this.messages[this.currentChat] = history;
                 
-                // تحديث الواجهة
                 const msgElement = document.getElementById(`msg-${messageId}`);
                 if (msgElement) {
                     const statusElement = msgElement.querySelector('.message-status');
                     if (statusElement) {
                         statusElement.className = `message-status ${status}`;
-                        if (status === 'delivered') {
-                            statusElement.innerHTML = '✓✓';
-                        } else if (status === 'read') {
-                            statusElement.innerHTML = '✓✓';
-                            statusElement.style.color = '#4fc3f7';
-                        }
+                        statusElement.innerHTML = status === 'delivered' ? '✓✓' : '✓✓';
+                        if (status === 'read') statusElement.style.color = '#4fc3f7';
                     }
                 }
             }
@@ -517,7 +672,6 @@ const ChatSystem = {
         }
     },
     
-    // تحديد الرسالة كمقروءة
     async markAsRead(messageId, firebaseDocId) {
         try {
             await window.db.collection('temp_messages').doc(firebaseDocId).update({
@@ -543,11 +697,8 @@ const ChatSystem = {
         }
     },
     
-    // إغلاق المحادثة
     closeChat() {
-        // إزالة كلاس الـ body
         document.body.classList.remove('conversation-open');
-        
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
         this.currentChat = null;
@@ -561,6 +712,8 @@ const ChatSystem = {
 };
 
 ChatSystem.init();
+
+// ========== تحميل المحادثات ==========
 
 async function loadChats() {
     if (!window.auth || !window.auth.currentUser) return;
@@ -579,7 +732,7 @@ async function loadChats() {
                 <div class="empty-state">
                     <i class="fas fa-comments"></i>
                     <h3>لا توجد محادثات</h3>
-                    <p>أضف أصدقاء لبدء المحادثة</p>
+                    <p>تواصل مع أصحاب العمل والمستثمرين</p>
                 </div>
             `;
             return;
@@ -592,7 +745,8 @@ async function loadChats() {
                 const friendDoc = await window.db.collection('users').doc(friendId).get();
                 if (friendDoc.exists) {
                     const friend = friendDoc.data();
-                    const avatarEmoji = window.getEmojiForUser(friend);
+                    const avatarEmoji = window.getEmojiForUser ? 
+                        window.getEmojiForUser(friend) : '👤';
                     
                     const key = `chat_${friendId}`;
                     let lastMessage = 'اضغط لبدء المحادثة';
@@ -603,15 +757,14 @@ async function loadChats() {
                         const history = JSON.parse(localStorage.getItem(key)) || [];
                         if (history.length > 0) {
                             const last = history[history.length - 1];
-                            if (last.type === 'text') lastMessage = last.text;
-                            else if (last.type === 'image') lastMessage = '📷 صورة';
-                            else if (last.type === 'voice') lastMessage = '🎤 بصمة';
+                            lastMessage = last.type === 'text' ? last.text :
+                                         last.type === 'image' ? '📷 صورة' :
+                                         last.type === 'voice' ? '🎤 بصمة' : 'رسالة';
                             lastTime = new Date(last.time).toLocaleTimeString('ar-EG', {
                                 hour: '2-digit',
                                 minute: '2-digit'
                             });
                             
-                            // حساب الرسائل غير المقروءة
                             unreadCount = history.filter(msg => 
                                 msg.sender === 'friend' && msg.status !== 'read'
                             ).length;
@@ -717,8 +870,6 @@ window.handleMessageKeyPress = function(event) {
 window.showAttachmentMenu = function() {
     const menu = document.getElementById('attachmentMenu');
     menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
-    
-    // إخفاء منتقي الإيموجي إذا كان ظاهراً
     const emojiPicker = document.getElementById('emojiPicker');
     if (emojiPicker) emojiPicker.style.display = 'none';
 };
@@ -726,18 +877,14 @@ window.showAttachmentMenu = function() {
 window.showEmojiPicker = function() {
     const picker = document.getElementById('emojiPicker');
     picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
-    
-    // إخفاء قائمة المرفقات إذا كانت ظاهرة
     const menu = document.getElementById('attachmentMenu');
     if (menu) menu.style.display = 'none';
     
-    // تحميل الإيموجيات إذا كانت فارغة
     if (picker.querySelector('.emoji-grid').children.length === 0) {
         loadEmojis();
     }
 };
 
-// تحميل الإيموجيات
 function loadEmojis() {
     const emojis = ['😊', '😂', '❤️', '👍', '🎉', '😢', '😡', '😍', '🤔', '👌', '🙏', '🔥', '✨', '⭐', '🌙', '☀️'];
     const grid = document.querySelector('.emoji-grid');
@@ -783,7 +930,6 @@ window.sendVoiceNote = function() {
             
             mediaRecorder.start();
             
-            // تغيير زر الإرسال إلى زر إيقاف
             const sendBtn = document.querySelector('.send-btn');
             const voiceBtn = document.querySelector('.voice-btn');
             if (sendBtn) sendBtn.style.display = 'none';
@@ -798,7 +944,6 @@ window.sendVoiceNote = function() {
                 };
             }
             
-            // إيقاف التسجيل تلقائياً بعد 60 ثانية
             setTimeout(() => {
                 if (mediaRecorder.state === 'recording') {
                     mediaRecorder.stop();
@@ -824,169 +969,180 @@ window.closeConversation = function() {
     ChatSystem.closeChat();
 };
 
-// دوال إضافية
 window.viewContactInfo = function() {
     alert('معلومات الاتصال - قيد التطوير');
 };
 
-// ========== باقي الدوال (بدون تغيير) ==========
+// ========== دوال الملف الشخصي ==========
 
-window.openEditProfileModal = function() {
-    const currentName = document.getElementById('profileName').textContent;
-    const currentNameInput = document.getElementById('editName');
-    if (currentNameInput) currentNameInput.value = currentName;
-    
-    const currentEmoji = document.getElementById('profileAvatarEmoji').textContent;
-    const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
-    if (currentAvatarEmoji) currentAvatarEmoji.textContent = currentEmoji;
-    
-    document.getElementById('editProfileModal').classList.add('active');
-};
-
-window.saveProfile = function() {
-    const newName = document.getElementById('editName').value.trim();
-    if (!newName) { alert('الرجاء إدخال الاسم'); return; }
-    if (newName.length > 25) { alert('الاسم يجب أن لا يتجاوز 25 حرف'); return; }
-    
-    if (auth && auth.currentUser) {
-        db.collection('users').doc(auth.currentUser.uid).update({
-            name: newName
-        }).then(() => {
-            document.getElementById('profileName').textContent = newName;
-            closeModal();
-            alert('تم حفظ التغييرات');
-        }).catch(error => {
-            console.error('Error saving profile:', error);
-            alert('حدث خطأ في الحفظ');
-        });
-    }
-};
-
-window.showUserTrips = function() {
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('tripsPage').style.display = 'block';
-    loadUserTrips();
-};
-
-async function loadUserTrips() {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    const tripsGrid = document.getElementById('tripsGrid');
-    if (!tripsGrid) return;
+async function loadUserProfile() {
+    if (!window.auth?.currentUser) return;
     
     try {
-        const snapshot = await window.db.collection('trips')
-            .where('userId', '==', window.auth.currentUser.uid)
-            .orderBy('startTime', 'desc')
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            
+            document.getElementById('profileName').textContent = userData.name || 'مستخدم';
+            document.getElementById('profileAvatarEmoji').textContent = 
+                window.getEmojiForUser ? window.getEmojiForUser(userData) : '👤';
+            document.getElementById('profileBio').textContent = userData.bio || '';
+            document.getElementById('shareableId').textContent = userData.shareableId || '0000000000';
+            document.getElementById('profileType').textContent = getAccountTypeText(userData.accountType);
+            
+            // تحميل إحصائيات المستخدم
+            await loadUserStats(userData.uid);
+        }
+    } catch (error) {
+        console.error('Error loading profile:', error);
+    }
+}
+
+function getAccountTypeText(type) {
+    const types = {
+        'jobseeker': 'باحث عن عمل',
+        'employer': 'صاحب عمل',
+        'investor': 'مستثمر',
+        'project-owner': 'صاحب مشروع'
+    };
+    return types[type] || 'باحث عن عمل';
+}
+
+async function loadUserStats(userId) {
+    try {
+        // عدد إعلانات المستخدم
+        const jobsSnapshot = await window.db.collection('jobs')
+            .where('userId', '==', userId)
             .get();
         
-        if (snapshot.empty) {
-            tripsGrid.innerHTML = `
+        const investmentsSnapshot = await window.db.collection('investments')
+            .where('userId', '==', userId)
+            .get();
+        
+        const postsCount = jobsSnapshot.size + investmentsSnapshot.size;
+        document.getElementById('postsCount').textContent = formatNumber(postsCount);
+        
+        // عدد الطلبات (سيتم تطويرها لاحقاً)
+        document.getElementById('applicationsCount').textContent = '0';
+        document.getElementById('savedCount').textContent = '0';
+        
+    } catch (error) {
+        console.error('Error loading user stats:', error);
+    }
+}
+
+window.showUserPosts = function() {
+    switchProfileTab('posts');
+};
+
+window.showApplications = function() {
+    switchProfileTab('applications');
+};
+
+window.showSaved = function() {
+    switchProfileTab('saved');
+};
+
+window.switchProfileTab = function(tab) {
+    const tabs = document.querySelectorAll('.profile-tab');
+    const sections = {
+        posts: document.getElementById('profilePostsSection'),
+        applications: document.getElementById('profileApplicationsSection'),
+        saved: document.getElementById('profileSavedSection')
+    };
+    
+    tabs.forEach(t => t.classList.remove('active'));
+    event.target.closest('.profile-tab').classList.add('active');
+    
+    Object.values(sections).forEach(s => s.style.display = 'none');
+    if (sections[tab]) sections[tab].style.display = 'block';
+    
+    if (tab === 'posts') loadUserPosts();
+};
+
+async function loadUserPosts() {
+    if (!window.auth?.currentUser) return;
+    
+    const postsSection = document.getElementById('profilePostsSection');
+    if (!postsSection) return;
+    
+    try {
+        const jobsSnapshot = await window.db.collection('jobs')
+            .where('userId', '==', window.auth.currentUser.uid)
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        const investmentsSnapshot = await window.db.collection('investments')
+            .where('userId', '==', window.auth.currentUser.uid)
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        if (jobsSnapshot.empty && investmentsSnapshot.empty) {
+            postsSection.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-map-marked-alt"></i>
-                    <h3>${i18n ? i18n.t('no_trips') : 'لا توجد رحلات'}</h3>
-                    <p>${i18n ? i18n.t('no_trips_desc') : 'لم تقم بأي رحلة بعد'}</p>
+                    <i class="fas fa-file-alt"></i>
+                    <h3>لا توجد إعلانات</h3>
+                    <p>لم تقم بنشر أي إعلان بعد</p>
                 </div>
             `;
             return;
         }
         
-        let html = '';
-        snapshot.forEach(doc => {
-            const trip = doc.data();
-            const startTime = trip.startTime ? new Date(trip.startTime.seconds * 1000) : new Date();
+        let html = '<div class="user-posts">';
+        
+        jobsSnapshot.forEach(doc => {
+            const job = doc.data();
             html += `
-                <div class="trip-item" onclick="viewTripDetails('${doc.id}')">
-                    <div class="trip-date">${startTime.toLocaleDateString('ar-EG')}</div>
-                    <div class="trip-route">${trip.destination || 'رحلة'}</div>
-                    <div class="trip-stats">
-                        <span>⏱️ ${trip.duration || '--'}</span>
+                <div class="post-item job-item" onclick="showJobDetails('${doc.id}')">
+                    <i class="fas fa-briefcase"></i>
+                    <div class="post-info">
+                        <h4>${job.title}</h4>
+                        <span>${job.governorate || 'غير محدد'}</span>
                     </div>
+                    <span class="post-type">وظيفة</span>
                 </div>
             `;
         });
-        tripsGrid.innerHTML = html;
-        updateTripsCount();
+        
+        investmentsSnapshot.forEach(doc => {
+            const inv = doc.data();
+            html += `
+                <div class="post-item investment-item" onclick="showInvestmentDetails('${doc.id}')">
+                    <i class="fas fa-chart-line"></i>
+                    <div class="post-info">
+                        <h4>${inv.title}</h4>
+                        <span>${inv.governorate || 'غير محدد'}</span>
+                    </div>
+                    <span class="post-type">استثمار</span>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        postsSection.innerHTML = html;
         
     } catch (error) {
-        console.error('Error loading trips:', error);
-        tripsGrid.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>خطأ في تحميل الرحلات</h3>
-            </div>
-        `;
+        console.error('Error loading user posts:', error);
     }
 }
 
-window.viewTripDetails = function(tripId) {
-    alert('تفاصيل الرحلة - معرف: ' + tripId);
+// ========== دوال النشر (سيتم تطويرها في jobs.js) ==========
+
+window.publishJob = function() {
+    alert('سيتم تطوير نشر الوظائف قريباً');
 };
 
-window.goBack = function() {
-    document.querySelectorAll('.profile-subpage').forEach(page => page.style.display = 'none');
-    document.querySelector('.profile-page').style.display = 'block';
-    document.querySelector('.profile-page').classList.add('active');
-    document.querySelectorAll('.page').forEach(page => {
-        if (!page.classList.contains('profile-page')) {
-            page.style.display = 'none';
-            page.classList.remove('active');
-        }
-    });
+window.publishInvestment = function() {
+    alert('سيتم تطوير نشر الفرص الاستثمارية قريباً');
 };
 
-window.selectAvatar = function(type) {
-    const emojiMap = {
-        'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧',
-        'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵'
-    };
-    const selectedEmoji = emojiMap[type] || '👤';
-    
-    const profileAvatar = document.getElementById('profileAvatarEmoji');
-    if (profileAvatar) profileAvatar.textContent = selectedEmoji;
-    const currentAvatar = document.getElementById('currentAvatarEmoji');
-    if (currentAvatar) currentAvatar.textContent = selectedEmoji;
-    
-    if (auth && auth.currentUser) {
-        db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
-            .catch(error => console.error('Error updating avatar:', error));
-    }
-    closeModal();
-};
+// ========== إحصائيات المستخدم ==========
 
-window.openAvatarModal = function() {
-    const modal = document.getElementById('avatarModal');
-    if (modal) modal.classList.add('active');
-};
+async function updateUserStats() {
+    if (!window.auth?.currentUser) return;
+    await loadUserStats(window.auth.currentUser.uid);
+}
 
-document.addEventListener('languageChanged', function() {
-    console.log('Language changed');
-    if (document.querySelector('.chat-page').style.display === 'block') loadChats();
-});
+// ========== التهيئة ==========
 
-window.getEmojiForUser = function(userData) {
-    const emojiMap = {
-        'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧',
-        'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵'
-    };
-    return emojiMap[userData?.avatarType] || '👤';
-};
-
-window.clearMessages = function() {
-    const container = document.getElementById('messagesContainer');
-    if (container) container.innerHTML = '';
-};
-
-window.showNotification = function(title, message) {
-    if (Notification.permission === 'granted') {
-        new Notification(title, { body: message });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') new Notification(title, { body: message });
-        });
-    }
-};
-
-if ('Notification' in window) Notification.requestPermission();
-
-console.log('✅ app.js محدث - نسخة نظيفة بدون قصص أو قوائم جانبية');
+console.log('✅ app.js محدث - منصة وظائف واستثمار');
