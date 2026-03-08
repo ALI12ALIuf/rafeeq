@@ -22,26 +22,24 @@
 
     <!-- المحتوى الرئيسي -->
     <div class="app-container" id="app" style="display: none;">
-        <!-- الهيدر -->
+        <!-- الهيدر (بدون زر الجرس) -->
         <header class="app-header">
             <div class="header-left">
-                <button class="icon-btn" id="menuBtn"><i class="fas fa-bars"></i></button>
+                <!-- تم إزالة زر القائمة الجانبية -->
             </div>
             <div class="header-title">
                 <h1 data-i18n="app_name">رفيق</h1>
             </div>
             <div class="header-right">
-                <button class="icon-btn" id="notificationsBtn"><i class="fas fa-bell"></i></button>
+                <!-- تم إزالة زر الجرس -->
             </div>
         </header>
 
         <!-- المحتوى الرئيسي -->
         <main class="app-content" id="mainContent">
-            <!-- الصفحة الرئيسية -->
+            <!-- الصفحة الرئيسية (بدون قصص) -->
             <div class="page home-page active">
-                <div class="stories-section">
-                    <div class="stories-container" id="storiesContainer"></div>
-                </div>
+                <!-- تم إزالة قسم القصص بالكامل -->
 
                 <div class="posts-section">
                     <div class="posts-container" id="postsContainer">
@@ -88,9 +86,9 @@
                 <div class="chats-list" id="chatsList"></div>
             </div>
 
-            <!-- صفحة المحادثة الفردية (مثل واتساب) - بدون أزرار مكالمات -->
+            <!-- صفحة المحادثة الفردية (مثل واتساب) -->
             <div class="conversation-page" id="conversationPage" style="display: none;">
-                <!-- رأس المحادثة (بدون أزرار مكالمات) -->
+                <!-- رأس المحادثة -->
                 <div class="conversation-header">
                     <button class="back-btn" onclick="closeConversation()">
                         <i class="fas fa-arrow-right"></i>
@@ -102,13 +100,12 @@
                             <span class="conversation-status" id="conversationStatus">آخر زيارة اليوم</span>
                         </div>
                     </div>
-                    <!-- تم إزالة أزرار المكالمات الصوتية والفيديو -->
                 </div>
 
                 <!-- منطقة الرسائل -->
                 <div class="messages-container" id="messagesContainer"></div>
 
-                <!-- شريط الإدخال (ثابت مثل واتساب) -->
+                <!-- شريط الإدخال -->
                 <div class="message-input-container">
                     <div class="message-input-wrapper">
                         <button class="attach-btn" onclick="showAttachmentMenu()">
@@ -250,7 +247,7 @@
                 </div>
             </div>
 
-            <!-- صفحة الإعدادات -->
+            <!-- صفحة الإعدادات (مع زر تسجيل الخروج) -->
             <div class="page settings-page">
                 <div class="settings-list">
                     <div class="settings-item">
@@ -270,6 +267,15 @@
                             <span data-i18n="language">اللغة</span>
                         </div>
                         <i class="fas fa-chevron-left"></i>
+                    </div>
+
+                    <!-- زر تسجيل الخروج الجديد -->
+                    <div class="settings-item" onclick="logout()">
+                        <div class="settings-item-left">
+                            <i class="fas fa-sign-out-alt" style="color: var(--danger);"></i>
+                            <span data-i18n="logout" style="color: var(--danger);">تسجيل الخروج</span>
+                        </div>
+                        <i class="fas fa-chevron-left" style="color: var(--danger);"></i>
                     </div>
                 </div>
             </div>
@@ -295,21 +301,7 @@
             </button>
         </nav>
 
-        <!-- القائمة الجانبية -->
-        <div class="side-menu" id="sideMenu">
-            <div class="menu-header">
-                <div class="menu-avatar-emoji" id="menuAvatarEmoji">👤</div>
-                <h3 id="menuName"></h3>
-            </div>
-            <div class="menu-items">
-                <a href="#" data-page="home"><i class="fas fa-home"></i> <span data-i18n="home">الرئيسية</span></a>
-                <a href="#" data-page="profile"><i class="fas fa-user"></i> <span data-i18n="profile">الملف الشخصي</span></a>
-                <a href="#" data-page="chat"><i class="fas fa-comment"></i> <span data-i18n="chat">الدردشة</span></a>
-                <a href="#" data-page="settings"><i class="fas fa-cog"></i> <span data-i18n="settings">الإعدادات</span></a>
-                <hr>
-                <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">تسجيل الخروج</span></a>
-            </div>
-        </div>
+        <!-- تم إزالة القائمة الجانبية بالكامل -->
     </div>
 
     <!-- النوافذ المنبثقة -->
@@ -376,8 +368,6 @@
         </div>
     </div>
 
-    <!-- تم إزالة PeerJS -->
-    
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
