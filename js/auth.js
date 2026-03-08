@@ -82,9 +82,6 @@ function updateUserUI() {
             if (app) app.style.display = 'flex';
         }, 500);
     }
-    
-    const loginPrompt = document.querySelector('.login-prompt');
-    if (loginPrompt) loginPrompt.remove();
 }
 
 async function logout() {
@@ -104,20 +101,16 @@ async function loadUserData(uid) {
             
             const profileName = document.getElementById('profileName');
             const profileAvatarEmoji = document.getElementById('profileAvatarEmoji');
-            const menuAvatarEmoji = document.getElementById('menuAvatarEmoji');
-            const menuName = document.getElementById('menuName');
             const profileBio = document.getElementById('profileBio');
             const shareableId = document.getElementById('shareableId');
             const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
             
             if (profileName) profileName.textContent = (userData.name || 'مستخدم').substring(0, 25);
-            if (menuName) menuName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (profileBio) profileBio.textContent = userData.bio || '';
             if (shareableId) shareableId.textContent = userData.shareableId || '0000000000';
             
             const avatarEmoji = getEmojiForUser(userData);
             if (profileAvatarEmoji) profileAvatarEmoji.textContent = avatarEmoji;
-            if (menuAvatarEmoji) menuAvatarEmoji.textContent = avatarEmoji;
             if (currentAvatarEmoji) currentAvatarEmoji.textContent = avatarEmoji;
             
             const friendsCount = document.getElementById('friendsCount');
@@ -140,34 +133,6 @@ async function loadUserData(uid) {
     } catch (error) {
         console.error('Error loading user data:', error);
     }
-}
-
-function showLoginPrompt() {
-    if (document.querySelector('.login-prompt')) return;
-    
-    const loginPrompt = document.createElement('div');
-    loginPrompt.className = 'login-prompt';
-    loginPrompt.style.cssText = `
-        position: fixed;
-        bottom: 80px;
-        left: 20px;
-        right: 20px;
-        background: var(--card-bg);
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        z-index: 1000;
-        text-align: center;
-    `;
-    
-    loginPrompt.innerHTML = `
-        <i class="fas fa-lock" style="font-size: 2rem; color: var(--primary); margin-bottom: 10px;"></i>
-        <h3 style="margin-bottom: 10px;">${i18n ? i18n.t('login') : 'تسجيل الدخول'}</h3>
-        <p style="margin-bottom: 20px; color: var(--text-light);">${i18n ? i18n.t('login_desc') : 'سجل دخولك للوصول إلى جميع الميزات'}</p>
-        <button class="btn btn-primary" onclick="signInWithGoogle()" style="width: 100%;">${i18n ? i18n.t('login_with_google') : 'المتابعة بحساب جوجل'}</button>
-    `;
-    
-    document.body.appendChild(loginPrompt);
 }
 
 // ========== نظام الصداقة ==========
@@ -572,6 +537,9 @@ function setupFriendRequestsListener(userId) {
 
 // ========== نهاية نظام الصداقة ==========
 
+// ========== نظام تسجيل الدخول الإلزامي ==========
+// تم إزالة كل الكود الذي يسمح بالمشاهدة بدون تسجيل دخول
+
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         console.log('Auth state changed:', user ? 'logged in' : 'logged out');
@@ -580,6 +548,7 @@ if (typeof window.auth !== 'undefined') {
         const app = document.getElementById('app');
         
         if (user) {
+            // مستخدم مسجل - نحمّل البيانات ونعرض التطبيق
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
@@ -592,22 +561,86 @@ if (typeof window.auth !== 'undefined') {
                 }, 500);
             }
         } else {
-            console.log('User not logged in, showing content after delay');
+            // مستخدم غير مسجل - نعرض شاشة التحميل ثم نعرض واجهة تسجيل الدخول
+            console.log('User not logged in, showing login screen');
+            
+            // إخفاء المحتوى الرئيسي
+            if (app) app.style.display = 'none';
+            
+            // إظهار شاشة التحميل
+            if (splash) {
+                splash.classList.remove('hide');
+                splash.style.display = 'flex';
+            }
+            
+            // بعد 2 ثانية، نخفي شاشة التحميل ونعرض واجهة تسجيل الدخول
             setTimeout(() => {
                 if (splash) {
                     splash.classList.add('hide');
                     setTimeout(() => {
                         splash.style.display = 'none';
-                        if (app) app.style.display = 'flex';
-                        setTimeout(showLoginPrompt, 1000);
+                        showLoginScreen();
                     }, 500);
+                } else {
+                    showLoginScreen();
                 }
             }, 2000);
         }
     });
 } else {
     console.error('auth is not defined. Firebase may not be loaded yet.');
-    setTimeout(showLoginPrompt, 3000);
+}
+
+// واجهة تسجيل الدخول الجديدة (بدلاً من الـ prompt السفلي)
+function showLoginScreen() {
+    // إزالة أي شاشة تسجيل دخول سابقة
+    const existingLogin = document.querySelector('.login-screen');
+    if (existingLogin) existingLogin.remove();
+    
+    // إنشاء شاشة تسجيل دخول كاملة
+    const loginScreen = document.createElement('div');
+    loginScreen.className = 'login-screen';
+    loginScreen.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    loginScreen.innerHTML = `
+        <div style="text-align: center; padding: 20px; max-width: 350px;">
+            <div style="font-size: 5rem; margin-bottom: 1rem;">🛡️</div>
+            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary);">${i18n ? i18n.t('app_name') : 'رفيق'}</h1>
+            <p style="margin-bottom: 2rem; color: var(--text-light);">${i18n ? i18n.t('login_desc') : 'سجل دخولك للوصول إلى جميع الميزات'}</p>
+            <button onclick="signInWithGoogle()" style="
+                background: var(--primary);
+                color: white;
+                border: none;
+                border-radius: 30px;
+                padding: 15px 30px;
+                font-size: 1.1rem;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                width: 100%;
+                transition: all 0.3s;
+            ">
+                <i class="fab fa-google"></i>
+                <span>${i18n ? i18n.t('login_with_google') : 'المتابعة بحساب جوجل'}</span>
+            </button>
+            <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-light);">${i18n ? i18n.t('login_note') : 'لن يتم مشاركة معلوماتك مع أي طرف ثالث'}</p>
+        </div>
+    `;
+    
+    document.body.appendChild(loginScreen);
 }
 
 function copyId() {
