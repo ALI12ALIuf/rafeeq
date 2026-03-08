@@ -22,22 +22,6 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
-// ========== أنواع الحسابات ==========
-const ACCOUNT_TYPES = {
-    JOB_SEEKER: 'jobseeker',
-    EMPLOYER: 'employer',
-    INVESTOR: 'investor',
-    PROJECT_OWNER: 'project-owner'
-};
-
-const ACCOUNT_TYPE_LABELS = {
-    [ACCOUNT_TYPES.JOB_SEEKER]: 'باحث عن عمل',
-    [ACCOUNT_TYPES.EMPLOYER]: 'صاحب عمل',
-    [ACCOUNT_TYPES.INVESTOR]: 'مستثمر',
-    [ACCOUNT_TYPES.PROJECT_OWNER]: 'صاحب مشروع'
-};
-
-// ========== تسجيل الدخول بجوجل ==========
 async function signInWithGoogle() {
     try {
         if (!window.auth || !window.googleProvider) {
@@ -51,8 +35,6 @@ async function signInWithGoogle() {
         
         if (!userDoc.exists) {
             const shareableId = generateShareableId();
-            
-            // مستخدم جديد - نطلب منه اختيار نوع الحساب
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid,
                 name: (user.displayName || 'مستخدم').substring(0, 25),
@@ -60,29 +42,16 @@ async function signInWithGoogle() {
                 shareableId: shareableId,
                 bio: '',
                 avatarType: 'male',
-                accountType: ACCOUNT_TYPES.JOB_SEEKER, // افتراضي
                 friends: [],
                 blocked: [],
-                jobsPosted: 0,
-                investmentsPosted: 0,
                 createdAt: new Date()
             });
-            
-            // عرض نافذة اختيار نوع الحساب للمستخدم الجديد
-            setTimeout(() => {
-                window.openAccountTypeModal?.();
-            }, 1000);
-            
         } else {
-            // تحديث المستخدمين القدامى
             const userData = userDoc.data();
             const updates = {};
-            
             if (!userData.friends) updates.friends = [];
-            if (!userData.accountType) updates.accountType = ACCOUNT_TYPES.JOB_SEEKER;
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
-            
             if (Object.keys(updates).length > 0) {
                 await window.db.collection('users').doc(user.uid).update(updates);
             }
@@ -101,35 +70,6 @@ async function signInWithGoogle() {
         return false;
     }
 }
-
-// ========== تعيين نوع الحساب ==========
-window.setAccountType = async function(type) {
-    if (!window.auth?.currentUser) return;
-    
-    try {
-        await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            accountType: type
-        });
-        
-        // تحديث الواجهة
-        const profileType = document.getElementById('profileType');
-        if (profileType) {
-            profileType.textContent = ACCOUNT_TYPE_LABELS[type] || 'باحث عن عمل';
-        }
-        
-        closeModal();
-        alert(`تم تعيين نوع حسابك بنجاح: ${ACCOUNT_TYPE_LABELS[type]}`);
-        
-        // إعادة تحميل الملف الشخصي
-        if (typeof loadUserProfile === 'function') {
-            loadUserProfile();
-        }
-        
-    } catch (error) {
-        console.error('Error setting account type:', error);
-        alert('حدث خطأ في تعيين نوع الحساب');
-    }
-};
 
 function updateUserUI() {
     const splash = document.getElementById('splash');
@@ -164,14 +104,10 @@ async function loadUserData(uid) {
             const profileBio = document.getElementById('profileBio');
             const shareableId = document.getElementById('shareableId');
             const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
-            const profileType = document.getElementById('profileType');
             
             if (profileName) profileName.textContent = (userData.name || 'مستخدم').substring(0, 25);
             if (profileBio) profileBio.textContent = userData.bio || '';
             if (shareableId) shareableId.textContent = userData.shareableId || '0000000000';
-            if (profileType) {
-                profileType.textContent = ACCOUNT_TYPE_LABELS[userData.accountType] || 'باحث عن عمل';
-            }
             
             const avatarEmoji = getEmojiForUser(userData);
             if (profileAvatarEmoji) profileAvatarEmoji.textContent = avatarEmoji;
@@ -199,7 +135,7 @@ async function loadUserData(uid) {
     }
 }
 
-// ========== نظام الصداقة (للتواصل بين المستخدمين) ==========
+// ========== نظام الصداقة ==========
 
 window.showFriendsList = function() {
     const profilePage = document.querySelector('.profile-page');
@@ -226,8 +162,8 @@ async function loadFriendsList() {
             friendsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>لا يوجد جهات اتصال</h3>
-                    <p>تواصل مع أصحاب العمل والمستثمرين</p>
+                    <h3>${i18n ? i18n.t('no_friends') : 'لا يوجد أصدقاء'}</h3>
+                    <p>${i18n ? i18n.t('no_friends_desc') : 'لم تضف أي أصدقاء بعد'}</p>
                 </div>
             `;
             return;
@@ -247,13 +183,13 @@ async function loadFriendsList() {
                             <div class="user-avatar-emoji">${avatarEmoji}</div>
                             <div class="user-info">
                                 <h4>${friend.name || 'مستخدم'}</h4>
-                                <p>${ACCOUNT_TYPE_LABELS[friend.accountType] || 'مستخدم'}</p>
+                                <p>${friend.shareableId || ''}</p>
                             </div>
                             <div class="user-actions">
                                 <button class="action-btn" onclick="openChat('${friendId}')" title="محادثة">
                                     <i class="fas fa-comment"></i>
                                 </button>
-                                <button class="action-btn" onclick="removeFriend('${friendId}')" title="حذف" style="background: var(--danger); color: white;">
+                                <button class="action-btn" onclick="removeFriend('${friendId}')" title="حذف الصديق" style="background: var(--danger); color: white;">
                                     <i class="fas fa-user-minus"></i>
                                 </button>
                             </div>
@@ -272,7 +208,7 @@ async function loadFriendsList() {
         friendsList.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-exclamation-triangle"></i>
-                <h3>خطأ في تحميل جهات الاتصال</h3>
+                <h3>خطأ في تحميل الأصدقاء</h3>
                 <p>${error.message || 'حدث خطأ، حاول مرة أخرى'}</p>
             </div>
         `;
@@ -281,7 +217,7 @@ async function loadFriendsList() {
 
 window.removeFriend = async function(friendId) {
     if (!window.auth || !window.auth.currentUser) return;
-    if (!confirm('هل أنت متأكد من حذف هذه الجهة؟')) return;
+    if (!confirm('هل أنت متأكد من حذف هذا الصديق؟')) return;
     
     try {
         const currentUserId = window.auth.currentUser.uid;
@@ -293,10 +229,10 @@ window.removeFriend = async function(friendId) {
         });
         await updateFriendsCount();
         await loadFriendsList();
-        alert('تم الحذف بنجاح');
+        alert('تم حذف الصديق بنجاح');
     } catch (error) {
         console.error('Error removing friend:', error);
-        alert('حدث خطأ في الحذف');
+        alert('حدث خطأ في حذف الصديق');
     }
 };
 
@@ -349,8 +285,8 @@ async function loadFriendRequests() {
             requestsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>لا توجد طلبات تواصل</h3>
-                    <p>لم يرسل لك أحد طلب تواصل بعد</p>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
             return;
@@ -382,7 +318,7 @@ async function loadFriendRequests() {
                             <div class="user-avatar-emoji">${avatarEmoji}</div>
                             <div class="user-info">
                                 <h4>${sender.name || 'مستخدم'}</h4>
-                                <p>${ACCOUNT_TYPE_LABELS[sender.accountType] || 'مستخدم'}</p>
+                                <p>${sender.shareableId || ''}</p>
                                 <small style="color: var(--text-light);">${requestDate}</small>
                             </div>
                             <div class="user-actions">
@@ -405,8 +341,8 @@ async function loadFriendRequests() {
             requestsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>لا توجد طلبات تواصل</h3>
-                    <p>لم يرسل لك أحد طلب تواصل بعد</p>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
         } else {
@@ -453,15 +389,15 @@ window.acceptFriendRequest = async function(requestId, senderId) {
         await updateFriendRequestsCount();
         await updateFriendsCount();
         
-        alert('تم قبول طلب التواصل بنجاح');
+        alert('تم قبول طلب الصداقة بنجاح');
         
         const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
         if (remainingRequests === 0) {
             document.getElementById('friendRequestsList').innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>لا توجد طلبات تواصل</h3>
-                    <p>لم يرسل لك أحد طلب تواصل بعد</p>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
         }
@@ -493,8 +429,8 @@ window.rejectFriendRequest = async function(requestId) {
             document.getElementById('friendRequestsList').innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>لا توجد طلبات تواصل</h3>
-                    <p>لم يرسل لك أحد طلب تواصل بعد</p>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
         }
@@ -530,7 +466,7 @@ window.addNewFriend = async function(targetUserId) {
     const currentUserId = window.auth.currentUser.uid;
     
     if (currentUserId === targetUserId) {
-        alert('لا يمكنك إضافة نفسك');
+        alert('لا يمكنك إضافة نفسك كصديق');
         return;
     }
     
@@ -542,7 +478,7 @@ window.addNewFriend = async function(targetUserId) {
             .get();
         
         if (!existingRequest.empty) {
-            alert('لقد أرسلت طلب تواصل لهذا المستخدم مسبقاً');
+            alert('لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً');
             return;
         }
         
@@ -550,7 +486,7 @@ window.addNewFriend = async function(targetUserId) {
         if (currentUserDoc.exists) {
             const friends = currentUserDoc.data().friends || [];
             if (friends.includes(targetUserId)) {
-                alert('هذا المستخدم موجود بالفعل في قائمة جهات الاتصال');
+                alert('هذا المستخدم صديقك بالفعل');
                 return;
             }
         }
@@ -571,7 +507,7 @@ window.addNewFriend = async function(targetUserId) {
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.value = '';
         
-        alert('تم إرسال طلب التواصل بنجاح');
+        alert('تم إرسال طلب الصداقة بنجاح');
         
     } catch (error) {
         console.error('Error sending friend request:', error);
@@ -599,7 +535,10 @@ function setupFriendRequestsListener(userId) {
     }
 }
 
+// ========== نهاية نظام الصداقة ==========
+
 // ========== نظام تسجيل الدخول الإلزامي ==========
+// تم إزالة كل الكود الذي يسمح بالمشاهدة بدون تسجيل دخول
 
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
@@ -609,6 +548,7 @@ if (typeof window.auth !== 'undefined') {
         const app = document.getElementById('app');
         
         if (user) {
+            // مستخدم مسجل - نحمّل البيانات ونعرض التطبيق
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
@@ -621,15 +561,19 @@ if (typeof window.auth !== 'undefined') {
                 }, 500);
             }
         } else {
+            // مستخدم غير مسجل - نعرض شاشة التحميل ثم نعرض واجهة تسجيل الدخول
             console.log('User not logged in, showing login screen');
             
+            // إخفاء المحتوى الرئيسي
             if (app) app.style.display = 'none';
             
+            // إظهار شاشة التحميل
             if (splash) {
                 splash.classList.remove('hide');
                 splash.style.display = 'flex';
             }
             
+            // بعد 2 ثانية، نخفي شاشة التحميل ونعرض واجهة تسجيل الدخول
             setTimeout(() => {
                 if (splash) {
                     splash.classList.add('hide');
@@ -647,11 +591,13 @@ if (typeof window.auth !== 'undefined') {
     console.error('auth is not defined. Firebase may not be loaded yet.');
 }
 
-// واجهة تسجيل الدخول
+// واجهة تسجيل الدخول الجديدة (بدلاً من الـ prompt السفلي)
 function showLoginScreen() {
+    // إزالة أي شاشة تسجيل دخول سابقة
     const existingLogin = document.querySelector('.login-screen');
     if (existingLogin) existingLogin.remove();
     
+    // إنشاء شاشة تسجيل دخول كاملة
     const loginScreen = document.createElement('div');
     loginScreen.className = 'login-screen';
     loginScreen.style.cssText = `
@@ -669,9 +615,9 @@ function showLoginScreen() {
     
     loginScreen.innerHTML = `
         <div style="text-align: center; padding: 20px; max-width: 350px;">
-            <div style="font-size: 5rem; margin-bottom: 1rem;">💼</div>
-            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary);">فرصة</h1>
-            <p style="margin-bottom: 2rem; color: var(--text-light);">منصة وظائف واستثمار</p>
+            <div style="font-size: 5rem; margin-bottom: 1rem;">🛡️</div>
+            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary);">${i18n ? i18n.t('app_name') : 'رفيق'}</h1>
+            <p style="margin-bottom: 2rem; color: var(--text-light);">${i18n ? i18n.t('login_desc') : 'سجل دخولك للوصول إلى جميع الميزات'}</p>
             <button onclick="signInWithGoogle()" style="
                 background: var(--primary);
                 color: white;
@@ -688,11 +634,9 @@ function showLoginScreen() {
                 transition: all 0.3s;
             ">
                 <i class="fab fa-google"></i>
-                <span>تسجيل الدخول بحساب جوجل</span>
+                <span>${i18n ? i18n.t('login_with_google') : 'المتابعة بحساب جوجل'}</span>
             </button>
-            <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-light);">
-                لن يتم مشاركة معلوماتك مع أي طرف ثالث
-            </p>
+            <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-light);">${i18n ? i18n.t('login_note') : 'لن يتم مشاركة معلوماتك مع أي طرف ثالث'}</p>
         </div>
     `;
     
@@ -710,7 +654,7 @@ function copyId() {
     });
 }
 
-// ========== دوال البحث عن المستخدمين ==========
+// ========== دوال البحث ==========
 
 window.findUserById = async function() {
     const input = document.getElementById('searchInput');
@@ -750,7 +694,7 @@ window.findUserById = async function() {
         
         const avatarEmoji = getEmojiForUser(user);
         
-        let buttonText = 'تواصل';
+        let buttonText = 'إضافة';
         let buttonDisabled = '';
         
         if (currentUser) {
@@ -758,7 +702,7 @@ window.findUserById = async function() {
             const currentUserData = currentUserDoc.data();
             
             if (currentUserData.friends && currentUserData.friends.includes(userId)) {
-                buttonText = 'جهة اتصال';
+                buttonText = 'أصدقاء';
                 buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
             } else {
                 const existingRequest = await window.db.collection('friendRequests')
@@ -779,7 +723,7 @@ window.findUserById = async function() {
                 <div class="search-result-avatar-emoji" style="width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 1.8rem;">${avatarEmoji}</div>
                 <div style="flex: 1;">
                     <h4 style="margin: 0; font-size: 1rem;">${user.name}</h4>
-                    <p style="margin: 0; color: var(--text-light); font-size: 0.85rem;">${ACCOUNT_TYPE_LABELS[user.accountType] || 'مستخدم'}</p>
+                    <p style="margin: 0; color: var(--text-light); font-size: 0.85rem;">${user.shareableId}</p>
                 </div>
                 ${currentUser ? '<button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85rem;" onclick="addNewFriend(\'' + userId + '\')" ' + buttonDisabled + '>' + buttonText + '</button>' : ''}
             </div>
@@ -797,5 +741,3 @@ window.hideSearchResults = function() {
         resultsContainer.innerHTML = '';
     }
 };
-
-console.log('✅ auth.js محدث - منصة وظائف واستثمار');
