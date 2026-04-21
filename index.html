@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rafeeq - رفيق</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" id="theme-color" content="#2196F3">
+</head>
+<body class="theme-light" data-page="home">
+    <!-- شاشة التحميل -->
+    <div class="splash-screen" id="splash">
+        <div class="splash-content">
+            <div class="app-icon">🛡️</div>
+            <h1>رفيق</h1>
+            <p>رفيقك الآمن في كل رحلة</p>
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <!-- المحتوى الرئيسي -->
+    <div class="app-container" id="app" style="display: none;">
+        <!-- الهيدر (بدون زر الجرس) -->
+        <header class="app-header">
+            <div class="header-left">
+                <!-- تم إزالة زر القائمة الجانبية -->
+            </div>
+            <div class="header-title">
+                <h1 data-i18n="app_name">رفيق</h1>
+            </div>
+            <div class="header-right">
+                <!-- تم إزالة زر الجرس -->
+            </div>
+        </header>
+
+        <!-- المحتوى الرئيسي -->
+        <main class="app-content" id="mainContent">
+            <!-- الصفحة الرئيسية (بدون قصص) -->
+            <div class="page home-page active">
+                <!-- تم إزالة قسم القصص بالكامل -->
+
+                <div class="posts-section">
+                    <div class="posts-container" id="postsContainer">
+                        <div class="post-card">
+                            <div class="post-header">
+                                <div class="post-avatar-emoji" id="postAvatarEmoji">👤</div>
+                                <div class="post-user">
+                                    <h4>أحمد</h4>
+                                    <span class="post-time">منذ ساعتين</span>
+                                </div>
+                                <button class="post-menu"><i class="fas fa-ellipsis-v"></i></button>
+                            </div>
+                            <div class="post-content">
+                                <div class="post-location">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    <span>بغداد - أربيل</span>
+                                </div>
+                                <div class="post-map-placeholder">
+                                    <i class="fas fa-map"></i>
+                                    <span data-i18n="location_sharing">مشاركة الموقع</span>
+                                </div>
+                            </div>
+                            <div class="post-actions">
+                                <button class="post-action"><i class="far fa-heart"></i> 24</button>
+                                <button class="post-action"><i class="far fa-comment"></i> 5</button>
+                                <button class="post-action"><i class="far fa-share-square"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- صفحة الدردشة -->
+            <div class="page chat-page">
+                <div class="search-container">
+                    <div class="search-box">
+                        <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
+                        <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
+                    </div>
+                    
+                    <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
+                </div>
+                
+                <div class="chats-list" id="chatsList"></div>
+            </div>
+
+            <!-- صفحة المحادثة الفردية (مثل واتساب) -->
+            <div class="conversation-page" id="conversationPage" style="display: none;">
+                <!-- رأس المحادثة -->
+                <div class="conversation-header">
+                    <button class="back-btn" onclick="closeConversation()">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <div class="conversation-user-info" onclick="viewContactInfo()">
+                        <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
+                        <div class="conversation-user-details">
+                            <h3 id="conversationName"></h3>
+                            <span class="conversation-status" id="conversationStatus">آخر زيارة اليوم</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- منطقة الرسائل -->
+                <div class="messages-container" id="messagesContainer"></div>
+
+                <!-- شريط الإدخال -->
+                <div class="message-input-container">
+                    <div class="message-input-wrapper">
+                        <button class="attach-btn" onclick="showAttachmentMenu()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <div class="input-area">
+                            <input type="text" 
+                                   id="messageInput" 
+                                   placeholder="اكتب رسالتك..." 
+                                   onkeypress="handleMessageKeyPress(event)"
+                                   autocomplete="off">
+                            <button class="emoji-btn" onclick="showEmojiPicker()">
+                                <i class="far fa-smile"></i>
+                            </button>
+                        </div>
+                        <button class="send-btn" onclick="sendMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                        <button class="voice-btn" onclick="startVoiceRecording()" style="display: none;">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- قائمة المرفقات -->
+                    <div class="attachment-menu" id="attachmentMenu" style="display: none;">
+                        <button onclick="sendImage()">
+                            <i class="fas fa-image"></i> صورة
+                        </button>
+                        <button onclick="sendVoiceNote()">
+                            <i class="fas fa-microphone"></i> بصمة صوت
+                        </button>
+                        <button onclick="shareLocation()">
+                            <i class="fas fa-map-marker-alt"></i> موقع
+                        </button>
+                    </div>
+
+                    <!-- قائمة الإيموجي -->
+                    <div class="emoji-picker" id="emojiPicker" style="display: none;">
+                        <div class="emoji-categories">
+                            <button class="active">😊</button>
+                            <button>❤️</button>
+                            <button>👍</button>
+                            <button>🎉</button>
+                            <button>😢</button>
+                            <button>😡</button>
+                        </div>
+                        <div class="emoji-grid">
+                            <!-- الإيموجيات ستضاف هنا ديناميكياً -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- صفحة الملف الشخصي -->
+            <div class="page profile-page">
+                <div class="profile-header">
+                    <div class="profile-cover">
+                        <div class="profile-avatar-center">
+                            <div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div>
+                        </div>
+                        <button class="edit-profile-btn-left" onclick="openEditProfileModal()">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="profile-info-container">
+                        <div class="profile-name-wrapper">
+                            <h2 id="profileName"></h2>
+                        </div>
+                        
+                        <div class="profile-id-row">
+                            <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
+                            <span id="shareableId" class="id-value-numbers"></span>
+                            <span class="id-label-english">ID</span>
+                        </div>
+                    </div>
+                    
+                    <p class="profile-bio" id="profileBio"></p>
+                    
+                    <div class="profile-stats">
+                        <a href="#" class="stat-link" onclick="showUserTrips()">
+                            <span class="stat-value" id="tripsCount">0</span>
+                            <span data-i18n="trips">رحلات</span>
+                        </a>
+                        <a href="#" class="stat-link" onclick="showFriendsList()">
+                            <span class="stat-value" id="friendsCount">0</span>
+                            <span data-i18n="friends">الأصدقاء</span>
+                        </a>
+                        <a href="#" class="stat-link" onclick="showFriendRequests()">
+                            <span class="stat-value" id="friendRequestsCount">0</span>
+                            <span data-i18n="friend_requests">الطلبات</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- الصفحات الفرعية -->
+            <div class="profile-pages">
+                <div class="profile-subpage" id="tripsPage" style="display: none;">
+                    <div class="subpage-header">
+                        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
+                        <h3 data-i18n="trips">الرحلات</h3>
+                    </div>
+                    <div class="trips-grid" id="tripsGrid">
+                        <div class="empty-state">
+                            <i class="fas fa-map-marked-alt"></i>
+                            <h3 data-i18n="no_trips">لا توجد رحلات</h3>
+                            <p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="profile-subpage" id="friendsPage" style="display: none;">
+                    <div class="subpage-header">
+                        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
+                        <h3 data-i18n="friends">الأصدقاء</h3>
+                    </div>
+                    <div class="users-list" id="friendsList">
+                        <div class="empty-state">
+                            <i class="fas fa-user-friends"></i>
+                            <h3 data-i18n="no_friends">لا يوجد أصدقاء</h3>
+                            <p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-subpage" id="friendRequestsPage" style="display: none;">
+                    <div class="subpage-header">
+                        <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button>
+                        <h3 data-i18n="friend_requests">طلبات الصداقة</h3>
+                    </div>
+                    <div class="users-list" id="friendRequestsList">
+                        <div class="empty-state">
+                            <i class="fas fa-user-friends"></i>
+                            <h3 data-i18n="no_friend_requests">لا توجد طلبات</h3>
+                            <p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- صفحة الإعدادات (مع زر تسجيل الخروج) -->
+            <div class="page settings-page">
+                <div class="settings-list">
+                    <div class="settings-item">
+                        <div class="settings-item-left">
+                            <i class="fas fa-palette"></i>
+                            <span data-i18n="theme">المظهر</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="themeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="settings-item" onclick="openLanguageModal()">
+                        <div class="settings-item-left">
+                            <i class="fas fa-globe"></i>
+                            <span data-i18n="language">اللغة</span>
+                        </div>
+                        <i class="fas fa-chevron-left"></i>
+                    </div>
+
+                    <!-- زر تسجيل الخروج الجديد -->
+                    <div class="settings-item" onclick="logout()">
+                        <div class="settings-item-left">
+                            <i class="fas fa-sign-out-alt" style="color: var(--danger);"></i>
+                            <span data-i18n="logout" style="color: var(--danger);">تسجيل الخروج</span>
+                        </div>
+                        <i class="fas fa-chevron-left" style="color: var(--danger);"></i>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- شريط التنقل السفلي -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-page="home">
+                <i class="fas fa-home"></i>
+                <span data-i18n="home">الرئيسية</span>
+            </button>
+            <button class="nav-item" data-page="chat">
+                <i class="fas fa-comment"></i>
+                <span data-i18n="chat">الدردشة</span>
+            </button>
+            <button class="nav-item" data-page="profile">
+                <i class="fas fa-user"></i>
+                <span data-i18n="profile">الملف</span>
+            </button>
+            <button class="nav-item" data-page="settings">
+                <i class="fas fa-cog"></i>
+                <span data-i18n="settings">الإعدادات</span>
+            </button>
+        </nav>
+
+        <!-- تم إزالة القائمة الجانبية بالكامل -->
+    </div>
+
+    <!-- النوافذ المنبثقة -->
+    <div class="modal" id="editProfileModal">
+        <div class="modal-content">
+            <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
+            
+            <div class="edit-field">
+                <label data-i18n="name">الاسم</label>
+                <div class="input-wrapper">
+                    <input type="text" id="editName" maxlength="25">
+                    <span class="char-counter" id="charCounter">0/25</span>
+                </div>
+            </div>
+            
+            <div class="edit-field">
+                <label data-i18n="avatar">صورتك الرمزية</label>
+                <div class="current-avatar" id="currentAvatarEmoji">👤</div>
+                <button class="change-avatar-btn" onclick="openAvatarModal()">
+                    <i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span>
+                </button>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
+                <button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button>
+            </div>
+            
+            <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <div class="modal" id="avatarModal">
+        <div class="modal-content">
+            <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
+            <div class="avatar-options">
+                <button class="avatar-option" onclick="selectAvatar('male')"><span>👨</span><span data-i18n="male">رجل</span></button>
+                <button class="avatar-option" onclick="selectAvatar('female')"><span>👩</span><span data-i18n="female">امرأة</span></button>
+                <button class="avatar-option" onclick="selectAvatar('boy')"><span>🧒</span><span data-i18n="boy">ولد</span></button>
+                <button class="avatar-option" onclick="selectAvatar('girl')"><span>👧</span><span data-i18n="girl">بنت</span></button>
+                <button class="avatar-option" onclick="selectAvatar('father')"><span>👨‍🦳</span><span data-i18n="father">أب</span></button>
+                <button class="avatar-option" onclick="selectAvatar('mother')"><span>👩‍🦳</span><span data-i18n="mother">أم</span></button>
+                <button class="avatar-option" onclick="selectAvatar('grandfather')"><span>👴</span><span data-i18n="grandfather">جد</span></button>
+                <button class="avatar-option" onclick="selectAvatar('grandmother')"><span>👵</span><span data-i18n="grandmother">جدة</span></button>
+            </div>
+            <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <div class="modal" id="languageModal">
+        <div class="modal-content">
+            <h3 data-i18n="select_language">اختر اللغة</h3>
+            <div class="language-options">
+                <button class="language-option" onclick="changeLanguage('ar')">
+                    <span class="flag">🇮🇶</span>
+                    <span data-i18n="arabic">العربية</span>
+                </button>
+                <button class="language-option" onclick="changeLanguage('en')">
+                    <span class="flag">🇬🇧</span>
+                    <span data-i18n="english">English</span>
+                </button>
+            </div>
+            <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyApCsnS6CjnzfMPjNsvidLiuX0ZlJ11szU",
+            authDomain: "rafeeq-9959a.firebaseapp.com",
+            projectId: "rafeeq-9959a",
+            storageBucket: "rafeeq-9959a.firebasestorage.app",
+            messagingSenderId: "348154736690",
+            appId: "1:348154736690:web:c2ebd6c4fb88e3594f8c2b"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        
+        window.auth = firebase.auth();
+        window.db = firebase.firestore();
+        window.googleProvider = new firebase.auth.GoogleAuthProvider();
+        
+        console.log('Firebase initialized successfully');
+    </script>
+    
+    <!-- ملفات JavaScript -->
+    <script src="js/i18n.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    
+    <script>
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            var splash = document.getElementById('splash');
+            var app = document.getElementById('app');
+            if (splash && !splash.classList.contains('hide')) {
+                splash.classList.add('hide');
+                setTimeout(function() {
+                    splash.style.display = 'none';
+                    if (app) app.style.display = 'flex';
+                }, 500);
+            }
+        }, 3000);
+        
+        const nameInput = document.getElementById('editName');
+        const charCounter = document.getElementById('charCounter');
+        
+        if (nameInput && charCounter) {
+            charCounter.textContent = '0/25';
+            nameInput.addEventListener('input', function(e) {
+                let value = this.value;
+                if (value.length > 25) this.value = value.slice(0, 25);
+                charCounter.textContent = this.value.length + '/25';
+                charCounter.classList.toggle('full', this.value.length >= 25);
+            });
+        }
+        
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') performSearch();
+            });
+        }
+    });
+    
+    window.performSearch = function() {
+        if (typeof findUserById === 'function') findUserById();
+    };
+    
+    window.onerror = function(msg, url, line) {
+        console.log('خطأ في الموقع:', msg, 'السطر:', line);
+        return false;
+    };
+    </script>
+</body>
+</html>
