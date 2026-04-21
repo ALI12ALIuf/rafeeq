@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModals();
     loadChats();
     setupChatListeners();
-    setupP2PListeners(); // إضافة مستمع P2P
+    setupP2PListeners();
     
     updateTripsCount();
 });
@@ -100,7 +100,6 @@ function setupModals() {
 function setupP2PListeners() {
     if (!window.p2pManager) return;
     
-    // تسجيل معالج للإشارات الواردة
     if (window.signaling) {
         window.signaling.on('offer', async (fromId, offerData) => {
             console.log('📞 Received offer from:', fromId);
@@ -124,8 +123,8 @@ function setupP2PListeners() {
 const ChatSystem = {
     currentChat: null,
     messages: {},
-    p2pConnections: new Map(), // تخزين اتصالات P2P لكل صديق
-    sharedSecrets: new Map(),   // تخزين الأسرار المشتركة لكل صديق
+    p2pConnections: new Map(),
+    sharedSecrets: new Map(),
     
     init() {
         this.loadAllChats();
@@ -145,14 +144,12 @@ const ChatSystem = {
         }
     },
     
-    // الحصول على السر المشترك مع صديق
     async getSharedSecret(friendId) {
         if (this.sharedSecrets.has(friendId)) {
             return this.sharedSecrets.get(friendId);
         }
         
         try {
-            // الحصول على المفتاح العام للصديق
             const friendDoc = await window.db.collection('users').doc(friendId).get();
             const friendPublicKeyBase64 = friendDoc.data()?.publicKey;
             
@@ -182,23 +179,18 @@ const ChatSystem = {
         }
     },
     
-    // تشفير رسالة قبل الإرسال
     async encryptMessageContent(content, friendId) {
         const sharedSecret = await this.getSharedSecret(friendId);
         if (!sharedSecret) return null;
-        
         return await window.cryptoSystem.encryptMessage(content, sharedSecret);
     },
     
-    // فك تشفير رسالة مستلمة
     async decryptMessageContent(encryptedData, friendId) {
         const sharedSecret = await this.getSharedSecret(friendId);
         if (!sharedSecret) return null;
-        
         return await window.cryptoSystem.decryptMessage(encryptedData, sharedSecret);
     },
     
-    // فتح المحادثة
     async openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
@@ -218,7 +210,6 @@ const ChatSystem = {
         this.displayMessages(friendId);
         this.listenForNewMessages(friendId);
         
-        // محاولة إنشاء اتصال P2P
         await this.establishP2PConnection(friendId);
         
         setTimeout(() => {
@@ -232,7 +223,6 @@ const ChatSystem = {
         }, 100);
     },
     
-    // إنشاء اتصال P2P مع الصديق
     async establishP2PConnection(friendId) {
         if (!window.p2pManager) return;
         
@@ -259,7 +249,6 @@ const ChatSystem = {
         });
     },
     
-    // تحديث حالة الاتصال في الواجهة
     updateConnectionStatus(isConnected, status = '') {
         const statusElement = document.getElementById('conversationStatus');
         if (!statusElement) return;
@@ -276,7 +265,6 @@ const ChatSystem = {
         }
     },
     
-    // معالجة رسالة P2P واردة
     async handleP2PMessage(friendId, rawData) {
         try {
             const encryptedMessage = JSON.parse(rawData);
@@ -319,9 +307,23 @@ const ChatSystem = {
         messages.forEach(msg => this.displayMessage(msg));
     },
     
-    displayMessage(msg) {
+    async displayMessage(msg) {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
+        
+        // فك تشفير الرسالة إذا كانت مشفرة
+        let displayText = msg.text;
+        if (msg.encryptedContent && !msg.text) {
+            const sharedSecret = await this.getSharedSecret(
+                msg.sender === 'me' ? this.currentChat : window.auth.currentUser.uid
+            );
+            if (sharedSecret) {
+                displayText = await window.cryptoSystem.decryptMessage(msg.encryptedContent, sharedSecret);
+                msg.text = displayText;
+            } else {
+                displayText = '[رسالة مشفرة]';
+            }
+        }
         
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
@@ -359,7 +361,7 @@ const ChatSystem = {
         
         if (msg.type === 'text') {
             messageDiv.innerHTML = `
-                <div class="message-content">${this.escapeHtml(msg.text)}</div>
+                <div class="message-content">${this.escapeHtml(displayText)}</div>
                 <div class="message-info">
                     <span class="message-time">${time}</span>
                     ${statusHtml}
@@ -387,19 +389,29 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // إرسال رسالة مع تشفير P2P (الأولوية)
+    // ✅ دالة sendMessage المعدلة (تشفير النصوص)
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
         const messageId = Date.now().toString();
+        
+        // تشفير النص قبل الإرسال
+        const encryptedContent = await this.encryptMessageContent(text, this.currentChat);
+        
         const messageObj = {
             id: messageId,
             type: 'text',
-            text: text,
             sender: 'me',
             time: new Date().toISOString(),
             status: 'sending'
         };
+        
+        // إذا نجح التشفير، أرسل المشفر
+        if (encryptedContent) {
+            messageObj.encryptedContent = encryptedContent;
+        } else {
+            messageObj.text = text; // احتياطي (إذا فشل التشفير)
+        }
         
         this.displayMessage(messageObj);
         this.saveMessage(this.currentChat, messageObj);
@@ -407,31 +419,28 @@ const ChatSystem = {
         // محاولة الإرسال عبر P2P أولاً
         const isP2PConnected = window.p2pManager?.isConnected(this.currentChat);
         
-        if (isP2PConnected) {
+        if (isP2PConnected && encryptedContent) {
             try {
-                const encryptedContent = await this.encryptMessageContent(text, this.currentChat);
-                if (encryptedContent) {
-                    const p2pMessage = {
-                        id: messageId,
-                        type: 'text',
-                        content: encryptedContent,
-                        time: new Date().toISOString()
-                    };
-                    
-                    const sent = await window.p2pManager.sendMessage(this.currentChat, JSON.stringify(p2pMessage));
-                    if (sent) {
-                        this.updateMessageStatus(messageId, 'read');
-                        console.log('✅ Message sent via P2P (encrypted)');
-                        return true;
-                    }
+                const p2pMessage = {
+                    id: messageId,
+                    type: 'text',
+                    content: encryptedContent,
+                    time: new Date().toISOString()
+                };
+                
+                const sent = await window.p2pManager.sendMessage(this.currentChat, JSON.stringify(p2pMessage));
+                if (sent) {
+                    this.updateMessageStatus(messageId, 'read');
+                    console.log('✅ Message sent via P2P (encrypted)');
+                    return true;
                 }
             } catch (error) {
                 console.error('P2P send failed, falling back to server:', error);
             }
         }
         
-        // Backup: الإرسال عبر السيرفر (الطريقة القديمة)
-        console.log('📡 Sending via server backup');
+        // Backup: الإرسال عبر السيرفر مع تشفير
+        console.log('📡 Sending via server backup (encrypted)');
         try {
             const docRef = await window.db.collection('temp_messages').add({
                 to: this.currentChat,
@@ -494,7 +503,6 @@ const ChatSystem = {
                     }
                 }
                 
-                // Backup عبر السيرفر
                 try {
                     const docRef = await window.db.collection('temp_messages').add({
                         to: this.currentChat,
@@ -516,7 +524,6 @@ const ChatSystem = {
         });
     },
     
-    // إرسال بصمة صوتية (مع أولوية P2P)
     async sendVoiceNote(audioBlob) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -559,7 +566,6 @@ const ChatSystem = {
                     }
                 }
                 
-                // Backup عبر السيرفر
                 try {
                     const docRef = await window.db.collection('temp_messages').add({
                         to: this.currentChat,
@@ -813,7 +819,7 @@ async function loadChats() {
                         const history = JSON.parse(localStorage.getItem(key)) || [];
                         if (history.length > 0) {
                             const last = history[history.length - 1];
-                            if (last.type === 'text') lastMessage = last.text;
+                            if (last.type === 'text') lastMessage = last.text || 'رسالة مشفرة';
                             else if (last.type === 'image') lastMessage = '📷 صورة';
                             else if (last.type === 'voice') lastMessage = '🎤 بصمة';
                             lastTime = new Date(last.time).toLocaleTimeString('ar-EG', {
@@ -830,7 +836,6 @@ async function loadChats() {
                     const unreadBadge = unreadCount > 0 ? 
                         `<span class="unread-badge">${unreadCount}</span>` : '';
                     
-                    // إضافة أيقونة P2P إذا كان الاتصال مباشراً
                     const p2pIcon = window.p2pManager?.isConnected(friendId) ? '🔒' : '';
                     
                     html += `
@@ -894,7 +899,7 @@ function setupChatListeners() {
     }
 }
 
-// ========== دوال عامة للواجهة (بدون تغيير) ==========
+// ========== دوال عامة للواجهة ==========
 
 window.openChat = async function(friendId) {
     try {
@@ -1033,7 +1038,7 @@ window.viewContactInfo = function() {
     alert('معلومات الاتصال - قيد التطوير');
 };
 
-// ========== باقي الدوال (بدون تغيير) ==========
+// ========== باقي الدوال ==========
 
 window.openEditProfileModal = function() {
     const currentName = document.getElementById('profileName').textContent;
@@ -1193,4 +1198,4 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - نسخة مع P2P وتشفير، مع الحفاظ على التصميم القديم');
+console.log('✅ app.js محدث - تشفير النصوص والصور والبصمات يعمل');
