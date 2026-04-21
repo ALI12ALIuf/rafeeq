@@ -1,227 +1,166 @@
+// ========== نظام الترجمة المبسط ==========
+
 const i18n = {
     currentLang: localStorage.getItem('language') || 'ar',
     
     translations: {
         ar: {
-            app_name: 'رفيق',
+            // عام
+            app_name: 'رفيق P2P',
             home: 'الرئيسية',
             chat: 'الدردشة',
-            profile: 'الملف الشخصي',
+            profile: 'الملف',
             settings: 'الإعدادات',
-            followers: 'متابعون',
-            following: 'يتابع',
-            posts: 'المنشورات',
-            trips: 'رحلات',
-            your_id: 'معرفك',
-            copy: 'نسخ',
-            copied: 'تم النسخ',
-            search_friends: 'البحث عن أصدقاء',
-            type_message: 'اكتب رسالتك...',
+            
+            // الدردشة
+            type_message: 'اكتب رسالة مشفرة...',
             send: 'إرسال',
             image: 'صورة',
-            call: 'اتصال',
-            logout: 'تسجيل الخروج',
-            login: 'تسجيل الدخول',
+            file: 'ملف',
+            voice: 'بصمة صوت',
+            encrypting: 'مشفر 🔒',
+            p2p_encrypted: 'P2P مشفر',
+            connecting: 'جاري الاتصال...',
+            offline: 'غير متصل',
+            
+            // البحث والأصدقاء
+            search_placeholder: 'بحث عن مستخدم بالمعرف...',
+            search_no_user: 'لا يوجد مستخدم',
+            search_yourself: 'هذا حسابك الشخصي',
+            add_friend: 'إضافة صديق',
+            friend_added: 'تم إضافة الصديق بنجاح',
+            friends: 'الأصدقاء',
+            no_friends: 'لا يوجد أصدقاء',
+            no_friends_desc: 'ابحث عن مستخدم باستخدام المعرف الخاص به',
+            
+            // تسجيل الدخول
             login_with_google: 'المتابعة بحساب جوجل',
-            login_desc: 'سجل دخولك للوصول إلى جميع الميزات',
-            login_note: 'لن يتم مشاركة معلوماتك مع أي طرف ثالث',
-            select_language: 'اختر اللغة',
-            dark_mode: 'الوضع الداكن',
-            light_mode: 'الوضع الفاتح',
+            login_desc: 'تواصل مشفر بالكامل',
+            login_note: '🔒 جميع الرسائل مشفرة من طرف إلى طرف\nالسيرفر لا يرى أي محتوى',
+            logout: 'تسجيل الخروج',
+            
+            // الحالات
+            online: 'متصل',
+            offline_status: 'غير متصل',
+            last_seen: 'آخر ظهور',
+            
+            // الإعدادات
             theme: 'المظهر',
             language: 'اللغة',
-            add_friend: 'إضافة صديق',
-            friend_id: 'معرف الصديق (10 أرقام)',
-            send_request: 'إرسال طلب',
-            pending_requests: 'طلبات الصداقة',
-            accept: 'قبول',
-            reject: 'رفض',
-            friends_list: 'قائمة الأصدقاء',
-            no_friends: 'لا يوجد أصدقاء',
-            add_first_friend: 'أضف أول صديق',
-            no_requests: 'لا توجد طلبات صداقة',
-            connecting: 'جاري الاتصال...',
-            online: 'متصل',
-            offline: 'غير متصل',
-            block: 'حظر',
-            unblock: 'إلغاء الحظر',
-            remove_friend: 'إزالة الصديق',
-            location_sharing: 'مشاركة الموقع',
-            share_location: 'شارك موقعك',
-            stop_sharing: 'إيقاف المشاركة',
-            followers_count: 'المتابعون',
-            following_count: 'يتابع',
-            trips_count: 'الرحلات',
-            edit_profile: 'تعديل الملف الشخصي',
-            save: 'حفظ',
-            cancel: 'إلغاء',
-            bio: 'نبذة عني',
-            camera: 'الكاميرا',
-            gallery: 'المعرض',
-            remove_photo: 'إزالة الصورة',
-            report: 'تبليغ',
-            block_user: 'حظر المستخدم',
-            unblock_user: 'إلغاء حظر المستخدم',
+            dark_mode: 'الوضع الداكن',
+            light_mode: 'الوضع الفاتح',
             arabic: 'العربية',
             english: 'English',
             
-            name: 'الاسم',
-            avatar: 'الصورة الرمزية',
-            change_avatar: 'تغيير',
-            choose_avatar: 'اختر صورتك الرمزية',
+            // الأخطاء
+            error_occurred: 'حدث خطأ',
+            connection_error: 'خطأ في الاتصال',
+            encryption_error: 'خطأ في التشفير',
             
-            male: 'رجل',
-            female: 'امرأة',
-            boy: 'ولد',
-            girl: 'بنت',
-            father: 'أب',
-            mother: 'أم',
-            grandfather: 'جد',
-            grandmother: 'جدة',
+            // نوافذ منبثقة
+            cancel: 'إلغاء',
+            save: 'حفظ',
+            delete: 'حذف',
+            confirm: 'تأكيد',
             
-            no_trips: 'لا توجد رحلات',
-            no_trips_desc: 'لم تقم بأي رحلة بعد',
-            no_followers: 'لا يوجد متابعين',
-            no_followers_desc: 'لم يتابعك أحد بعد',
-            no_following: 'لا تتابع أحداً',
-            no_following_desc: 'لم تتابع أي شخص بعد',
+            // حالة التشفير
+            encryption_status: 'حالة التشفير',
+            encryption_algorithm: 'AES-256-GCM + ECDH',
+            key_exchange: 'تبادل المفاتيح',
+            perfect_forward_secrecy: 'سرية تامة للأمام',
             
-            search_placeholder: 'البحث عن الأصدقاء',
-            search_no_user: 'لا يوجد مستخدم',
-            search_yourself: 'هذا حسابك الشخصي',
-            search_error: 'حدث خطأ بالبحث حاول مرة ثانية',
-            searching: 'جاري البحث...',
+            // الملفات
+            image_sent: '📷 صورة',
+            file_sent: '📎 ملف',
+            voice_sent: '🎤 بصمة صوتية',
+            recording: 'جاري التسجيل...',
+            stop_recording: 'إيقاف',
             
-            friend_requests: 'طلبات الصداقة',
-            no_friend_requests: 'لا توجد طلبات صداقة',
-            no_friend_requests_desc: 'لم يرسل لك أحد طلب صداقة بعد',
-            request_sent: 'تم إرسال طلب الصداقة بنجاح',
-            request_error: 'حدث خطأ في إرسال الطلب',
-            request_pending: 'طلب معلق',
-            already_friends: 'أصدقاء بالفعل',
-            accept_request: 'قبول الطلب',
-            reject_request: 'رفض الطلب',
-            request_accepted: 'تم قبول طلب الصداقة بنجاح',
-            request_rejected: 'تم رفض الطلب',
-            friends: 'أصدقاء',
-            friends_count: 'الأصدقاء',
-            friend_added: 'تمت إضافة الصديق بنجاح',
-            friend_removed: 'تم إزالة الصديق',
-            friend_request_exists: 'لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً',
-            cannot_add_self: 'لا يمكنك إضافة نفسك كصديق'
+            // ترحيب
+            welcome_title: 'تواصل مشفر بالكامل',
+            welcome_desc: 'اختر محادثة لبدء التشفير من طرف إلى طرف'
         },
+        
         en: {
-            app_name: 'Rafeeq',
+            // General
+            app_name: 'Rafeeq P2P',
             home: 'Home',
             chat: 'Chat',
             profile: 'Profile',
             settings: 'Settings',
-            followers: 'Followers',
-            following: 'Following',
-            posts: 'Posts',
-            trips: 'Trips',
-            your_id: 'Your ID',
-            copy: 'Copy',
-            copied: 'Copied',
-            search_friends: 'Search friends',
-            type_message: 'Type your message...',
+            
+            // Chat
+            type_message: 'Type encrypted message...',
             send: 'Send',
             image: 'Image',
-            call: 'Call',
-            logout: 'Logout',
-            login: 'Login',
+            file: 'File',
+            voice: 'Voice note',
+            encrypting: 'Encrypted 🔒',
+            p2p_encrypted: 'P2P Encrypted',
+            connecting: 'Connecting...',
+            offline: 'Offline',
+            
+            // Search & Friends
+            search_placeholder: 'Search user by ID...',
+            search_no_user: 'No user found',
+            search_yourself: 'This is your account',
+            add_friend: 'Add Friend',
+            friend_added: 'Friend added successfully',
+            friends: 'Friends',
+            no_friends: 'No friends yet',
+            no_friends_desc: 'Search for a user using their ID',
+            
+            // Login
             login_with_google: 'Continue with Google',
-            login_desc: 'Login to access all features',
-            login_note: 'Your information will not be shared',
-            select_language: 'Select Language',
-            dark_mode: 'Dark Mode',
-            light_mode: 'Light Mode',
+            login_desc: 'Fully encrypted communication',
+            login_note: '🔒 All messages are end-to-end encrypted\nThe server never sees any content',
+            logout: 'Logout',
+            
+            // Status
+            online: 'Online',
+            offline_status: 'Offline',
+            last_seen: 'Last seen',
+            
+            // Settings
             theme: 'Theme',
             language: 'Language',
-            add_friend: 'Add Friend',
-            friend_id: 'Friend ID (10 digits)',
-            send_request: 'Send Request',
-            pending_requests: 'Friend Requests',
-            accept: 'Accept',
-            reject: 'Reject',
-            friends_list: 'Friends List',
-            no_friends: 'No friends yet',
-            add_first_friend: 'Add your first friend',
-            no_requests: 'No friend requests',
-            connecting: 'Connecting...',
-            online: 'Online',
-            offline: 'Offline',
-            block: 'Block',
-            unblock: 'Unblock',
-            remove_friend: 'Remove Friend',
-            location_sharing: 'Location Sharing',
-            share_location: 'Share Location',
-            stop_sharing: 'Stop Sharing',
-            followers_count: 'Followers',
-            following_count: 'Following',
-            trips_count: 'Trips',
-            edit_profile: 'Edit Profile',
-            save: 'Save',
-            cancel: 'Cancel',
-            bio: 'Bio',
-            camera: 'Camera',
-            gallery: 'Gallery',
-            remove_photo: 'Remove Photo',
-            report: 'Report',
-            block_user: 'Block User',
-            unblock_user: 'Unblock User',
+            dark_mode: 'Dark Mode',
+            light_mode: 'Light Mode',
             arabic: 'Arabic',
             english: 'English',
             
-            name: 'Name',
-            avatar: 'Avatar',
-            change_avatar: 'Change',
-            choose_avatar: 'Choose Avatar',
+            // Errors
+            error_occurred: 'An error occurred',
+            connection_error: 'Connection error',
+            encryption_error: 'Encryption error',
             
-            male: 'Male',
-            female: 'Female',
-            boy: 'Boy',
-            girl: 'Girl',
-            father: 'Father',
-            mother: 'Mother',
-            grandfather: 'Grandfather',
-            grandmother: 'Grandmother',
+            // Modals
+            cancel: 'Cancel',
+            save: 'Save',
+            delete: 'Delete',
+            confirm: 'Confirm',
             
-            no_trips: 'No Trips',
-            no_trips_desc: "You haven't taken any trips yet",
-            no_followers: 'No Followers',
-            no_followers_desc: "No one is following you yet",
-            no_following: 'Not Following',
-            no_following_desc: "You aren't following anyone yet",
+            // Encryption status
+            encryption_status: 'Encryption Status',
+            encryption_algorithm: 'AES-256-GCM + ECDH',
+            key_exchange: 'Key Exchange',
+            perfect_forward_secrecy: 'Perfect Forward Secrecy',
             
-            search_placeholder: 'Search for friends',
-            search_no_user: 'No user found',
-            search_yourself: 'This is your account',
-            search_error: 'Search error, please try again',
-            searching: 'Searching...',
+            // Files
+            image_sent: '📷 Image',
+            file_sent: '📎 File',
+            voice_sent: '🎤 Voice note',
+            recording: 'Recording...',
+            stop_recording: 'Stop',
             
-            friend_requests: 'Friend Requests',
-            no_friend_requests: 'No friend requests',
-            no_friend_requests_desc: 'No one has sent you a friend request yet',
-            request_sent: 'Friend request sent successfully',
-            request_error: 'Error sending friend request',
-            request_pending: 'Request pending',
-            already_friends: 'Already friends',
-            accept_request: 'Accept request',
-            reject_request: 'Reject request',
-            request_accepted: 'Friend request accepted successfully',
-            request_rejected: 'Request rejected',
-            friends: 'Friends',
-            friends_count: 'Friends',
-            friend_added: 'Friend added successfully',
-            friend_removed: 'Friend removed',
-            friend_request_exists: 'You have already sent a friend request to this user',
-            cannot_add_self: 'You cannot add yourself as a friend'
+            // Welcome
+            welcome_title: 'Fully Encrypted Communication',
+            welcome_desc: 'Select a chat to start end-to-end encryption'
         }
     },
     
     init() {
-        console.log('Initializing i18n with language:', this.currentLang);
+        console.log('🌐 i18n initialized with language:', this.currentLang);
         this.applyLanguage();
         this.setupLanguageObserver();
     },
@@ -231,62 +170,116 @@ const i18n = {
     },
     
     applyLanguage() {
+        // تحديث النصوص في العناصر التي تحمل data-i18n
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
-            el.textContent = this.t(key);
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                el.placeholder = this.t(key);
+            } else {
+                el.textContent = this.t(key);
+            }
         });
         
+        // تحديث خاصية placeholder
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             const key = el.getAttribute('data-i18n-placeholder');
             el.placeholder = this.t(key);
         });
         
+        // تحديث خاصية title
         document.querySelectorAll('[data-i18n-title]').forEach(el => {
             const key = el.getAttribute('data-i18n-title');
             el.title = this.t(key);
         });
         
+        // تحديث اتجاه النص (RTL/LTR)
+        if (this.currentLang === 'ar') {
+            document.documentElement.setAttribute('dir', 'rtl');
+            document.documentElement.setAttribute('lang', 'ar');
+        } else {
+            document.documentElement.setAttribute('dir', 'ltr');
+            document.documentElement.setAttribute('lang', 'en');
+        }
+        
         localStorage.setItem('language', this.currentLang);
-        document.dispatchEvent(new Event('languageChanged'));
+        document.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang: this.currentLang } }));
     },
     
     setupLanguageObserver() {
+        // مراقبة إضافة عناصر جديدة للترجمة التلقائية
         const observer = new MutationObserver((mutations) => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
-                    if (node.nodeType === 1) {
-                        if (node.hasAttribute && node.hasAttribute('data-i18n')) {
-                            const key = node.getAttribute('data-i18n');
-                            node.textContent = this.t(key);
-                        }
-                        if (node.hasAttribute && node.hasAttribute('data-i18n-placeholder')) {
-                            const key = node.getAttribute('data-i18n-placeholder');
-                            node.placeholder = this.t(key);
-                        }
-                        if (node.querySelectorAll) {
-                            node.querySelectorAll('[data-i18n]').forEach(el => {
-                                const key = el.getAttribute('data-i18n');
-                                el.textContent = this.t(key);
-                            });
-                            node.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-                                const key = el.getAttribute('data-i18n-placeholder');
-                                el.placeholder = this.t(key);
-                            });
-                        }
+                    if (node.nodeType === 1) { // Element node
+                        this.translateNode(node);
                     }
                 });
             });
         });
+        
         observer.observe(document.body, { childList: true, subtree: true });
+    },
+    
+    translateNode(node) {
+        // ترجمة العنصر نفسه
+        if (node.hasAttribute && node.hasAttribute('data-i18n')) {
+            const key = node.getAttribute('data-i18n');
+            if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
+                node.placeholder = this.t(key);
+            } else {
+                node.textContent = this.t(key);
+            }
+        }
+        
+        // ترجمة العناصر الفرعية
+        if (node.querySelectorAll) {
+            node.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    el.placeholder = this.t(key);
+                } else {
+                    el.textContent = this.t(key);
+                }
+            });
+            
+            node.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                el.placeholder = this.t(key);
+            });
+        }
+    },
+    
+    // تغيير اللغة
+    setLanguage(lang) {
+        if (this.translations[lang]) {
+            this.currentLang = lang;
+            this.applyLanguage();
+            return true;
+        }
+        return false;
+    },
+    
+    // الحصول على اللغة الحالية
+    getLanguage() {
+        return this.currentLang;
     }
 };
 
+// تهيئة النظام
 i18n.init();
 
+// دوال عامة للاستخدام
 window.changeLanguage = function(lang) {
-    if (i18n.translations[lang]) {
-        i18n.currentLang = lang;
-        i18n.applyLanguage();
-        closeModal();
+    if (i18n.setLanguage(lang)) {
+        console.log('Language changed to:', lang);
+        // إغلاق النافذة المنبثقة إذا كانت مفتوحة
+        const modal = document.getElementById('languageModal');
+        if (modal) modal.style.display = 'none';
     }
 };
+
+window.getCurrentLanguage = function() {
+    return i18n.getLanguage();
+};
+
+console.log('✅ i18n system initialized');
