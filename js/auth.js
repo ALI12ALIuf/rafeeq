@@ -22,6 +22,7 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
+// ========== دالة تسجيل الدخول مع إضافة المفتاح العام P2P ==========
 async function signInWithGoogle() {
     try {
         if (!window.auth || !window.googleProvider) {
@@ -34,7 +35,22 @@ async function signInWithGoogle() {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         
         if (!userDoc.exists) {
+            // إنشاء مستخدم جديد
             const shareableId = generateShareableId();
+            
+            // توليد مفتاح خاص وعام للمستخدم (لـ P2P)
+            let publicKeyBase64 = null;
+            try {
+                if (window.cryptoSystem) {
+                    const keyPair = await window.cryptoSystem.generateKeyPair();
+                    publicKeyBase64 = await window.cryptoSystem.exportPublicKey(keyPair.publicKey);
+                    window.cryptoSystem.keyPairs.set(user.uid, keyPair);
+                    console.log('✅ P2P keys generated for new user');
+                }
+            } catch (e) {
+                console.warn('P2P key generation failed:', e);
+            }
+            
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid,
                 name: (user.displayName || 'مستخدم').substring(0, 25),
@@ -42,19 +58,52 @@ async function signInWithGoogle() {
                 shareableId: shareableId,
                 bio: '',
                 avatarType: 'male',
+                publicKey: publicKeyBase64 || null,
                 friends: [],
                 blocked: [],
                 createdAt: new Date()
             });
         } else {
+            // مستخدم موجود - تأكد من وجود مفتاح عام
             const userData = userDoc.data();
             const updates = {};
+            
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
+            
+            // إذا لم يكن هناك مفتاح عام، قم بإنشائه
+            if (!userData.publicKey && window.cryptoSystem) {
+                try {
+                    const keyPair = await window.cryptoSystem.generateKeyPair();
+                    const publicKeyBase64 = await window.cryptoSystem.exportPublicKey(keyPair.publicKey);
+                    updates.publicKey = publicKeyBase64;
+                    window.cryptoSystem.keyPairs.set(user.uid, keyPair);
+                    console.log('✅ P2P keys added to existing user');
+                } catch (e) {
+                    console.warn('P2P key generation failed for existing user:', e);
+                }
+            } else if (userData.publicKey && window.cryptoSystem && !window.cryptoSystem.keyPairs.has(user.uid)) {
+                // إنشاء مفتاح خاص محلي (لا يرسل للسيرفر)
+                try {
+                    const keyPair = await window.cryptoSystem.generateKeyPair();
+                    window.cryptoSystem.keyPairs.set(user.uid, keyPair);
+                } catch (e) {
+                    console.warn('Local key generation failed:', e);
+                }
+            }
+            
             if (Object.keys(updates).length > 0) {
                 await window.db.collection('users').doc(user.uid).update(updates);
             }
+        }
+        
+        // تهيئة أنظمة P2P
+        if (window.signaling) {
+            window.signaling.init(user.uid);
+        }
+        if (window.p2pManager) {
+            window.p2pManager.init(user.uid);
         }
         
         updateUserUI();
@@ -162,8 +211,8 @@ async function loadFriendsList() {
             friendsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friends') : 'لا يوجد أصدقاء'}</h3>
-                    <p>${i18n ? i18n.t('no_friends_desc') : 'لم تضف أي أصدقاء بعد'}</p>
+                    <h3>${window.i18n ? window.i18n.t('no_friends') : 'لا يوجد أصدقاء'}</h3>
+                    <p>${window.i18n ? window.i18n.t('no_friends_desc') : 'لم تضف أي أصدقاء بعد'}</p>
                 </div>
             `;
             return;
@@ -285,8 +334,8 @@ async function loadFriendRequests() {
             requestsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
-                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
+                    <h3>${window.i18n ? window.i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${window.i18n ? window.i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
             return;
@@ -341,8 +390,8 @@ async function loadFriendRequests() {
             requestsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
-                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
+                    <h3>${window.i18n ? window.i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${window.i18n ? window.i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
         } else {
@@ -396,8 +445,8 @@ window.acceptFriendRequest = async function(requestId, senderId) {
             document.getElementById('friendRequestsList').innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
-                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
+                    <h3>${window.i18n ? window.i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${window.i18n ? window.i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
         }
@@ -429,8 +478,8 @@ window.rejectFriendRequest = async function(requestId) {
             document.getElementById('friendRequestsList').innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
-                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
+                    <h3>${window.i18n ? window.i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${window.i18n ? window.i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
         }
@@ -538,7 +587,6 @@ function setupFriendRequestsListener(userId) {
 // ========== نهاية نظام الصداقة ==========
 
 // ========== نظام تسجيل الدخول الإلزامي ==========
-// تم إزالة كل الكود الذي يسمح بالمشاهدة بدون تسجيل دخول
 
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
@@ -548,7 +596,6 @@ if (typeof window.auth !== 'undefined') {
         const app = document.getElementById('app');
         
         if (user) {
-            // مستخدم مسجل - نحمّل البيانات ونعرض التطبيق
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
@@ -561,19 +608,15 @@ if (typeof window.auth !== 'undefined') {
                 }, 500);
             }
         } else {
-            // مستخدم غير مسجل - نعرض شاشة التحميل ثم نعرض واجهة تسجيل الدخول
             console.log('User not logged in, showing login screen');
             
-            // إخفاء المحتوى الرئيسي
             if (app) app.style.display = 'none';
             
-            // إظهار شاشة التحميل
             if (splash) {
                 splash.classList.remove('hide');
                 splash.style.display = 'flex';
             }
             
-            // بعد 2 ثانية، نخفي شاشة التحميل ونعرض واجهة تسجيل الدخول
             setTimeout(() => {
                 if (splash) {
                     splash.classList.add('hide');
@@ -591,13 +634,10 @@ if (typeof window.auth !== 'undefined') {
     console.error('auth is not defined. Firebase may not be loaded yet.');
 }
 
-// واجهة تسجيل الدخول الجديدة (بدلاً من الـ prompt السفلي)
 function showLoginScreen() {
-    // إزالة أي شاشة تسجيل دخول سابقة
     const existingLogin = document.querySelector('.login-screen');
     if (existingLogin) existingLogin.remove();
     
-    // إنشاء شاشة تسجيل دخول كاملة
     const loginScreen = document.createElement('div');
     loginScreen.className = 'login-screen';
     loginScreen.style.cssText = `
@@ -616,8 +656,8 @@ function showLoginScreen() {
     loginScreen.innerHTML = `
         <div style="text-align: center; padding: 20px; max-width: 350px;">
             <div style="font-size: 5rem; margin-bottom: 1rem;">🛡️</div>
-            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary);">${i18n ? i18n.t('app_name') : 'رفيق'}</h1>
-            <p style="margin-bottom: 2rem; color: var(--text-light);">${i18n ? i18n.t('login_desc') : 'سجل دخولك للوصول إلى جميع الميزات'}</p>
+            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary);">${window.i18n ? window.i18n.t('app_name') : 'رفيق'}</h1>
+            <p style="margin-bottom: 2rem; color: var(--text-light);">${window.i18n ? window.i18n.t('login_desc') : 'سجل دخولك للوصول إلى جميع الميزات'}</p>
             <button onclick="signInWithGoogle()" style="
                 background: var(--primary);
                 color: white;
@@ -634,9 +674,9 @@ function showLoginScreen() {
                 transition: all 0.3s;
             ">
                 <i class="fab fa-google"></i>
-                <span>${i18n ? i18n.t('login_with_google') : 'المتابعة بحساب جوجل'}</span>
+                <span>${window.i18n ? window.i18n.t('login_with_google') : 'المتابعة بحساب جوجل'}</span>
             </button>
-            <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-light);">${i18n ? i18n.t('login_note') : 'لن يتم مشاركة معلوماتك مع أي طرف ثالث'}</p>
+            <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-light);">${window.i18n ? window.i18n.t('login_note') : 'لن يتم مشاركة معلوماتك مع أي طرف ثالث'}</p>
         </div>
     `;
     
