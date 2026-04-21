@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>رفيق P2P - تواصل مشفر</title>
+    <title data-i18n="app_name">رفيق P2P - تواصل مشفر</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
+    <meta name="theme-color" id="theme-color" content="#2196F3">
 </head>
-<body>
+<body class="theme-light">
     <!-- شاشة التحميل -->
     <div class="splash" id="splash">
         <div class="splash-content">
             <div class="logo">🔒</div>
-            <h1>رفيق P2P</h1>
-            <p>تواصل مشفر بالكامل</p>
+            <h1 data-i18n="app_name">رفيق P2P</h1>
+            <p data-i18n="login_desc">تواصل مشفر بالكامل</p>
             <div class="spinner"></div>
         </div>
     </div>
@@ -22,12 +23,12 @@
     <div class="login-screen" id="loginScreen" style="display: none;">
         <div class="login-card">
             <div class="login-icon">🛡️</div>
-            <h2>رفيق P2P</h2>
-            <p>تواصل آمن ومشفر بالكامل</p>
+            <h2 data-i18n="app_name">رفيق P2P</h2>
+            <p data-i18n="login_desc">تواصل آمن ومشفر بالكامل</p>
             <button id="googleLoginBtn" class="btn-google">
-                <i class="fab fa-google"></i> تسجيل الدخول بـ Google
+                <i class="fab fa-google"></i> <span data-i18n="login_with_google">تسجيل الدخول بـ Google</span>
             </button>
-            <p class="login-note">🔒 جميع الرسائل مشفرة من طرف إلى طرف<br>السيرفر لا يرى أي محتوى</p>
+            <p class="login-note" data-i18n="login_note">🔒 جميع الرسائل مشفرة من طرف إلى طرف<br>السيرفر لا يرى أي محتوى</p>
         </div>
     </div>
 
@@ -38,13 +39,16 @@
             <div class="header-left">
                 <div class="online-indicator" id="onlineIndicator">
                     <span class="dot"></span>
-                    <span id="connectionStatus">متصل</span>
+                    <span id="connectionStatus" data-i18n="online">متصل</span>
                 </div>
             </div>
             <div class="header-title">
-                <h1>رفيق P2P</h1>
+                <h1 data-i18n="app_name">رفيق P2P</h1>
             </div>
             <div class="header-right">
+                <button id="settingsBtn" class="icon-btn" title="الإعدادات">
+                    <i class="fas fa-cog"></i>
+                </button>
                 <button id="logoutBtn" class="icon-btn">
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
@@ -57,14 +61,14 @@
             <div class="chats-sidebar" id="chatsSidebar">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="بحث عن مستخدم بالمعرف...">
+                    <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" placeholder="بحث عن مستخدم بالمعرف...">
                 </div>
                 <div id="searchResults" class="search-results"></div>
                 <div class="chats-list" id="chatsList">
                     <div class="empty-state">
                         <i class="fas fa-comments"></i>
-                        <p>لا توجد محادثات بعد</p>
-                        <p class="small">أضف أصدقاء باستخدام المعرف الخاص بهم</p>
+                        <p data-i18n="no_friends">لا توجد محادثات بعد</p>
+                        <p class="small" data-i18n="no_friends_desc">أضف أصدقاء باستخدام المعرف الخاص بهم</p>
                     </div>
                 </div>
             </div>
@@ -78,12 +82,12 @@
                             <h3 id="chatUserName"></h3>
                             <div class="connection-badge" id="connectionBadge">
                                 <span class="status-dot"></span>
-                                <span id="connectionType">P2P مشفر</span>
+                                <span id="connectionType" data-i18n="p2p_encrypted">P2P مشفر</span>
                             </div>
                         </div>
                     </div>
                     <div class="chat-actions">
-                        <button id="encryptionStatusBtn" class="icon-btn" title="حالة التشفير">
+                        <button id="encryptionStatusBtn" class="icon-btn" data-i18n-title="encryption_status" title="حالة التشفير">
                             <i class="fas fa-lock"></i>
                         </button>
                     </div>
@@ -97,21 +101,21 @@
                             <i class="fas fa-paperclip"></i>
                         </button>
                         <div class="input-area">
-                            <input type="text" id="messageInput" placeholder="اكتب رسالة مشفرة..." autocomplete="off">
+                            <input type="text" id="messageInput" data-i18n-placeholder="type_message" placeholder="اكتب رسالة مشفرة..." autocomplete="off">
                             <button id="emojiBtn" class="emoji-btn">
                                 <i class="far fa-smile"></i>
                             </button>
                         </div>
-                        <button id="sendBtn" class="send-btn">
+                        <button id="sendBtn" class="send-btn" data-i18n-title="send" title="إرسال">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
 
                     <!-- قائمة المرفقات -->
                     <div class="attachment-menu" id="attachmentMenu" style="display: none;">
-                        <button id="imageBtn"><i class="fas fa-image"></i> صورة</button>
-                        <button id="fileBtn"><i class="fas fa-file"></i> ملف</button>
-                        <button id="voiceBtn"><i class="fas fa-microphone"></i> بصمة صوت</button>
+                        <button id="imageBtn"><i class="fas fa-image"></i> <span data-i18n="image">صورة</span></button>
+                        <button id="fileBtn"><i class="fas fa-file"></i> <span data-i18n="file">ملف</span></button>
+                        <button id="voiceBtn"><i class="fas fa-microphone"></i> <span data-i18n="voice">بصمة صوت</span></button>
                     </div>
                 </div>
             </div>
@@ -119,17 +123,69 @@
             <!-- حالة عدم اختيار محادثة -->
             <div class="no-chat-selected" id="noChatSelected">
                 <i class="fas fa-lock"></i>
-                <h3>تواصل مشفر بالكامل</h3>
-                <p>اختر محادثة لبدء التشفير من طرف إلى طرف</p>
+                <h3 data-i18n="welcome_title">تواصل مشفر بالكامل</h3>
+                <p data-i18n="welcome_desc">اختر محادثة لبدء التشفير من طرف إلى طرف</p>
             </div>
         </main>
+    </div>
+
+    <!-- نافذة الإعدادات (الثيم واللغة) -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="settings">الإعدادات</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="settings-list">
+                <!-- خيار الثيم -->
+                <div class="settings-item">
+                    <div class="settings-item-left">
+                        <i class="fas fa-palette"></i>
+                        <span data-i18n="theme">المظهر</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="themeToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                
+                <!-- خيار اللغة -->
+                <div class="settings-item" id="languageSettingsBtn">
+                    <div class="settings-item-left">
+                        <i class="fas fa-globe"></i>
+                        <span data-i18n="language">اللغة</span>
+                    </div>
+                    <i class="fas fa-chevron-left"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة اختيار اللغة -->
+    <div class="modal" id="languageModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="select_language">اختر اللغة</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="language-options">
+                <button class="language-option" onclick="changeLanguage('ar')">
+                    <span class="flag">🇮🇶</span>
+                    <span data-i18n="arabic">العربية</span>
+                </button>
+                <button class="language-option" onclick="changeLanguage('en')">
+                    <span class="flag">🇬🇧</span>
+                    <span data-i18n="english">English</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- نافذة معلومات المستخدم -->
     <div class="modal" id="userInfoModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>معلومات المستخدم</h3>
+                <h3 data-i18n="user_info">معلومات المستخدم</h3>
                 <button class="close-modal">&times;</button>
             </div>
             <div class="user-info-content" id="userInfoContent"></div>
@@ -139,19 +195,19 @@
     <!-- نافذة تسجيل بصمة صوت -->
     <div class="modal" id="voiceModal" style="display: none;">
         <div class="modal-content voice-modal">
-            <h3>تسجيل بصمة صوتية</h3>
+            <h3 data-i18n="voice_recording">تسجيل بصمة صوتية</h3>
             <div class="voice-recorder">
                 <div class="voice-wave" id="voiceWave"></div>
                 <div class="voice-timer" id="voiceTimer">0:00</div>
                 <div class="voice-buttons">
                     <button id="startRecordBtn" class="btn-record">
-                        <i class="fas fa-microphone"></i> تسجيل
+                        <i class="fas fa-microphone"></i> <span data-i18n="record">تسجيل</span>
                     </button>
                     <button id="stopRecordBtn" class="btn-stop" style="display: none;">
-                        <i class="fas fa-stop"></i> إيقاف
+                        <i class="fas fa-stop"></i> <span data-i18n="stop">إيقاف</span>
                     </button>
                     <button id="sendVoiceBtn" class="btn-send" style="display: none;">
-                        <i class="fas fa-paper-plane"></i> إرسال
+                        <i class="fas fa-paper-plane"></i> <span data-i18n="send">إرسال</span>
                     </button>
                 </div>
             </div>
@@ -161,12 +217,23 @@
     <!-- نافذة حالة التشفير -->
     <div class="modal" id="encryptionModal">
         <div class="modal-content">
-            <h3>🔒 حالة التشفير</h3>
-            <div id="encryptionStatus">
-                <p><strong>نوع الاتصال:</strong> <span id="encConnectionType">-</span></p>
-                <p><strong>التشفير:</strong> <span id="encAlgorithm">AES-256-GCM + ECDH</span></p>
-                <p><strong>بصمة المفتاح:</strong> <span id="keyFingerprint">-</span></p>
+            <div class="modal-header">
+                <h3>🔒 <span data-i18n="encryption_status">حالة التشفير</span></h3>
+                <button class="close-modal">&times;</button>
             </div>
+            <div id="encryptionStatus">
+                <p><strong data-i18n="connection_type">نوع الاتصال:</strong> <span id="encConnectionType">-</span></p>
+                <p><strong data-i18n="encryption_algorithm">التشفير:</strong> <span id="encAlgorithm">AES-256-GCM + ECDH</span></p>
+                <p><strong data-i18n="key_fingerprint">بصمة المفتاح:</strong> <span id="keyFingerprint">-</span></p>
+                <p><strong data-i18n="perfect_forward_secrecy">سرية تامة للأمام:</strong> <span>✅ مفعلة</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- إيموجيات بسيطة (اختياري) -->
+    <div class="emoji-picker" id="emojiPicker" style="display: none;">
+        <div class="emoji-grid" id="emojiGrid">
+            <!-- سيتم تعبئتها بواسطة JavaScript -->
         </div>
     </div>
 
@@ -182,6 +249,93 @@
     <script src="js/p2p.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/chat.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/theme.js"></script>
     <script src="js/app.js"></script>
+
+    <script>
+        // إعدادات إضافية بعد تحميل الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            // إعداد زر الإعدادات
+            const settingsBtn = document.getElementById('settingsBtn');
+            const settingsModal = document.getElementById('settingsModal');
+            
+            if (settingsBtn && settingsModal) {
+                settingsBtn.addEventListener('click', () => {
+                    settingsModal.style.display = 'flex';
+                });
+            }
+            
+            // إعداد زر اللغة من نافذة الإعدادات
+            const languageSettingsBtn = document.getElementById('languageSettingsBtn');
+            const languageModal = document.getElementById('languageModal');
+            
+            if (languageSettingsBtn && languageModal) {
+                languageSettingsBtn.addEventListener('click', () => {
+                    settingsModal.style.display = 'none';
+                    languageModal.style.display = 'flex';
+                });
+            }
+            
+            // إغلاق النوافذ المنبثقة
+            document.querySelectorAll('.close-modal').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    this.closest('.modal').style.display = 'none';
+                });
+            });
+            
+            window.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal')) {
+                    e.target.style.display = 'none';
+                }
+            });
+            
+            // إيموجيات بسيطة
+            const emojis = ['😊', '😂', '❤️', '👍', '🎉', '😢', '😡', '😍', '🤔', '👌', '🙏', '🔥', '✨', '⭐', '🌙', '☀️'];
+            const emojiGrid = document.getElementById('emojiGrid');
+            const emojiBtn = document.getElementById('emojiBtn');
+            const emojiPicker = document.getElementById('emojiPicker');
+            const messageInput = document.getElementById('messageInput');
+            
+            if (emojiGrid && emojiBtn) {
+                emojis.forEach(emoji => {
+                    const btn = document.createElement('button');
+                    btn.textContent = emoji;
+                    btn.onclick = () => {
+                        if (messageInput) {
+                            messageInput.value += emoji;
+                            messageInput.focus();
+                        }
+                        emojiPicker.style.display = 'none';
+                    };
+                    emojiGrid.appendChild(btn);
+                });
+                
+                emojiBtn.addEventListener('click', () => {
+                    emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
+                });
+                
+                document.addEventListener('click', (e) => {
+                    if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+                        emojiPicker.style.display = 'none';
+                    }
+                });
+            }
+        });
+        
+        // دوال عامة للترجمة
+        window.updateConnectionStatusText = function(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            if (statusElement) {
+                if (status === 'online') statusElement.setAttribute('data-i18n', 'online');
+                else if (status === 'connecting') statusElement.setAttribute('data-i18n', 'connecting');
+                else if (status === 'offline') statusElement.setAttribute('data-i18n', 'offline');
+                
+                if (window.i18n) {
+                    statusElement.textContent = window.i18n.t(status === 'online' ? 'online' : (status === 'connecting' ? 'connecting' : 'offline'));
+                }
+            }
+        };
+    </script>
 </body>
 </html>
