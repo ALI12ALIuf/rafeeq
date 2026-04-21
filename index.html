@@ -22,25 +22,17 @@
 
     <!-- المحتوى الرئيسي -->
     <div class="app-container" id="app" style="display: none;">
-        <!-- الهيدر (بدون زر الجرس) -->
         <header class="app-header">
-            <div class="header-left">
-                <!-- تم إزالة زر القائمة الجانبية -->
-            </div>
+            <div class="header-left"></div>
             <div class="header-title">
                 <h1 data-i18n="app_name">رفيق</h1>
             </div>
-            <div class="header-right">
-                <!-- تم إزالة زر الجرس -->
-            </div>
+            <div class="header-right"></div>
         </header>
 
-        <!-- المحتوى الرئيسي -->
         <main class="app-content" id="mainContent">
-            <!-- الصفحة الرئيسية (بدون قصص) -->
+            <!-- الصفحة الرئيسية -->
             <div class="page home-page active">
-                <!-- تم إزالة قسم القصص بالكامل -->
-
                 <div class="posts-section">
                     <div class="posts-container" id="postsContainer">
                         <div class="post-card">
@@ -79,16 +71,13 @@
                         <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
                         <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
                     </div>
-                    
                     <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
                 </div>
-                
                 <div class="chats-list" id="chatsList"></div>
             </div>
 
-            <!-- صفحة المحادثة الفردية (مثل واتساب) -->
+            <!-- صفحة المحادثة الفردية -->
             <div class="conversation-page" id="conversationPage" style="display: none;">
-                <!-- رأس المحادثة -->
                 <div class="conversation-header">
                     <button class="back-btn" onclick="closeConversation()">
                         <i class="fas fa-arrow-right"></i>
@@ -102,10 +91,8 @@
                     </div>
                 </div>
 
-                <!-- منطقة الرسائل -->
                 <div class="messages-container" id="messagesContainer"></div>
 
-                <!-- شريط الإدخال -->
                 <div class="message-input-container">
                     <div class="message-input-wrapper">
                         <button class="attach-btn" onclick="showAttachmentMenu()">
@@ -129,7 +116,6 @@
                         </button>
                     </div>
                     
-                    <!-- قائمة المرفقات -->
                     <div class="attachment-menu" id="attachmentMenu" style="display: none;">
                         <button onclick="sendImage()">
                             <i class="fas fa-image"></i> صورة
@@ -142,7 +128,6 @@
                         </button>
                     </div>
 
-                    <!-- قائمة الإيموجي -->
                     <div class="emoji-picker" id="emojiPicker" style="display: none;">
                         <div class="emoji-categories">
                             <button class="active">😊</button>
@@ -152,9 +137,7 @@
                             <button>😢</button>
                             <button>😡</button>
                         </div>
-                        <div class="emoji-grid">
-                            <!-- الإيموجيات ستضاف هنا ديناميكياً -->
-                        </div>
+                        <div class="emoji-grid"></div>
                     </div>
                 </div>
             </div>
@@ -247,7 +230,7 @@
                 </div>
             </div>
 
-            <!-- صفحة الإعدادات (مع زر تسجيل الخروج) -->
+            <!-- صفحة الإعدادات -->
             <div class="page settings-page">
                 <div class="settings-list">
                     <div class="settings-item">
@@ -269,7 +252,6 @@
                         <i class="fas fa-chevron-left"></i>
                     </div>
 
-                    <!-- زر تسجيل الخروج الجديد -->
                     <div class="settings-item" onclick="logout()">
                         <div class="settings-item-left">
                             <i class="fas fa-sign-out-alt" style="color: var(--danger);"></i>
@@ -281,7 +263,6 @@
             </div>
         </main>
 
-        <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-page="home">
                 <i class="fas fa-home"></i>
@@ -300,15 +281,12 @@
                 <span data-i18n="settings">الإعدادات</span>
             </button>
         </nav>
-
-        <!-- تم إزالة القائمة الجانبية بالكامل -->
     </div>
 
     <!-- النوافذ المنبثقة -->
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
-            
             <div class="edit-field">
                 <label data-i18n="name">الاسم</label>
                 <div class="input-wrapper">
@@ -316,7 +294,6 @@
                     <span class="char-counter" id="charCounter">0/25</span>
                 </div>
             </div>
-            
             <div class="edit-field">
                 <label data-i18n="avatar">صورتك الرمزية</label>
                 <div class="current-avatar" id="currentAvatarEmoji">👤</div>
@@ -324,12 +301,10 @@
                     <i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span>
                 </button>
             </div>
-            
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
                 <button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button>
             </div>
-            
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
@@ -374,13 +349,14 @@
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
 
     <script>
+        // إعدادات Firebase - استخدم بيانات مشروعك الجديد
         const firebaseConfig = {
-            apiKey: "AIzaSyApCsnS6CjnzfMPjNsvidLiuX0ZlJ11szU",
-            authDomain: "rafeeq-9959a.firebaseapp.com",
-            projectId: "rafeeq-9959a",
-            storageBucket: "rafeeq-9959a.firebasestorage.app",
-            messagingSenderId: "348154736690",
-            appId: "1:348154736690:web:c2ebd6c4fb88e3594f8c2b"
+            apiKey: "AIzaSyAuyKDI0JhPn-v02c5l7XekiyymNWeFPIQ",
+            authDomain: "rafeeq2-c0aef.firebaseapp.com",
+            projectId: "rafeeq2-c0aef",
+            storageBucket: "rafeeq2-c0aef.firebasestorage.app",
+            messagingSenderId: "1030537082006",
+            appId: "1:1030537082006:web:7eb0a052da85e1441bfeb7"
         };
 
         firebase.initializeApp(firebaseConfig);
@@ -389,12 +365,15 @@
         window.db = firebase.firestore();
         window.googleProvider = new firebase.auth.GoogleAuthProvider();
         
-        console.log('Firebase initialized successfully');
+        console.log('✅ Firebase initialized successfully');
     </script>
     
-    <!-- ملفات JavaScript -->
+    <!-- ملفات JavaScript - الترتيب مهم جداً -->
     <script src="js/i18n.js"></script>
     <script src="js/theme.js"></script>
+    <script src="js/crypto.js"></script>
+    <script src="js/signaling.js"></script>
+    <script src="js/p2p.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
     
