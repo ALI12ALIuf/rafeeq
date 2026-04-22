@@ -214,7 +214,7 @@ const ChatSystem = {
         
         if (nameElement) nameElement.textContent = friendName;
         if (avatarElement) avatarElement.textContent = friendAvatar || '👤';
-        if (statusElement) statusElement.textContent = 'P2P مشفر 🔒';
+        if (statusElement) statusElement.textContent = 'مشفر 🔒';
         
         document.querySelector('.chat-page').style.display = 'none';
         document.getElementById('conversationPage').style.display = 'flex';
@@ -222,7 +222,8 @@ const ChatSystem = {
         this.displayMessages(friendId);
         this.listenForNewMessages(friendId);
         
-        await this.establishP2PConnection(friendId);
+        // محاولة P2P لكن بدون انتظار
+        this.establishP2PConnection(friendId).catch(e => console.log('P2P not available'));
         
         setTimeout(() => {
             const input = document.getElementById('messageInput');
@@ -272,8 +273,8 @@ const ChatSystem = {
             statusElement.textContent = 'جاري الاتصال...';
             statusElement.style.color = '#ff9800';
         } else {
-            statusElement.textContent = 'غير متصل (خادم احتياطي)';
-            statusElement.style.color = '#f44336';
+            statusElement.textContent = 'مشفر 🔒';
+            statusElement.style.color = '#2196F3';
         }
     },
     
@@ -331,7 +332,6 @@ const ChatSystem = {
         const container = document.getElementById('messagesContainer');
         if (!container) return;
         
-        // فك تشفير الرسالة إذا كانت مشفرة
         let displayText = msg.text;
         let displayData = msg.data;
         let isEncrypted = false;
@@ -440,86 +440,57 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // ✅ دالة sendMessage المعدلة (تشفير النصوص)
+    // ✅ دالة sendMessage المعدلة (ترسل دائماً عبر السيرفر)
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
         const messageId = Date.now().toString();
         
-        // تشفير النص قبل الإرسال
+        // تشفير النص
         const encryptedContent = await this.encryptMessageContent(text, this.currentChat);
+        
+        if (!encryptedContent) {
+            console.error('Encryption failed');
+            alert('فشل التشفير، حاول مرة أخرى');
+            return false;
+        }
         
         const messageObj = {
             id: messageId,
             type: 'text',
+            encryptedContent: encryptedContent,
             sender: 'me',
             time: new Date().toISOString(),
-            status: 'sending'
+            status: 'sent'
         };
-        
-        if (encryptedContent) {
-            messageObj.encryptedContent = encryptedContent;
-        } else {
-            console.error('Encryption failed');
-            this.updateMessageStatus(messageId, 'error');
-            return false;
-        }
         
         this.displayMessage(messageObj);
         this.saveMessage(this.currentChat, messageObj);
         
-        // محاولة الإرسال عبر P2P أولاً
-        const isP2PConnected = window.p2pManager?.isConnected(this.currentChat);
-        
-        if (isP2PConnected) {
-            try {
-                const p2pMessage = {
-                    id: messageId,
-                    type: 'text',
-                    content: encryptedContent,
-                    time: new Date().toISOString()
-                };
-                
-                const sent = await window.p2pManager.sendMessage(this.currentChat, JSON.stringify(p2pMessage));
-                if (sent) {
-                    this.updateMessageStatus(messageId, 'read');
-                    console.log('✅ Message sent via P2P (AES-256 encrypted)');
-                    return true;
-                }
-            } catch (error) {
-                console.error('P2P send failed, falling back to server:', error);
-            }
-        }
-        
-        // Backup: الإرسال عبر السيرفر مع تشفير
-        console.log('📡 Sending via server backup (AES-256 encrypted)');
+        // إرسال عبر السيرفر (يعمل دائماً)
         try {
-            const docRef = await window.db.collection('temp_messages').add({
+            await window.db.collection('temp_messages').add({
                 to: this.currentChat,
                 from: window.auth.currentUser.uid,
                 message: messageObj,
                 timestamp: new Date(),
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
-            
-            this.updateMessageStatus(messageId, 'sent');
-            this.waitForDelivery(messageId, docRef.id);
-            
+            console.log('✅ Message sent (encrypted)');
+            return true;
         } catch (error) {
-            console.error('Server send failed:', error);
+            console.error('Send failed:', error);
             this.updateMessageStatus(messageId, 'error');
+            return false;
         }
-        
-        return true;
     },
     
-    // ✅ دالة sendImage المعدلة (تشفير حقيقي - بدون Base64)
+    // ✅ دالة sendImage المعدلة
     async sendImage(file) {
         if (!this.currentChat) return false;
         
         const messageId = Date.now().toString();
         
-        // تشفير الملف حقيقياً باستخدام AES-256-GCM
         const encryptedContent = await this.encryptFileContent(file, this.currentChat);
         
         if (!encryptedContent) {
@@ -532,7 +503,7 @@ const ChatSystem = {
             type: 'image',
             sender: 'me',
             time: new Date().toISOString(),
-            status: 'sending',
+            status: 'sent',
             encryptedContent: encryptedContent,
             fileName: file.name,
             fileSize: file.size,
@@ -542,61 +513,30 @@ const ChatSystem = {
         this.displayMessage(messageObj);
         this.saveMessage(this.currentChat, messageObj);
         
-        // محاولة الإرسال عبر P2P أولاً
-        const isP2PConnected = window.p2pManager?.isConnected(this.currentChat);
-        
-        if (isP2PConnected) {
-            try {
-                const p2pMessage = {
-                    id: messageId,
-                    type: 'image',
-                    content: encryptedContent,
-                    time: new Date().toISOString(),
-                    fileName: file.name,
-                    fileSize: file.size,
-                    fileType: file.type
-                };
-                
-                const sent = await window.p2pManager.sendMessage(this.currentChat, JSON.stringify(p2pMessage));
-                if (sent) {
-                    this.updateMessageStatus(messageId, 'read');
-                    console.log('✅ Image sent via P2P (AES-256 encrypted)');
-                    return true;
-                }
-            } catch (error) {
-                console.error('P2P image send failed:', error);
-            }
-        }
-        
-        // Backup عبر السيرفر
-        console.log('📡 Sending image via server backup (AES-256 encrypted)');
         try {
-            const docRef = await window.db.collection('temp_messages').add({
+            await window.db.collection('temp_messages').add({
                 to: this.currentChat,
                 from: window.auth.currentUser.uid,
                 message: messageObj,
                 timestamp: new Date(),
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
-            
-            this.updateMessageStatus(messageId, 'sent');
-            this.waitForDelivery(messageId, docRef.id);
+            console.log('✅ Image sent (encrypted)');
+            return true;
         } catch (error) {
-            console.error('Server image send failed:', error);
+            console.error('Image send failed:', error);
             this.updateMessageStatus(messageId, 'error');
+            return false;
         }
-        
-        return true;
     },
     
-    // ✅ دالة sendVoiceNote المعدلة (تشفير حقيقي - بدون Base64)
+    // ✅ دالة sendVoiceNote المعدلة
     async sendVoiceNote(audioBlob) {
         if (!this.currentChat) return false;
         
         const messageId = Date.now().toString();
         const file = new File([audioBlob], `voice_${messageId}.webm`, { type: 'audio/webm' });
         
-        // تشفير الملف حقيقياً
         const encryptedContent = await this.encryptFileContent(file, this.currentChat);
         
         if (!encryptedContent) {
@@ -609,7 +549,7 @@ const ChatSystem = {
             type: 'voice',
             sender: 'me',
             time: new Date().toISOString(),
-            status: 'sending',
+            status: 'sent',
             encryptedContent: encryptedContent,
             fileName: file.name,
             fileSize: file.size,
@@ -619,51 +559,21 @@ const ChatSystem = {
         this.displayMessage(messageObj);
         this.saveMessage(this.currentChat, messageObj);
         
-        // محاولة الإرسال عبر P2P أولاً
-        const isP2PConnected = window.p2pManager?.isConnected(this.currentChat);
-        
-        if (isP2PConnected) {
-            try {
-                const p2pMessage = {
-                    id: messageId,
-                    type: 'voice',
-                    content: encryptedContent,
-                    time: new Date().toISOString(),
-                    fileName: file.name,
-                    fileSize: file.size,
-                    fileType: file.type
-                };
-                
-                const sent = await window.p2pManager.sendMessage(this.currentChat, JSON.stringify(p2pMessage));
-                if (sent) {
-                    this.updateMessageStatus(messageId, 'read');
-                    console.log('✅ Voice note sent via P2P (AES-256 encrypted)');
-                    return true;
-                }
-            } catch (error) {
-                console.error('P2P voice send failed:', error);
-            }
-        }
-        
-        // Backup عبر السيرفر
-        console.log('📡 Sending voice via server backup (AES-256 encrypted)');
         try {
-            const docRef = await window.db.collection('temp_messages').add({
+            await window.db.collection('temp_messages').add({
                 to: this.currentChat,
                 from: window.auth.currentUser.uid,
                 message: messageObj,
                 timestamp: new Date(),
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             });
-            
-            this.updateMessageStatus(messageId, 'sent');
-            this.waitForDelivery(messageId, docRef.id);
+            console.log('✅ Voice note sent (encrypted)');
+            return true;
         } catch (error) {
-            console.error('Server voice send failed:', error);
+            console.error('Voice send failed:', error);
             this.updateMessageStatus(messageId, 'error');
+            return false;
         }
-        
-        return true;
     },
     
     updateMessageStatus(messageId, status) {
@@ -919,13 +829,11 @@ async function loadChats() {
                     const unreadBadge = unreadCount > 0 ? 
                         `<span class="unread-badge">${unreadCount}</span>` : '';
                     
-                    const p2pIcon = window.p2pManager?.isConnected(friendId) ? '🔒' : '';
-                    
                     html += `
                         <div class="chat-item" onclick="openChat('${friendId}')">
                             <div class="chat-avatar-emoji">${avatarEmoji}</div>
                             <div class="chat-info">
-                                <h4>${friend.name || 'مستخدم'} ${p2pIcon}</h4>
+                                <h4>${friend.name || 'مستخدم'}</h4>
                                 <p class="last-message">${lastMessage}</p>
                             </div>
                             <div class="chat-meta">
@@ -1283,4 +1191,4 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - تشفير AES-256-GCM حقيقي للنصوص والصور والبصمات (بدون Base64)');
+console.log('✅ app.js محدث - الإرسال يعمل دائماً مع تشفير AES-256-GCM');
