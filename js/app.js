@@ -128,7 +128,6 @@ const ChatSystem = {
             const friendDoc = await window.db.collection('users').doc(friendId).get();
             let friendPublicKeyBase64 = friendDoc.data()?.publicKey;
             
-            // إذا لم يكن هناك مفتاح عام، حاول مرة أخرى
             if (!friendPublicKeyBase64) {
                 console.warn('No public key for friend:', friendId);
                 return null;
@@ -136,10 +135,10 @@ const ChatSystem = {
             
             const friendPublicKey = await window.cryptoSystem.importPublicKey(friendPublicKeyBase64);
             
-            // التأكد من وجود مفتاح للمستخدم الحالي
+            // استخدام getOrCreateKeyPair بدلاً من generateKeyPair مباشرة
             let myKeyPair = window.cryptoSystem.keyPairs?.get(window.auth.currentUser.uid);
             if (!myKeyPair) {
-                myKeyPair = await window.cryptoSystem.generateKeyPair();
+                myKeyPair = await window.cryptoSystem.getOrCreateKeyPair(window.auth.currentUser.uid);
                 window.cryptoSystem.keyPairs.set(window.auth.currentUser.uid, myKeyPair);
             }
             
@@ -237,6 +236,7 @@ const ChatSystem = {
                     displayText = await window.cryptoSystem.decryptMessage(msg.encryptedContent, sharedSecret);
                     msg.text = displayText;
                 } catch (e) {
+                    console.warn('Decryption failed:', e);
                     displayText = '[رسالة مشفرة]';
                 }
             } else {
@@ -256,6 +256,7 @@ const ChatSystem = {
                     displayData = URL.createObjectURL(blob);
                     msg.data = displayData;
                 } catch (e) {
+                    console.warn('File decryption failed:', e);
                     displayData = null;
                 }
             } else {
