@@ -1,6 +1,5 @@
-// ========== إضافة أنظمة P2P والتشفير ==========
-// تأكد من تحميل الملفات التالية قبل هذا الملف:
-// crypto.js, signaling.js, p2p.js
+// ========== نظام الدردشة المشفر (سيرفر فقط) ==========
+// يعمل دائماً مع تشفير AES-256-GCM
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('App loaded, setting up navigation...');
@@ -9,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModals();
     loadChats();
     setupChatListeners();
-    setupP2PListeners();
     
     updateTripsCount();
 });
@@ -96,34 +94,11 @@ function setupModals() {
     });
 }
 
-// ========== إعداد مستمع P2P ==========
-function setupP2PListeners() {
-    if (!window.p2pManager) return;
-    
-    if (window.signaling) {
-        window.signaling.on('offer', async (fromId, offerData) => {
-            console.log('📞 Received offer from:', fromId);
-            await window.p2pManager.handleOffer(fromId, offerData);
-        });
-        
-        window.signaling.on('answer', async (fromId, answerData) => {
-            console.log('📞 Received answer from:', fromId);
-            await window.p2pManager.handleAnswer(fromId, answerData);
-        });
-        
-        window.signaling.on('ice-candidate', async (fromId, candidateData) => {
-            console.log('📞 Received ICE candidate from:', fromId);
-            await window.p2pManager.handleIceCandidate(fromId, candidateData);
-        });
-    }
-}
-
-// ========== نظام الدردشة المتكامل مع P2P ==========
+// ========== نظام الدردشة (بدون P2P) ==========
 
 const ChatSystem = {
     currentChat: null,
     messages: {},
-    p2pConnections: new Map(),
     sharedSecrets: new Map(),
     
     init() {
@@ -151,19 +126,21 @@ const ChatSystem = {
         
         try {
             const friendDoc = await window.db.collection('users').doc(friendId).get();
-            const friendPublicKeyBase64 = friendDoc.data()?.publicKey;
+            let friendPublicKeyBase64 = friendDoc.data()?.publicKey;
             
+            // إذا لم يكن هناك مفتاح عام، حاول مرة أخرى
             if (!friendPublicKeyBase64) {
                 console.warn('No public key for friend:', friendId);
                 return null;
             }
             
             const friendPublicKey = await window.cryptoSystem.importPublicKey(friendPublicKeyBase64);
-            const myKeyPair = window.cryptoSystem.keyPairs?.get(window.auth.currentUser.uid);
             
+            // التأكد من وجود مفتاح للمستخدم الحالي
+            let myKeyPair = window.cryptoSystem.keyPairs?.get(window.auth.currentUser.uid);
             if (!myKeyPair) {
-                console.warn('No key pair for current user');
-                return null;
+                myKeyPair = await window.cryptoSystem.generateKeyPair();
+                window.cryptoSystem.keyPairs.set(window.auth.currentUser.uid, myKeyPair);
             }
             
             const sharedSecret = await window.cryptoSystem.deriveSharedSecret(
@@ -222,9 +199,6 @@ const ChatSystem = {
         this.displayMessages(friendId);
         this.listenForNewMessages(friendId);
         
-        // محاولة P2P لكن بدون انتظار
-        this.establishP2PConnection(friendId).catch(e => console.log('P2P not available'));
-        
         setTimeout(() => {
             const input = document.getElementById('messageInput');
             if (input) input.focus();
@@ -234,90 +208,6 @@ const ChatSystem = {
             const container = document.getElementById('messagesContainer');
             if (container) container.scrollTop = container.scrollHeight;
         }, 100);
-    },
-    
-    async establishP2PConnection(friendId) {
-        if (!window.p2pManager) return;
-        
-        if (window.p2pManager.isConnected(friendId)) {
-            console.log('P2P already connected to:', friendId);
-            this.updateConnectionStatus(true);
-            return;
-        }
-        
-        this.updateConnectionStatus(false, 'connecting');
-        
-        await window.p2pManager.startConnection(friendId, {
-            onOpen: () => {
-                console.log('✅ P2P connected with:', friendId);
-                this.updateConnectionStatus(true);
-            },
-            onMessage: async (data) => {
-                await this.handleP2PMessage(friendId, data);
-            },
-            onClose: () => {
-                console.log('🔒 P2P disconnected from:', friendId);
-                this.updateConnectionStatus(false);
-            }
-        });
-    },
-    
-    updateConnectionStatus(isConnected, status = '') {
-        const statusElement = document.getElementById('conversationStatus');
-        if (!statusElement) return;
-        
-        if (isConnected) {
-            statusElement.textContent = 'P2P مشفر 🔒';
-            statusElement.style.color = '#4caf50';
-        } else if (status === 'connecting') {
-            statusElement.textContent = 'جاري الاتصال...';
-            statusElement.style.color = '#ff9800';
-        } else {
-            statusElement.textContent = 'مشفر 🔒';
-            statusElement.style.color = '#2196F3';
-        }
-    },
-    
-    async handleP2PMessage(friendId, rawData) {
-        try {
-            const encryptedMessage = JSON.parse(rawData);
-            
-            let decryptedContent;
-            let decryptedData = null;
-            
-            if (encryptedMessage.type === 'text') {
-                decryptedContent = await this.decryptMessageContent(encryptedMessage.content, friendId);
-            } else {
-                decryptedData = await this.decryptFileContent(encryptedMessage.content, friendId);
-                decryptedContent = decryptedData;
-            }
-            
-            const messageObj = {
-                id: encryptedMessage.id,
-                type: encryptedMessage.type,
-                text: decryptedContent,
-                data: decryptedData,
-                encryptedContent: encryptedMessage.content,
-                sender: 'friend',
-                time: encryptedMessage.time,
-                status: 'read'
-            };
-            
-            this.saveMessage(friendId, messageObj);
-            
-            if (this.currentChat === friendId) {
-                this.displayMessage(messageObj);
-            } else {
-                let lastMsg = '';
-                if (encryptedMessage.type === 'text') lastMsg = decryptedContent || 'رسالة مشفرة';
-                else if (encryptedMessage.type === 'image') lastMsg = '📷 صورة مشفرة';
-                else if (encryptedMessage.type === 'voice') lastMsg = '🎤 بصمة مشفرة';
-                this.updateLastMessage(friendId, lastMsg);
-                loadChats();
-            }
-        } catch (error) {
-            console.error('Error handling P2P message:', error);
-        }
     },
     
     displayMessages(friendId) {
@@ -336,14 +226,19 @@ const ChatSystem = {
         let displayData = msg.data;
         let isEncrypted = false;
         
+        // فك التشفير إذا كانت الرسالة مشفرة
         if (msg.encryptedContent && !msg.text && msg.type === 'text') {
             isEncrypted = true;
             const sharedSecret = await this.getSharedSecret(
                 msg.sender === 'me' ? this.currentChat : window.auth.currentUser.uid
             );
             if (sharedSecret) {
-                displayText = await window.cryptoSystem.decryptMessage(msg.encryptedContent, sharedSecret);
-                msg.text = displayText;
+                try {
+                    displayText = await window.cryptoSystem.decryptMessage(msg.encryptedContent, sharedSecret);
+                    msg.text = displayText;
+                } catch (e) {
+                    displayText = '[رسالة مشفرة]';
+                }
             } else {
                 displayText = '[رسالة مشفرة]';
             }
@@ -353,12 +248,16 @@ const ChatSystem = {
                 msg.sender === 'me' ? this.currentChat : window.auth.currentUser.uid
             );
             if (sharedSecret) {
-                const decryptedBuffer = await window.cryptoSystem.decryptFile(msg.encryptedContent, sharedSecret);
-                const blob = new Blob([decryptedBuffer], { 
-                    type: msg.type === 'image' ? 'image/jpeg' : 'audio/webm' 
-                });
-                displayData = URL.createObjectURL(blob);
-                msg.data = displayData;
+                try {
+                    const decryptedBuffer = await window.cryptoSystem.decryptFile(msg.encryptedContent, sharedSecret);
+                    const blob = new Blob([decryptedBuffer], { 
+                        type: msg.type === 'image' ? 'image/jpeg' : 'audio/webm' 
+                    });
+                    displayData = URL.createObjectURL(blob);
+                    msg.data = displayData;
+                } catch (e) {
+                    displayData = null;
+                }
             } else {
                 displayData = null;
             }
@@ -440,13 +339,12 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // ✅ دالة sendMessage المعدلة (ترسل دائماً عبر السيرفر)
+    // ✅ إرسال رسالة نصية (مشفرة)
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
         const messageId = Date.now().toString();
         
-        // تشفير النص
         const encryptedContent = await this.encryptMessageContent(text, this.currentChat);
         
         if (!encryptedContent) {
@@ -467,7 +365,6 @@ const ChatSystem = {
         this.displayMessage(messageObj);
         this.saveMessage(this.currentChat, messageObj);
         
-        // إرسال عبر السيرفر (يعمل دائماً)
         try {
             await window.db.collection('temp_messages').add({
                 to: this.currentChat,
@@ -485,7 +382,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅ دالة sendImage المعدلة
+    // ✅ إرسال صورة (مشفرة)
     async sendImage(file) {
         if (!this.currentChat) return false;
         
@@ -495,6 +392,7 @@ const ChatSystem = {
         
         if (!encryptedContent) {
             console.error('Image encryption failed');
+            alert('فشل تشفير الصورة');
             return false;
         }
         
@@ -530,7 +428,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅ دالة sendVoiceNote المعدلة
+    // ✅ إرسال بصمة صوتية (مشفرة)
     async sendVoiceNote(audioBlob) {
         if (!this.currentChat) return false;
         
@@ -541,6 +439,7 @@ const ChatSystem = {
         
         if (!encryptedContent) {
             console.error('Voice encryption failed');
+            alert('فشل تشفير البصمة الصوتية');
             return false;
         }
         
@@ -1191,4 +1090,4 @@ window.showNotification = function(title, message) {
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - الإرسال يعمل دائماً مع تشفير AES-256-GCM');
+console.log('✅ app.js محدث - سيرفر فقط مع تشفير AES-256-GCM (بدون P2P)');
