@@ -7,12 +7,90 @@ class CryptoSystem {
         this.sharedSecrets = new Map(); // peerId -> sharedSecret
     }
 
+    // حفظ المفتاح الخاص في localStorage
+    async savePrivateKey(userId, privateKey) {
+        try {
+            const exported = await window.crypto.subtle.exportKey("jwk", privateKey);
+            localStorage.setItem(`privateKey_${userId}`, JSON.stringify(exported));
+            console.log('✅ Private key saved to localStorage');
+        } catch (error) {
+            console.error('Failed to save private key:', error);
+        }
+    }
+
+    // استرجاع المفتاح الخاص من localStorage
+    async loadPrivateKey(userId) {
+        const saved = localStorage.getItem(`privateKey_${userId}`);
+        if (!saved) return null;
+        
+        try {
+            const privateKeyJwk = JSON.parse(saved);
+            const privateKey = await window.crypto.subtle.importKey(
+                "jwk",
+                privateKeyJwk,
+                {
+                    name: "ECDH",
+                    namedCurve: "P-384"
+                },
+                true,
+                ["deriveKey", "deriveBits"]
+            );
+            console.log('✅ Private key loaded from localStorage');
+            return privateKey;
+        } catch (error) {
+            console.error('Failed to load private key:', error);
+            return null;
+        }
+    }
+
+    // استرجاع أو توليد مفتاح للمستخدم
+    async getOrCreateKeyPair(userId) {
+        // محاولة استرجاع المفتاح الخاص من localStorage أولاً
+        const existingPrivateKey = await this.loadPrivateKey(userId);
+        
+        if (existingPrivateKey) {
+            // إعادة بناء keyPair من المفتاح الخاص المسترجع
+            // نحتاج أيضاً إلى المفتاح العام
+            const publicKey = await window.crypto.subtle.importKey(
+                "raw",
+                this.base64ToArrayBuffer(localStorage.getItem(`publicKey_${userId}`) || ''),
+                {
+                    name: "ECDH",
+                    namedCurve: "P-384"
+                },
+                true,
+                []
+            );
+            
+            const keyPair = {
+                privateKey: existingPrivateKey,
+                publicKey: publicKey
+            };
+            this.keyPairs.set(userId, keyPair);
+            return keyPair;
+        }
+        
+        // إذا لم يوجد، قم بتوليد مفاتيح جديدة
+        console.log('Generating new key pair for user:', userId);
+        const keyPair = await this.generateKeyPair();
+        
+        // حفظ المفتاح الخاص في localStorage
+        await this.savePrivateKey(userId, keyPair.privateKey);
+        
+        // حفظ المفتاح العام أيضاً (لفك التشفير لاحقاً)
+        const publicKeyBase64 = await this.exportPublicKey(keyPair.publicKey);
+        localStorage.setItem(`publicKey_${userId}`, publicKeyBase64);
+        
+        this.keyPairs.set(userId, keyPair);
+        return keyPair;
+    }
+
     // توليد مفتاح خاص وعام (ECDH)
     async generateKeyPair() {
         const keyPair = await window.crypto.subtle.generateKey(
             {
                 name: "ECDH",
-                namedCurve: "P-384"  // منحنى آمن
+                namedCurve: "P-384"
             },
             true,
             ["deriveKey", "deriveBits"]
@@ -204,4 +282,4 @@ class CryptoSystem {
 
 // إنشاء نسخة عامة
 window.cryptoSystem = new CryptoSystem();
-console.log('✅ Crypto system initialized');
+console.log('✅ Crypto system initialized (with persistent private keys)');
