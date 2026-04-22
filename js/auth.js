@@ -22,6 +22,7 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
+// ✅ دالة تسجيل الدخول
 async function signInWithGoogle() {
     try {
         if (!window.auth || !window.googleProvider) {
@@ -42,9 +43,10 @@ async function signInWithGoogle() {
                     const keyPair = await window.cryptoSystem.generateKeyPair();
                     publicKeyBase64 = await window.cryptoSystem.exportPublicKey(keyPair.publicKey);
                     window.cryptoSystem.keyPairs.set(user.uid, keyPair);
-                    // حفظ المفتاح الخاص
-                    await window.cryptoSystem.savePrivateKey(user.uid, keyPair.privateKey);
-                    console.log('✅ P2P keys generated and saved for new user');
+                    if (window.cryptoSystem.savePrivateKey) {
+                        await window.cryptoSystem.savePrivateKey(user.uid, keyPair.privateKey);
+                    }
+                    console.log('✅ P2P keys generated for new user');
                 }
             } catch (e) {
                 console.warn('P2P key generation failed:', e);
@@ -76,15 +78,12 @@ async function signInWithGoogle() {
                     const publicKeyBase64 = await window.cryptoSystem.exportPublicKey(keyPair.publicKey);
                     updates.publicKey = publicKeyBase64;
                     window.cryptoSystem.keyPairs.set(user.uid, keyPair);
-                    await window.cryptoSystem.savePrivateKey(user.uid, keyPair.privateKey);
+                    if (window.cryptoSystem.savePrivateKey) {
+                        await window.cryptoSystem.savePrivateKey(user.uid, keyPair.privateKey);
+                    }
                     console.log('✅ P2P keys added to existing user');
                 } catch (e) {
-                    console.warn('P2P key generation failed for existing user:', e);
-                }
-            } else if (userData.publicKey && window.cryptoSystem && !window.cryptoSystem.keyPairs.has(user.uid)) {
-                const keyPair = await window.cryptoSystem.getOrCreateKeyPair(user.uid);
-                if (keyPair) {
-                    window.cryptoSystem.keyPairs.set(user.uid, keyPair);
+                    console.warn('P2P key generation failed:', e);
                 }
             }
             
@@ -93,6 +92,7 @@ async function signInWithGoogle() {
             }
         }
         
+        // تهيئة الأنظمة
         if (window.signaling) {
             window.signaling.init(user.uid);
         }
@@ -100,7 +100,20 @@ async function signInWithGoogle() {
             window.p2pManager.init(user.uid);
         }
         
-        updateUserUI();
+        // ✅ إخفاء شاشة تسجيل الدخول وإظهار التطبيق مباشرة
+        const loginScreen = document.querySelector('.login-screen');
+        const splash = document.getElementById('splash');
+        const app = document.getElementById('app');
+        
+        if (loginScreen) loginScreen.style.display = 'none';
+        if (splash) splash.style.display = 'none';
+        if (app) app.style.display = 'flex';
+        
+        // إعادة تحميل المحادثات
+        if (typeof loadChats === 'function') {
+            setTimeout(() => loadChats(), 100);
+        }
+        
         return true;
     } catch (error) {
         console.error('Login error:', error);
@@ -112,35 +125,6 @@ async function signInWithGoogle() {
         alert(errorMessage);
         return false;
     }
-}
-
-function updateUserUI() {
-    const splash = document.getElementById('splash');
-    const app = document.getElementById('app');
-    const loginScreen = document.querySelector('.login-screen');
-    
-    // إخفاء جميع شاشات التحميل وتسجيل الدخول
-    if (splash) {
-        splash.classList.add('hide');
-        setTimeout(() => {
-            splash.style.display = 'none';
-        }, 500);
-    }
-    
-    if (loginScreen) {
-        loginScreen.style.display = 'none';
-    }
-    
-    if (app) {
-        app.style.display = 'flex';
-    }
-    
-    // إعادة تحميل المحادثات
-    setTimeout(() => {
-        if (typeof loadChats === 'function') {
-            loadChats();
-        }
-    }, 100);
 }
 
 async function logout() {
@@ -194,5 +178,109 @@ async function loadUserData(uid) {
     }
 }
 
-// ========== نظام الصداقة (نفسه بدون تغيير) ==========
-// ... (باقي الكود كما هو) ...
+// ✅ شاشة تسجيل الدخول
+function showLoginScreen() {
+    const existingLogin = document.querySelector('.login-screen');
+    if (existingLogin) existingLogin.remove();
+    
+    const loginScreen = document.createElement('div');
+    loginScreen.className = 'login-screen';
+    loginScreen.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--bg, #ffffff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    loginScreen.innerHTML = `
+        <div style="text-align: center; padding: 20px; max-width: 350px;">
+            <div style="font-size: 5rem; margin-bottom: 1rem;">🛡️</div>
+            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary, #2196F3);">رفيق P2P</h1>
+            <p style="margin-bottom: 2rem; color: var(--text-light, #666);">تواصل مشفر بالكامل</p>
+            <button id="googleSignInBtn" style="
+                background: var(--primary, #2196F3);
+                color: white;
+                border: none;
+                border-radius: 30px;
+                padding: 15px 30px;
+                font-size: 1.1rem;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                width: 100%;
+                transition: all 0.3s;
+            ">
+                <i class="fab fa-google"></i>
+                <span>المتابعة بحساب جوجل</span>
+            </button>
+            <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-light, #666);">🔒 جميع الرسائل مشفرة من طرف إلى طرف<br>السيرفر لا يرى أي محتوى</p>
+        </div>
+    `;
+    
+    document.body.appendChild(loginScreen);
+    
+    // ربط زر تسجيل الدخول
+    const signInBtn = document.getElementById('googleSignInBtn');
+    if (signInBtn) {
+        signInBtn.onclick = signInWithGoogle;
+    }
+}
+
+// ========== مراقبة حالة المصادقة ==========
+if (typeof window.auth !== 'undefined') {
+    window.auth.onAuthStateChanged(async (user) => {
+        console.log('Auth state changed:', user ? 'logged in' : 'logged out');
+        
+        const splash = document.getElementById('splash');
+        const app = document.getElementById('app');
+        
+        if (user) {
+            console.log('Loading user data for:', user.uid);
+            
+            // محاولة استرجاع المفتاح الخاص من localStorage
+            if (window.cryptoSystem && window.cryptoSystem.getOrCreateKeyPair) {
+                const keyPair = await window.cryptoSystem.getOrCreateKeyPair(user.uid);
+                if (keyPair) {
+                    window.cryptoSystem.keyPairs.set(user.uid, keyPair);
+                    console.log('✅ Key pair loaded for user');
+                }
+            }
+            
+            await loadUserData(user.uid);
+            setupFriendRequestsListener(user.uid);
+            
+            // إخفاء شاشة التحميل وتسجيل الدخول
+            if (splash) splash.style.display = 'none';
+            const loginScreen = document.querySelector('.login-screen');
+            if (loginScreen) loginScreen.style.display = 'none';
+            if (app) app.style.display = 'flex';
+            
+            if (typeof loadChats === 'function') {
+                setTimeout(() => loadChats(), 100);
+            }
+        } else {
+            console.log('User not logged in, showing login screen');
+            
+            if (app) app.style.display = 'none';
+            if (splash) splash.style.display = 'flex';
+            
+            setTimeout(() => {
+                if (splash) splash.style.display = 'none';
+                showLoginScreen();
+            }, 1000);
+        }
+    });
+} else {
+    console.error('auth is not defined. Firebase may not be loaded yet.');
+}
+
+// ========== باقي دوال الصداقة والبحث (بدون تغيير) ==========
+// ... (أضف هنا دوال الصداقة والبحث من ملف auth.js القديم)
