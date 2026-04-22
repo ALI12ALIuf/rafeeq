@@ -35,22 +35,6 @@ async function signInWithGoogle() {
         
         if (!userDoc.exists) {
             const shareableId = generateShareableId();
-            
-            let publicKeyBase64 = null;
-            try {
-                if (window.cryptoSystem) {
-                    const keyPair = await window.cryptoSystem.generateKeyPair();
-                    publicKeyBase64 = await window.cryptoSystem.exportPublicKey(keyPair.publicKey);
-                    window.cryptoSystem.keyPairs.set(user.uid, keyPair);
-                    if (window.cryptoSystem.savePrivateKey) {
-                        await window.cryptoSystem.savePrivateKey(user.uid, keyPair.privateKey);
-                    }
-                    console.log('✅ P2P keys generated for new user');
-                }
-            } catch (e) {
-                console.warn('P2P key generation failed:', e);
-            }
-            
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid,
                 name: (user.displayName || 'مستخدم').substring(0, 25),
@@ -58,7 +42,6 @@ async function signInWithGoogle() {
                 shareableId: shareableId,
                 bio: '',
                 avatarType: 'male',
-                publicKey: publicKeyBase64 || null,
                 friends: [],
                 blocked: [],
                 createdAt: new Date()
@@ -66,24 +49,9 @@ async function signInWithGoogle() {
         } else {
             const userData = userDoc.data();
             const updates = {};
-            
             if (!userData.friends) updates.friends = [];
-            
-            if (!userData.publicKey && window.cryptoSystem) {
-                try {
-                    const keyPair = await window.cryptoSystem.generateKeyPair();
-                    const publicKeyBase64 = await window.cryptoSystem.exportPublicKey(keyPair.publicKey);
-                    updates.publicKey = publicKeyBase64;
-                    window.cryptoSystem.keyPairs.set(user.uid, keyPair);
-                    if (window.cryptoSystem.savePrivateKey) {
-                        await window.cryptoSystem.savePrivateKey(user.uid, keyPair.privateKey);
-                    }
-                    console.log('✅ P2P keys added to existing user');
-                } catch (e) {
-                    console.warn('P2P key generation failed:', e);
-                }
-            }
-            
+            if (userData.followers) updates.followers = [];
+            if (userData.following) updates.following = [];
             if (Object.keys(updates).length > 0) {
                 await window.db.collection('users').doc(user.uid).update(updates);
             }
@@ -106,34 +74,14 @@ async function signInWithGoogle() {
 function updateUserUI() {
     const splash = document.getElementById('splash');
     const app = document.getElementById('app');
-    const loginScreen = document.querySelector('.login-screen');
     
-    if (splash) splash.style.display = 'none';
-    if (loginScreen) loginScreen.style.display = 'none';
-    if (app) app.style.display = 'flex';
-    
-    setTimeout(() => {
-        if (typeof loadChats === 'function') loadChats();
-        if (typeof updateTripsCount === 'function') updateTripsCount();
-        if (typeof loadUserTrips === 'function') loadUserTrips();
-        if (typeof loadFriendsList === 'function') loadFriendsList();
-        if (typeof loadFriendRequests === 'function') loadFriendRequests();
-        
-        const profileName = document.getElementById('profileName');
-        const shareableId = document.getElementById('shareableId');
-        const profileAvatar = document.getElementById('profileAvatarEmoji');
-        
-        if (window.auth.currentUser) {
-            window.db.collection('users').doc(window.auth.currentUser.uid).get().then(doc => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    if (profileName) profileName.textContent = data.name || 'مستخدم';
-                    if (shareableId) shareableId.textContent = data.shareableId || '0000000000';
-                    if (profileAvatar) profileAvatar.textContent = getEmojiForUser(data);
-                }
-            });
-        }
-    }, 300);
+    if (splash) {
+        splash.classList.add('hide');
+        setTimeout(() => {
+            splash.style.display = 'none';
+            if (app) app.style.display = 'flex';
+        }, 500);
+    }
 }
 
 async function logout() {
@@ -187,115 +135,6 @@ async function loadUserData(uid) {
     }
 }
 
-function showLoginScreen() {
-    const existingLogin = document.querySelector('.login-screen');
-    if (existingLogin) existingLogin.remove();
-    
-    const loginScreen = document.createElement('div');
-    loginScreen.className = 'login-screen';
-    loginScreen.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: var(--bg, #ffffff);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-    `;
-    
-    loginScreen.innerHTML = `
-        <div style="text-align: center; padding: 20px; max-width: 350px;">
-            <div style="font-size: 5rem; margin-bottom: 1rem;">🛡️</div>
-            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary, #2196F3);">رفيق</h1>
-            <p style="margin-bottom: 2rem; color: var(--text-light, #666);">سجل دخولك للوصول إلى جميع الميزات</p>
-            <button id="googleSignInBtn" style="
-                background: var(--primary, #2196F3);
-                color: white;
-                border: none;
-                border-radius: 30px;
-                padding: 15px 30px;
-                font-size: 1.1rem;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-                width: 100%;
-                transition: all 0.3s;
-            ">
-                <i class="fab fa-google"></i>
-                <span>المتابعة بحساب جوجل</span>
-            </button>
-            <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-light, #666);">لن يتم مشاركة معلوماتك مع أي طرف ثالث</p>
-        </div>
-    `;
-    
-    document.body.appendChild(loginScreen);
-    
-    const signInBtn = document.getElementById('googleSignInBtn');
-    if (signInBtn) {
-        signInBtn.onclick = signInWithGoogle;
-    }
-}
-
-// ========== مراقبة حالة المصادقة ==========
-if (typeof window.auth !== 'undefined') {
-    window.auth.onAuthStateChanged(async (user) => {
-        console.log('Auth state changed:', user ? 'logged in' : 'logged out');
-        
-        const splash = document.getElementById('splash');
-        const app = document.getElementById('app');
-        
-        if (user) {
-            console.log('Loading user data for:', user.uid);
-            
-            if (window.cryptoSystem && window.cryptoSystem.getOrCreateKeyPair) {
-                const keyPair = await window.cryptoSystem.getOrCreateKeyPair(user.uid);
-                if (keyPair) {
-                    window.cryptoSystem.keyPairs.set(user.uid, keyPair);
-                }
-            }
-            
-            await loadUserData(user.uid);
-            setupFriendRequestsListener(user.uid);
-            
-            if (splash) splash.style.display = 'none';
-            const loginScreen = document.querySelector('.login-screen');
-            if (loginScreen) loginScreen.style.display = 'none';
-            if (app) app.style.display = 'flex';
-            
-            setTimeout(() => {
-                if (typeof loadChats === 'function') loadChats();
-                if (typeof updateTripsCount === 'function') updateTripsCount();
-            }, 300);
-        } else {
-            if (app) app.style.display = 'none';
-            if (splash) splash.style.display = 'flex';
-            
-            setTimeout(() => {
-                if (splash) splash.style.display = 'none';
-                showLoginScreen();
-            }, 1000);
-        }
-    });
-} else {
-    console.error('auth is not defined. Firebase may not be loaded yet.');
-}
-
-function copyId() {
-    const idElement = document.getElementById('shareableId');
-    if (!idElement) return;
-    const id = idElement.textContent;
-    navigator.clipboard.writeText(id).then(() => {
-        alert('تم النسخ');
-    }).catch(err => {
-        console.error('Copy failed:', err);
-    });
-}
-
 // ========== نظام الصداقة ==========
 
 window.showFriendsList = function() {
@@ -316,14 +155,15 @@ async function loadFriendsList() {
         const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
         if (!userDoc.exists) return;
         
-        const friends = userDoc.data().friends || [];
+        const userData = userDoc.data();
+        const friends = userData.friends || [];
         
         if (friends.length === 0) {
             friendsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>لا يوجد أصدقاء</h3>
-                    <p>أضف أصدقاء لبدء المحادثة</p>
+                    <h3>${i18n ? i18n.t('no_friends') : 'لا يوجد أصدقاء'}</h3>
+                    <p>${i18n ? i18n.t('no_friends_desc') : 'لم تضف أي أصدقاء بعد'}</p>
                 </div>
             `;
             return;
@@ -349,7 +189,7 @@ async function loadFriendsList() {
                                 <button class="action-btn" onclick="openChat('${friendId}')" title="محادثة">
                                     <i class="fas fa-comment"></i>
                                 </button>
-                                <button class="action-btn" onclick="removeFriend('${friendId}')" title="حذف" style="background: var(--danger); color: white;">
+                                <button class="action-btn" onclick="removeFriend('${friendId}')" title="حذف الصديق" style="background: var(--danger); color: white;">
                                     <i class="fas fa-user-minus"></i>
                                 </button>
                             </div>
@@ -365,7 +205,13 @@ async function loadFriendsList() {
         
     } catch (error) {
         console.error('Error loading friends list:', error);
-        friendsList.innerHTML = `<div class="empty-state"><p>خطأ في تحميل الأصدقاء</p></div>`;
+        friendsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>خطأ في تحميل الأصدقاء</h3>
+                <p>${error.message || 'حدث خطأ، حاول مرة أخرى'}</p>
+            </div>
+        `;
     }
 }
 
@@ -381,6 +227,7 @@ window.removeFriend = async function(friendId) {
         await window.db.collection('users').doc(friendId).update({
             friends: FieldValue.arrayRemove(currentUserId)
         });
+        await updateFriendsCount();
         await loadFriendsList();
         alert('تم حذف الصديق بنجاح');
     } catch (error) {
@@ -389,6 +236,20 @@ window.removeFriend = async function(friendId) {
     }
 };
 
+async function updateFriendsCount() {
+    if (!window.auth || !window.auth.currentUser) return;
+    try {
+        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+        if (userDoc.exists) {
+            const friends = userDoc.data().friends || [];
+            const countElement = document.getElementById('friendsCount');
+            if (countElement) countElement.textContent = formatNumber(friends.length);
+        }
+    } catch (error) {
+        console.error('Error updating friends count:', error);
+    }
+}
+
 window.showFriendRequests = function() {
     const profilePage = document.querySelector('.profile-page');
     const requestsPage = document.getElementById('friendRequestsPage');
@@ -396,6 +257,17 @@ window.showFriendRequests = function() {
     if (requestsPage) requestsPage.style.display = 'block';
     loadFriendRequests();
 };
+
+function formatDateSafely(timestamp) {
+    try {
+        if (!timestamp) return 'تاريخ غير معروف';
+        if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toLocaleDateString('ar-EG');
+        if (timestamp instanceof Date) return timestamp.toLocaleDateString('ar-EG');
+        return new Date(timestamp).toLocaleDateString('ar-EG');
+    } catch (e) {
+        return 'تاريخ غير معروف';
+    }
+}
 
 async function loadFriendRequests() {
     if (!window.auth || !window.auth.currentUser) return;
@@ -413,35 +285,47 @@ async function loadFriendRequests() {
             requestsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-user-friends"></i>
-                    <h3>لا توجد طلبات</h3>
-                    <p>ليس لديك طلبات صداقة حالياً</p>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
                 </div>
             `;
             return;
         }
         
         let html = '';
+        let requests = [];
         
-        for (const doc of snapshot.docs) {
-            const request = doc.data();
+        snapshot.forEach(doc => {
+            requests.push({ id: doc.id, ...doc.data() });
+        });
+        
+        requests.sort((a, b) => {
+            const timeA = a.timestamp?.seconds || 0;
+            const timeB = b.timestamp?.seconds || 0;
+            return timeB - timeA;
+        });
+        
+        for (const request of requests) {
             try {
                 const senderDoc = await window.db.collection('users').doc(request.from).get();
                 if (senderDoc.exists) {
                     const sender = senderDoc.data();
                     const avatarEmoji = getEmojiForUser(sender);
+                    const requestDate = formatDateSafely(request.timestamp);
                     
                     html += `
-                        <div class="user-item" id="request-${doc.id}">
+                        <div class="user-item" id="request-${request.id}">
                             <div class="user-avatar-emoji">${avatarEmoji}</div>
                             <div class="user-info">
                                 <h4>${sender.name || 'مستخدم'}</h4>
                                 <p>${sender.shareableId || ''}</p>
+                                <small style="color: var(--text-light);">${requestDate}</small>
                             </div>
                             <div class="user-actions">
-                                <button class="action-btn" style="background: var(--success); color: white;" onclick="acceptFriendRequest('${doc.id}', '${request.from}')">
+                                <button class="action-btn" style="background: var(--success); color: white;" onclick="acceptFriendRequest('${request.id}', '${request.from}')" title="قبول">
                                     <i class="fas fa-check"></i>
                                 </button>
-                                <button class="action-btn remove" onclick="rejectFriendRequest('${doc.id}')">
+                                <button class="action-btn remove" onclick="rejectFriendRequest('${request.id}')" title="رفض">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </div>
@@ -453,16 +337,35 @@ async function loadFriendRequests() {
             }
         }
         
-        requestsList.innerHTML = html;
+        if (html === '') {
+            requestsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-friends"></i>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
+                </div>
+            `;
+        } else {
+            requestsList.innerHTML = html;
+        }
         
     } catch (error) {
         console.error('Error loading friend requests:', error);
-        requestsList.innerHTML = `<div class="empty-state"><p>خطأ في تحميل الطلبات</p></div>`;
+        requestsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>خطأ في تحميل الطلبات</h3>
+                <p>${error.message || 'حدث خطأ، حاول مرة أخرى'}</p>
+            </div>
+        `;
     }
 }
 
 window.acceptFriendRequest = async function(requestId, senderId) {
-    if (!window.auth || !window.auth.currentUser) return;
+    if (!window.auth || !window.auth.currentUser) {
+        alert('الرجاء تسجيل الدخول أولاً');
+        return;
+    }
     
     try {
         const currentUserId = window.auth.currentUser.uid;
@@ -480,13 +383,28 @@ window.acceptFriendRequest = async function(requestId, senderId) {
             friends: FieldValue.arrayUnion(currentUserId)
         });
         
-        document.getElementById(`request-${requestId}`)?.remove();
-        await loadFriendRequests();
-        alert('تم قبول طلب الصداقة');
+        const requestElement = document.getElementById(`request-${requestId}`);
+        if (requestElement) requestElement.remove();
+        
+        await updateFriendRequestsCount();
+        await updateFriendsCount();
+        
+        alert('تم قبول طلب الصداقة بنجاح');
+        
+        const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
+        if (remainingRequests === 0) {
+            document.getElementById('friendRequestsList').innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-friends"></i>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
+                </div>
+            `;
+        }
         
     } catch (error) {
         console.error('Error accepting friend request:', error);
-        alert('حدث خطأ في قبول الطلب');
+        alert('حدث خطأ في قبول الطلب: ' + error.message);
     }
 };
 
@@ -499,15 +417,45 @@ window.rejectFriendRequest = async function(requestId) {
             respondedAt: new Date()
         });
         
-        document.getElementById(`request-${requestId}`)?.remove();
-        await loadFriendRequests();
+        const requestElement = document.getElementById(`request-${requestId}`);
+        if (requestElement) requestElement.remove();
+        
+        await updateFriendRequestsCount();
+        
         alert('تم رفض الطلب');
+        
+        const remainingRequests = document.querySelectorAll('[id^="request-"]').length;
+        if (remainingRequests === 0) {
+            document.getElementById('friendRequestsList').innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-friends"></i>
+                    <h3>${i18n ? i18n.t('no_friend_requests') : 'لا توجد طلبات'}</h3>
+                    <p>${i18n ? i18n.t('no_friend_requests_desc') : 'لم يرسل لك أحد طلب صداقة بعد'}</p>
+                </div>
+            `;
+        }
         
     } catch (error) {
         console.error('Error rejecting friend request:', error);
         alert('حدث خطأ في رفض الطلب');
     }
 };
+
+async function updateFriendRequestsCount() {
+    if (!window.auth || !window.auth.currentUser) return;
+    
+    try {
+        const snapshot = await window.db.collection('friendRequests')
+            .where('to', '==', window.auth.currentUser.uid)
+            .where('status', '==', 'pending')
+            .get();
+        
+        const countElement = document.getElementById('friendRequestsCount');
+        if (countElement) countElement.textContent = formatNumber(snapshot.size);
+    } catch (error) {
+        console.error('Error updating friend requests count:', error);
+    }
+}
 
 window.addNewFriend = async function(targetUserId) {
     if (!window.auth || !window.auth.currentUser) {
@@ -530,8 +478,17 @@ window.addNewFriend = async function(targetUserId) {
             .get();
         
         if (!existingRequest.empty) {
-            alert('طلب صداقة معلق بالفعل');
+            alert('لقد أرسلت طلب صداقة لهذا المستخدم مسبقاً');
             return;
+        }
+        
+        const currentUserDoc = await window.db.collection('users').doc(currentUserId).get();
+        if (currentUserDoc.exists) {
+            const friends = currentUserDoc.data().friends || [];
+            if (friends.includes(targetUserId)) {
+                alert('هذا المستخدم صديقك بالفعل');
+                return;
+            }
         }
         
         await window.db.collection('friendRequests').add({
@@ -541,25 +498,160 @@ window.addNewFriend = async function(targetUserId) {
             timestamp: new Date()
         });
         
-        alert('تم إرسال طلب الصداقة');
+        const resultsContainer = document.getElementById('searchResultsContainer');
+        if (resultsContainer) {
+            resultsContainer.style.display = 'none';
+            resultsContainer.innerHTML = '';
+        }
+        
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
+        
+        alert('تم إرسال طلب الصداقة بنجاح');
         
     } catch (error) {
         console.error('Error sending friend request:', error);
-        alert('حدث خطأ في إرسال الطلب');
+        alert('حدث خطأ في إرسال الطلب: ' + error.message);
     }
 };
 
 function setupFriendRequestsListener(userId) {
     try {
-        window.db.collection('friendRequests')
+        const requestsQuery = window.db.collection('friendRequests')
             .where('to', '==', userId)
-            .where('status', '==', 'pending')
-            .onSnapshot(() => {
-                loadFriendRequests();
-            });
+            .where('status', '==', 'pending');
+        
+        requestsQuery.onSnapshot((snapshot) => {
+            const countElement = document.getElementById('friendRequestsCount');
+            if (countElement) countElement.textContent = formatNumber(snapshot.size);
+            
+            const requestsPage = document.getElementById('friendRequestsPage');
+            if (requestsPage && requestsPage.style.display === 'block') loadFriendRequests();
+        }, (error) => {
+            console.log('Listener error:', error);
+        });
     } catch (error) {
         console.log('Error setting up listener:', error);
     }
+}
+
+// ========== نهاية نظام الصداقة ==========
+
+// ========== نظام تسجيل الدخول الإلزامي ==========
+// تم إزالة كل الكود الذي يسمح بالمشاهدة بدون تسجيل دخول
+
+if (typeof window.auth !== 'undefined') {
+    window.auth.onAuthStateChanged(async (user) => {
+        console.log('Auth state changed:', user ? 'logged in' : 'logged out');
+        
+        const splash = document.getElementById('splash');
+        const app = document.getElementById('app');
+        
+        if (user) {
+            // مستخدم مسجل - نحمّل البيانات ونعرض التطبيق
+            console.log('Loading user data for:', user.uid);
+            await loadUserData(user.uid);
+            setupFriendRequestsListener(user.uid);
+            
+            if (splash) {
+                splash.classList.add('hide');
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    if (app) app.style.display = 'flex';
+                }, 500);
+            }
+        } else {
+            // مستخدم غير مسجل - نعرض شاشة التحميل ثم نعرض واجهة تسجيل الدخول
+            console.log('User not logged in, showing login screen');
+            
+            // إخفاء المحتوى الرئيسي
+            if (app) app.style.display = 'none';
+            
+            // إظهار شاشة التحميل
+            if (splash) {
+                splash.classList.remove('hide');
+                splash.style.display = 'flex';
+            }
+            
+            // بعد 2 ثانية، نخفي شاشة التحميل ونعرض واجهة تسجيل الدخول
+            setTimeout(() => {
+                if (splash) {
+                    splash.classList.add('hide');
+                    setTimeout(() => {
+                        splash.style.display = 'none';
+                        showLoginScreen();
+                    }, 500);
+                } else {
+                    showLoginScreen();
+                }
+            }, 2000);
+        }
+    });
+} else {
+    console.error('auth is not defined. Firebase may not be loaded yet.');
+}
+
+// واجهة تسجيل الدخول الجديدة (بدلاً من الـ prompt السفلي)
+function showLoginScreen() {
+    // إزالة أي شاشة تسجيل دخول سابقة
+    const existingLogin = document.querySelector('.login-screen');
+    if (existingLogin) existingLogin.remove();
+    
+    // إنشاء شاشة تسجيل دخول كاملة
+    const loginScreen = document.createElement('div');
+    loginScreen.className = 'login-screen';
+    loginScreen.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    loginScreen.innerHTML = `
+        <div style="text-align: center; padding: 20px; max-width: 350px;">
+            <div style="font-size: 5rem; margin-bottom: 1rem;">🛡️</div>
+            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary);">${i18n ? i18n.t('app_name') : 'رفيق'}</h1>
+            <p style="margin-bottom: 2rem; color: var(--text-light);">${i18n ? i18n.t('login_desc') : 'سجل دخولك للوصول إلى جميع الميزات'}</p>
+            <button onclick="signInWithGoogle()" style="
+                background: var(--primary);
+                color: white;
+                border: none;
+                border-radius: 30px;
+                padding: 15px 30px;
+                font-size: 1.1rem;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                width: 100%;
+                transition: all 0.3s;
+            ">
+                <i class="fab fa-google"></i>
+                <span>${i18n ? i18n.t('login_with_google') : 'المتابعة بحساب جوجل'}</span>
+            </button>
+            <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-light);">${i18n ? i18n.t('login_note') : 'لن يتم مشاركة معلوماتك مع أي طرف ثالث'}</p>
+        </div>
+    `;
+    
+    document.body.appendChild(loginScreen);
+}
+
+function copyId() {
+    const idElement = document.getElementById('shareableId');
+    if (!idElement) return;
+    const id = idElement.textContent;
+    navigator.clipboard.writeText(id).then(() => {
+        alert('تم النسخ');
+    }).catch(err => {
+        console.error('Copy failed:', err);
+    });
 }
 
 // ========== دوال البحث ==========
@@ -579,7 +671,7 @@ window.findUserById = async function() {
     }
     
     resultsContainer.style.display = 'block';
-    resultsContainer.innerHTML = '<div style="text-align: center; padding: 10px;">جاري البحث...</div>';
+    resultsContainer.innerHTML = `<div style="text-align: center; padding: 10px; color: var(--text-light);">جاري البحث...</div>`;
     
     try {
         const snapshot = await window.db.collection('users')
@@ -587,34 +679,58 @@ window.findUserById = async function() {
             .get();
         
         if (snapshot.empty) {
-            resultsContainer.innerHTML = '<div style="text-align: center; padding: 15px;">لا يوجد مستخدم</div>';
+            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">لا يوجد مستخدم</div>`;
             return;
         }
         
         const user = snapshot.docs[0].data();
         const userId = snapshot.docs[0].id;
-        const currentUser = window.auth.currentUser;
+        const currentUser = window.auth ? window.auth.currentUser : null;
         
         if (currentUser && userId === currentUser.uid) {
-            resultsContainer.innerHTML = '<div style="text-align: center; padding: 15px;">هذا حسابك الشخصي</div>';
+            resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">هذا حسابك الشخصي</div>`;
             return;
         }
         
         const avatarEmoji = getEmojiForUser(user);
         
+        let buttonText = 'إضافة';
+        let buttonDisabled = '';
+        
+        if (currentUser) {
+            const currentUserDoc = await window.db.collection('users').doc(currentUser.uid).get();
+            const currentUserData = currentUserDoc.data();
+            
+            if (currentUserData.friends && currentUserData.friends.includes(userId)) {
+                buttonText = 'أصدقاء';
+                buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+            } else {
+                const existingRequest = await window.db.collection('friendRequests')
+                    .where('from', '==', currentUser.uid)
+                    .where('to', '==', userId)
+                    .where('status', '==', 'pending')
+                    .get();
+                
+                if (!existingRequest.empty) {
+                    buttonText = 'طلب معلق';
+                    buttonDisabled = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+                }
+            }
+        }
+        
         resultsContainer.innerHTML = `
-            <div class="search-result-item" style="display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid #ddd;">
-                <div style="font-size: 2rem;">${avatarEmoji}</div>
+            <div class="search-result-item" style="display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border);">
+                <div class="search-result-avatar-emoji" style="width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 1.8rem;">${avatarEmoji}</div>
                 <div style="flex: 1;">
-                    <h4 style="margin: 0;">${user.name}</h4>
-                    <p style="margin: 0; color: #666; font-size: 0.8rem;">${user.shareableId}</p>
+                    <h4 style="margin: 0; font-size: 1rem;">${user.name}</h4>
+                    <p style="margin: 0; color: var(--text-light); font-size: 0.85rem;">${user.shareableId}</p>
                 </div>
-                <button class="btn btn-primary" onclick="addNewFriend('${userId}')" style="padding: 5px 10px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;">إضافة صديق</button>
+                ${currentUser ? '<button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85rem;" onclick="addNewFriend(\'' + userId + '\')" ' + buttonDisabled + '>' + buttonText + '</button>' : ''}
             </div>
         `;
     } catch (error) {
         console.error('Search error:', error);
-        resultsContainer.innerHTML = '<div style="text-align: center; padding: 15px;">حدث خطأ في البحث</div>';
+        resultsContainer.innerHTML = `<div style="text-align: center; padding: 15px; color: var(--text-light); font-size: 0.95rem;">حدث خطأ بالبحث حاول مرة ثانية</div>`;
     }
 };
 
