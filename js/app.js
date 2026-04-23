@@ -115,14 +115,19 @@ const CryptoSystem = {
     },
     
     async importPublicKey(base64Key) {
-        const binaryKey = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
-        return await window.crypto.subtle.importKey(
-            "spki",
-            binaryKey,
-            { name: "RSA-OAEP", hash: "SHA-256" },
-            true,
-            ["encrypt"]
-        );
+        try {
+            const binaryKey = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
+            return await window.crypto.subtle.importKey(
+                "spki",
+                binaryKey,
+                { name: "RSA-OAEP", hash: "SHA-256" },
+                true,
+                ["encrypt"]
+            );
+        } catch (e) {
+            console.error('فشل استيراد المفتاح العام:', e);
+            return null;
+        }
     },
     
     async exportPrivateKey(key) {
@@ -131,14 +136,19 @@ const CryptoSystem = {
     },
     
     async importPrivateKey(base64Key) {
-        const binaryKey = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
-        return await window.crypto.subtle.importKey(
-            "pkcs8",
-            binaryKey,
-            { name: "RSA-OAEP", hash: "SHA-256" },
-            false,
-            ["decrypt"]
-        );
+        try {
+            const binaryKey = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
+            return await window.crypto.subtle.importKey(
+                "pkcs8",
+                binaryKey,
+                { name: "RSA-OAEP", hash: "SHA-256" },
+                false,
+                ["decrypt"]
+            );
+        } catch (e) {
+            console.error('فشل استيراد المفتاح الخاص:', e);
+            return null;
+        }
     },
     
     async generateSessionKey() {
@@ -255,22 +265,6 @@ const CryptoSystem = {
         });
     },
     
-    async encryptImage(imageFile, receiverPublicKey) {
-        const compressed = await this.compressImage(imageFile);
-        const base64 = await this.blobToBase64(compressed);
-        return await this.encryptMessage(base64, receiverPublicKey);
-    },
-    
-    async encryptVoice(audioBlob, receiverPublicKey) {
-        const base64 = await this.blobToBase64(audioBlob);
-        return await this.encryptMessage(base64, receiverPublicKey);
-    },
-    
-    async encryptVideo(videoFile, receiverPublicKey) {
-        const base64 = await this.blobToBase64(videoFile);
-        return await this.encryptMessage(base64, receiverPublicKey);
-    },
-    
     async encryptFile(file, receiverPublicKey) {
         const base64 = await this.blobToBase64(file);
         return await this.encryptMessage(base64, receiverPublicKey);
@@ -312,7 +306,6 @@ async function getMyPrivateKey() {
 const ChatSystem = {
     currentChat: null,
     messages: {},
-    onlineUsers: new Set(), // تتبع المستخدمين المتصلين
     
     init() {
         this.loadAllChats();
@@ -322,15 +315,13 @@ const ChatSystem = {
     setupOnlinePresence() {
         if (!window.auth?.currentUser) return;
         
-        // تحديث حالة الاتصال
         const userStatusRef = window.db.collection('users').doc(window.auth.currentUser.uid);
         
         userStatusRef.update({
             online: true,
             lastSeen: new Date()
-        });
+        }).catch(() => {});
         
-        // عند الخروج
         window.addEventListener('beforeunload', () => {
             userStatusRef.update({
                 online: false,
@@ -390,11 +381,6 @@ const ChatSystem = {
             const input = document.getElementById('messageInput');
             if (input) input.focus();
         }, 300);
-        
-        setTimeout(() => {
-            const container = document.getElementById('messagesContainer');
-            if (container) container.scrollTop = container.scrollHeight;
-        }, 100);
     },
     
     async displayMessages(friendId) {
@@ -408,6 +394,10 @@ const ChatSystem = {
         for (const msg of messages) {
             await this.displayMessage(msg, privateKey);
         }
+        
+        setTimeout(() => {
+            container.scrollTop = container.scrollHeight;
+        }, 100);
     },
     
     async displayMessage(msg, privateKey) {
@@ -418,204 +408,118 @@ const ChatSystem = {
         messageDiv.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
         messageDiv.id = `msg-${msg.id}`;
         
-        const time = new Date(msg.time).toLocaleTimeString('ar-EG', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
         
         let statusHtml = '';
         if (msg.sender === 'me') {
             let statusIcon = '✓';
             let statusClass = 'sent';
-            
-            if (msg.status === 'sending') {
-                statusIcon = '⏳';
-                statusClass = 'sending';
-            } else if (msg.status === 'delivered') {
-                statusIcon = '✓✓';
-                statusClass = 'delivered';
-            } else if (msg.status === 'read') {
-                statusIcon = '✓✓';
-                statusClass = 'read';
-            }
-            
+            if (msg.status === 'sending') { statusIcon = '⏳'; statusClass = 'sending'; }
+            else if (msg.status === 'delivered') { statusIcon = '✓✓'; statusClass = 'delivered'; }
+            else if (msg.status === 'read') { statusIcon = '✓✓'; statusClass = 'read'; }
             statusHtml = `<span class="message-status ${statusClass}">${statusIcon}</span>`;
         }
         
         let displayContent = '';
+        let mediaUrl = '';
         
-        if (msg.type === 'encrypted') {
-            if (msg.sender === 'me') {
-                displayContent = msg.plainText || '📝 رسالة مشفرة';
-            } else {
-                try {
-                    const decrypted = await CryptoSystem.decryptMessage(msg.encrypted, privateKey);
-                    displayContent = decrypted || '🔒 رسالة مشفرة (تعذر فك التشفير)';
-                    msg.plainText = displayContent;
-                } catch (e) {
-                    displayContent = '🔒 رسالة مشفرة';
+        if (msg.sender === 'me' && msg.plainText) {
+            displayContent = msg.plainText;
+            mediaUrl = msg.plainData;
+        } else if (msg.encrypted && privateKey) {
+            try {
+                const decrypted = await CryptoSystem.decryptMessage(msg.encrypted, privateKey);
+                if (msg.type === 'encrypted_text') {
+                    displayContent = decrypted;
+                } else {
+                    mediaUrl = decrypted;
                 }
-            }
-            
-            messageDiv.innerHTML = `
-                <div class="message-content">${this.escapeHtml(displayContent)}</div>
-                <div class="message-info">
-                    <span class="message-time">${time}</span>
-                    ${statusHtml}
-                </div>
-            `;
-        } else if (msg.type === 'encrypted_image') {
-            if (msg.sender === 'me') {
-                messageDiv.innerHTML = `
-                    <img src="${msg.plainData}" class="message-image" onclick="window.open('${msg.plainData}')">
-                    <div class="message-info">
-                        <span class="message-time">${time}</span>
-                        ${statusHtml}
-                    </div>
-                `;
-            } else {
-                try {
-                    const decrypted = await CryptoSystem.decryptMessage(msg.encrypted, privateKey);
-                    messageDiv.innerHTML = `
-                        <img src="${decrypted}" class="message-image" onclick="window.open('${decrypted}')">
-                        <div class="message-info">
-                            <span class="message-time">${time}</span>
-                            ${statusHtml}
-                        </div>
-                    `;
-                } catch (e) {
-                    messageDiv.innerHTML = `
-                        <div class="message-content">🖼️ صورة مشفرة</div>
-                        <div class="message-info">
-                            <span class="message-time">${time}</span>
-                        </div>
-                    `;
-                }
-            }
-        } else if (msg.type === 'encrypted_voice') {
-            if (msg.sender === 'me') {
-                messageDiv.innerHTML = `
-                    <audio controls src="${msg.plainData}" class="message-audio"></audio>
-                    <div class="message-info">
-                        <span class="message-time">${time}</span>
-                        ${statusHtml}
-                    </div>
-                `;
-            } else {
-                try {
-                    const decrypted = await CryptoSystem.decryptMessage(msg.encrypted, privateKey);
-                    messageDiv.innerHTML = `
-                        <audio controls src="${decrypted}" class="message-audio"></audio>
-                        <div class="message-info">
-                            <span class="message-time">${time}</span>
-                        </div>
-                    `;
-                } catch (e) {
-                    messageDiv.innerHTML = `
-                        <div class="message-content">🎤 بصمة صوتية مشفرة</div>
-                        <div class="message-info">
-                            <span class="message-time">${time}</span>
-                        </div>
-                    `;
-                }
-            }
-        } else if (msg.type === 'encrypted_video') {
-            if (msg.sender === 'me') {
-                messageDiv.innerHTML = `
-                    <video controls src="${msg.plainData}" class="message-video"></video>
-                    <div class="message-info">
-                        <span class="message-time">${time}</span>
-                        ${statusHtml}
-                    </div>
-                `;
-            } else {
-                try {
-                    const decrypted = await CryptoSystem.decryptMessage(msg.encrypted, privateKey);
-                    messageDiv.innerHTML = `
-                        <video controls src="${decrypted}" class="message-video"></video>
-                        <div class="message-info">
-                            <span class="message-time">${time}</span>
-                        </div>
-                    `;
-                } catch (e) {
-                    messageDiv.innerHTML = `
-                        <div class="message-content">🎬 فيديو مشفر</div>
-                        <div class="message-info">
-                            <span class="message-time">${time}</span>
-                        </div>
-                    `;
-                }
-            }
-        } else if (msg.type === 'encrypted_file') {
-            if (msg.sender === 'me') {
-                messageDiv.innerHTML = `
-                    <div class="message-content">
-                        📎 <a href="${msg.plainData}" download="${msg.fileName}">${msg.fileName}</a>
-                    </div>
-                    <div class="message-info">
-                        <span class="message-time">${time}</span>
-                        ${statusHtml}
-                    </div>
-                `;
-            } else {
-                try {
-                    const decrypted = await CryptoSystem.decryptMessage(msg.encrypted, privateKey);
-                    messageDiv.innerHTML = `
-                        <div class="message-content">
-                            📎 <a href="${decrypted}" download="${msg.fileName}">${msg.fileName}</a>
-                        </div>
-                        <div class="message-info">
-                            <span class="message-time">${time}</span>
-                        </div>
-                    `;
-                } catch (e) {
-                    messageDiv.innerHTML = `
-                        <div class="message-content">📁 ملف مشفر: ${msg.fileName}</div>
-                        <div class="message-info">
-                            <span class="message-time">${time}</span>
-                        </div>
-                    `;
-                }
+            } catch (e) {
+                displayContent = '🔒 تعذر فك التشفير';
             }
         }
         
+        if (msg.type === 'encrypted_text' || msg.type === 'text') {
+            messageDiv.innerHTML = `
+                <div class="message-content">${this.escapeHtml(displayContent || msg.text || '')}</div>
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+        } else if (msg.type.includes('image')) {
+            messageDiv.innerHTML = `
+                <img src="${mediaUrl}" class="message-image" onclick="window.open('${mediaUrl}')">
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+        } else if (msg.type.includes('voice')) {
+            messageDiv.innerHTML = `
+                <audio controls src="${mediaUrl}" class="message-audio"></audio>
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+        } else if (msg.type.includes('video')) {
+            messageDiv.innerHTML = `
+                <video controls src="${mediaUrl}" class="message-video" style="max-width:250px;max-height:250px;"></video>
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+        } else if (msg.type.includes('file')) {
+            messageDiv.innerHTML = `
+                <div class="message-content"><a href="${mediaUrl}" download="${msg.fileName}">📁 ${msg.fileName}</a></div>
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+        }
+        
         container.appendChild(messageDiv);
-        container.scrollTop = container.scrollHeight;
     },
     
-    async sendMessage(text) {
-        if (!this.currentChat || !text.trim()) return false;
+    async sendMessage(text, type = 'text', file = null) {
+        if (!this.currentChat) {
+            alert('الرجاء فتح محادثة أولاً');
+            return false;
+        }
         
         const messageId = Date.now().toString();
-        
         const receiverDoc = await window.db.collection('users').doc(this.currentChat).get();
         const receiverData = receiverDoc.data();
         
         if (!receiverData.publicKey) {
             console.error('المستخدم ليس لديه مفتاح عام');
+            alert('المستخدم ليس لديه مفتاح تشفير');
             return false;
         }
         
         const receiverPublicKey = await CryptoSystem.importPublicKey(receiverData.publicKey);
-        const encrypted = await CryptoSystem.encryptMessage(text, receiverPublicKey);
+        if (!receiverPublicKey) return false;
         
-        const message = {
+        let message = {
             id: messageId,
-            type: 'encrypted',
-            encrypted: encrypted,
-            plainText: text,
+            type: 'encrypted_' + type,
             sender: 'me',
             time: new Date().toISOString(),
             status: 'sending'
         };
         
+        // تجهيز المحتوى
+        let contentToEncrypt = text;
+        if (type === 'text') {
+            message.plainText = text;
+            contentToEncrypt = text;
+        } else if (file) {
+            const base64 = await CryptoSystem.blobToBase64(file);
+            message.plainData = base64;
+            message.fileName = file.name;
+            contentToEncrypt = base64;
+        }
+        
+        // تشفير
+        message.encrypted = await CryptoSystem.encryptMessage(contentToEncrypt, receiverPublicKey);
+        if (!message.encrypted) return false;
+        
         const privateKey = await getMyPrivateKey();
         await this.displayMessage(message, privateKey);
         this.saveMessage(this.currentChat, message);
+        this.updateMessageStatus(messageId, 'sent');
         
+        // إرسال للسيرفر
         try {
             const isReceiverOnline = await this.isUserOnline(this.currentChat);
-            
             const messageData = {
                 to: this.currentChat,
                 from: window.auth.currentUser.uid,
@@ -624,325 +528,27 @@ const ChatSystem = {
                     type: message.type,
                     encrypted: message.encrypted,
                     sender: message.sender,
-                    time: message.time
+                    time: message.time,
+                    fileName: message.fileName
                 },
                 timestamp: new Date()
             };
             
-            // إذا المستلم متصل، نحذف بعد 10 ثواني (بعد ما توصل)
-            // إذا غير متصل، نحذف بعد 24 ساعة
             if (!isReceiverOnline) {
                 messageData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
             }
             
             const docRef = await window.db.collection('temp_messages').add(messageData);
             
-            this.updateMessageStatus(messageId, 'sent');
-            
-            // إذا المستلم متصل، ننتظر وصولها ثم نحذف
             if (isReceiverOnline) {
                 this.waitForDeliveryAndDelete(messageId, docRef.id);
-            } else {
-                this.waitForDelivery(messageId, docRef.id);
             }
-            
         } catch (error) {
-            console.error('خطأ في إرسال الرسالة:', error);
+            console.error('خطأ في الإرسال:', error);
             this.updateMessageStatus(messageId, 'error');
         }
         
         return true;
-    },
-    
-    async sendImage(file) {
-        return new Promise(async (resolve) => {
-            const messageId = Date.now().toString();
-            
-            const receiverDoc = await window.db.collection('users').doc(this.currentChat).get();
-            const receiverData = receiverDoc.data();
-            
-            if (!receiverData.publicKey) {
-                console.error('المستخدم ليس لديه مفتاح عام');
-                resolve();
-                return;
-            }
-            
-            const receiverPublicKey = await CryptoSystem.importPublicKey(receiverData.publicKey);
-            const encrypted = await CryptoSystem.encryptImage(file, receiverPublicKey);
-            
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const message = {
-                    id: messageId,
-                    type: 'encrypted_image',
-                    encrypted: encrypted,
-                    plainData: e.target.result,
-                    sender: 'me',
-                    time: new Date().toISOString(),
-                    status: 'sending'
-                };
-                
-                const privateKey = await getMyPrivateKey();
-                await this.displayMessage(message, privateKey);
-                this.saveMessage(this.currentChat, message);
-                
-                try {
-                    const isReceiverOnline = await this.isUserOnline(this.currentChat);
-                    
-                    const messageData = {
-                        to: this.currentChat,
-                        from: window.auth.currentUser.uid,
-                        message: {
-                            id: message.id,
-                            type: message.type,
-                            encrypted: message.encrypted,
-                            sender: message.sender,
-                            time: message.time
-                        },
-                        timestamp: new Date()
-                    };
-                    
-                    if (!isReceiverOnline) {
-                        messageData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                    }
-                    
-                    const docRef = await window.db.collection('temp_messages').add(messageData);
-                    
-                    this.updateMessageStatus(messageId, 'sent');
-                    
-                    if (isReceiverOnline) {
-                        this.waitForDeliveryAndDelete(messageId, docRef.id);
-                    } else {
-                        this.waitForDelivery(messageId, docRef.id);
-                    }
-                    
-                } catch (error) {
-                    console.error('خطأ في إرسال الصورة:', error);
-                    this.updateMessageStatus(messageId, 'error');
-                }
-                resolve();
-            };
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    async sendVoiceNote(audioBlob) {
-        return new Promise(async (resolve) => {
-            const messageId = Date.now().toString();
-            
-            const receiverDoc = await window.db.collection('users').doc(this.currentChat).get();
-            const receiverData = receiverDoc.data();
-            
-            if (!receiverData.publicKey) {
-                console.error('المستخدم ليس لديه مفتاح عام');
-                resolve();
-                return;
-            }
-            
-            const receiverPublicKey = await CryptoSystem.importPublicKey(receiverData.publicKey);
-            
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const encrypted = await CryptoSystem.encryptVoice(audioBlob, receiverPublicKey);
-                
-                const message = {
-                    id: messageId,
-                    type: 'encrypted_voice',
-                    encrypted: encrypted,
-                    plainData: e.target.result,
-                    sender: 'me',
-                    time: new Date().toISOString(),
-                    status: 'sending'
-                };
-                
-                const privateKey = await getMyPrivateKey();
-                await this.displayMessage(message, privateKey);
-                this.saveMessage(this.currentChat, message);
-                
-                try {
-                    const isReceiverOnline = await this.isUserOnline(this.currentChat);
-                    
-                    const messageData = {
-                        to: this.currentChat,
-                        from: window.auth.currentUser.uid,
-                        message: {
-                            id: message.id,
-                            type: message.type,
-                            encrypted: message.encrypted,
-                            sender: message.sender,
-                            time: message.time
-                        },
-                        timestamp: new Date()
-                    };
-                    
-                    if (!isReceiverOnline) {
-                        messageData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                    }
-                    
-                    const docRef = await window.db.collection('temp_messages').add(messageData);
-                    
-                    this.updateMessageStatus(messageId, 'sent');
-                    
-                    if (isReceiverOnline) {
-                        this.waitForDeliveryAndDelete(messageId, docRef.id);
-                    } else {
-                        this.waitForDelivery(messageId, docRef.id);
-                    }
-                    
-                } catch (error) {
-                    console.error('خطأ في إرسال البصمة:', error);
-                    this.updateMessageStatus(messageId, 'error');
-                }
-                resolve();
-            };
-            reader.readAsDataURL(audioBlob);
-        });
-    },
-    
-    async sendVideo(file) {
-        return new Promise(async (resolve) => {
-            const messageId = Date.now().toString();
-            
-            const receiverDoc = await window.db.collection('users').doc(this.currentChat).get();
-            const receiverData = receiverDoc.data();
-            
-            if (!receiverData.publicKey) {
-                console.error('المستخدم ليس لديه مفتاح عام');
-                resolve();
-                return;
-            }
-            
-            const receiverPublicKey = await CryptoSystem.importPublicKey(receiverData.publicKey);
-            const encrypted = await CryptoSystem.encryptVideo(file, receiverPublicKey);
-            
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const message = {
-                    id: messageId,
-                    type: 'encrypted_video',
-                    encrypted: encrypted,
-                    plainData: e.target.result,
-                    sender: 'me',
-                    time: new Date().toISOString(),
-                    status: 'sending'
-                };
-                
-                const privateKey = await getMyPrivateKey();
-                await this.displayMessage(message, privateKey);
-                this.saveMessage(this.currentChat, message);
-                
-                try {
-                    const isReceiverOnline = await this.isUserOnline(this.currentChat);
-                    
-                    const messageData = {
-                        to: this.currentChat,
-                        from: window.auth.currentUser.uid,
-                        message: {
-                            id: message.id,
-                            type: message.type,
-                            encrypted: message.encrypted,
-                            sender: message.sender,
-                            time: message.time
-                        },
-                        timestamp: new Date()
-                    };
-                    
-                    if (!isReceiverOnline) {
-                        messageData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                    }
-                    
-                    const docRef = await window.db.collection('temp_messages').add(messageData);
-                    
-                    this.updateMessageStatus(messageId, 'sent');
-                    
-                    if (isReceiverOnline) {
-                        this.waitForDeliveryAndDelete(messageId, docRef.id);
-                    } else {
-                        this.waitForDelivery(messageId, docRef.id);
-                    }
-                    
-                } catch (error) {
-                    console.error('خطأ في إرسال الفيديو:', error);
-                    this.updateMessageStatus(messageId, 'error');
-                }
-                resolve();
-            };
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    async sendFile(file) {
-        return new Promise(async (resolve) => {
-            const messageId = Date.now().toString();
-            
-            const receiverDoc = await window.db.collection('users').doc(this.currentChat).get();
-            const receiverData = receiverDoc.data();
-            
-            if (!receiverData.publicKey) {
-                console.error('المستخدم ليس لديه مفتاح عام');
-                resolve();
-                return;
-            }
-            
-            const receiverPublicKey = await CryptoSystem.importPublicKey(receiverData.publicKey);
-            const encrypted = await CryptoSystem.encryptFile(file, receiverPublicKey);
-            
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const message = {
-                    id: messageId,
-                    type: 'encrypted_file',
-                    encrypted: encrypted,
-                    plainData: e.target.result,
-                    fileName: file.name,
-                    sender: 'me',
-                    time: new Date().toISOString(),
-                    status: 'sending'
-                };
-                
-                const privateKey = await getMyPrivateKey();
-                await this.displayMessage(message, privateKey);
-                this.saveMessage(this.currentChat, message);
-                
-                try {
-                    const isReceiverOnline = await this.isUserOnline(this.currentChat);
-                    
-                    const messageData = {
-                        to: this.currentChat,
-                        from: window.auth.currentUser.uid,
-                        message: {
-                            id: message.id,
-                            type: message.type,
-                            encrypted: message.encrypted,
-                            sender: message.sender,
-                            time: message.time,
-                            fileName: file.name
-                        },
-                        timestamp: new Date()
-                    };
-                    
-                    if (!isReceiverOnline) {
-                        messageData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                    }
-                    
-                    const docRef = await window.db.collection('temp_messages').add(messageData);
-                    
-                    this.updateMessageStatus(messageId, 'sent');
-                    
-                    if (isReceiverOnline) {
-                        this.waitForDeliveryAndDelete(messageId, docRef.id);
-                    } else {
-                        this.waitForDelivery(messageId, docRef.id);
-                    }
-                    
-                } catch (error) {
-                    console.error('خطأ في إرسال الملف:', error);
-                    this.updateMessageStatus(messageId, 'error');
-                }
-                resolve();
-            };
-            reader.readAsDataURL(file);
-        });
     },
     
     updateMessageStatus(messageId, status) {
@@ -953,75 +559,28 @@ const ChatSystem = {
         if (!statusElement) return;
         
         statusElement.className = `message-status ${status}`;
+        if (status === 'sending') statusElement.innerHTML = '⏳';
+        else if (status === 'sent') statusElement.innerHTML = '✓';
+        else if (status === 'delivered') statusElement.innerHTML = '✓✓';
+        else if (status === 'read') { statusElement.innerHTML = '✓✓'; statusElement.style.color = '#4fc3f7'; }
+        else if (status === 'error') { statusElement.innerHTML = '⚠️'; statusElement.style.color = '#f44336'; }
         
-        if (status === 'sending') {
-            statusElement.innerHTML = '⏳';
-        } else if (status === 'sent') {
-            statusElement.innerHTML = '✓';
-        } else if (status === 'delivered') {
-            statusElement.innerHTML = '✓✓';
-        } else if (status === 'read') {
-            statusElement.innerHTML = '✓✓';
-            statusElement.style.color = '#4fc3f7';
-        } else if (status === 'error') {
-            statusElement.innerHTML = '⚠️';
-            statusElement.style.color = '#f44336';
-        }
-        
-        this.updateMessageStatusInStorage(messageId, status);
-    },
-    
-    updateMessageStatusInStorage(messageId, status) {
         const key = `chat_${this.currentChat}`;
         try {
             let history = JSON.parse(localStorage.getItem(key)) || [];
-            history = history.map(msg => {
-                if (msg.id === messageId) {
-                    return { ...msg, status: status };
-                }
-                return msg;
-            });
+            history = history.map(msg => msg.id === messageId ? { ...msg, status } : msg);
             localStorage.setItem(key, JSON.stringify(history));
             this.messages[this.currentChat] = history;
-        } catch (e) {
-            console.error('خطأ في تحديث الحالة:', e);
-        }
+        } catch (e) {}
     },
     
-    waitForDelivery(messageId, firebaseDocId) {
-        const unsubscribe = window.db.collection('temp_messages')
-            .doc(firebaseDocId)
-            .onSnapshot((doc) => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    if (data.delivered) {
-                        this.updateMessageStatus(messageId, 'delivered');
-                    }
-                    if (data.read) {
-                        this.updateMessageStatus(messageId, 'read');
-                        unsubscribe();
-                    }
-                }
-            });
-    },
-    
-    // جديد: انتظار التسليم ثم الحذف فوراً
     waitForDeliveryAndDelete(messageId, firebaseDocId) {
-        const unsubscribe = window.db.collection('temp_messages')
-            .doc(firebaseDocId)
+        const unsubscribe = window.db.collection('temp_messages').doc(firebaseDocId)
             .onSnapshot(async (doc) => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    if (data.delivered) {
-                        this.updateMessageStatus(messageId, 'delivered');
-                        // حذف الرسالة من السيرفر فوراً بعد التسليم
-                        await window.db.collection('temp_messages').doc(firebaseDocId).delete();
-                        unsubscribe();
-                        console.log('🗑️ تم حذف الرسالة من السيرفر بعد التسليم الفوري');
-                    }
-                    if (data.read) {
-                        this.updateMessageStatus(messageId, 'read');
-                    }
+                if (doc.exists && doc.data().delivered) {
+                    this.updateMessageStatus(messageId, 'delivered');
+                    await window.db.collection('temp_messages').doc(firebaseDocId).delete();
+                    unsubscribe();
                 }
             });
     },
@@ -1029,18 +588,11 @@ const ChatSystem = {
     saveMessage(friendId, message) {
         const key = `chat_${friendId}`;
         let history = [];
-        try {
-            history = JSON.parse(localStorage.getItem(key)) || [];
-        } catch (e) {
-            history = [];
-        }
+        try { history = JSON.parse(localStorage.getItem(key)) || []; } catch (e) {}
         
         const existingIndex = history.findIndex(m => m.id === message.id);
-        if (existingIndex >= 0) {
-            history[existingIndex] = message;
-        } else {
-            history.push(message);
-        }
+        if (existingIndex >= 0) history[existingIndex] = message;
+        else history.push(message);
         
         if (history.length > 200) history = history.slice(-200);
         localStorage.setItem(key, JSON.stringify(history));
@@ -1056,58 +608,25 @@ const ChatSystem = {
             .onSnapshot(async (snapshot) => {
                 const privateKey = await getMyPrivateKey();
                 
-                snapshot.docChanges().forEach(async (change) => {
+                for (const change of snapshot.docChanges()) {
                     if (change.type === 'added') {
                         const data = change.doc.data();
                         const docRef = change.doc.ref;
                         
-                        // تحديث حالة التسليم فوراً
-                        await docRef.update({
-                            delivered: true,
-                            deliveredAt: new Date()
-                        });
+                        await docRef.update({ delivered: true, deliveredAt: new Date() });
                         
-                        const message = { 
-                            ...data.message, 
-                            sender: 'friend',
-                            status: 'delivered'
-                        };
-                        
+                        const message = { ...data.message, sender: 'friend', status: 'delivered' };
                         this.saveMessage(friendId, message);
                         
                         if (this.currentChat === friendId) {
                             await this.displayMessage(message, privateKey);
-                            
-                            // تحديث حالة القراءة
-                            await docRef.update({
-                                read: true,
-                                readAt: new Date()
-                            });
-                            
-                            // حذف الرسالة من السيرفر فوراً بعد القراءة
+                            await docRef.update({ read: true, readAt: new Date() });
                             await docRef.delete();
-                            console.log('🗑️ تم حذف الرسالة من السيرفر بعد القراءة');
-                            
                         } else {
-                            let lastMessageText = '📝 رسالة جديدة';
-                            try {
-                                if (message.type === 'encrypted') {
-                                    lastMessageText = await CryptoSystem.decryptMessage(message.encrypted, privateKey);
-                                } else if (message.type === 'encrypted_image') {
-                                    lastMessageText = '📷 صورة جديدة';
-                                } else if (message.type === 'encrypted_voice') {
-                                    lastMessageText = '🎤 بصمة صوتية';
-                                } else if (message.type === 'encrypted_video') {
-                                    lastMessageText = '🎬 فيديو';
-                                } else if (message.type === 'encrypted_file') {
-                                    lastMessageText = `📁 ${message.fileName || 'ملف'}`;
-                                }
-                            } catch (e) {}
-                            
-                            this.updateLastMessage(friendId, lastMessageText);
+                            this.updateLastMessage(friendId, '📩 رسالة جديدة');
                         }
                     }
-                });
+                }
             });
     },
     
@@ -1116,9 +635,7 @@ const ChatSystem = {
         for (const item of chatItems) {
             if (item.getAttribute('onclick')?.includes(friendId)) {
                 const lastMsgEl = item.querySelector('.last-message');
-                const timeEl = item.querySelector('.chat-time');
                 if (lastMsgEl) lastMsgEl.textContent = lastMessage;
-                if (timeEl) timeEl.textContent = 'الآن';
                 break;
             }
         }
@@ -1138,187 +655,27 @@ const ChatSystem = {
     }
 };
 
-// ========== حذف الرسائل منتهية الصلاحية (للرسائل اللي ما وصلت) ==========
-
-async function cleanupExpiredMessages() {
+// تنظيف الرسائل منتهية الصلاحية كل ساعة
+setInterval(async () => {
     try {
-        const now = new Date();
         const snapshot = await window.db.collection('temp_messages')
-            .where('expiresAt', '<=', now)
-            .get();
-        
-        if (!snapshot.empty) {
-            const batch = window.db.batch();
-            snapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-            console.log(`🗑️ تم حذف ${snapshot.size} رسالة منتهية الصلاحية`);
-        }
-    } catch (error) {
-        console.error('خطأ في تنظيف الرسائل:', error);
-    }
-}
-
-// تشغيل التنظيف كل ساعة
-setInterval(cleanupExpiredMessages, 60 * 60 * 1000);
+            .where('expiresAt', '<=', new Date()).get();
+        const batch = window.db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+    } catch (e) {}
+}, 60 * 60 * 1000);
 
 ChatSystem.init();
 
-async function loadChats() {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    const chatsList = document.getElementById('chatsList');
-    if (!chatsList) return;
-    
-    try {
-        const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
-        if (!userDoc.exists) return;
-        
-        const friends = userDoc.data().friends || [];
-        
-        if (friends.length === 0) {
-            chatsList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-comments"></i>
-                    <h3>لا توجد محادثات</h3>
-                    <p>أضف أصدقاء لبدء المحادثة</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = '';
-        const privateKey = await getMyPrivateKey();
-        
-        for (const friendId of friends) {
-            try {
-                const friendDoc = await window.db.collection('users').doc(friendId).get();
-                if (friendDoc.exists) {
-                    const friend = friendDoc.data();
-                    const avatarEmoji = window.getEmojiForUser(friend);
-                    const isOnline = friend.online || false;
-                    
-                    const key = `chat_${friendId}`;
-                    let lastMessage = 'اضغط لبدء المحادثة';
-                    let lastTime = '';
-                    let unreadCount = 0;
-                    
-                    try {
-                        const history = JSON.parse(localStorage.getItem(key)) || [];
-                        if (history.length > 0) {
-                            const last = history[history.length - 1];
-                            
-                            if (last.sender === 'friend') {
-                                if (last.type === 'encrypted') {
-                                    try {
-                                        lastMessage = await CryptoSystem.decryptMessage(last.encrypted, privateKey);
-                                    } catch (e) {
-                                        lastMessage = '🔒 رسالة مشفرة';
-                                    }
-                                } else if (last.type === 'encrypted_image') {
-                                    lastMessage = '📷 صورة';
-                                } else if (last.type === 'encrypted_voice') {
-                                    lastMessage = '🎤 بصمة';
-                                } else if (last.type === 'encrypted_video') {
-                                    lastMessage = '🎬 فيديو';
-                                } else if (last.type === 'encrypted_file') {
-                                    lastMessage = `📁 ${last.fileName || 'ملف'}`;
-                                }
-                            } else {
-                                lastMessage = last.plainText || '📝 رسالة';
-                            }
-                            
-                            lastTime = new Date(last.time).toLocaleTimeString('ar-EG', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            });
-                            
-                            unreadCount = history.filter(msg => 
-                                msg.sender === 'friend' && msg.status !== 'read'
-                            ).length;
-                        }
-                    } catch (e) {}
-                    
-                    const unreadBadge = unreadCount > 0 ? 
-                        `<span class="unread-badge">${unreadCount}</span>` : '';
-                    
-                    const onlineIndicator = isOnline ? 
-                        '<span class="online-indicator" style="width:10px;height:10px;background:#4CAF50;border-radius:50%;display:inline-block;margin-right:5px;"></span>' : '';
-                    
-                    html += `
-                        <div class="chat-item" onclick="openChat('${friendId}')">
-                            <div class="chat-avatar-emoji">${avatarEmoji}</div>
-                            <div class="chat-info">
-                                <h4>${onlineIndicator}${friend.name || 'مستخدم'}</h4>
-                                <p class="last-message">${lastMessage}</p>
-                            </div>
-                            <div class="chat-meta">
-                                <span class="chat-time">${lastTime || ''}</span>
-                                ${unreadBadge}
-                            </div>
-                        </div>
-                    `;
-                }
-            } catch (e) {
-                console.error('Error loading friend:', e);
-            }
-        }
-        
-        chatsList.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading chats:', error);
-        chatsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>خطأ في تحميل المحادثات</h3>
-                <p>حاول مرة أخرى</p>
-            </div>
-        `;
-    }
-}
-
-function setupChatListeners() {
-    document.addEventListener('click', (e) => {
-        const menu = document.getElementById('attachmentMenu');
-        const attachBtn = document.querySelector('.attach-btn');
-        if (menu && attachBtn && !menu.contains(e.target) && !attachBtn.contains(e.target)) {
-            menu.style.display = 'none';
-        }
-        
-        const emojiPicker = document.getElementById('emojiPicker');
-        const emojiBtn = document.querySelector('.emoji-btn');
-        if (emojiPicker && emojiBtn && !emojiPicker.contains(e.target) && !emojiBtn.contains(e.target)) {
-            emojiPicker.style.display = 'none';
-        }
-    });
-    
-    if (window.auth?.currentUser) {
-        window.db.collection('temp_messages')
-            .where('to', '==', window.auth.currentUser.uid)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added') {
-                        loadChats();
-                    }
-                });
-            });
-    }
-}
-
-// ========== دوال عامة للواجهة ==========
+// ========== دوال الواجهة ==========
 
 window.openChat = function(friendId) {
-    window.db.collection('users').doc(friendId).get().then((doc) => {
+    window.db.collection('users').doc(friendId).get().then(doc => {
         if (doc.exists) {
             const friend = doc.data();
-            const avatarEmoji = window.getEmojiForUser ? 
-                window.getEmojiForUser(friend) : '👤';
-            ChatSystem.openChat(friendId, friend.name, avatarEmoji);
+            ChatSystem.openChat(friendId, friend.name, window.getEmojiForUser?.(friend) || '👤');
         }
-    }).catch(error => {
-        console.error('خطأ في فتح المحادثة:', error);
     });
 };
 
@@ -1326,9 +683,7 @@ window.sendMessage = function() {
     const input = document.getElementById('messageInput');
     const text = input.value.trim();
     if (text) {
-        ChatSystem.sendMessage(text).then(sent => {
-            if (sent) input.value = '';
-        });
+        ChatSystem.sendMessage(text, 'text').then(sent => { if (sent) input.value = ''; });
     }
 };
 
@@ -1339,296 +694,79 @@ window.handleMessageKeyPress = function(event) {
     }
 };
 
-window.showAttachmentMenu = function() {
-    const menu = document.getElementById('attachmentMenu');
-    menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
-    
-    const emojiPicker = document.getElementById('emojiPicker');
-    if (emojiPicker) emojiPicker.style.display = 'none';
-};
-
-window.showEmojiPicker = function() {
-    const picker = document.getElementById('emojiPicker');
-    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
-    
-    const menu = document.getElementById('attachmentMenu');
-    if (menu) menu.style.display = 'none';
-    
-    if (picker.querySelector('.emoji-grid').children.length === 0) {
-        loadEmojis();
-    }
-};
-
-function loadEmojis() {
-    const emojis = ['😊', '😂', '❤️', '👍', '🎉', '😢', '😡', '😍', '🤔', '👌', '🙏', '🔥', '✨', '⭐', '🌙', '☀️'];
-    const grid = document.querySelector('.emoji-grid');
-    if (!grid) return;
-    
-    emojis.forEach(emoji => {
-        const btn = document.createElement('button');
-        btn.textContent = emoji;
-        btn.onclick = () => {
-            const input = document.getElementById('messageInput');
-            input.value += emoji;
-            input.focus();
-            document.getElementById('emojiPicker').style.display = 'none';
-        };
-        grid.appendChild(btn);
-    });
-}
-
 window.sendImage = function() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = e => {
         const file = e.target.files[0];
-        if (file && ChatSystem.currentChat) ChatSystem.sendImage(file);
+        if (file) ChatSystem.sendMessage('', 'image', file);
     };
     input.click();
-    document.getElementById('attachmentMenu').style.display = 'none';
 };
 
 window.sendVoiceNote = function() {
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-            const mediaRecorder = new MediaRecorder(stream);
-            const chunks = [];
-            
-            mediaRecorder.ondataavailable = e => chunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                ChatSystem.sendVoiceNote(blob);
-                stream.getTracks().forEach(track => track.stop());
-            };
-            
-            mediaRecorder.start();
-            
-            const sendBtn = document.querySelector('.send-btn');
-            const voiceBtn = document.querySelector('.voice-btn');
-            if (sendBtn) sendBtn.style.display = 'none';
-            if (voiceBtn) {
-                voiceBtn.style.display = 'flex';
-                voiceBtn.onclick = () => {
-                    if (mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                        sendBtn.style.display = 'flex';
-                        voiceBtn.style.display = 'none';
-                    }
-                };
-            }
-            
-            setTimeout(() => {
-                if (mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
-                    if (sendBtn) sendBtn.style.display = 'flex';
-                    if (voiceBtn) voiceBtn.style.display = 'none';
-                }
-            }, 60000);
-        });
-    document.getElementById('attachmentMenu').style.display = 'none';
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        const recorder = new MediaRecorder(stream);
+        const chunks = [];
+        recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            ChatSystem.sendMessage('', 'voice', blob);
+            stream.getTracks().forEach(t => t.stop());
+        };
+        recorder.start();
+        setTimeout(() => recorder.stop(), 60000);
+        alert('🎤 جاري التسجيل... اضغط موافق للإيقاف', recorder.stop());
+    });
 };
 
 window.sendVideo = function() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'video/*';
-    input.onchange = (e) => {
+    input.onchange = e => {
         const file = e.target.files[0];
-        if (file && ChatSystem.currentChat) ChatSystem.sendVideo(file);
+        if (file) ChatSystem.sendMessage('', 'video', file);
     };
     input.click();
-    document.getElementById('attachmentMenu').style.display = 'none';
 };
 
 window.sendFile = function() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '*/*';
-    input.onchange = (e) => {
+    input.onchange = e => {
         const file = e.target.files[0];
-        if (file && ChatSystem.currentChat) ChatSystem.sendFile(file);
+        if (file) ChatSystem.sendMessage('', 'file', file);
     };
     input.click();
-    document.getElementById('attachmentMenu').style.display = 'none';
 };
 
-window.shareLocation = function() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((position) => {
-            const locationUrl = `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`;
-            ChatSystem.sendMessage(`📍 موقعي: ${locationUrl}`);
-        });
-    }
-    document.getElementById('attachmentMenu').style.display = 'none';
-};
-
-window.closeConversation = function() {
-    ChatSystem.closeChat();
-};
-
-window.viewContactInfo = function() {
-    alert('معلومات الاتصال - قيد التطوير');
-};
-
-// ========== باقي الدوال ==========
-
-window.openEditProfileModal = function() {
-    const currentName = document.getElementById('profileName').textContent;
-    const currentNameInput = document.getElementById('editName');
-    if (currentNameInput) currentNameInput.value = currentName;
-    
-    const currentEmoji = document.getElementById('profileAvatarEmoji').textContent;
-    const currentAvatarEmoji = document.getElementById('currentAvatarEmoji');
-    if (currentAvatarEmoji) currentAvatarEmoji.textContent = currentEmoji;
-    
-    document.getElementById('editProfileModal').classList.add('active');
-};
-
-window.saveProfile = function() {
-    const newName = document.getElementById('editName').value.trim();
-    if (!newName) { alert('الرجاء إدخال الاسم'); return; }
-    if (newName.length > 25) { alert('الاسم يجب أن لا يتجاوز 25 حرف'); return; }
-    
-    if (auth && auth.currentUser) {
-        db.collection('users').doc(auth.currentUser.uid).update({
-            name: newName
-        }).then(() => {
-            document.getElementById('profileName').textContent = newName;
-            closeModal();
-            alert('تم حفظ التغييرات');
-        }).catch(error => {
-            console.error('Error saving profile:', error);
-            alert('حدث خطأ في الحفظ');
-        });
-    }
-};
-
-window.showUserTrips = function() {
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('tripsPage').style.display = 'block';
-    loadUserTrips();
-};
-
-async function loadUserTrips() {
-    if (!window.auth || !window.auth.currentUser) return;
-    
-    const tripsGrid = document.getElementById('tripsGrid');
-    if (!tripsGrid) return;
-    
-    try {
-        const snapshot = await window.db.collection('trips')
-            .where('userId', '==', window.auth.currentUser.uid)
-            .orderBy('startTime', 'desc')
-            .get();
-        
-        if (snapshot.empty) {
-            tripsGrid.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-map-marked-alt"></i>
-                    <h3>${i18n ? i18n.t('no_trips') : 'لا توجد رحلات'}</h3>
-                    <p>${i18n ? i18n.t('no_trips_desc') : 'لم تقم بأي رحلة بعد'}</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = '';
-        snapshot.forEach(doc => {
-            const trip = doc.data();
-            const startTime = trip.startTime ? new Date(trip.startTime.seconds * 1000) : new Date();
-            html += `
-                <div class="trip-item" onclick="viewTripDetails('${doc.id}')">
-                    <div class="trip-date">${startTime.toLocaleDateString('ar-EG')}</div>
-                    <div class="trip-route">${trip.destination || 'رحلة'}</div>
-                    <div class="trip-stats">
-                        <span>⏱️ ${trip.duration || '--'}</span>
-                    </div>
-                </div>
-            `;
-        });
-        tripsGrid.innerHTML = html;
-        updateTripsCount();
-        
-    } catch (error) {
-        console.error('Error loading trips:', error);
-        tripsGrid.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>خطأ في تحميل الرحلات</h3>
-            </div>
-        `;
-    }
-}
-
-window.viewTripDetails = function(tripId) {
-    alert('تفاصيل الرحلة - معرف: ' + tripId);
-};
-
-window.goBack = function() {
-    document.querySelectorAll('.profile-subpage').forEach(page => page.style.display = 'none');
-    document.querySelector('.profile-page').style.display = 'block';
-    document.querySelector('.profile-page').classList.add('active');
-    document.querySelectorAll('.page').forEach(page => {
-        if (!page.classList.contains('profile-page')) {
-            page.style.display = 'none';
-            page.classList.remove('active');
-        }
+window.closeConversation = () => ChatSystem.closeChat();
+window.showAttachmentMenu = () => document.getElementById('attachmentMenu').style.display = 'flex';
+window.shareLocation = () => {
+    navigator.geolocation.getCurrentPosition(pos => {
+        ChatSystem.sendMessage(`📍 https://maps.google.com?q=${pos.coords.latitude},${pos.coords.longitude}`, 'text');
     });
 };
 
-window.selectAvatar = function(type) {
-    const emojiMap = {
-        'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧',
-        'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵'
-    };
-    const selectedEmoji = emojiMap[type] || '👤';
-    
-    const profileAvatar = document.getElementById('profileAvatarEmoji');
-    if (profileAvatar) profileAvatar.textContent = selectedEmoji;
-    const currentAvatar = document.getElementById('currentAvatarEmoji');
-    if (currentAvatar) currentAvatar.textContent = selectedEmoji;
-    
-    if (auth && auth.currentUser) {
-        db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
-            .catch(error => console.error('Error updating avatar:', error));
+// إخفاء القوائم عند النقر خارجها
+document.addEventListener('click', e => {
+    const menu = document.getElementById('attachmentMenu');
+    if (menu && !e.target.closest('.attach-btn') && !e.target.closest('#attachmentMenu')) {
+        menu.style.display = 'none';
     }
-    closeModal();
-};
-
-window.openAvatarModal = function() {
-    const modal = document.getElementById('avatarModal');
-    if (modal) modal.classList.add('active');
-};
-
-document.addEventListener('languageChanged', function() {
-    console.log('Language changed');
-    if (document.querySelector('.chat-page').style.display === 'block') loadChats();
+    const picker = document.getElementById('emojiPicker');
+    if (picker && !e.target.closest('.emoji-btn') && !e.target.closest('#emojiPicker')) {
+        picker.style.display = 'none';
+    }
 });
 
-window.getEmojiForUser = function(userData) {
-    const emojiMap = {
-        'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧',
-        'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵'
-    };
-    return emojiMap[userData?.avatarType] || '👤';
+// باقي الدوال المساعدة
+window.showEmojiPicker = () => {
+    document.getElementById('emojiPicker').style.display = 'block';
+    document.getElementById('attachmentMenu').style.display = 'none';
 };
+window.viewContactInfo = () => alert('معلومات الاتصال');
 
-window.clearMessages = function() {
-    const container = document.getElementById('messagesContainer');
-    if (container) container.innerHTML = '';
-};
-
-window.showNotification = function(title, message) {
-    if (Notification.permission === 'granted') {
-        new Notification(title, { body: message });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') new Notification(title, { body: message });
-        });
-    }
-};
-
-if ('Notification' in window) Notification.requestPermission();
-
-console.log('✅ app.js محدث - تشفير E2EE كامل مع حذف فوري بعد التسليم');
+console.log('✅ Rafeeq E2EE جاهز - جميع الرسائل والملفات مشفرة بالكامل');
