@@ -58,6 +58,13 @@ async function signInWithGoogle() {
         }
         
         updateUserUI();
+        
+        // ✅ تهيئة مفاتيح التشفير بعد تسجيل الدخول
+        if (typeof SecureChatSystem !== 'undefined') {
+            await SecureChatSystem.init();
+            console.log('✅ تمت تهيئة التشفير بعد تسجيل الدخول');
+        }
+        
         return true;
     } catch (error) {
         console.error('Login error:', error);
@@ -538,7 +545,6 @@ function setupFriendRequestsListener(userId) {
 // ========== نهاية نظام الصداقة ==========
 
 // ========== نظام تسجيل الدخول الإلزامي ==========
-// تم إزالة كل الكود الذي يسمح بالمشاهدة بدون تسجيل دخول
 
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
@@ -548,10 +554,14 @@ if (typeof window.auth !== 'undefined') {
         const app = document.getElementById('app');
         
         if (user) {
-            // مستخدم مسجل - نحمّل البيانات ونعرض التطبيق
             console.log('Loading user data for:', user.uid);
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
+            
+            // ✅ تهيئة مفاتيح التشفير عند استمرار الجلسة
+            if (typeof SecureChatSystem !== 'undefined') {
+                await SecureChatSystem.init();
+            }
             
             if (splash) {
                 splash.classList.add('hide');
@@ -561,19 +571,15 @@ if (typeof window.auth !== 'undefined') {
                 }, 500);
             }
         } else {
-            // مستخدم غير مسجل - نعرض شاشة التحميل ثم نعرض واجهة تسجيل الدخول
             console.log('User not logged in, showing login screen');
             
-            // إخفاء المحتوى الرئيسي
             if (app) app.style.display = 'none';
             
-            // إظهار شاشة التحميل
             if (splash) {
                 splash.classList.remove('hide');
                 splash.style.display = 'flex';
             }
             
-            // بعد 2 ثانية، نخفي شاشة التحميل ونعرض واجهة تسجيل الدخول
             setTimeout(() => {
                 if (splash) {
                     splash.classList.add('hide');
@@ -591,13 +597,10 @@ if (typeof window.auth !== 'undefined') {
     console.error('auth is not defined. Firebase may not be loaded yet.');
 }
 
-// واجهة تسجيل الدخول الجديدة (بدلاً من الـ prompt السفلي)
 function showLoginScreen() {
-    // إزالة أي شاشة تسجيل دخول سابقة
     const existingLogin = document.querySelector('.login-screen');
     if (existingLogin) existingLogin.remove();
     
-    // إنشاء شاشة تسجيل دخول كاملة
     const loginScreen = document.createElement('div');
     loginScreen.className = 'login-screen';
     loginScreen.style.cssText = `
