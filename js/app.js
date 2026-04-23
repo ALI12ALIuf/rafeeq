@@ -3,26 +3,48 @@ const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
     
     async init() {
-        if (window.auth?.currentUser) {
+        if (!window.auth?.currentUser) {
+            console.warn('⚠️ لا يوجد مستخدم مسجل، تأجيل تهيئة التشفير');
+            return false;
+        }
+        
+        try {
             await this.setupKeys();
             this.startReceiving();
             console.log('✅ نظام التشفير E2EE جاهز');
+            console.log('🔑 المفتاح العام: مخزن في Firebase');
+            console.log('🔐 المفتاح الخاص: مخزن في localStorage');
+            return true;
+        } catch (error) {
+            console.error('❌ فشل تهيئة التشفير:', error);
+            return false;
         }
     },
     
     async setupKeys() {
         const existingKey = localStorage.getItem('enc_private_key');
         if (!existingKey) {
+            console.log('🔨 توليد مفاتيح تشفير جديدة...');
             const keyPair = await this.generateKeyPair();
             const publicKey = await this.exportPublicKey(keyPair.publicKey);
+            
             await window.db.collection('users').doc(window.auth.currentUser.uid).update({ publicKey });
+            console.log('📤 المفتاح العام محفوظ في Firebase');
+            
             const privateExport = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
             localStorage.setItem('enc_private_key', btoa(String.fromCharCode(...new Uint8Array(privateExport))));
+            console.log('📥 المفتاح الخاص محفوظ في localStorage');
+        } else {
+            console.log('✅ المفاتيح موجودة مسبقاً');
         }
     },
     
     async generateKeyPair() {
-        return await window.crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+        return await window.crypto.subtle.generateKey(
+            { name: 'ECDH', namedCurve: 'P-256' },
+            true,
+            ['deriveKey']
+        );
     },
     
     async exportPublicKey(key) {
@@ -32,30 +54,54 @@ const SecureChatSystem = {
     
     async importPublicKey(base64Key) {
         const binary = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
-        return await window.crypto.subtle.importKey('raw', binary, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+        return await window.crypto.subtle.importKey(
+            'raw', binary,
+            { name: 'ECDH', namedCurve: 'P-256' },
+            true, []
+        );
     },
     
     async getMyPrivateKey() {
         const stored = localStorage.getItem('enc_private_key');
-        if (!stored) return null;
+        if (!stored) {
+            console.error('❌ المفتاح الخاص غير موجود في localStorage');
+            return null;
+        }
         const binary = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
-        return await window.crypto.subtle.importKey('pkcs8', binary, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']);
+        return await window.crypto.subtle.importKey(
+            'pkcs8', binary,
+            { name: 'ECDH', namedCurve: 'P-256' },
+            false, ['deriveKey']
+        );
     },
     
     async getReceiverPublicKey(userId) {
         const doc = await window.db.collection('users').doc(userId).get();
-        if (!doc.exists || !doc.data().publicKey) return null;
+        if (!doc.exists || !doc.data().publicKey) {
+            console.error('❌ المفتاح العام للمستقبل غير موجود في Firebase');
+            return null;
+        }
         return await this.importPublicKey(doc.data().publicKey);
     },
     
     async deriveSharedKey(privateKey, publicKey) {
-        return await window.crypto.subtle.deriveKey({ name: 'ECDH', public: publicKey }, privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+        return await window.crypto.subtle.deriveKey(
+            { name: 'ECDH', public: publicKey },
+            privateKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
     },
     
     async encryptData(data, sharedKey) {
         const encoder = new TextEncoder();
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        const encrypted = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, typeof data === 'string' ? encoder.encode(data) : data);
+        const encrypted = await window.crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') },
+            sharedKey,
+            typeof data === 'string' ? encoder.encode(data) : data
+        );
         const combined = new Uint8Array(iv.length + encrypted.byteLength);
         combined.set(iv);
         combined.set(new Uint8Array(encrypted), iv.length);
@@ -67,7 +113,11 @@ const SecureChatSystem = {
         const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
         const iv = combined.slice(0, 12);
         const data = combined.slice(12);
-        const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, data);
+        const decrypted = await window.crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') },
+            sharedKey,
+            data
+        );
         return new TextDecoder().decode(decrypted);
     },
     
@@ -105,46 +155,83 @@ const SecureChatSystem = {
             from: window.auth.currentUser.uid,
             package: encryptedPackage,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000))
+            expiresAt: firebase.firestore.Timestamp.fromDate(
+                new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000)
+            )
         });
     },
     
     startReceiving() {
         if (!window.auth?.currentUser) return;
-        window.db.collection('secure_messages').where('to', '==', window.auth.currentUser.uid).onSnapshot(async snapshot => {
-            for (const change of snapshot.docChanges()) {
-                if (change.type === 'added') {
-                    const msg = { id: change.doc.id, ...change.doc.data() };
-                    await this.processReceivedMessage(msg);
-                    await change.doc.ref.delete();
+        
+        window.db.collection('secure_messages')
+            .where('to', '==', window.auth.currentUser.uid)
+            .onSnapshot(async snapshot => {
+                for (const change of snapshot.docChanges()) {
+                    if (change.type === 'added') {
+                        const msg = { id: change.doc.id, ...change.doc.data() };
+                        await this.processReceivedMessage(msg);
+                        await change.doc.ref.delete();
+                    }
                 }
-            }
-        });
+            }, error => {
+                console.error('❌ خطأ في استقبال الرسائل:', error);
+            });
     },
     
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey();
             const senderPublicKey = await this.getReceiverPublicKey(msg.from);
-            if (!myPrivateKey || !senderPublicKey) return;
+            
+            if (!myPrivateKey || !senderPublicKey) {
+                console.error('❌ لا يمكن فك التشفير - المفاتيح غير متوفرة');
+                return;
+            }
+            
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
             if (msg.package.type === 'text') {
                 const decrypted = await this.decryptData(msg.package.data, sharedKey);
-                const messageObj = { id: msg.package.id, type: 'text', text: decrypted, sender: 'friend', time: new Date().toISOString() };
+                const messageObj = {
+                    id: msg.package.id,
+                    type: 'text',
+                    text: decrypted,
+                    sender: 'friend',
+                    time: new Date().toISOString()
+                };
+                
                 ChatSystem.saveMessage(msg.from, messageObj);
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessage(messageObj);
+                
+                if (ChatSystem.currentChat === msg.from) {
+                    ChatSystem.displayMessage(messageObj);
+                }
+                
                 ChatSystem.updateLastMessage(msg.from, decrypted);
+                
             } else if (msg.package.type === 'image') {
                 const decrypted = await this.decryptData(msg.package.data, sharedKey);
-                const messageObj = { id: msg.package.id, type: 'image', data: decrypted, sender: 'friend', time: new Date().toISOString() };
+                const messageObj = {
+                    id: msg.package.id,
+                    type: 'image',
+                    data: decrypted,
+                    sender: 'friend',
+                    time: new Date().toISOString()
+                };
+                
                 ChatSystem.saveMessage(msg.from, messageObj);
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessage(messageObj);
+                
+                if (ChatSystem.currentChat === msg.from) {
+                    ChatSystem.displayMessage(messageObj);
+                }
+                
                 ChatSystem.updateLastMessage(msg.from, '📷 صورة');
             }
+            
             loadChats();
+            
         } catch (error) {
-            console.error('فشل معالجة الرسالة:', error);
+            console.error('❌ فشل معالجة الرسالة:', error);
         }
     }
 };
@@ -157,7 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loadChats();
     setupChatListeners();
     updateTripsCount();
-    SecureChatSystem.init();
+    
+    // تهيئة التشفير إذا المستخدم مسجل
+    if (window.auth?.currentUser) {
+        SecureChatSystem.init();
+    }
 });
 
 function formatNumber(num) {
@@ -346,7 +437,6 @@ const ChatSystem = {
         container.scrollTop = container.scrollHeight;
     },
     
-    // ========== دالة الإرسال المشفر ==========
     async sendMessage(text) {
         if (!this.currentChat || !text.trim()) return false;
         
@@ -357,31 +447,53 @@ const ChatSystem = {
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
             
             if (!myPrivateKey || !receiverPublicKey) {
-                console.error('المفاتيح غير متوفرة');
+                console.error('❌ المفاتيح غير متوفرة، تعذر الإرسال');
                 return false;
             }
             
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(text, sharedKey);
             
-            const encryptedPackage = { id: messageId, type: 'text', data: encrypted, timestamp: Date.now() };
+            const encryptedPackage = {
+                id: messageId,
+                type: 'text',
+                data: encrypted,
+                timestamp: Date.now()
+            };
+            
             await SecureChatSystem.sendToServer(this.currentChat, encryptedPackage);
             
-            const message = { id: messageId, type: 'text', text: text, sender: 'me', time: new Date().toISOString(), status: 'sent' };
+            const message = {
+                id: messageId,
+                type: 'text',
+                text: text,
+                sender: 'me',
+                time: new Date().toISOString(),
+                status: 'sent'
+            };
+            
             this.saveMessage(this.currentChat, message);
             this.displayMessage(message);
             
+            console.log('✅ رسالة مشفرة أرسلت بنجاح');
             return true;
+            
         } catch (error) {
-            console.error('فشل التشفير/الإرسال:', error);
-            const message = { id: messageId, type: 'text', text: text, sender: 'me', time: new Date().toISOString(), status: 'error' };
+            console.error('❌ فشل الإرسال:', error);
+            const message = {
+                id: messageId,
+                type: 'text',
+                text: text,
+                sender: 'me',
+                time: new Date().toISOString(),
+                status: 'error'
+            };
             this.saveMessage(this.currentChat, message);
             this.displayMessage(message);
             return false;
         }
     },
     
-    // ========== دالة إرسال الصورة المشفرة ==========
     async sendImage(file) {
         if (!this.currentChat) return;
         
@@ -394,20 +506,39 @@ const ChatSystem = {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
             
-            if (!myPrivateKey || !receiverPublicKey) return;
+            if (!myPrivateKey || !receiverPublicKey) {
+                console.error('❌ المفاتيح غير متوفرة لارسال الصورة');
+                return;
+            }
             
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(base64, sharedKey);
             
-            const encryptedPackage = { id: messageId, type: 'image', data: encrypted, timestamp: Date.now() };
+            const encryptedPackage = {
+                id: messageId,
+                type: 'image',
+                data: encrypted,
+                timestamp: Date.now()
+            };
+            
             await SecureChatSystem.sendToServer(this.currentChat, encryptedPackage);
             
-            const message = { id: messageId, type: 'image', data: base64, sender: 'me', time: new Date().toISOString(), status: 'sent' };
+            const message = {
+                id: messageId,
+                type: 'image',
+                data: base64,
+                sender: 'me',
+                time: new Date().toISOString(),
+                status: 'sent'
+            };
+            
             this.saveMessage(this.currentChat, message);
             this.displayMessage(message);
             
+            console.log('✅ صورة مشفرة أرسلت بنجاح');
+            
         } catch (error) {
-            console.error('فشل إرسال الصورة:', error);
+            console.error('❌ فشل إرسال الصورة:', error);
         }
     },
     
@@ -462,8 +593,13 @@ const ChatSystem = {
         if (status === 'sending') statusElement.innerHTML = '⏳';
         else if (status === 'sent') statusElement.innerHTML = '✓';
         else if (status === 'delivered') statusElement.innerHTML = '✓✓';
-        else if (status === 'read') { statusElement.innerHTML = '✓✓'; statusElement.style.color = '#4fc3f7'; }
-        else if (status === 'error') { statusElement.innerHTML = '⚠️'; statusElement.style.color = '#f44336'; }
+        else if (status === 'read') {
+            statusElement.innerHTML = '✓✓';
+            statusElement.style.color = '#4fc3f7';
+        } else if (status === 'error') {
+            statusElement.innerHTML = '⚠️';
+            statusElement.style.color = '#f44336';
+        }
         
         this.updateMessageStatusInStorage(messageId, status);
     },
@@ -484,13 +620,18 @@ const ChatSystem = {
     },
     
     waitForDelivery(messageId, firebaseDocId) {
-        const unsubscribe = window.db.collection('temp_messages').doc(firebaseDocId).onSnapshot((doc) => {
-            if (doc.exists) {
-                const data = doc.data();
-                if (data.delivered) this.updateMessageStatus(messageId, 'delivered');
-                if (data.read) { this.updateMessageStatus(messageId, 'read'); unsubscribe(); }
-            }
-        });
+        const unsubscribe = window.db.collection('temp_messages')
+            .doc(firebaseDocId)
+            .onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data.delivered) this.updateMessageStatus(messageId, 'delivered');
+                    if (data.read) {
+                        this.updateMessageStatus(messageId, 'read');
+                        unsubscribe();
+                    }
+                }
+            });
         
         setTimeout(() => {
             this.updateMessageStatus(messageId, 'delivered');
@@ -537,7 +678,10 @@ const ChatSystem = {
                     if (statusElement) {
                         statusElement.className = `message-status ${status}`;
                         if (status === 'delivered') statusElement.innerHTML = '✓✓';
-                        else if (status === 'read') { statusElement.innerHTML = '✓✓'; statusElement.style.color = '#4fc3f7'; }
+                        else if (status === 'read') {
+                            statusElement.innerHTML = '✓✓';
+                            statusElement.style.color = '#4fc3f7';
+                        }
                     }
                 }
             }
@@ -548,7 +692,10 @@ const ChatSystem = {
     
     async markAsRead(messageId, firebaseDocId) {
         try {
-            await window.db.collection('temp_messages').doc(firebaseDocId).update({ read: true, readAt: new Date() });
+            await window.db.collection('temp_messages').doc(firebaseDocId).update({
+                read: true,
+                readAt: new Date()
+            });
             this.updateMessageStatus(messageId, 'read');
         } catch (error) {
             console.error('خطأ في تحديث حالة القراءة:', error);
@@ -855,7 +1002,10 @@ async function loadUserTrips() {
     const tripsGrid = document.getElementById('tripsGrid');
     if (!tripsGrid) return;
     try {
-        const snapshot = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).orderBy('startTime', 'desc').get();
+        const snapshot = await window.db.collection('trips')
+            .where('userId', '==', window.auth.currentUser.uid)
+            .orderBy('startTime', 'desc')
+            .get();
         if (snapshot.empty) {
             tripsGrid.innerHTML = `<div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3>${i18n ? i18n.t('no_trips') : 'لا توجد رحلات'}</h3><p>${i18n ? i18n.t('no_trips_desc') : 'لم تقم بأي رحلة بعد'}</p></div>`;
             return;
@@ -874,26 +1024,35 @@ async function loadUserTrips() {
     }
 }
 
-window.viewTripDetails = function(tripId) { alert('تفاصيل الرحلة - معرف: ' + tripId); };
+window.viewTripDetails = function(tripId) {
+    alert('تفاصيل الرحلة - معرف: ' + tripId);
+};
 
 window.goBack = function() {
     document.querySelectorAll('.profile-subpage').forEach(page => page.style.display = 'none');
     document.querySelector('.profile-page').style.display = 'block';
     document.querySelector('.profile-page').classList.add('active');
     document.querySelectorAll('.page').forEach(page => {
-        if (!page.classList.contains('profile-page')) { page.style.display = 'none'; page.classList.remove('active'); }
+        if (!page.classList.contains('profile-page')) {
+            page.style.display = 'none';
+            page.classList.remove('active');
+        }
     });
 };
 
 window.selectAvatar = function(type) {
-    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧', 'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵' };
+    const emojiMap = {
+        'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧',
+        'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵'
+    };
     const selectedEmoji = emojiMap[type] || '👤';
     const profileAvatar = document.getElementById('profileAvatarEmoji');
     if (profileAvatar) profileAvatar.textContent = selectedEmoji;
     const currentAvatar = document.getElementById('currentAvatarEmoji');
     if (currentAvatar) currentAvatar.textContent = selectedEmoji;
     if (auth && auth.currentUser) {
-        db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type }).catch(error => console.error('Error updating avatar:', error));
+        db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
+            .catch(error => console.error('Error updating avatar:', error));
     }
     closeModal();
 };
@@ -909,7 +1068,10 @@ document.addEventListener('languageChanged', function() {
 });
 
 window.getEmojiForUser = function(userData) {
-    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧', 'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵' };
+    const emojiMap = {
+        'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧',
+        'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵'
+    };
     return emojiMap[userData?.avatarType] || '👤';
 };
 
@@ -919,10 +1081,15 @@ window.clearMessages = function() {
 };
 
 window.showNotification = function(title, message) {
-    if (Notification.permission === 'granted') new Notification(title, { body: message });
-    else if (Notification.permission !== 'denied') Notification.requestPermission().then(permission => { if (permission === 'granted') new Notification(title, { body: message }); });
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body: message });
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') new Notification(title, { body: message });
+        });
+    }
 };
 
 if ('Notification' in window) Notification.requestPermission();
 
-console.log('✅ app.js محدث - E2EE + ضغط + حذف 24 ساعة');
+console.log('✅ app.js محدث - E2EE + ضغط + حذف 24 ساعة | جاهز نهائياً');
