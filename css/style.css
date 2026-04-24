@@ -4,6 +4,17 @@
     box-sizing: border-box;
 }
 
+/* ===== إزالة جميع تأثيرات اللمس نهائياً ===== */
+* {
+    -webkit-tap-highlight-color: transparent !important;
+    outline: none !important;
+}
+
+*:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
 :root {
     --primary: #2196F3;
     --primary-dark: #1976D2;
