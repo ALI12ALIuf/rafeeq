@@ -2,10 +2,6 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-}
-
-/* ===== إزالة جميع تأثيرات اللمس نهائياً ===== */
-* {
     -webkit-tap-highlight-color: transparent !important;
     outline: none !important;
 }
@@ -22,13 +18,13 @@
     --success: #4CAF50;
     --danger: #f44336;
     --dark: #333;
-    --light: #f5f5f5;
-    --border: #e0e0e0;
-    --text: #333;
-    --text-light: #666;
-    --bg: #fff;
-    --card-bg: #fff;
-    --shadow: 0 2px 10px rgba(0,0,0,0.1);
+    --light: #e8e8e8;
+    --border: #cccccc;
+    --text: #222;
+    --text-light: #555;
+    --bg: #f0f0f0;
+    --card-bg: #ffffff;
+    --shadow: 0 2px 10px rgba(0,0,0,0.15);
     --radius: 12px;
     --header-height: 60px;
     --nav-height: 60px;
@@ -190,7 +186,6 @@ body {
     color: var(--text-light);
     font-size: 0.8rem;
     cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .nav-item i {
@@ -338,7 +333,6 @@ body {
     background: var(--card-bg);
     border-radius: var(--radius);
     cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .chat-avatar-emoji {
@@ -471,7 +465,6 @@ body {
     cursor: pointer;
     font-size: 1.1rem;
     padding: 0 5px;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .id-value-numbers {
@@ -516,7 +509,6 @@ body {
     border-radius: var(--radius);
     display: inline-block;
     flex: 1;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .stat-value {
@@ -633,7 +625,6 @@ body {
     border-radius: var(--radius);
     margin-bottom: 0.75rem;
     box-shadow: var(--shadow);
-    -webkit-tap-highlight-color: transparent;
 }
 
 .user-avatar-emoji {
@@ -864,7 +855,7 @@ body {
     gap: 0.5rem;
     padding: 1rem;
     background: var(--light);
-    border: none;
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     cursor: pointer;
 }
@@ -889,7 +880,7 @@ body {
     gap: 1rem;
     padding: 1rem;
     background: var(--light);
-    border: none;
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text);
     cursor: pointer;
@@ -972,7 +963,7 @@ body {
     background: var(--card-bg);
     border-radius: var(--radius);
     margin-bottom: 0.5rem;
-    -webkit-tap-highlight-color: transparent;
+    box-shadow: var(--shadow);
 }
 
 .settings-item-left {
@@ -1174,7 +1165,7 @@ body.conversation-open .conversation-page {
     flex: 1;
     padding: 4px 8px;
     border-radius: 8px;
-    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
 }
 
 .conversation-avatar-emoji {
@@ -1241,7 +1232,6 @@ body.conversation-open .conversation-page {
     color: var(--text);
     box-shadow: var(--shadow);
     word-wrap: break-word;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .message.sent .message-content {
