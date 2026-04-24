@@ -95,7 +95,6 @@ body {
     to { transform: rotate(360deg); }
 }
 
-/* الحاوية الرئيسية */
 .app-container {
     height: 100vh;
     display: flex;
@@ -103,7 +102,6 @@ body {
     background: var(--bg);
 }
 
-/* الهيدر */
 .app-header {
     height: var(--header-height);
     background: var(--card-bg);
@@ -134,11 +132,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.3s;
-}
-
-.icon-btn:hover {
-    background: var(--light);
 }
 
 .header-title h1 {
@@ -146,7 +139,6 @@ body {
     font-weight: 600;
 }
 
-/* المحتوى الرئيسي */
 .app-content {
     flex: 1;
     overflow-y: auto;
@@ -163,7 +155,6 @@ body {
     display: block;
 }
 
-/* شريط التنقل السفلي */
 .bottom-nav {
     height: var(--nav-height);
     background: var(--card-bg);
@@ -188,7 +179,7 @@ body {
     color: var(--text-light);
     font-size: 0.8rem;
     cursor: pointer;
-    transition: color 0.3s;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .nav-item i {
@@ -199,11 +190,6 @@ body {
     color: var(--primary);
 }
 
-/* ===== تم إزالة القائمة الجانبية (side-menu) بالكامل ===== */
-
-/* الصفحة الرئيسية - تم إزالة قسم القصص بالكامل */
-
-/* بطاقات المنشورات */
 .post-card {
     background: var(--card-bg);
     border-radius: var(--radius);
@@ -341,11 +327,7 @@ body {
     background: var(--card-bg);
     border-radius: var(--radius);
     cursor: pointer;
-    transition: background 0.3s;
-}
-
-.chat-item:hover {
-    background: var(--light);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .chat-avatar-emoji {
@@ -435,14 +417,7 @@ body {
     justify-content: center;
     font-size: 1.3rem;
     box-shadow: var(--shadow);
-    transition: all 0.3s;
     z-index: 10;
-}
-
-.edit-profile-btn-left:hover {
-    transform: scale(1.1);
-    background: var(--primary);
-    color: white;
 }
 
 .profile-info-container {
@@ -465,7 +440,6 @@ body {
     margin: 0;
 }
 
-/* صف المعرف */
 .profile-id-row {
     display: flex;
     align-items: center;
@@ -486,13 +460,7 @@ body {
     cursor: pointer;
     font-size: 1.1rem;
     padding: 0 5px;
-    transition: transform 0.3s;
-    order: 0;
-}
-
-.copy-btn-left:hover {
-    transform: scale(1.1);
-    color: var(--primary-dark);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .id-value-numbers {
@@ -535,18 +503,9 @@ body {
     text-align: center;
     padding: 10px;
     border-radius: var(--radius);
-    transition: all 0.3s;
     display: inline-block;
     flex: 1;
-}
-
-.stat-link:hover {
-    background: var(--light);
-    transform: translateY(-2px);
-}
-
-.stat-link:active {
-    transform: translateY(0);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .stat-value {
@@ -602,13 +561,11 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s;
 }
 
 .back-btn:hover {
     background: var(--primary);
     color: white;
-    transform: scale(1.1);
 }
 
 .subpage-header h3 {
@@ -665,11 +622,7 @@ body {
     border-radius: var(--radius);
     margin-bottom: 0.75rem;
     box-shadow: var(--shadow);
-    transition: transform 0.3s;
-}
-
-.user-item:hover {
-    transform: translateX(-5px);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .user-avatar-emoji {
@@ -714,11 +667,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s;
-}
-
-.action-btn:hover {
-    transform: scale(1.1);
 }
 
 .action-btn.following {
@@ -770,7 +718,6 @@ body {
     text-align: center;
 }
 
-/* نافذة تعديل الملف الشخصي */
 .edit-field {
     margin-bottom: 1.5rem;
     text-align: center;
@@ -784,7 +731,6 @@ body {
     text-align: center;
 }
 
-/* حقل الإدخال مع عداد الأحرف */
 .input-wrapper {
     position: relative;
     width: 100%;
@@ -811,7 +757,6 @@ body {
     border-color: var(--primary);
 }
 
-/* عداد الأحرف */
 .char-counter {
     position: absolute;
     left: 10px;
@@ -831,7 +776,6 @@ body {
     font-weight: bold;
 }
 
-/* الأفاتار */
 .current-avatar {
     width: 80px;
     height: 80px;
@@ -844,7 +788,6 @@ body {
     margin: 0 auto 1rem;
 }
 
-/* زر تغيير الأفاتار */
 .change-avatar-btn {
     display: inline-flex;
     align-items: center;
@@ -858,19 +801,8 @@ body {
     color: var(--text);
     font-size: 0.9rem;
     cursor: pointer;
-    transition: all 0.3s;
 }
 
-.change-avatar-btn:hover {
-    background: var(--primary);
-    color: white;
-}
-
-.change-avatar-btn i {
-    font-size: 1rem;
-}
-
-/* أزرار الحفظ والإلغاء - موحدة (كلاهما بإطار أزرق) */
 .modal-actions {
     display: flex;
     gap: 1.2rem;
@@ -887,20 +819,13 @@ body {
     font-weight: 600;
     font-size: 1rem;
     cursor: pointer;
-    transition: all 0.3s;
     text-align: center;
 }
 
-/* كل الأزرار لها نفس التصميم (إطار أزرق) */
 .modal-btn-outline {
     background: transparent;
     border: 2px solid var(--primary);
     color: var(--primary);
-}
-
-.modal-btn-outline:hover {
-    background: var(--primary);
-    color: white;
 }
 
 .close-modal {
@@ -914,7 +839,6 @@ body {
     cursor: pointer;
 }
 
-/* باقي الأنماط */
 .avatar-options {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -932,13 +856,6 @@ body {
     border: none;
     border-radius: var(--radius);
     cursor: pointer;
-    transition: all 0.3s;
-}
-
-.avatar-option:hover {
-    background: var(--primary);
-    color: white;
-    transform: scale(1.05);
 }
 
 .avatar-option span:first-child {
@@ -947,10 +864,6 @@ body {
 
 .avatar-option span:last-child {
     font-size: 0.9rem;
-}
-
-.avatar-option:hover span:first-child {
-    filter: brightness(0) invert(1);
 }
 
 .language-options {
@@ -969,12 +882,6 @@ body {
     border-radius: var(--radius);
     color: var(--text);
     cursor: pointer;
-    transition: background 0.3s;
-}
-
-.language-option:hover {
-    background: var(--primary);
-    color: white;
 }
 
 .language-option .flag {
@@ -1021,10 +928,6 @@ body {
     cursor: pointer;
 }
 
-.search-result-item:hover {
-    background: var(--light);
-}
-
 .search-result-avatar-emoji {
     width: 40px;
     height: 40px;
@@ -1058,6 +961,7 @@ body {
     background: var(--card-bg);
     border-radius: var(--radius);
     margin-bottom: 0.5rem;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .settings-item-left {
@@ -1114,41 +1018,6 @@ input:checked + .slider {
 
 input:checked + .slider:before {
     transform: translateX(26px);
-}
-
-/* ===== إزالة تأثير اللمس (الظل الأزرق) ===== */
-* {
-    -webkit-tap-highlight-color: transparent !important;
-    tap-highlight-color: transparent !important;
-    outline: none !important;
-}
-
-button, 
-.nav-item, 
-.chat-item, 
-.user-item, 
-.action-btn, 
-.icon-btn, 
-.back-btn, 
-.stat-link, 
-.menu-items a {
-    -webkit-tap-highlight-color: transparent !important;
-    tap-highlight-color: transparent !important;
-    outline: none !important;
-}
-
-/* إزالة تأثير التركيز على الأزرار */
-button:focus, 
-.nav-item:focus, 
-.chat-item:focus, 
-.user-item:focus, 
-.action-btn:focus, 
-.icon-btn:focus, 
-.back-btn:focus, 
-.stat-link:focus, 
-.menu-items a:focus {
-    outline: none !important;
-    box-shadow: none !important;
 }
 
 @media (min-width: 768px) {
@@ -1220,7 +1089,6 @@ button:focus,
     }
 }
 
-/* ===== أنماط تثبيت الأيقونات ===== */
 .bottom-nav .nav-item i,
 .settings-item-left i,
 .header-left i,
@@ -1241,15 +1109,12 @@ button:focus,
     margin: 0 0 4px 0;
 }
 
-/* ========== صفحة المحادثة المنعزلة (مثل واتساب) ========== */
-
-/* إخفاء العناصر عندما تكون صفحة المحادثة مفتوحة */
+/* ========== صفحة المحادثة المنعزلة ========== */
 body.conversation-open .bottom-nav,
 body.conversation-open .app-header {
     display: none !important;
 }
 
-/* جعل صفحة المحادثة تغطي الشاشة بالكامل */
 body.conversation-open .conversation-page {
     display: flex !important;
     flex-direction: column;
@@ -1262,7 +1127,6 @@ body.conversation-open .conversation-page {
     background: var(--bg);
 }
 
-/* تنسيق رأس المحادثة */
 .conversation-header {
     display: flex;
     align-items: center;
@@ -1273,7 +1137,6 @@ body.conversation-open .conversation-page {
     height: 70px;
 }
 
-/* زر الرجوع */
 .conversation-header .back-btn {
     width: 40px;
     height: 40px;
@@ -1286,7 +1149,6 @@ body.conversation-open .conversation-page {
     align-items: center;
     justify-content: center;
     margin-left: 12px;
-    transition: all 0.2s;
 }
 
 .conversation-header .back-btn:hover {
@@ -1294,19 +1156,14 @@ body.conversation-open .conversation-page {
     color: white;
 }
 
-/* معلومات المستخدم */
 .conversation-user-info {
     display: flex;
     align-items: center;
     gap: 12px;
     flex: 1;
-    cursor: pointer;
     padding: 4px 8px;
     border-radius: 8px;
-}
-
-.conversation-user-info:hover {
-    background: var(--light);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .conversation-avatar-emoji {
@@ -1336,7 +1193,6 @@ body.conversation-open .conversation-page {
     color: var(--text-light);
 }
 
-/* منطقة الرسائل */
 .messages-container {
     flex: 1;
     overflow-y: auto;
@@ -1347,7 +1203,6 @@ body.conversation-open .conversation-page {
     gap: 8px;
 }
 
-/* تنسيق الرسائل */
 .message {
     max-width: 70%;
     margin-bottom: 4px;
@@ -1375,7 +1230,7 @@ body.conversation-open .conversation-page {
     color: var(--text);
     box-shadow: var(--shadow);
     word-wrap: break-word;
-    position: relative;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .message.sent .message-content {
@@ -1392,7 +1247,6 @@ body.conversation-open .conversation-page {
     border-bottom-left-radius: 4px;
 }
 
-/* معلومات الرسالة (الوقت والحالة) */
 .message-info {
     display: flex;
     align-items: center;
@@ -1418,43 +1272,19 @@ body.conversation-open .conversation-page {
     font-size: 0.8rem;
 }
 
-.message-status.sent {
-    color: #999;
-}
-
-.message-status.delivered {
-    color: #999;
-}
-
-.message-status.read {
-    color: #4fc3f7;
-}
-
-/* الصور في الرسائل */
 .message-image {
     max-width: 200px;
     max-height: 200px;
     border-radius: 12px;
     cursor: pointer;
-    transition: transform 0.2s;
 }
 
-.message-image:hover {
-    transform: scale(1.05);
-}
-
-/* البصمات الصوتية */
 .message-audio {
     width: 250px;
     height: 40px;
     border-radius: 20px;
 }
 
-.message-audio::-webkit-media-controls-panel {
-    background: var(--primary);
-}
-
-/* منطقة إدخال الرسالة */
 .message-input-container {
     background: var(--card-bg);
     border-top: 1px solid var(--border);
@@ -1470,12 +1300,10 @@ body.conversation-open .conversation-page {
     border-radius: 30px;
     padding: 4px 8px;
     border: 1px solid var(--border);
-    transition: all 0.2s;
 }
 
 .message-input-wrapper:focus-within {
     border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
 }
 
 .attach-btn {
@@ -1490,13 +1318,6 @@ body.conversation-open .conversation-page {
     align-items: center;
     justify-content: center;
     font-size: 1.3rem;
-    transition: all 0.2s;
-}
-
-.attach-btn:hover {
-    background: var(--primary);
-    color: white;
-    transform: rotate(90deg);
 }
 
 .input-area {
@@ -1532,12 +1353,6 @@ body.conversation-open .conversation-page {
     align-items: center;
     justify-content: center;
     font-size: 1.2rem;
-    transition: all 0.2s;
-}
-
-.emoji-btn:hover {
-    background: var(--light);
-    color: var(--primary);
 }
 
 .send-btn, .voice-btn {
@@ -1552,15 +1367,8 @@ body.conversation-open .conversation-page {
     align-items: center;
     justify-content: center;
     font-size: 1.2rem;
-    transition: all 0.2s;
 }
 
-.send-btn:hover, .voice-btn:hover {
-    background: var(--primary-dark);
-    transform: scale(1.1);
-}
-
-/* قائمة المرفقات */
 .attachment-menu {
     position: absolute;
     bottom: 80px;
@@ -1587,14 +1395,9 @@ body.conversation-open .conversation-page {
     color: var(--text);
     cursor: pointer;
     border-radius: 12px;
-    transition: all 0.2s;
     font-size: 0.95rem;
     width: 100%;
     text-align: right;
-}
-
-.attachment-menu button:hover {
-    background: var(--light);
 }
 
 .attachment-menu button i {
@@ -1603,7 +1406,6 @@ body.conversation-open .conversation-page {
     font-size: 1.2rem;
 }
 
-/* منتقي الإيموجي */
 .emoji-picker {
     position: absolute;
     bottom: 80px;
@@ -1634,7 +1436,6 @@ body.conversation-open .conversation-page {
     color: var(--text);
     cursor: pointer;
     font-size: 1.3rem;
-    transition: all 0.2s;
 }
 
 .emoji-categories button.active {
@@ -1662,15 +1463,8 @@ body.conversation-open .conversation-page {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
 }
 
-.emoji-grid button:hover {
-    background: var(--light);
-    transform: scale(1.1);
-}
-
-/* تنسيق للشاشات الصغيرة */
 @media (max-width: 480px) {
     .conversation-header {
         padding: 8px 12px;
@@ -1681,14 +1475,6 @@ body.conversation-open .conversation-page {
         width: 40px;
         height: 40px;
         font-size: 2rem;
-    }
-    
-    .conversation-user-details h3 {
-        font-size: 1rem;
-    }
-    
-    .conversation-status {
-        font-size: 0.7rem;
     }
     
     .message {
@@ -1739,7 +1525,6 @@ body.conversation-open .conversation-page {
     }
 }
 
-/* تحسينات للوضع الداكن */
 .theme-dark .message.received .message-content {
     background: #2d2d2d;
     color: #fff;
@@ -1771,11 +1556,6 @@ body.conversation-open .conversation-page {
     background: #444;
 }
 
-.theme-dark .emoji-grid button:hover {
-    background: #444;
-}
-
-/* تأثيرات الحركة */
 @keyframes messagePop {
     0% { transform: scale(0.8); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
@@ -1785,7 +1565,6 @@ body.conversation-open .conversation-page {
     animation: messagePop 0.2s ease;
 }
 
-/* شريط التمرير المخصص */
 .messages-container::-webkit-scrollbar {
     width: 6px;
 }
@@ -1797,8 +1576,4 @@ body.conversation-open .conversation-page {
 .messages-container::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 3px;
-}
-
-.messages-container::-webkit-scrollbar-thumb:hover {
-    background: var(--text-light);
 }
