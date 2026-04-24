@@ -49,10 +49,6 @@ const SecureChatSystem = {
         return new Promise(resolve => { const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); img.onload = () => { let w = img.width, h = img.height; if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); canvas.toBlob(resolve, 'image/jpeg', 0.8); }; img.src = URL.createObjectURL(file); });
     },
     
-    async compressVideo(file) {
-        return new Promise((resolve) => { const video = document.createElement('video'); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); video.preload = 'metadata'; video.onloadedmetadata = () => { URL.revokeObjectURL(video.src); let width = video.videoWidth, height = video.videoHeight; if (height > 480) { width *= 480 / height; height = 480; } canvas.width = Math.round(width); canvas.height = Math.round(height); const stream = canvas.captureStream(30); const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 300000 }); const chunks = []; mediaRecorder.ondataavailable = e => chunks.push(e.data); mediaRecorder.onstop = () => { resolve(new Blob(chunks, { type: 'video/webm' })); }; video.currentTime = 0; video.play(); mediaRecorder.start(); setTimeout(() => { mediaRecorder.stop(); video.pause(); }, Math.min(video.duration * 1000, 60000)); }; video.src = URL.createObjectURL(file); });
-    },
-    
     fileToBase64(blob) { return new Promise(resolve => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob); }); },
     
     async sendToServer(receiverId, encryptedPackage) {
@@ -108,17 +104,24 @@ const ChatSystem = {
         const div = document.createElement('div'); div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; div.id = `msg-${msg.id}`;
         const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
         let statusHtml = ''; if (msg.sender === 'me') { let icon = '✓', cls = 'sent'; if (msg.status === 'delivered') { icon = '✓✓'; cls = 'delivered'; } else if (msg.status === 'read') { icon = '✓✓'; cls = 'read'; } statusHtml = `<span class="message-status ${cls}">${icon}</span>`; }
-        if (msg.type === 'text') div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
-        else if (msg.type === 'image') div.innerHTML = `<img src="${msg.data}" class="message-image"><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
-        else if (msg.type === 'voice') div.innerHTML = `<audio controls src="${msg.data}" class="message-audio"></audio><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
-        else if (msg.type === 'video') div.innerHTML = `<video controls src="${msg.data}" style="max-width:250px;border-radius:12px;"></video><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
-        else if (msg.type === 'file') div.innerHTML = `<div class="message-content" onclick="window.open('${msg.data}')" style="cursor:pointer;">📎 ${msg.fileName || 'ملف'}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        
+        if (msg.type === 'text') {
+            div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        } else if (msg.type === 'image') {
+            div.innerHTML = `<div class="msg-media-wrapper" onclick="viewMedia('${msg.data}', 'image')"><img src="${msg.data}" class="message-image" loading="lazy"><button class="msg-download-btn" onclick="event.stopPropagation(); downloadMedia('${msg.data}', 'rafeeq_image_${msg.id}.jpg')"><i class="fas fa-download"></i></button></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        } else if (msg.type === 'video') {
+            div.innerHTML = `<div class="msg-media-wrapper" onclick="viewMedia('${msg.data}', 'video')"><video src="${msg.data}" class="message-video" preload="metadata"></video><div class="msg-play-overlay"><i class="fas fa-play-circle"></i></div><button class="msg-download-btn" onclick="event.stopPropagation(); downloadMedia('${msg.data}', 'rafeeq_video_${msg.id}.webm')"><i class="fas fa-download"></i></button></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        } else if (msg.type === 'voice') {
+            div.innerHTML = `<audio controls src="${msg.data}" class="message-audio"></audio><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        } else if (msg.type === 'file') {
+            div.innerHTML = `<div class="msg-file-wrapper" onclick="downloadMedia('${msg.data}', '${msg.fileName || 'rafeeq_file'}')"><div class="msg-file-icon"><i class="fas fa-file"></i></div><div class="msg-file-info"><span class="msg-file-name">${msg.fileName || 'ملف'}</span><span class="msg-file-size">اضغط للتنزيل</span></div><button class="msg-download-btn" onclick="event.stopPropagation(); downloadMedia('${msg.data}', '${msg.fileName || 'rafeeq_file'}')"><i class="fas fa-download"></i></button></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        }
         c.appendChild(div); c.scrollTop = c.scrollHeight;
     },
     async sendMessage(text) { if (!this.currentChat || !text.trim()) return false; const mid = Date.now().toString(); try { const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return false; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(text, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); return true; } catch (e) { return false; } },
     async sendImage(file) { if (!this.currentChat) return; const mid = Date.now().toString(); try { const comp = await SecureChatSystem.compressImage(file); const b64 = await SecureChatSystem.fileToBase64(comp); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'image', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
     async sendVoiceNote(audioBlob) { if (!this.currentChat) return; const mid = Date.now().toString(); try { const b64 = await SecureChatSystem.fileToBase64(audioBlob); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'voice', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
-    async sendVideo(file) { if (!this.currentChat) return; const mid = Date.now().toString(); try { let vf = file; if (file.size > 10 * 1024 * 1024) vf = await SecureChatSystem.compressVideo(file); const b64 = await SecureChatSystem.fileToBase64(vf); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'video', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'video', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'video', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
+    async sendVideo(file) { if (!this.currentChat) return; const mid = Date.now().toString(); try { const b64 = await SecureChatSystem.fileToBase64(file); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'video', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'video', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'video', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
     async sendFile(file) { if (!this.currentChat) return; const mid = Date.now().toString(); try { const b64 = await SecureChatSystem.fileToBase64(file); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'file', data: enc, fileName: file.name, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
     saveMessage(friendId, message) { const key = `chat_${friendId}`; let h = []; try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; } h.push(message); if (h.length > 100) h = h.slice(-100); localStorage.setItem(key, JSON.stringify(h)); this.messages[friendId] = h; },
     updateLastMessage(friendId, lastMessage) { document.querySelectorAll('.chat-item').forEach(item => { if (item.getAttribute('onclick')?.includes(friendId)) { const lm = item.querySelector('.last-message'); const tm = item.querySelector('.chat-time'); if (lm) lm.textContent = lastMessage; if (tm) tm.textContent = 'الآن'; } }); },
@@ -131,6 +134,7 @@ async function loadChats() { if (!window.auth || !window.auth.currentUser) retur
 
 function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'); const ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'); const eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
 
+// ========== دوال عامة ==========
 window.openChat = friendId => { window.db.collection('users').doc(friendId).get().then(doc => { if (doc.exists) { const f = doc.data(); ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤'); } }); };
 window.sendMessage = () => { const inp = document.getElementById('messageInput'); if (inp.value.trim()) { ChatSystem.sendMessage(inp.value.trim()).then(s => { if (s) inp.value = ''; }); } };
 window.handleMessageKeyPress = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.sendMessage(); } };
@@ -143,6 +147,34 @@ window.sendVoiceNote = () => { navigator.mediaDevices.getUserMedia({ audio: true
 window.shareLocation = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`)); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.closeConversation = () => ChatSystem.closeChat();
 window.viewContactInfo = () => { /* تم إزالة معلومات الاتصال */ };
+
+// ========== عارض الوسائط والتنزيل ==========
+window.viewMedia = function(src, type) {
+    const modal = document.createElement('div');
+    modal.className = 'media-viewer';
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    if (type === 'image') {
+        modal.innerHTML = `<img src="${src}" style="max-width:95%;max-height:95%;border-radius:12px;object-fit:contain;">`;
+    } else {
+        modal.innerHTML = `<video src="${src}" controls autoplay style="max-width:95%;max-height:95%;border-radius:12px;"></video>`;
+    }
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'media-viewer-close';
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.onclick = () => modal.remove();
+    modal.appendChild(closeBtn);
+    document.body.appendChild(modal);
+};
+
+window.downloadMedia = function(base64, filename) {
+    const link = document.createElement('a');
+    link.href = base64;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
 window.openEditProfileModal = () => { document.getElementById('editName').value = document.getElementById('profileName').textContent; document.getElementById('currentAvatarEmoji').textContent = document.getElementById('profileAvatarEmoji').textContent; document.getElementById('editProfileModal').classList.add('active'); };
 window.saveProfile = () => { const n = document.getElementById('editName').value.trim(); if (!n || n.length > 25) return; if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { document.getElementById('profileName').textContent = n; closeModal(); }); };
 window.showUserTrips = () => { document.querySelector('.profile-page').style.display = 'none'; document.getElementById('tripsPage').style.display = 'block'; };
@@ -152,4 +184,4 @@ window.openAvatarModal = () => document.getElementById('avatarModal')?.classList
 window.getEmojiForUser = u => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; return m[u?.avatarType] || '👤'; };
 window.clearMessages = () => { const c = document.getElementById('messagesContainer'); if (c) c.innerHTML = ''; };
 if ('Notification' in window) Notification.requestPermission();
-console.log('✅ جاهز');
+console.log('✅ جاهز - E2EE + عارض وسائط + تنزيل');
