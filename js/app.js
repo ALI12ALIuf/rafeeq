@@ -2,158 +2,287 @@
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
     
-    async init() { if (!window.auth?.currentUser) return false; try { await this.setupKeys(); this.startReceiving(); return true; } catch (e) { return false; } },
-    async setupKeys() { if (!localStorage.getItem('enc_private_key')) { const kp = await this.generateKeyPair(); const pk = await this.exportPublicKey(kp.publicKey); await window.db.collection('users').doc(window.auth.currentUser.uid).update({ publicKey: pk }); localStorage.setItem('enc_private_key', btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.exportKey('pkcs8', kp.privateKey))))); } },
+    async init() {
+        if (!window.auth?.currentUser) { return false; }
+        try { await this.setupKeys(); this.startReceiving(); return true; } catch (error) { return false; }
+    },
+    
+    async setupKeys() {
+        const existingKey = localStorage.getItem('enc_private_key');
+        if (!existingKey) {
+            const keyPair = await this.generateKeyPair();
+            const publicKey = await this.exportPublicKey(keyPair.publicKey);
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({ publicKey });
+            const privateExport = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+            localStorage.setItem('enc_private_key', btoa(String.fromCharCode(...new Uint8Array(privateExport))));
+        }
+    },
+    
     async generateKeyPair() { return await window.crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']); },
-    async exportPublicKey(k) { return btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.exportKey('raw', k)))); },
-    async importPublicKey(b64) { return await window.crypto.subtle.importKey('raw', Uint8Array.from(atob(b64), c => c.charCodeAt(0)), { name: 'ECDH', namedCurve: 'P-256' }, true, []); },
-    async getMyPrivateKey() { const s = localStorage.getItem('enc_private_key'); if (!s) return null; return await window.crypto.subtle.importKey('pkcs8', Uint8Array.from(atob(s), c => c.charCodeAt(0)), { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']); },
-    async getReceiverPublicKey(uid) { const d = await window.db.collection('users').doc(uid).get(); return (d.exists && d.data().publicKey) ? await this.importPublicKey(d.data().publicKey) : null; },
-    async deriveSharedKey(pr, pu) { return await window.crypto.subtle.deriveKey({ name: 'ECDH', public: pu }, pr, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']); },
+    async exportPublicKey(key) { const raw = await window.crypto.subtle.exportKey('raw', key); return btoa(String.fromCharCode(...new Uint8Array(raw))); },
+    async importPublicKey(base64Key) { const binary = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0)); return await window.crypto.subtle.importKey('raw', binary, { name: 'ECDH', namedCurve: 'P-256' }, true, []); },
     
-    async encryptData(data, sharedKey) { const enc = new TextEncoder(); const iv = window.crypto.getRandomValues(new Uint8Array(12)); const e = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode('rfq') }, sharedKey, typeof data === 'string' ? enc.encode(data) : data); const c = new Uint8Array(iv.length + e.byteLength); c.set(iv); c.set(new Uint8Array(e), iv.length); return btoa(String.fromCharCode(...c)); },
-    async decryptData(b64, sharedKey) { const enc = new TextEncoder(); const c = Uint8Array.from(atob(b64), x => x.charCodeAt(0)); const d = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: c.slice(0, 12), additionalData: enc.encode('rfq') }, sharedKey, c.slice(12)); return new TextDecoder().decode(d); },
+    async getMyPrivateKey() {
+        const stored = localStorage.getItem('enc_private_key'); if (!stored) return null;
+        const binary = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
+        return await window.crypto.subtle.importKey('pkcs8', binary, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']);
+    },
     
-    async compressImage(f) { return new Promise(r => { const i = new Image(), cv = document.createElement('canvas'), cx = cv.getContext('2d'); i.onload = () => { let w = i.width, h = i.height; if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } cv.width = w; cv.height = h; cx.drawImage(i, 0, 0, w, h); cv.toBlob(r, 'image/jpeg', 0.8); }; i.src = URL.createObjectURL(f); }); },
-    fileToBase64(b) { return new Promise(r => { const fr = new FileReader(); fr.onloadend = () => r(fr.result); fr.readAsDataURL(b); }); },
+    async getReceiverPublicKey(userId) { const doc = await window.db.collection('users').doc(userId).get(); if (!doc.exists || !doc.data().publicKey) return null; return await this.importPublicKey(doc.data().publicKey); },
+    async deriveSharedKey(privateKey, publicKey) { return await window.crypto.subtle.deriveKey({ name: 'ECDH', public: publicKey }, privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']); },
     
-    async sendToServer(rid, pkg) { await window.db.collection('secure_messages').add({ to: rid, from: window.auth.currentUser.uid, package: pkg, timestamp: firebase.firestore.FieldValue.serverTimestamp(), expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000)) }); },
-    startReceiving() { if (!window.auth?.currentUser) return; window.db.collection('secure_messages').where('to', '==', window.auth.currentUser.uid).onSnapshot(async s => { for (const c of s.docChanges()) { if (c.type === 'added') { const m = { id: c.doc.id, ...c.doc.data() }; await this.processReceivedMessage(m); await c.doc.ref.delete(); } } }); },
+    async encryptData(data, sharedKey) {
+        const encoder = new TextEncoder(); const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        const encrypted = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, typeof data === 'string' ? encoder.encode(data) : data);
+        const combined = new Uint8Array(iv.length + encrypted.byteLength); combined.set(iv); combined.set(new Uint8Array(encrypted), iv.length);
+        return btoa(String.fromCharCode(...combined));
+    },
+    
+    async decryptData(encryptedBase64, sharedKey) {
+        const encoder = new TextEncoder(); const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+        const iv = combined.slice(0, 12); const data = combined.slice(12);
+        const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, data);
+        return new TextDecoder().decode(decrypted);
+    },
+    
+    async compressImage(file) {
+        return new Promise(resolve => { const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); img.onload = () => { let w = img.width, h = img.height; if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); canvas.toBlob(resolve, 'image/jpeg', 0.8); }; img.src = URL.createObjectURL(file); });
+    },
+    
+    async compressVideo(file) {
+        return new Promise((resolve) => { const video = document.createElement('video'); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); video.preload = 'metadata'; video.onloadedmetadata = () => { URL.revokeObjectURL(video.src); let width = video.videoWidth, height = video.videoHeight; if (height > 480) { width *= 480 / height; height = 480; } canvas.width = Math.round(width); canvas.height = Math.round(height); const stream = canvas.captureStream(30); const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 300000 }); const chunks = []; mediaRecorder.ondataavailable = e => chunks.push(e.data); mediaRecorder.onstop = () => { resolve(new Blob(chunks, { type: 'video/webm' })); }; video.currentTime = 0; video.play(); mediaRecorder.start(); setTimeout(() => { mediaRecorder.stop(); video.pause(); }, Math.min(video.duration * 1000, 60000)); }; video.src = URL.createObjectURL(file); });
+    },
+    
+    fileToBase64(blob) { return new Promise(resolve => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob); }); },
+    
+    async sendToServer(receiverId, encryptedPackage) {
+        await window.db.collection('secure_messages').add({ to: receiverId, from: window.auth.currentUser.uid, package: encryptedPackage, timestamp: firebase.firestore.FieldValue.serverTimestamp(), expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000)) });
+    },
+    
+    startReceiving() {
+        if (!window.auth?.currentUser) return;
+        window.db.collection('secure_messages').where('to', '==', window.auth.currentUser.uid).onSnapshot(async snapshot => { for (const change of snapshot.docChanges()) { if (change.type === 'added') { const msg = { id: change.doc.id, ...change.doc.data() }; await this.processReceivedMessage(msg); await change.doc.ref.delete(); } } });
+    },
     
     async processReceivedMessage(msg) {
         try {
-            const pr = await this.getMyPrivateKey(), pu = await this.getReceiverPublicKey(msg.from);
-            if (!pr || !pu) return;
-            const sk = await this.deriveSharedKey(pr, pu);
-            if (msg.package.type === 'text') { const d = await this.decryptData(msg.package.data, sk); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, d); }
-            else if (msg.package.type === 'p2p') {
-                const d = JSON.parse(await this.decryptData(msg.package.data, sk));
-                if (d.type === 'call-offer') { P2PSystem.showIncomingCall(msg.from, d); }
-                else if (d.type === 'call-accept') { P2PSystem.handleAnswer(d); }
-                else if (d.type === 'call-reject') { P2PSystem.handleReject(); }
-                else if (d.type === 'file-offer') {
-                    const name = document.querySelector('#conversationName')?.textContent || 'صديق';
-                    const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' };
-                    if (confirm(`${name} يرسل ${tm[d.fileType]||'📎 ملف'} (${(d.size/1024).toFixed(1)}KB) - استلام؟`)) { P2PSystem.handleFileOffer(msg.from, d); }
-                }
-                else if (d.type === 'file-accept') { P2PSystem.handleFileAccept(d); }
-                else if (d.type === 'file-complete') { P2PSystem.receiveComplete(d); }
-                else if (d.type === 'ice-candidate') { P2PSystem.handleSignaling(d); }
-                else if (d.type === 'offer') { P2PSystem.handleOffer(msg.from, d); }
-            }
+            const myPrivateKey = await this.getMyPrivateKey(); const senderPublicKey = await this.getReceiverPublicKey(msg.from);
+            if (!myPrivateKey || !senderPublicKey) return;
+            const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
+            if (msg.package.type === 'text') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, d); }
+            else if (msg.package.type === 'voice') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'voice', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '🎤 بصمة'); }
+            else if (msg.package.type === 'image') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '📷 صورة'); }
+            else if (msg.package.type === 'video') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'video', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '🎥 فيديو'); }
+            else if (msg.package.type === 'file') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'file', data: d, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '📎 ملف'); }
+            else if (msg.package.type === 'webrtc') { const d = await this.decryptData(msg.package.data, sharedKey); const signalData = JSON.parse(d); if (signalData.sdp && signalData.sdp.type === 'offer' && !CallSystem.isInCall) { CallSystem.showIncomingCall(msg.from, signalData); } else { CallSystem.handleSignaling(signalData); } }
             loadChats();
-        } catch (e) { console.error(e); }
+        } catch (error) {}
     }
 };
 
-// ========== نظام P2P ==========
-const P2PSystem = {
-    pc: null, dc: null, localStream: null, isInCall: false, pendingFile: null, pendingFileInfo: null, receiveBuffer: [], receiveInfo: null, peerId: null,
+// ========== نظام اتصال WebRTC مباشر ==========
+const CallSystem = {
+    pc: null, localStream: null, isInCall: false, isCaller: false,
     
-    iceServers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }, { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
-    
-    async ensureConnection(peerId) {
-        if (this.pc && this.pc.connectionState === 'connected' && this.dc && this.dc.readyState === 'open') return true;
-        this.peerId = peerId;
-        await this.createOffer(peerId);
-        return new Promise(resolve => { const check = setInterval(() => { if (this.pc && this.pc.connectionState === 'connected' && this.dc && this.dc.readyState === 'open') { clearInterval(check); resolve(true); } }, 300); setTimeout(() => { clearInterval(check); resolve(false); }, 15000); });
+    servers: {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+        ]
     },
     
-    async createOffer(peerId) {
-        if (this.pc) { this.pc.close(); }
-        this.pc = new RTCPeerConnection(this.iceServers);
-        this.pc.onicecandidate = e => { if (e.candidate) this.sendP2PMsg(peerId, { type: 'ice-candidate', candidate: e.candidate }); };
-        this.pc.onconnectionstatechange = () => { if (this.pc && this.pc.connectionState === 'connected') console.log('✅ P2P متصل'); };
-        this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(); };
-        this.dc = this.pc.createDataChannel('fileTransfer');
-        this.setupDataChannel();
-        const offer = await this.pc.createOffer();
-        await this.pc.setLocalDescription(offer);
-        this.sendP2PMsg(peerId, { type: 'offer', sdp: this.pc.localDescription });
+    async startCall(calleeId, callType = 'video') {
+        if (!window.auth?.currentUser || this.isInCall) return;
+        this.isInCall = true; this.isCaller = true;
+        try {
+            const constraints = { audio: true, video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
+            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.showCallUI(callType);
+            this.pc = new RTCPeerConnection(this.servers);
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+            this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv) rv.srcObject = e.streams[0]; };
+            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
+            const offer = await this.pc.createOffer();
+            await this.pc.setLocalDescription(offer);
+            this.sendSignal(calleeId, { sdp: this.pc.localDescription });
+        } catch (e) { this.endCall(); }
     },
     
-    async handleOffer(peerId, data) {
-        this.peerId = peerId;
-        if (this.pc) { this.pc.close(); }
-        this.pc = new RTCPeerConnection(this.iceServers);
-        this.pc.onicecandidate = e => { if (e.candidate) this.sendP2PMsg(peerId, { type: 'ice-candidate', candidate: e.candidate }); };
-        this.pc.onconnectionstatechange = () => { if (this.pc && this.pc.connectionState === 'connected') console.log('✅ P2P متصل'); };
-        this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(); };
-        await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        const answer = await this.pc.createAnswer();
-        await this.pc.setLocalDescription(answer);
-        this.sendP2PMsg(peerId, { type: 'ice-candidate', sdp: this.pc.localDescription });
+    showIncomingCall(callerId, callData) {
+        const callerName = ChatSystem.messages[callerId]?.length ? 'صديقك' : 'مستخدم';
+        const callType = callData.sdp?.type === 'offer' ? (document.querySelector('#conversationName')?.textContent || 'مستخدم') : 'مستخدم';
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'incomingCall';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+        overlay.innerHTML = `
+            <div style="font-size:1.5rem;">📞 ${callType} يتصل بك...</div>
+            <div style="display:flex;gap:30px;">
+                <button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button>
+                <button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button>
+            </div>`;
+        document.body.appendChild(overlay);
+        
+        document.getElementById('btnAccept').onclick = () => { overlay.remove(); this.receiveCall(callerId, callData); };
+        document.getElementById('btnReject').onclick = () => { overlay.remove(); };
+    },
+    
+    async receiveCall(callerId, callData) {
+        if (this.isInCall) return;
+        this.isInCall = true; this.isCaller = false;
+        try {
+            const hasVideo = callData.sdp?.sdp?.includes('video') !== false;
+            const constraints = { audio: true, video: hasVideo ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
+            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.showCallUI(hasVideo ? 'video' : 'audio');
+            this.pc = new RTCPeerConnection(this.servers);
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
+            this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv) rv.srcObject = e.streams[0]; };
+            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
+            if (callData.sdp) {
+                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+                const answer = await this.pc.createAnswer();
+                await this.pc.setLocalDescription(answer);
+                this.sendSignal(callerId, { sdp: this.pc.localDescription });
+            }
+        } catch (e) { this.endCall(); }
     },
     
     async handleSignaling(data) {
-        try { if (!this.pc) return; if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); } else if (data.candidate) { await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } } catch (e) {}
+        try {
+            if (!this.pc) return;
+            if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); if (data.sdp.type === 'offer') { const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); } }
+            else if (data.candidate) { await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate)); }
+        } catch (e) {}
     },
     
-    setupDataChannel() { if (!this.dc) return; this.dc.onopen = () => console.log('✅ قناة بيانات مفتوحة'); this.dc.onmessage = e => { try { const msg = JSON.parse(e.data); if (msg.type === 'file-complete') this.receiveComplete(msg); } catch (ex) {} }; },
+    async sendSignal(calleeId, data) {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
+        await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
+    },
     
-    async startCall(peerId) { if (this.isInCall) return; this.isInCall = true; try { await this.ensureConnection(peerId); this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); this.showCallUI(); this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; }; this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream)); const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer); this.sendP2PMsg(peerId, { type: 'call-offer', sdp: this.pc.localDescription }); } catch (e) { this.endCall(); } },
+    showCallUI(callType) {
+        document.body.classList.add('in-call');
+        const ui = document.createElement('div');
+        ui.id = 'callUI';
+        ui.innerHTML = `
+            <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video>
+            <video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video>
+            <div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;">
+                <button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button>
+                <button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button>
+                <button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">📹</button>
+            </div>`;
+        document.body.appendChild(ui);
+        const lv = document.getElementById('localVideo');
+        if (lv && this.localStream) lv.srcObject = this.localStream;
+    },
     
-    showIncomingCall(callerId, data) { const name = document.querySelector('#conversationName')?.textContent || 'صديق'; const ov = document.createElement('div'); ov.id = 'incomingCall'; ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;'; ov.innerHTML = `<div style="font-size:1.5rem;">📞 ${name} يتصل بك...</div><div style="display:flex;gap:30px;"><button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button><button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button></div>`; document.body.appendChild(ov); document.getElementById('btnAccept').onclick = () => { ov.remove(); this.acceptCall(callerId, data); }; document.getElementById('btnReject').onclick = () => { ov.remove(); this.sendP2PMsg(callerId, { type: 'call-reject' }); }; },
-    async acceptCall(peerId, data) { this.isInCall = true; try { await this.ensureConnection(peerId); this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; }; this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream)); this.showCallUI(); if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); const ans = await this.pc.createAnswer(); await this.pc.setLocalDescription(ans); this.sendP2PMsg(peerId, { type: 'call-accept', sdp: this.pc.localDescription }); } } catch (e) { this.endCall(); } },
-    async handleAnswer(data) { try { if (this.pc && data.sdp) await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); } catch (e) {} },
-    handleReject() { this.endCall(); alert('تم رفض المكالمة'); },
+    toggleAudio() {
+        if (this.localStream) {
+            const at = this.localStream.getAudioTracks()[0];
+            if (at) at.enabled = !at.enabled;
+        }
+    },
     
-    showCallUI() { document.body.classList.add('in-call'); const ui = document.createElement('div'); ui.id = 'callUI'; ui.innerHTML = `<audio id="remoteAudio" autoplay playsinline style="display:none;"></audio><div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;color:white;">🔊 مكالمة</div><div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;"><button onclick="P2PSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button><button onclick="P2PSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button></div>`; document.body.appendChild(ui); },
-    toggleAudio() { if (this.localStream) { const t = this.localStream.getAudioTracks()[0]; if (t) t.enabled = !t.enabled; } },
-    endCall() { this.isInCall = false; document.body.classList.remove('in-call'); if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } ['callUI','incomingCall'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); }); },
+    toggleVideo() {
+        if (this.localStream) {
+            const vt = this.localStream.getVideoTracks()[0];
+            if (vt) vt.enabled = !vt.enabled;
+        }
+    },
     
-    async sendFileP2P(peerId, file, fileType) { this.pendingFile = file; this.pendingFileInfo = { name: file.name, type: fileType, size: file.size }; this.sendP2PMsg(peerId, { type: 'file-offer', fileType, name: file.name, size: file.size }); },
-    async handleFileOffer(senderId, info) { this.receiveBuffer = []; this.receiveInfo = info; this.sendP2PMsg(senderId, { type: 'file-accept' }); },
-    async handleFileAccept(data) { if (!this.pendingFile || !this.dc || this.dc.readyState !== 'open') return; const chunkSize = 16384; let offset = 0; const sendChunk = () => { if (offset >= this.pendingFile.size) { this.dc.send(JSON.stringify({ type: 'file-complete', fileType: this.pendingFileInfo.type, fileName: this.pendingFileInfo.name })); this.showSentFile(this.pendingFileInfo); this.pendingFile = null; this.pendingFileInfo = null; return; } const end = Math.min(offset + chunkSize, this.pendingFile.size); const reader = new FileReader(); reader.onload = () => { this.dc.send(JSON.stringify({ type: 'file-chunk', data: reader.result })); offset = end; setTimeout(sendChunk, 10); }; reader.readAsDataURL(this.pendingFile.slice(offset, end)); }; sendChunk(); },
-    receiveComplete(msg) { let fullData = (this.receiveBuffer && this.receiveBuffer.length > 0) ? this.receiveBuffer.join('') : (msg.data || ''); this.receiveBuffer = []; const messageObj = { id: Date.now().toString(), type: msg.fileType || this.receiveInfo?.type || 'file', data: fullData, fileName: msg.fileName || this.receiveInfo?.name || 'ملف', sender: 'friend', time: new Date().toISOString() }; const cc = ChatSystem.currentChat; ChatSystem.saveMessage(cc, messageObj); ChatSystem.displayMessages(cc); const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' }; ChatSystem.updateLastMessage(cc, tm[msg.fileType]||'📎 ملف'); loadChats(); },
-    showSentFile(info) { const reader = new FileReader(); reader.onload = () => { const msg = { id: Date.now().toString(), type: info.type, data: reader.result, fileName: info.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }; ChatSystem.saveMessage(ChatSystem.currentChat, msg); ChatSystem.displayMessages(ChatSystem.currentChat); const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' }; ChatSystem.updateLastMessage(ChatSystem.currentChat, tm[info.type]||'📎 ملف'); loadChats(); }; reader.readAsDataURL(this.pendingFile); },
-    async sendP2PMsg(peerId, data) { const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(peerId); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(JSON.stringify(data), sk); await SecureChatSystem.sendToServer(peerId, { id: Date.now().toString(), type: 'p2p', data: enc, timestamp: Date.now() }); }
+    endCall() {
+        this.isInCall = false;
+        document.body.classList.remove('in-call');
+        if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
+        if (this.pc) { this.pc.close(); this.pc = null; }
+        const ui = document.getElementById('callUI'); if (ui) ui.remove();
+        const inc = document.getElementById('incomingCall'); if (inc) inc.remove();
+    }
 };
 
-window.startAudioCall = async () => { if (ChatSystem.currentChat) await P2PSystem.startCall(ChatSystem.currentChat); };
+window.startVideoCall = async () => {
+    if (!ChatSystem.currentChat) return;
+    await CallSystem.startCall(ChatSystem.currentChat, 'video');
+};
+
+window.startAudioCall = async () => {
+    if (!ChatSystem.currentChat) return;
+    await CallSystem.startCall(ChatSystem.currentChat, 'audio');
+};
 
 document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); if (window.auth?.currentUser) SecureChatSystem.init(); });
 
 function formatNumber(num) { if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return num.toString(); }
-async function updateTripsCount() { if (!window.auth?.currentUser) return; try { const s = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).where('status', '==', 'ended').get(); const c = document.getElementById('tripsCount'); if (c) c.textContent = formatNumber(s.size); } catch (e) {} }
+async function updateTripsCount() { if (!window.auth || !window.auth.currentUser) return; try { const s = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).where('status', '==', 'ended').get(); const c = document.getElementById('tripsCount'); if (c) c.textContent = formatNumber(s.size); } catch (error) {} }
 function ensureSinglePage() { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.querySelectorAll('.page').forEach(p => { p.style.display = p.classList.contains('active') ? 'block' : 'none'; }); }
-function setupNavigation() { const n = document.querySelectorAll('.nav-item'), p = document.querySelectorAll('.page'); if (!n.length || !p.length) return; function s(id) { p.forEach(x => x.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } p.forEach(x => { if (!x.classList.contains('active')) x.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(x => x.style.display = 'none'); if (id === 'chat') loadChats(); document.body.classList.remove('conversation-open'); n.forEach(x => x.classList.toggle('active', x.dataset.page === id)); } n.forEach(x => x.addEventListener('click', () => s(x.dataset.page))); }
-function setupModals() { window.openLanguageModal = () => document.getElementById('languageModal')?.classList.add('active'); window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); })); }
+function setupNavigation() { const nav = document.querySelectorAll('.nav-item'); const pages = document.querySelectorAll('.page'); if (!nav.length || !pages.length) return; function switchPage(id) { pages.forEach(p => p.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } pages.forEach(p => { if (!p.classList.contains('active')) p.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); if (id === 'chat') loadChats(); document.body.classList.remove('conversation-open'); nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); } nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); }
+function setupModals() { window.openLanguageModal = () => document.getElementById('languageModal')?.classList.add('active'); window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); })); document.querySelectorAll('.settings-item').forEach(i => { if (i.querySelector('[data-i18n="language"]')) i.addEventListener('click', openLanguageModal); }); }
 
 const ChatSystem = {
     currentChat: null, messages: {},
     init() { this.loadAllChats(); },
-    loadAllChats() { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('chat_')) { const f = k.replace('chat_', ''); try { this.messages[f] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[f] = []; } } } },
-    openChat(fid, name, av) { this.currentChat = fid; document.body.classList.add('conversation-open'); document.getElementById('conversationName').textContent = name; document.getElementById('conversationAvatar').textContent = av || '👤'; document.querySelector('.chat-page').style.display = 'none'; document.getElementById('conversationPage').style.display = 'flex'; this.displayMessages(fid); P2PSystem.ensureConnection(fid).then(c => { if (c) console.log('✅ P2P جاهز للإرسال'); }); setTimeout(() => { const i = document.getElementById('messageInput'); if (i) i.focus(); }, 300); setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100); },
-    displayMessages(fid) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[fid] || []).forEach(m => this.displayMessage(m)); },
-    displayMessage(msg) { const c = document.getElementById('messagesContainer'); if (!c) return; const d = document.createElement('div'); d.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; d.id = `msg-${msg.id}`; const t = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); let sh = ''; if (msg.sender === 'me') { let ic = '✓', cl = 'sent'; if (msg.status === 'delivered') { ic = '✓✓'; cl = 'delivered'; } else if (msg.status === 'read') { ic = '✓✓'; cl = 'read'; } sh = `<span class="message-status ${cl}">${ic}</span>`; } if (msg.type === 'text') d.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; else if (msg.type === 'image') d.innerHTML = `<img src="${msg.data}" class="message-image"><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; else if (msg.type === 'voice') d.innerHTML = `<audio controls src="${msg.data}" class="message-audio"></audio><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; else if (msg.type === 'video') d.innerHTML = `<video controls src="${msg.data}" style="max-width:250px;border-radius:12px;"></video><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; else if (msg.type === 'file') d.innerHTML = `<div class="message-content" onclick="window.open('${msg.data}')" style="cursor:pointer;">📎 ${msg.fileName||'ملف'}</div><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; c.appendChild(d); c.scrollTop = c.scrollHeight; },
-    async sendMessage(text) { if (!this.currentChat || !text.trim()) return false; const mid = Date.now().toString(); try { const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return false; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(text, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); return true; } catch (e) { return false; } },
-    async sendFileP2POnly(file, fileType) { if (!this.currentChat) return; if (P2PSystem.dc && P2PSystem.dc.readyState === 'open') { await P2PSystem.sendFileP2P(this.currentChat, file, fileType); } else { alert('⚠️ انتظر قليلاً... جاري الاتصال. حاول مرة أخرى.'); } },
-    async sendImage(file) { if (!this.currentChat) return; const comp = await SecureChatSystem.compressImage(file); await this.sendFileP2POnly(comp, 'image'); },
-    async sendVoiceNote(blob) { await this.sendFileP2POnly(blob, 'voice'); },
-    async sendVideo(file) { await this.sendFileP2POnly(file, 'video'); },
-    async sendFile(file) { await this.sendFileP2POnly(file, 'file'); },
-    saveMessage(fid, msg) { const k = `chat_${fid}`; let h = []; try { h = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { h = []; } h.push(msg); if (h.length > 100) h = h.slice(-100); localStorage.setItem(k, JSON.stringify(h)); this.messages[fid] = h; },
-    updateLastMessage(fid, lm) { document.querySelectorAll('.chat-item').forEach(i => { if (i.getAttribute('onclick')?.includes(fid)) { const l = i.querySelector('.last-message'), t = i.querySelector('.chat-time'); if (l) l.textContent = lm; if (t) t.textContent = 'الآن'; } }); },
+    loadAllChats() { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('chat_')) { const fid = k.replace('chat_', ''); try { this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[fid] = []; } } } },
+    openChat(friendId, friendName, friendAvatar) {
+        this.currentChat = friendId; document.body.classList.add('conversation-open');
+        document.getElementById('conversationName').textContent = friendName;
+        document.getElementById('conversationAvatar').textContent = friendAvatar || '👤';
+        document.getElementById('conversationStatus').textContent = '';
+        document.querySelector('.chat-page').style.display = 'none'; document.getElementById('conversationPage').style.display = 'flex';
+        this.displayMessages(friendId);
+        setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
+        setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+    },
+    displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
+    displayMessage(msg) {
+        const c = document.getElementById('messagesContainer'); if (!c) return;
+        const div = document.createElement('div'); div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; div.id = `msg-${msg.id}`;
+        const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+        let statusHtml = ''; if (msg.sender === 'me') { let icon = '✓', cls = 'sent'; if (msg.status === 'delivered') { icon = '✓✓'; cls = 'delivered'; } else if (msg.status === 'read') { icon = '✓✓'; cls = 'read'; } statusHtml = `<span class="message-status ${cls}">${icon}</span>`; }
+        if (msg.type === 'text') div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        else if (msg.type === 'image') div.innerHTML = `<img src="${msg.data}" class="message-image"><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        else if (msg.type === 'voice') div.innerHTML = `<audio controls src="${msg.data}" class="message-audio"></audio><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        else if (msg.type === 'video') div.innerHTML = `<video controls src="${msg.data}" style="max-width:250px;border-radius:12px;"></video><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        else if (msg.type === 'file') div.innerHTML = `<div class="message-content" onclick="window.open('${msg.data}')" style="cursor:pointer;">📎 ${msg.fileName || 'ملف'}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        c.appendChild(div); c.scrollTop = c.scrollHeight;
+    },
+    async sendMessage(text) { if (!this.currentChat || !text.trim()) return false; const mid = Date.now().toString(); try { const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return false; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(text, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); return true; } catch (e) { return false; } },
+    async sendImage(file) { if (!this.currentChat) return; const mid = Date.now().toString(); try { const comp = await SecureChatSystem.compressImage(file); const b64 = await SecureChatSystem.fileToBase64(comp); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'image', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
+    async sendVoiceNote(audioBlob) { if (!this.currentChat) return; const mid = Date.now().toString(); try { const b64 = await SecureChatSystem.fileToBase64(audioBlob); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'voice', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
+    async sendVideo(file) { if (!this.currentChat) return; const mid = Date.now().toString(); try { let vf = file; if (file.size > 10 * 1024 * 1024) vf = await SecureChatSystem.compressVideo(file); const b64 = await SecureChatSystem.fileToBase64(vf); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'video', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'video', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'video', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
+    async sendFile(file) { if (!this.currentChat) return; const mid = Date.now().toString(); try { const b64 = await SecureChatSystem.fileToBase64(file); const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(b64, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'file', data: enc, fileName: file.name, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } catch (e) {} },
+    saveMessage(friendId, message) { const key = `chat_${friendId}`; let h = []; try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; } h.push(message); if (h.length > 100) h = h.slice(-100); localStorage.setItem(key, JSON.stringify(h)); this.messages[friendId] = h; },
+    updateLastMessage(friendId, lastMessage) { document.querySelectorAll('.chat-item').forEach(item => { if (item.getAttribute('onclick')?.includes(friendId)) { const lm = item.querySelector('.last-message'); const tm = item.querySelector('.chat-time'); if (lm) lm.textContent = lastMessage; if (tm) tm.textContent = 'الآن'; } }); },
     closeChat() { document.body.classList.remove('conversation-open'); document.getElementById('conversationPage').style.display = 'none'; document.querySelector('.chat-page').style.display = 'block'; this.currentChat = null; },
-    escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 ChatSystem.init();
 
-async function loadChats() { if (!window.auth?.currentUser) return; const l = document.getElementById('chatsList'); if (!l) return; try { const u = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); if (!u.exists) return; const fr = u.data().friends || []; if (!fr.length) { l.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3></div>`; return; } let h = ''; for (const f of fr) { try { const fd = await window.db.collection('users').doc(f).get(); if (fd.exists) { const d = fd.data(), k = `chat_${f}`; let lm = 'اضغط لبدء المحادثة', lt = ''; try { const hs = JSON.parse(localStorage.getItem(k)) || []; if (hs.length > 0) { const ls = hs[hs.length - 1]; lm = ls.type === 'text' ? ls.text : ls.type === 'image' ? '📷 صورة' : ls.type === 'voice' ? '🎤 بصمة' : ls.type === 'video' ? '🎥 فيديو' : ls.type === 'file' ? '📎 ملف' : lm; lt = new Date(ls.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); } } catch (e) {} h += `<div class="chat-item" onclick="openChat('${f}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(d)}</div><div class="chat-info"><h4>${d.name||'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt||''}</span></div></div>`; } } catch (e) {} } l.innerHTML = h; } catch (e) {} }
-function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'); if (m && !m.contains(e.target) && !e.target.closest('.attach-btn')) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'); if (ep && !ep.contains(e.target) && !e.target.closest('.emoji-btn')) ep.style.display = 'none'; }); }
+async function loadChats() { if (!window.auth || !window.auth.currentUser) return; const list = document.getElementById('chatsList'); if (!list) return; try { const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); if (!udoc.exists) return; const friends = udoc.data().friends || []; if (!friends.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; return; } let html = ''; for (const fid of friends) { try { const fdoc = await window.db.collection('users').doc(fid).get(); if (fdoc.exists) { const f = fdoc.data(); const key = `chat_${fid}`; let lm = 'اضغط لبدء المحادثة', lt = ''; try { const h = JSON.parse(localStorage.getItem(key)) || []; if (h.length > 0) { const l = h[h.length - 1]; if (l.type === 'text') lm = l.text; else if (l.type === 'image') lm = '📷 صورة'; else if (l.type === 'voice') lm = '🎤 بصمة'; else if (l.type === 'video') lm = '🎥 فيديو'; else if (l.type === 'file') lm = '📎 ملف'; lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); } } catch (e) {} html += `<div class="chat-item" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`; } } catch (e) {} } list.innerHTML = html; } catch (e) {} }
 
-window.openChat = fid => { window.db.collection('users').doc(fid).get().then(d => { if (d.exists) { const f = d.data(); ChatSystem.openChat(fid, f.name, window.getEmojiForUser?.(f) || '👤'); } }); };
-window.sendMessage = () => { const i = document.getElementById('messageInput'); if (i.value.trim()) { ChatSystem.sendMessage(i.value.trim()).then(s => { if (s) i.value = ''; }); } };
+function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'); const ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'); const eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
+
+window.openChat = friendId => { window.db.collection('users').doc(friendId).get().then(doc => { if (doc.exists) { const f = doc.data(); ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤'); } }); };
+window.sendMessage = () => { const inp = document.getElementById('messageInput'); if (inp.value.trim()) { ChatSystem.sendMessage(inp.value.trim()).then(s => { if (s) inp.value = ''; }); } };
 window.handleMessageKeyPress = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.sendMessage(); } };
 window.showAttachmentMenu = () => { const m = document.getElementById('attachmentMenu'); m.style.display = m.style.display === 'none' ? 'flex' : 'none'; document.getElementById('emojiPicker').style.display = 'none'; };
 window.showEmojiPicker = () => { const p = document.getElementById('emojiPicker'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; document.getElementById('attachmentMenu').style.display = 'none'; };
-window.sendImage = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.onchange = e => { if (e.target.files[0] && ChatSystem.currentChat) ChatSystem.sendImage(e.target.files[0]); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
-window.sendVideo = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'video/*'; i.onchange = e => { if (e.target.files[0] && ChatSystem.currentChat) ChatSystem.sendVideo(e.target.files[0]); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
-window.sendFile = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '*/*'; i.onchange = e => { if (e.target.files[0] && ChatSystem.currentChat) ChatSystem.sendFile(e.target.files[0]); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
-window.sendVoiceNote = () => { navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s), ch = []; mr.ondataavailable = e => ch.push(e.data); mr.onstop = () => { ChatSystem.sendVoiceNote(new Blob(ch, { type: 'audio/webm' })); s.getTracks().forEach(t => t.stop()); }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') { mr.stop(); sb.style.display = 'flex'; vb.style.display = 'none'; } }; } setTimeout(() => { if (mr.state === 'recording') { mr.stop(); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; } }, 60000); }); document.getElementById('attachmentMenu').style.display = 'none'; };
-window.shareLocation = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`)); document.getElementById('attachmentMenu').style.display = 'none'; };
-window.closeConversation = () => { P2PSystem.endCall(); ChatSystem.closeChat(); };
+window.sendImage = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendImage(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
+window.sendVideo = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'video/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendVideo(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
+window.sendFile = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '*/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
+window.sendVoiceNote = () => { navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => ch.push(e.data); mr.onstop = () => { ChatSystem.sendVoiceNote(new Blob(ch, { type: 'audio/webm' })); s.getTracks().forEach(t => t.stop()); }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') { mr.stop(); sb.style.display = 'flex'; vb.style.display = 'none'; } }; } setTimeout(() => { if (mr.state === 'recording') { mr.stop(); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; } }, 60000); }); document.getElementById('attachmentMenu').style.display = 'none'; };
+window.shareLocation = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`)); document.getElementById('attachmentMenu').style.display = 'none'; };
+window.closeConversation = () => { CallSystem.endCall(); ChatSystem.closeChat(); };
+window.viewContactInfo = () => { };
 window.openEditProfileModal = () => { document.getElementById('editName').value = document.getElementById('profileName').textContent; document.getElementById('currentAvatarEmoji').textContent = document.getElementById('profileAvatarEmoji').textContent; document.getElementById('editProfileModal').classList.add('active'); };
 window.saveProfile = () => { const n = document.getElementById('editName').value.trim(); if (!n || n.length > 25) return; if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { document.getElementById('profileName').textContent = n; closeModal(); }); };
 window.showUserTrips = () => { document.querySelector('.profile-page').style.display = 'none'; document.getElementById('tripsPage').style.display = 'block'; };
