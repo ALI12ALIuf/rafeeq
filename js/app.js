@@ -11,24 +11,13 @@ const SecureChatSystem = {
     async getReceiverPublicKey(uid) { const d = await window.db.collection('users').doc(uid).get(); return (d.exists && d.data().publicKey) ? await this.importPublicKey(d.data().publicKey) : null; },
     async deriveSharedKey(pr, pu) { return await window.crypto.subtle.deriveKey({ name: 'ECDH', public: pu }, pr, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']); },
     
-    async encryptData(data, sharedKey) {
-        const enc = new TextEncoder(); const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        const e = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode('rfq') }, sharedKey, typeof data === 'string' ? enc.encode(data) : data);
-        const c = new Uint8Array(iv.length + e.byteLength); c.set(iv); c.set(new Uint8Array(e), iv.length);
-        return btoa(String.fromCharCode(...c));
-    },
-    
-    async decryptData(b64, sharedKey) {
-        const enc = new TextEncoder(); const c = Uint8Array.from(atob(b64), x => x.charCodeAt(0));
-        const d = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: c.slice(0, 12), additionalData: enc.encode('rfq') }, sharedKey, c.slice(12));
-        return new TextDecoder().decode(d);
-    },
+    async encryptData(data, sharedKey) { const enc = new TextEncoder(); const iv = window.crypto.getRandomValues(new Uint8Array(12)); const e = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode('rfq') }, sharedKey, typeof data === 'string' ? enc.encode(data) : data); const c = new Uint8Array(iv.length + e.byteLength); c.set(iv); c.set(new Uint8Array(e), iv.length); return btoa(String.fromCharCode(...c)); },
+    async decryptData(b64, sharedKey) { const enc = new TextEncoder(); const c = Uint8Array.from(atob(b64), x => x.charCodeAt(0)); const d = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: c.slice(0, 12), additionalData: enc.encode('rfq') }, sharedKey, c.slice(12)); return new TextDecoder().decode(d); },
     
     async compressImage(f) { return new Promise(r => { const i = new Image(), cv = document.createElement('canvas'), cx = cv.getContext('2d'); i.onload = () => { let w = i.width, h = i.height; if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } cv.width = w; cv.height = h; cx.drawImage(i, 0, 0, w, h); cv.toBlob(r, 'image/jpeg', 0.8); }; i.src = URL.createObjectURL(f); }); },
     fileToBase64(b) { return new Promise(r => { const fr = new FileReader(); fr.onloadend = () => r(fr.result); fr.readAsDataURL(b); }); },
     
     async sendToServer(rid, pkg) { await window.db.collection('secure_messages').add({ to: rid, from: window.auth.currentUser.uid, package: pkg, timestamp: firebase.firestore.FieldValue.serverTimestamp(), expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000)) }); },
-    
     startReceiving() { if (!window.auth?.currentUser) return; window.db.collection('secure_messages').where('to', '==', window.auth.currentUser.uid).onSnapshot(async s => { for (const c of s.docChanges()) { if (c.type === 'added') { const m = { id: c.doc.id, ...c.doc.data() }; await this.processReceivedMessage(m); await c.doc.ref.delete(); } } }); },
     
     async processReceivedMessage(msg) {
@@ -36,7 +25,6 @@ const SecureChatSystem = {
             const pr = await this.getMyPrivateKey(), pu = await this.getReceiverPublicKey(msg.from);
             if (!pr || !pu) return;
             const sk = await this.deriveSharedKey(pr, pu);
-            
             if (msg.package.type === 'text') { const d = await this.decryptData(msg.package.data, sk); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, d); }
             else if (msg.package.type === 'p2p') {
                 const d = JSON.parse(await this.decryptData(msg.package.data, sk));
@@ -45,146 +33,80 @@ const SecureChatSystem = {
                 else if (d.type === 'call-reject') { P2PSystem.handleReject(); }
                 else if (d.type === 'file-offer') {
                     const name = document.querySelector('#conversationName')?.textContent || 'صديق';
-                    const typeMap = { image: '📷 صورة', voice: '🎤 بصمة', video: '🎥 فيديو', file: '📎 ملف' };
-                    if (confirm(`${name} يرسل ${typeMap[d.fileType]||'📎 ملف'} (${(d.size/1024).toFixed(1)}KB) - استلام؟`)) {
-                        P2PSystem.handleFileOffer(msg.from, d);
-                    }
+                    const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' };
+                    if (confirm(`${name} يرسل ${tm[d.fileType]||'📎 ملف'} (${(d.size/1024).toFixed(1)}KB) - استلام؟`)) { P2PSystem.handleFileOffer(msg.from, d); }
                 }
                 else if (d.type === 'file-accept') { P2PSystem.handleFileAccept(d); }
                 else if (d.type === 'file-complete') { P2PSystem.receiveComplete(d); }
-                else if (d.type === 'ice-candidate' || d.type === 'answer') { P2PSystem.handleSignaling(d); }
+                else if (d.type === 'ice-candidate') { P2PSystem.handleSignaling(d); }
+                else if (d.type === 'offer') { P2PSystem.handleOffer(msg.from, d); }
             }
             loadChats();
         } catch (e) { console.error(e); }
     }
 };
 
-// ========== نظام P2P متكامل ==========
+// ========== نظام P2P ==========
 const P2PSystem = {
-    pc: null, dc: null, localStream: null, isInCall: false, pendingFile: null, pendingFileInfo: null, receiveBuffer: [], receiveInfo: null,
+    pc: null, dc: null, localStream: null, isInCall: false, pendingFile: null, pendingFileInfo: null, receiveBuffer: [], receiveInfo: null, peerId: null,
     
-    iceServers: { iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-    ]},
+    iceServers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }, { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
     
     async ensureConnection(peerId) {
         if (this.pc && this.pc.connectionState === 'connected' && this.dc && this.dc.readyState === 'open') return true;
-        await this.createConnection(peerId);
-        return new Promise(resolve => {
-            const check = setInterval(() => {
-                if (this.pc && this.pc.connectionState === 'connected' && this.dc && this.dc.readyState === 'open') {
-                    clearInterval(check); resolve(true);
-                }
-            }, 200);
-            setTimeout(() => { clearInterval(check); resolve(false); }, 10000);
-        });
+        this.peerId = peerId;
+        await this.createOffer(peerId);
+        return new Promise(resolve => { const check = setInterval(() => { if (this.pc && this.pc.connectionState === 'connected' && this.dc && this.dc.readyState === 'open') { clearInterval(check); resolve(true); } }, 300); setTimeout(() => { clearInterval(check); resolve(false); }, 15000); });
     },
     
-    async createConnection(peerId) {
-        if (this.pc) { this.pc.close(); this.pc = null; }
+    async createOffer(peerId) {
+        if (this.pc) { this.pc.close(); }
         this.pc = new RTCPeerConnection(this.iceServers);
         this.pc.onicecandidate = e => { if (e.candidate) this.sendP2PMsg(peerId, { type: 'ice-candidate', candidate: e.candidate }); };
+        this.pc.onconnectionstatechange = () => { if (this.pc && this.pc.connectionState === 'connected') console.log('✅ P2P متصل'); };
         this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(); };
         this.dc = this.pc.createDataChannel('fileTransfer');
         this.setupDataChannel();
         const offer = await this.pc.createOffer();
         await this.pc.setLocalDescription(offer);
-        this.sendP2PMsg(peerId, { type: 'answer', sdp: this.pc.localDescription });
+        this.sendP2PMsg(peerId, { type: 'offer', sdp: this.pc.localDescription });
     },
     
-    setupDataChannel() {
-        if (!this.dc) return;
-        this.dc.onopen = () => console.log('✅ قناة بيانات مفتوحة');
-        this.dc.onmessage = e => {
-            try { const msg = JSON.parse(e.data); if (msg.type === 'file-complete') { this.receiveComplete(msg); } } catch (ex) {}
-        };
+    async handleOffer(peerId, data) {
+        this.peerId = peerId;
+        if (this.pc) { this.pc.close(); }
+        this.pc = new RTCPeerConnection(this.iceServers);
+        this.pc.onicecandidate = e => { if (e.candidate) this.sendP2PMsg(peerId, { type: 'ice-candidate', candidate: e.candidate }); };
+        this.pc.onconnectionstatechange = () => { if (this.pc && this.pc.connectionState === 'connected') console.log('✅ P2P متصل'); };
+        this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(); };
+        await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        const answer = await this.pc.createAnswer();
+        await this.pc.setLocalDescription(answer);
+        this.sendP2PMsg(peerId, { type: 'ice-candidate', sdp: this.pc.localDescription });
     },
     
-    async startCall(peerId) {
-        if (this.isInCall) return; this.isInCall = true;
-        try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            this.showCallUI();
-            if (!this.pc || this.pc.connectionState !== 'connected') await this.createConnection(peerId);
-            this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; };
-            this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
-            const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer);
-            this.sendP2PMsg(peerId, { type: 'call-offer', sdp: this.pc.localDescription });
-        } catch (e) { this.endCall(); }
+    async handleSignaling(data) {
+        try { if (!this.pc) return; if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); } else if (data.candidate) { await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } } catch (e) {}
     },
     
-    showIncomingCall(callerId, data) {
-        const name = document.querySelector('#conversationName')?.textContent || 'صديق';
-        const ov = document.createElement('div'); ov.id = 'incomingCall';
-        ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
-        ov.innerHTML = `<div style="font-size:1.5rem;">📞 ${name} يتصل بك...</div><div style="display:flex;gap:30px;"><button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button><button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button></div>`;
-        document.body.appendChild(ov);
-        document.getElementById('btnAccept').onclick = () => { ov.remove(); this.acceptCall(callerId, data); };
-        document.getElementById('btnReject').onclick = () => { ov.remove(); this.sendP2PMsg(callerId, { type: 'call-reject' }); };
-    },
+    setupDataChannel() { if (!this.dc) return; this.dc.onopen = () => console.log('✅ قناة بيانات مفتوحة'); this.dc.onmessage = e => { try { const msg = JSON.parse(e.data); if (msg.type === 'file-complete') this.receiveComplete(msg); } catch (ex) {} }; },
     
-    async acceptCall(peerId, data) {
-        this.isInCall = true;
-        try {
-            if (!this.pc || this.pc.connectionState !== 'connected') await this.createConnection(peerId);
-            this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; };
-            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
-            this.showCallUI();
-            if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); const ans = await this.pc.createAnswer(); await this.pc.setLocalDescription(ans); this.sendP2PMsg(peerId, { type: 'call-accept', sdp: this.pc.localDescription }); }
-        } catch (e) { this.endCall(); }
-    },
+    async startCall(peerId) { if (this.isInCall) return; this.isInCall = true; try { await this.ensureConnection(peerId); this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); this.showCallUI(); this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; }; this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream)); const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer); this.sendP2PMsg(peerId, { type: 'call-offer', sdp: this.pc.localDescription }); } catch (e) { this.endCall(); } },
     
+    showIncomingCall(callerId, data) { const name = document.querySelector('#conversationName')?.textContent || 'صديق'; const ov = document.createElement('div'); ov.id = 'incomingCall'; ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;'; ov.innerHTML = `<div style="font-size:1.5rem;">📞 ${name} يتصل بك...</div><div style="display:flex;gap:30px;"><button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button><button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button></div>`; document.body.appendChild(ov); document.getElementById('btnAccept').onclick = () => { ov.remove(); this.acceptCall(callerId, data); }; document.getElementById('btnReject').onclick = () => { ov.remove(); this.sendP2PMsg(callerId, { type: 'call-reject' }); }; },
+    async acceptCall(peerId, data) { this.isInCall = true; try { await this.ensureConnection(peerId); this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; }; this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream)); this.showCallUI(); if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); const ans = await this.pc.createAnswer(); await this.pc.setLocalDescription(ans); this.sendP2PMsg(peerId, { type: 'call-accept', sdp: this.pc.localDescription }); } } catch (e) { this.endCall(); } },
     async handleAnswer(data) { try { if (this.pc && data.sdp) await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); } catch (e) {} },
     handleReject() { this.endCall(); alert('تم رفض المكالمة'); },
-    async handleSignaling(data) { try { if (!this.pc) return; if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); if (data.sdp.type === 'offer') { const ans = await this.pc.createAnswer(); await this.pc.setLocalDescription(ans); } } else if (data.candidate) { await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } } catch (e) {} },
     
-    showCallUI() {
-        document.body.classList.add('in-call');
-        const ui = document.createElement('div'); ui.id = 'callUI';
-        ui.innerHTML = `<audio id="remoteAudio" autoplay playsinline style="display:none;"></audio><div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;color:white;font-size:1.2rem;">🔊 مكالمة صوتية</div><div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;"><button onclick="P2PSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button><button onclick="P2PSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button></div>`;
-        document.body.appendChild(ui);
-    },
-    
+    showCallUI() { document.body.classList.add('in-call'); const ui = document.createElement('div'); ui.id = 'callUI'; ui.innerHTML = `<audio id="remoteAudio" autoplay playsinline style="display:none;"></audio><div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;color:white;">🔊 مكالمة</div><div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;"><button onclick="P2PSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button><button onclick="P2PSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button></div>`; document.body.appendChild(ui); },
     toggleAudio() { if (this.localStream) { const t = this.localStream.getAudioTracks()[0]; if (t) t.enabled = !t.enabled; } },
     endCall() { this.isInCall = false; document.body.classList.remove('in-call'); if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } ['callUI','incomingCall'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); }); },
     
     async sendFileP2P(peerId, file, fileType) { this.pendingFile = file; this.pendingFileInfo = { name: file.name, type: fileType, size: file.size }; this.sendP2PMsg(peerId, { type: 'file-offer', fileType, name: file.name, size: file.size }); },
     async handleFileOffer(senderId, info) { this.receiveBuffer = []; this.receiveInfo = info; this.sendP2PMsg(senderId, { type: 'file-accept' }); },
-    async handleFileAccept(data) {
-        if (!this.pendingFile || !this.dc || this.dc.readyState !== 'open') return;
-        const chunkSize = 16384; let offset = 0;
-        const sendChunk = () => {
-            if (offset >= this.pendingFile.size) { this.dc.send(JSON.stringify({ type: 'file-complete', fileType: this.pendingFileInfo.type, fileName: this.pendingFileInfo.name })); this.showSentFile(this.pendingFileInfo); this.pendingFile = null; this.pendingFileInfo = null; return; }
-            const end = Math.min(offset + chunkSize, this.pendingFile.size);
-            const reader = new FileReader(); reader.onload = () => { this.dc.send(JSON.stringify({ type: 'file-chunk', data: reader.result })); offset = end; setTimeout(sendChunk, 10); };
-            reader.readAsDataURL(this.pendingFile.slice(offset, end));
-        };
-        sendChunk();
-    },
-    
-    receiveComplete(msg) {
-        let fullData = (this.receiveBuffer && this.receiveBuffer.length > 0) ? this.receiveBuffer.join('') : (msg.data || '');
-        this.receiveBuffer = [];
-        const messageObj = { id: Date.now().toString(), type: msg.fileType || this.receiveInfo?.type || 'file', data: fullData, fileName: msg.fileName || this.receiveInfo?.name || 'ملف', sender: 'friend', time: new Date().toISOString() };
-        const cc = ChatSystem.currentChat; ChatSystem.saveMessage(cc, messageObj); ChatSystem.displayMessages(cc);
-        const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' };
-        ChatSystem.updateLastMessage(cc, tm[msg.fileType]||'📎 ملف'); loadChats();
-    },
-    
-    showSentFile(info) {
-        const reader = new FileReader(); reader.onload = () => {
-            const msg = { id: Date.now().toString(), type: info.type, data: reader.result, fileName: info.name, sender: 'me', time: new Date().toISOString(), status: 'sent' };
-            ChatSystem.saveMessage(ChatSystem.currentChat, msg); ChatSystem.displayMessages(ChatSystem.currentChat);
-            const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' };
-            ChatSystem.updateLastMessage(ChatSystem.currentChat, tm[info.type]||'📎 ملف'); loadChats();
-        };
-        reader.readAsDataURL(this.pendingFile);
-    },
-    
+    async handleFileAccept(data) { if (!this.pendingFile || !this.dc || this.dc.readyState !== 'open') return; const chunkSize = 16384; let offset = 0; const sendChunk = () => { if (offset >= this.pendingFile.size) { this.dc.send(JSON.stringify({ type: 'file-complete', fileType: this.pendingFileInfo.type, fileName: this.pendingFileInfo.name })); this.showSentFile(this.pendingFileInfo); this.pendingFile = null; this.pendingFileInfo = null; return; } const end = Math.min(offset + chunkSize, this.pendingFile.size); const reader = new FileReader(); reader.onload = () => { this.dc.send(JSON.stringify({ type: 'file-chunk', data: reader.result })); offset = end; setTimeout(sendChunk, 10); }; reader.readAsDataURL(this.pendingFile.slice(offset, end)); }; sendChunk(); },
+    receiveComplete(msg) { let fullData = (this.receiveBuffer && this.receiveBuffer.length > 0) ? this.receiveBuffer.join('') : (msg.data || ''); this.receiveBuffer = []; const messageObj = { id: Date.now().toString(), type: msg.fileType || this.receiveInfo?.type || 'file', data: fullData, fileName: msg.fileName || this.receiveInfo?.name || 'ملف', sender: 'friend', time: new Date().toISOString() }; const cc = ChatSystem.currentChat; ChatSystem.saveMessage(cc, messageObj); ChatSystem.displayMessages(cc); const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' }; ChatSystem.updateLastMessage(cc, tm[msg.fileType]||'📎 ملف'); loadChats(); },
+    showSentFile(info) { const reader = new FileReader(); reader.onload = () => { const msg = { id: Date.now().toString(), type: info.type, data: reader.result, fileName: info.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }; ChatSystem.saveMessage(ChatSystem.currentChat, msg); ChatSystem.displayMessages(ChatSystem.currentChat); const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' }; ChatSystem.updateLastMessage(ChatSystem.currentChat, tm[info.type]||'📎 ملف'); loadChats(); }; reader.readAsDataURL(this.pendingFile); },
     async sendP2PMsg(peerId, data) { const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(peerId); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(JSON.stringify(data), sk); await SecureChatSystem.sendToServer(peerId, { id: Date.now().toString(), type: 'p2p', data: enc, timestamp: Date.now() }); }
 };
 
@@ -202,47 +124,15 @@ const ChatSystem = {
     currentChat: null, messages: {},
     init() { this.loadAllChats(); },
     loadAllChats() { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('chat_')) { const f = k.replace('chat_', ''); try { this.messages[f] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[f] = []; } } } },
-    openChat(fid, name, av) { 
-        this.currentChat = fid; document.body.classList.add('conversation-open');
-        document.getElementById('conversationName').textContent = name;
-        document.getElementById('conversationAvatar').textContent = av || '👤';
-        document.querySelector('.chat-page').style.display = 'none'; document.getElementById('conversationPage').style.display = 'flex';
-        this.displayMessages(fid);
-        // فتح اتصال P2P تلقائياً
-        P2PSystem.ensureConnection(fid).then(c => { if (c) console.log('✅ P2P جاهز'); });
-        setTimeout(() => { const i = document.getElementById('messageInput'); if (i) i.focus(); }, 300);
-        setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
-    },
+    openChat(fid, name, av) { this.currentChat = fid; document.body.classList.add('conversation-open'); document.getElementById('conversationName').textContent = name; document.getElementById('conversationAvatar').textContent = av || '👤'; document.querySelector('.chat-page').style.display = 'none'; document.getElementById('conversationPage').style.display = 'flex'; this.displayMessages(fid); P2PSystem.ensureConnection(fid).then(c => { if (c) console.log('✅ P2P جاهز للإرسال'); }); setTimeout(() => { const i = document.getElementById('messageInput'); if (i) i.focus(); }, 300); setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100); },
     displayMessages(fid) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[fid] || []).forEach(m => this.displayMessage(m)); },
-    displayMessage(msg) {
-        const c = document.getElementById('messagesContainer'); if (!c) return;
-        const d = document.createElement('div'); d.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; d.id = `msg-${msg.id}`;
-        const t = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-        let sh = ''; if (msg.sender === 'me') { let ic = '✓', cl = 'sent'; if (msg.status === 'delivered') { ic = '✓✓'; cl = 'delivered'; } else if (msg.status === 'read') { ic = '✓✓'; cl = 'read'; } sh = `<span class="message-status ${cl}">${ic}</span>`; }
-        if (msg.type === 'text') d.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`;
-        else if (msg.type === 'image') d.innerHTML = `<img src="${msg.data}" class="message-image"><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`;
-        else if (msg.type === 'voice') d.innerHTML = `<audio controls src="${msg.data}" class="message-audio"></audio><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`;
-        else if (msg.type === 'video') d.innerHTML = `<video controls src="${msg.data}" style="max-width:250px;border-radius:12px;"></video><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`;
-        else if (msg.type === 'file') d.innerHTML = `<div class="message-content" onclick="window.open('${msg.data}')" style="cursor:pointer;">📎 ${msg.fileName||'ملف'}</div><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`;
-        c.appendChild(d); c.scrollTop = c.scrollHeight;
-    },
+    displayMessage(msg) { const c = document.getElementById('messagesContainer'); if (!c) return; const d = document.createElement('div'); d.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; d.id = `msg-${msg.id}`; const t = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); let sh = ''; if (msg.sender === 'me') { let ic = '✓', cl = 'sent'; if (msg.status === 'delivered') { ic = '✓✓'; cl = 'delivered'; } else if (msg.status === 'read') { ic = '✓✓'; cl = 'read'; } sh = `<span class="message-status ${cl}">${ic}</span>`; } if (msg.type === 'text') d.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; else if (msg.type === 'image') d.innerHTML = `<img src="${msg.data}" class="message-image"><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; else if (msg.type === 'voice') d.innerHTML = `<audio controls src="${msg.data}" class="message-audio"></audio><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; else if (msg.type === 'video') d.innerHTML = `<video controls src="${msg.data}" style="max-width:250px;border-radius:12px;"></video><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; else if (msg.type === 'file') d.innerHTML = `<div class="message-content" onclick="window.open('${msg.data}')" style="cursor:pointer;">📎 ${msg.fileName||'ملف'}</div><div class="message-info"><span class="message-time">${t}</span>${sh}</div>`; c.appendChild(d); c.scrollTop = c.scrollHeight; },
     async sendMessage(text) { if (!this.currentChat || !text.trim()) return false; const mid = Date.now().toString(); try { const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return false; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(text, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); return true; } catch (e) { return false; } },
-    
-    async sendFileP2POnly(file, fileType) {
-        if (!this.currentChat) return;
-        if (P2PSystem.dc && P2PSystem.dc.readyState === 'open') {
-            console.log('🚀 إرسال P2P مباشر');
-            await P2PSystem.sendFileP2P(this.currentChat, file, fileType);
-        } else {
-            alert('⚠️ انتظر قليلاً... جاري الاتصال. حاول مرة أخرى.');
-        }
-    },
-    
+    async sendFileP2POnly(file, fileType) { if (!this.currentChat) return; if (P2PSystem.dc && P2PSystem.dc.readyState === 'open') { await P2PSystem.sendFileP2P(this.currentChat, file, fileType); } else { alert('⚠️ انتظر قليلاً... جاري الاتصال. حاول مرة أخرى.'); } },
     async sendImage(file) { if (!this.currentChat) return; const comp = await SecureChatSystem.compressImage(file); await this.sendFileP2POnly(comp, 'image'); },
     async sendVoiceNote(blob) { await this.sendFileP2POnly(blob, 'voice'); },
     async sendVideo(file) { await this.sendFileP2POnly(file, 'video'); },
     async sendFile(file) { await this.sendFileP2POnly(file, 'file'); },
-    
     saveMessage(fid, msg) { const k = `chat_${fid}`; let h = []; try { h = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { h = []; } h.push(msg); if (h.length > 100) h = h.slice(-100); localStorage.setItem(k, JSON.stringify(h)); this.messages[fid] = h; },
     updateLastMessage(fid, lm) { document.querySelectorAll('.chat-item').forEach(i => { if (i.getAttribute('onclick')?.includes(fid)) { const l = i.querySelector('.last-message'), t = i.querySelector('.chat-time'); if (l) l.textContent = lm; if (t) t.textContent = 'الآن'; } }); },
     closeChat() { document.body.classList.remove('conversation-open'); document.getElementById('conversationPage').style.display = 'none'; document.querySelector('.chat-page').style.display = 'block'; this.currentChat = null; },
@@ -251,7 +141,6 @@ const ChatSystem = {
 ChatSystem.init();
 
 async function loadChats() { if (!window.auth?.currentUser) return; const l = document.getElementById('chatsList'); if (!l) return; try { const u = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); if (!u.exists) return; const fr = u.data().friends || []; if (!fr.length) { l.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3></div>`; return; } let h = ''; for (const f of fr) { try { const fd = await window.db.collection('users').doc(f).get(); if (fd.exists) { const d = fd.data(), k = `chat_${f}`; let lm = 'اضغط لبدء المحادثة', lt = ''; try { const hs = JSON.parse(localStorage.getItem(k)) || []; if (hs.length > 0) { const ls = hs[hs.length - 1]; lm = ls.type === 'text' ? ls.text : ls.type === 'image' ? '📷 صورة' : ls.type === 'voice' ? '🎤 بصمة' : ls.type === 'video' ? '🎥 فيديو' : ls.type === 'file' ? '📎 ملف' : lm; lt = new Date(ls.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); } } catch (e) {} h += `<div class="chat-item" onclick="openChat('${f}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(d)}</div><div class="chat-info"><h4>${d.name||'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt||''}</span></div></div>`; } } catch (e) {} } l.innerHTML = h; } catch (e) {} }
-
 function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'); if (m && !m.contains(e.target) && !e.target.closest('.attach-btn')) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'); if (ep && !ep.contains(e.target) && !e.target.closest('.emoji-btn')) ep.style.display = 'none'; }); }
 
 window.openChat = fid => { window.db.collection('users').doc(fid).get().then(d => { if (d.exists) { const f = d.data(); ChatSystem.openChat(fid, f.name, window.getEmojiForUser?.(f) || '👤'); } }); };
