@@ -87,11 +87,6 @@ const P2PSystem = {
         if (this.pc) { this.pc.close(); this.pc = null; }
         this.pc = new RTCPeerConnection(this.iceServers);
         this.pc.onicecandidate = e => { if (e.candidate) this.sendP2PMsg(peerId, { type: 'ice-candidate', candidate: e.candidate }); };
-        this.pc.onconnectionstatechange = () => {
-            if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
-                if (!this.isInCall) { this.pc.close(); this.pc = null; this.dc = null; }
-            }
-        };
         this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(); };
         this.dc = this.pc.createDataChannel('fileTransfer');
         this.setupDataChannel();
@@ -112,7 +107,8 @@ const P2PSystem = {
         if (this.isInCall) return; this.isInCall = true;
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            this.showCallUI(); await this.createConnection(peerId);
+            this.showCallUI();
+            if (!this.pc || this.pc.connectionState !== 'connected') await this.createConnection(peerId);
             this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; };
             this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
             const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer);
@@ -133,7 +129,7 @@ const P2PSystem = {
     async acceptCall(peerId, data) {
         this.isInCall = true;
         try {
-            await this.createConnection(peerId);
+            if (!this.pc || this.pc.connectionState !== 'connected') await this.createConnection(peerId);
             this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; };
             this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
@@ -154,7 +150,7 @@ const P2PSystem = {
     },
     
     toggleAudio() { if (this.localStream) { const t = this.localStream.getAudioTracks()[0]; if (t) t.enabled = !t.enabled; } },
-    endCall() { this.isInCall = false; document.body.classList.remove('in-call'); if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } if (this.pc && !this.pendingFile) { this.pc.close(); this.pc = null; this.dc = null; } ['callUI','incomingCall'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); }); },
+    endCall() { this.isInCall = false; document.body.classList.remove('in-call'); if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } ['callUI','incomingCall'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); }); },
     
     async sendFileP2P(peerId, file, fileType) { this.pendingFile = file; this.pendingFileInfo = { name: file.name, type: fileType, size: file.size }; this.sendP2PMsg(peerId, { type: 'file-offer', fileType, name: file.name, size: file.size }); },
     async handleFileOffer(senderId, info) { this.receiveBuffer = []; this.receiveInfo = info; this.sendP2PMsg(senderId, { type: 'file-accept' }); },
@@ -206,7 +202,17 @@ const ChatSystem = {
     currentChat: null, messages: {},
     init() { this.loadAllChats(); },
     loadAllChats() { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('chat_')) { const f = k.replace('chat_', ''); try { this.messages[f] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[f] = []; } } } },
-    openChat(fid, name, av) { this.currentChat = fid; document.body.classList.add('conversation-open'); document.getElementById('conversationName').textContent = name; document.getElementById('conversationAvatar').textContent = av || '👤'; document.querySelector('.chat-page').style.display = 'none'; document.getElementById('conversationPage').style.display = 'flex'; this.displayMessages(fid); setTimeout(() => { const i = document.getElementById('messageInput'); if (i) i.focus(); }, 300); setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100); },
+    openChat(fid, name, av) { 
+        this.currentChat = fid; document.body.classList.add('conversation-open');
+        document.getElementById('conversationName').textContent = name;
+        document.getElementById('conversationAvatar').textContent = av || '👤';
+        document.querySelector('.chat-page').style.display = 'none'; document.getElementById('conversationPage').style.display = 'flex';
+        this.displayMessages(fid);
+        // فتح اتصال P2P تلقائياً
+        P2PSystem.ensureConnection(fid).then(c => { if (c) console.log('✅ P2P جاهز'); });
+        setTimeout(() => { const i = document.getElementById('messageInput'); if (i) i.focus(); }, 300);
+        setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+    },
     displayMessages(fid) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[fid] || []).forEach(m => this.displayMessage(m)); },
     displayMessage(msg) {
         const c = document.getElementById('messagesContainer'); if (!c) return;
@@ -222,18 +228,14 @@ const ChatSystem = {
     },
     async sendMessage(text) { if (!this.currentChat || !text.trim()) return false; const mid = Date.now().toString(); try { const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return false; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(text, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); return true; } catch (e) { return false; } },
     
-    // P2P فقط - بدون Firebase احتياطي
     async sendFileP2POnly(file, fileType) {
         if (!this.currentChat) return;
-        try {
-            const connected = await P2PSystem.ensureConnection(this.currentChat);
-            if (connected && P2PSystem.dc && P2PSystem.dc.readyState === 'open') {
-                console.log('🚀 إرسال P2P مباشر');
-                await P2PSystem.sendFileP2P(this.currentChat, file, fileType);
-            } else {
-                alert('⚠️ الطرف الآخر غير متصل. لا يمكن الإرسال حالياً. افتح اتصال أولاً.');
-            }
-        } catch (e) { alert('❌ فشل الاتصال P2P. تأكد من فتح اتصال أولاً.'); }
+        if (P2PSystem.dc && P2PSystem.dc.readyState === 'open') {
+            console.log('🚀 إرسال P2P مباشر');
+            await P2PSystem.sendFileP2P(this.currentChat, file, fileType);
+        } else {
+            alert('⚠️ انتظر قليلاً... جاري الاتصال. حاول مرة أخرى.');
+        }
     },
     
     async sendImage(file) { if (!this.currentChat) return; const comp = await SecureChatSystem.compressImage(file); await this.sendFileP2POnly(comp, 'image'); },
