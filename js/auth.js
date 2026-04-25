@@ -26,15 +26,7 @@ async function signInWithGoogle() {
         if (!userDoc.exists) {
             await window.db.collection('users').doc(user.uid).set({ uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25), email: user.email || '', shareableId: generateShareableId(), bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date() });
         } else {
-            const userData = userDoc.data();
-            
-            // ✅ إذا كان هناك طلب مسح سابق، إلغاءه تلقائياً
-            if (userData.deleteRequestedAt) {
-                await window.db.collection('users').doc(user.uid).update({ deleteRequestedAt: FieldValue.delete(), deleteAfter: FieldValue.delete() });
-                console.log('✅ تم إلغاء مسح الحساب - تم تسجيل الدخول');
-            }
-            
-            const updates = {};
+            const userData = userDoc.data(); const updates = {};
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
@@ -63,18 +55,9 @@ async function loadUserData(uid) {
         const doc = await window.db.collection('users').doc(uid).get();
         if (doc.exists) {
             const d = doc.data();
-            
-            // ✅ إظهار تنبيه إذا كان هناك طلب مسح نشط
-            if (d.deleteRequestedAt) {
-                const remaining = calculateRemainingTime(d.deleteAfter);
-                if (remaining) {
-                    document.getElementById('profileBio').textContent = `⏰ ${remaining}`;
-                }
-            }
-            
             const pn = document.getElementById('profileName'), pa = document.getElementById('profileAvatarEmoji'), pb = document.getElementById('profileBio'), si = document.getElementById('shareableId'), ca = document.getElementById('currentAvatarEmoji');
             if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 25);
-            if (pb && !d.deleteRequestedAt) pb.textContent = d.bio || '';
+            if (pb) pb.textContent = d.bio || '';
             if (si) si.textContent = d.shareableId || '0000000000';
             const emoji = getEmojiForUser(d);
             if (pa) pa.textContent = emoji; if (ca) ca.textContent = emoji;
@@ -84,165 +67,6 @@ async function loadUserData(uid) {
         }
     } catch (e) {}
 }
-
-// ========== نظام مسح الحساب ==========
-async function requestAccountDeletion() {
-    if (!window.auth?.currentUser) return;
-    const uid = window.auth.currentUser.uid;
-    const deleteAfter = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ساعة
-    
-    try {
-        await window.db.collection('users').doc(uid).update({
-            deleteRequestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            deleteAfter: firebase.firestore.Timestamp.fromDate(deleteAfter)
-        });
-        
-        // جدولة الحذف
-        scheduleAccountDeletion(uid, deleteAfter);
-        
-        alert('⏰ سيتم مسح حسابك بعد 24 ساعة.\nإذا سجلت دخول قبل انتهاء المدة، سيتم إلغاء المسح تلقائياً.');
-        
-        // تسجيل خروج
-        await logout();
-        
-    } catch (error) {
-        console.error('خطأ في طلب مسح الحساب:', error);
-        alert('حدث خطأ. حاول مرة أخرى.');
-    }
-}
-
-function calculateRemainingTime(deleteAfter) {
-    if (!deleteAfter) return null;
-    const now = new Date();
-    const deleteDate = deleteAfter.toDate ? deleteAfter.toDate() : new Date(deleteAfter.seconds * 1000);
-    const diff = deleteDate - now;
-    
-    if (diff <= 0) return 'جاري المسح...';
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `⏰ سيتم مسح الحساب بعد ${hours} ساعة و ${minutes} دقيقة`;
-}
-
-function scheduleAccountDeletion(uid, deleteAfter) {
-    const now = new Date();
-    const deleteDate = new Date(deleteAfter);
-    const delay = deleteDate - now;
-    
-    if (delay <= 0) {
-        performAccountDeletion(uid);
-        return;
-    }
-    
-    // تخزين في localStorage للتحقق عند تحميل الصفحة
-    localStorage.setItem(`delete_scheduled_${uid}`, deleteAfter.toISOString());
-    
-    // جدولة الحذف
-    setTimeout(async () => {
-        await performAccountDeletion(uid);
-        localStorage.removeItem(`delete_scheduled_${uid}`);
-    }, delay);
-    
-    console.log(`⏰ جدولة مسح الحساب ${uid} بعد ${Math.floor(delay/3600000)} ساعة`);
-}
-
-async function performAccountDeletion(uid) {
-    try {
-        // التحقق من أن المستخدم لم يسجل دخول (إلغاء المسح)
-        const userDoc = await window.db.collection('users').doc(uid).get();
-        if (!userDoc.exists || !userDoc.data().deleteRequestedAt) {
-            console.log('✅ تم إلغاء مسح الحساب - المستخدم سجل دخول');
-            return;
-        }
-        
-        console.log('🗑️ جاري مسح الحساب:', uid);
-        
-        // 1. مسح بيانات المستخدم
-        await window.db.collection('users').doc(uid).delete();
-        
-        // 2. مسح طلبات الصداقة
-        const sentRequests = await window.db.collection('friendRequests').where('from', '==', uid).get();
-        const receivedRequests = await window.db.collection('friendRequests').where('to', '==', uid).get();
-        for (const doc of sentRequests.docs) { await doc.ref.delete(); }
-        for (const doc of receivedRequests.docs) { await doc.ref.delete(); }
-        
-        // 3. مسح الرسائل المشفرة
-        const sentMessages = await window.db.collection('secure_messages').where('from', '==', uid).get();
-        const receivedMessages = await window.db.collection('secure_messages').where('to', '==', uid).get();
-        for (const doc of sentMessages.docs) { await doc.ref.delete(); }
-        for (const doc of receivedMessages.docs) { await doc.ref.delete(); }
-        
-        // 4. مسح الرسائل المؤقتة
-        const tempSent = await window.db.collection('temp_messages').where('from', '==', uid).get();
-        const tempReceived = await window.db.collection('temp_messages').where('to', '==', uid).get();
-        for (const doc of tempSent.docs) { await doc.ref.delete(); }
-        for (const doc of tempReceived.docs) { await doc.ref.delete(); }
-        
-        // 5. مسح الرحلات
-        const trips = await window.db.collection('trips').where('userId', '==', uid).get();
-        for (const doc of trips.docs) { await doc.ref.delete(); }
-        
-        // 6. مسح حساب Firebase Auth
-        try {
-            const user = window.auth.currentUser;
-            if (user && user.uid === uid) {
-                await user.delete();
-            }
-        } catch (authError) {
-            console.error('خطأ في مسح حساب المصادقة:', authError);
-        }
-        
-        // 7. مسح localStorage
-        localStorage.removeItem(`delete_scheduled_${uid}`);
-        localStorage.removeItem('enc_private_key');
-        
-        console.log('✅ تم مسح الحساب بنجاح:', uid);
-        
-    } catch (error) {
-        console.error('❌ فشل مسح الحساب:', error);
-    }
-}
-
-// ✅ التحقق من المسح المجدول عند تحميل الصفحة
-function checkScheduledDeletions() {
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key.startsWith('delete_scheduled_')) {
-            const uid = key.replace('delete_scheduled_', '');
-            const deleteAfter = new Date(localStorage.getItem(key));
-            const now = new Date();
-            
-            if (deleteAfter <= now) {
-                // حان وقت المسح
-                performAccountDeletion(uid);
-                localStorage.removeItem(key);
-            } else {
-                // إعادة جدولة
-                const delay = deleteAfter - now;
-                setTimeout(() => {
-                    performAccountDeletion(uid);
-                    localStorage.removeItem(key);
-                }, delay);
-            }
-        }
-    }
-}
-
-// ✅ تصدير الدوال العامة
-window.requestAccountDeletion = requestAccountDeletion;
-window.cancelAccountDeletion = async function() {
-    if (!window.auth?.currentUser) return;
-    const uid = window.auth.currentUser.uid;
-    await window.db.collection('users').doc(uid).update({
-        deleteRequestedAt: FieldValue.delete(),
-        deleteAfter: FieldValue.delete()
-    });
-    localStorage.removeItem(`delete_scheduled_${uid}`);
-    alert('✅ تم إلغاء مسح الحساب');
-};
-
-// ✅ تشغيل التحقق عند تحميل الصفحة
-checkScheduledDeletions();
 
 // ========== نظام الصداقة ==========
 window.showFriendsList = function() { document.querySelector('.profile-page').style.display = 'none'; document.getElementById('friendsPage').style.display = 'block'; loadFriendsList(); };
