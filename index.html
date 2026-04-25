@@ -10,7 +10,6 @@
     <meta name="theme-color" id="theme-color" content="#2196F3">
 </head>
 <body class="theme-light" data-page="home">
-    <!-- شاشة التحميل -->
     <div class="splash-screen" id="splash">
         <div class="splash-content">
             <div class="app-icon">🛡️</div>
@@ -20,7 +19,6 @@
         </div>
     </div>
 
-    <!-- المحتوى الرئيسي -->
     <div class="app-container" id="app" style="display: none;">
         <header class="app-header">
             <div class="header-left"></div>
@@ -40,7 +38,7 @@
                             </div>
                             <div class="post-content">
                                 <div class="post-location"><i class="fas fa-map-marker-alt"></i><span>بغداد - أربيل</span></div>
-                                <div class="post-map-placeholder"><i class="fas fa-map"></i><span data-i18n="location_sharing">مشاركة الموقع</span></div>
+                                <div class="post-map-placeholder"><i class="fas fa-map"></i><span>مشاركة الموقع</span></div>
                             </div>
                             <div class="post-actions">
                                 <button class="post-action"><i class="far fa-heart"></i> 24</button>
@@ -56,7 +54,7 @@
                 <div class="search-container">
                     <div class="search-box">
                         <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
-                        <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
+                        <input type="text" id="searchInput" placeholder="البحث عن الأصدقاء">
                     </div>
                     <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
                 </div>
@@ -66,11 +64,10 @@
             <div class="conversation-page" id="conversationPage" style="display: none;">
                 <div class="conversation-header">
                     <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
-                    <div class="conversation-user-info" onclick="viewContactInfo()">
+                    <div class="conversation-user-info">
                         <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
                         <div class="conversation-user-details">
                             <h3 id="conversationName"></h3>
-                            <span class="conversation-status" id="conversationStatus">آخر زيارة اليوم</span>
                         </div>
                     </div>
                 </div>
@@ -88,13 +85,9 @@
                         <button class="voice-btn" onclick="startVoiceRecording()" style="display: none;"><i class="fas fa-microphone"></i></button>
                     </div>
                     
-                    <!-- ✅ قائمة المرفقات - جميع الأزرار -->
                     <div class="attachment-menu" id="attachmentMenu" style="display: none;">
                         <button onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
-                        <button onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
-                        <button onclick="sendFile()"><i class="fas fa-file"></i> ملف</button>
                         <button onclick="sendVoiceNote()"><i class="fas fa-microphone"></i> بصمة صوت</button>
-                        <button onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
                     </div>
 
                     <div class="emoji-picker" id="emojiPicker" style="display: none;">
@@ -122,40 +115,40 @@
                     </div>
                     <p class="profile-bio" id="profileBio"></p>
                     <div class="profile-stats">
-                        <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
-                        <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
-                        <a href="#" class="stat-link" onclick="showFriendRequests()"><span class="stat-value" id="friendRequestsCount">0</span><span data-i18n="friend_requests">الطلبات</span></a>
+                        <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span>رحلات</span></a>
+                        <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span>الأصدقاء</span></a>
+                        <a href="#" class="stat-link" onclick="showFriendRequests()"><span class="stat-value" id="friendRequestsCount">0</span><span>الطلبات</span></a>
                     </div>
                 </div>
             </div>
 
             <div class="profile-pages">
                 <div class="profile-subpage" id="tripsPage" style="display: none;">
-                    <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
-                    <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
+                    <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3>الرحلات</h3></div>
+                    <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3>لا توجد رحلات</h3><p>لم تقم بأي رحلة بعد</p></div></div>
                 </div>
                 <div class="profile-subpage" id="friendsPage" style="display: none;">
-                    <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friends">الأصدقاء</h3></div>
-                    <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
+                    <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3>الأصدقاء</h3></div>
+                    <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا يوجد أصدقاء</h3><p>لم تضف أي أصدقاء بعد</p></div></div>
                 </div>
                 <div class="profile-subpage" id="friendRequestsPage" style="display: none;">
-                    <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friend_requests">طلبات الصداقة</h3></div>
-                    <div class="users-list" id="friendRequestsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friend_requests">لا توجد طلبات</h3><p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p></div></div>
+                    <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3>طلبات الصداقة</h3></div>
+                    <div class="users-list" id="friendRequestsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3><p>لم يرسل لك أحد طلب صداقة بعد</p></div></div>
                 </div>
             </div>
 
             <div class="page settings-page">
                 <div class="settings-list">
                     <div class="settings-item">
-                        <div class="settings-item-left"><i class="fas fa-palette"></i><span data-i18n="theme">المظهر</span></div>
+                        <div class="settings-item-left"><i class="fas fa-palette"></i><span>المظهر</span></div>
                         <label class="switch"><input type="checkbox" id="themeToggle"><span class="slider"></span></label>
                     </div>
                     <div class="settings-item" onclick="openLanguageModal()">
-                        <div class="settings-item-left"><i class="fas fa-globe"></i><span data-i18n="language">اللغة</span></div>
+                        <div class="settings-item-left"><i class="fas fa-globe"></i><span>اللغة</span></div>
                         <i class="fas fa-chevron-left"></i>
                     </div>
                     <div class="settings-item" onclick="logout()">
-                        <div class="settings-item-left"><i class="fas fa-sign-out-alt" style="color: var(--danger);"></i><span data-i18n="logout" style="color: var(--danger);">تسجيل الخروج</span></div>
+                        <div class="settings-item-left"><i class="fas fa-sign-out-alt" style="color: var(--danger);"></i><span style="color: var(--danger);">تسجيل الخروج</span></div>
                         <i class="fas fa-chevron-left" style="color: var(--danger);"></i>
                     </div>
                 </div>
@@ -163,35 +156,35 @@
         </main>
 
         <nav class="bottom-nav">
-            <button class="nav-item active" data-page="home"><i class="fas fa-home"></i><span data-i18n="home">الرئيسية</span></button>
-            <button class="nav-item" data-page="chat"><i class="fas fa-comment"></i><span data-i18n="chat">الدردشة</span></button>
-            <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span data-i18n="profile">الملف</span></button>
-            <button class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span data-i18n="settings">الإعدادات</span></button>
+            <button class="nav-item active" data-page="home"><i class="fas fa-home"></i><span>الرئيسية</span></button>
+            <button class="nav-item" data-page="chat"><i class="fas fa-comment"></i><span>الدردشة</span></button>
+            <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span>الملف</span></button>
+            <button class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span>الإعدادات</span></button>
         </nav>
     </div>
 
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
-            <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
-            <div class="edit-field"><label data-i18n="name">الاسم</label><div class="input-wrapper"><input type="text" id="editName" maxlength="25"><span class="char-counter" id="charCounter">0/25</span></div></div>
-            <div class="edit-field"><label data-i18n="avatar">صورتك الرمزية</label><div class="current-avatar" id="currentAvatarEmoji">👤</div><button class="change-avatar-btn" onclick="openAvatarModal()"><i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span></button></div>
-            <div class="modal-actions"><button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button><button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button></div>
+            <h3>تعديل الملف الشخصي</h3>
+            <div class="edit-field"><label>الاسم</label><div class="input-wrapper"><input type="text" id="editName" maxlength="25"><span class="char-counter" id="charCounter">0/25</span></div></div>
+            <div class="edit-field"><label>صورتك الرمزية</label><div class="current-avatar" id="currentAvatarEmoji">👤</div><button class="change-avatar-btn" onclick="openAvatarModal()"><i class="fas fa-smile"></i> تغيير</button></div>
+            <div class="modal-actions"><button class="modal-btn modal-btn-outline" onclick="closeModal()">إلغاء</button><button class="modal-btn modal-btn-outline" onclick="saveProfile()">حفظ</button></div>
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
 
     <div class="modal" id="avatarModal">
         <div class="modal-content">
-            <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
+            <h3>اختر صورتك الرمزية</h3>
             <div class="avatar-options">
-                <button class="avatar-option" onclick="selectAvatar('male')"><span>👨</span><span data-i18n="male">رجل</span></button>
-                <button class="avatar-option" onclick="selectAvatar('female')"><span>👩</span><span data-i18n="female">امرأة</span></button>
-                <button class="avatar-option" onclick="selectAvatar('boy')"><span>🧒</span><span data-i18n="boy">ولد</span></button>
-                <button class="avatar-option" onclick="selectAvatar('girl')"><span>👧</span><span data-i18n="girl">بنت</span></button>
-                <button class="avatar-option" onclick="selectAvatar('father')"><span>👨‍🦳</span><span data-i18n="father">أب</span></button>
-                <button class="avatar-option" onclick="selectAvatar('mother')"><span>👩‍🦳</span><span data-i18n="mother">أم</span></button>
-                <button class="avatar-option" onclick="selectAvatar('grandfather')"><span>👴</span><span data-i18n="grandfather">جد</span></button>
-                <button class="avatar-option" onclick="selectAvatar('grandmother')"><span>👵</span><span data-i18n="grandmother">جدة</span></button>
+                <button class="avatar-option" onclick="selectAvatar('male')"><span>👨</span><span>رجل</span></button>
+                <button class="avatar-option" onclick="selectAvatar('female')"><span>👩</span><span>امرأة</span></button>
+                <button class="avatar-option" onclick="selectAvatar('boy')"><span>🧒</span><span>ولد</span></button>
+                <button class="avatar-option" onclick="selectAvatar('girl')"><span>👧</span><span>بنت</span></button>
+                <button class="avatar-option" onclick="selectAvatar('father')"><span>👨‍🦳</span><span>أب</span></button>
+                <button class="avatar-option" onclick="selectAvatar('mother')"><span>👩‍🦳</span><span>أم</span></button>
+                <button class="avatar-option" onclick="selectAvatar('grandfather')"><span>👴</span><span>جد</span></button>
+                <button class="avatar-option" onclick="selectAvatar('grandmother')"><span>👵</span><span>جدة</span></button>
             </div>
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
@@ -199,10 +192,10 @@
 
     <div class="modal" id="languageModal">
         <div class="modal-content">
-            <h3 data-i18n="select_language">اختر اللغة</h3>
+            <h3>اختر اللغة</h3>
             <div class="language-options">
-                <button class="language-option" onclick="changeLanguage('ar')"><span class="flag">🇮🇶</span><span data-i18n="arabic">العربية</span></button>
-                <button class="language-option" onclick="changeLanguage('en')"><span class="flag">🇬🇧</span><span data-i18n="english">English</span></button>
+                <button class="language-option" onclick="changeLanguage('ar')"><span class="flag">🇮🇶</span><span>العربية</span></button>
+                <button class="language-option" onclick="changeLanguage('en')"><span class="flag">🇬🇧</span><span>English</span></button>
             </div>
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
@@ -225,7 +218,6 @@
         window.auth = firebase.auth();
         window.db = firebase.firestore();
         window.googleProvider = new firebase.auth.GoogleAuthProvider();
-        console.log('Firebase initialized successfully');
     </script>
     
     <script src="js/i18n.js"></script>
@@ -261,7 +253,6 @@
     });
     
     window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
-    window.onerror = function(msg, url, line) { console.log('خطأ:', msg, 'السطر:', line); return false; };
     </script>
 </body>
 </html>
