@@ -148,7 +148,6 @@
                         <div class="settings-item-left"><i class="fas fa-sign-out-alt" style="color: var(--danger);"></i><span style="color: var(--danger);">تسجيل الخروج</span></div>
                         <i class="fas fa-chevron-left" style="color: var(--danger);"></i>
                     </div>
-                    <!-- ✅ زر مسح الحساب -->
                     <div class="settings-item" onclick="showDeleteAccountModal()">
                         <div class="settings-item-left"><i class="fas fa-trash-alt" style="color: #f44336;"></i><span style="color: #f44336;">مسح حسابي</span></div>
                         <i class="fas fa-chevron-left" style="color: #f44336;"></i>
@@ -165,7 +164,6 @@
         </nav>
     </div>
 
-    <!-- نوافذ منبثقة -->
     <div class="modal" id="editProfileModal">
         <div class="modal-content">
             <h3>تعديل الملف الشخصي</h3>
@@ -204,22 +202,21 @@
         </div>
     </div>
 
-    <!-- ✅ نافذة تأكيد مسح الحساب -->
+    <!-- نافذة تأكيد مسح الحساب -->
     <div class="modal" id="deleteAccountModal">
         <div class="modal-content" style="text-align: center;">
-            <h3 style="color: #f44336;">⚠️ مسح الحساب</h3>
-            <p style="margin-bottom: 1rem; color: var(--text-light);">سيتم مسح حسابك نهائياً بعد 24 ساعة من الآن.</p>
-            <p style="margin-bottom: 1rem; color: var(--text-light);">إذا سجلت دخول خلال 24 ساعة، سيتم إلغاء المسح تلقائياً.</p>
+            <h3 style="color: #f44336; margin-bottom: 1rem;">تأكيد مسح الحساب</h3>
+            <p style="margin-bottom: 0.75rem; color: var(--text-light); font-size: 0.9rem; line-height: 1.6;">خلال 24 ساعة سيتم مسح كل شيء متعلق بحسابك من أصدقاء وبريد إلكتروني ورسائل وجميع بياناتك</p>
+            <p style="margin-bottom: 0.75rem; color: var(--text-light); font-size: 0.9rem; line-height: 1.6;">خلال 24 ساعة يمكنك إلغاء المسح بمجرد تسجيل الدخول</p>
+            <p style="margin-bottom: 0.75rem; color: #f44336; font-size: 0.9rem; line-height: 1.6;">بعد 24 ساعة يمسح حسابك نهائياً ولا يمكن استرجاع أي شيء ويمكنك التسجيل من جديد بنفس البريد الإلكتروني في أي وقت لكن كحساب جديد تماماً</p>
+            <p style="margin-bottom: 1.5rem; color: var(--primary); font-size: 0.95rem; line-height: 1.6;">نعتز بوجودك معنا ونشكر لك تواجدك في عالمنا، ونتمنى أن نراك مجدداً في أي وقت</p>
             <div style="background: var(--light); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
                 <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 1rem;">
                     <input type="checkbox" id="confirmDelete" style="width: 20px; height: 20px; cursor: pointer;">
                     <span>نعم، أريد مسح حسابي نهائياً</span>
                 </label>
             </div>
-            <div class="modal-actions">
-                <button class="modal-btn modal-btn-outline" onclick="closeModal()">إلغاء</button>
-                <button class="modal-btn" id="confirmDeleteBtn" style="background: #f44336; color: white; border: none; opacity: 0.5; cursor: not-allowed;" disabled onclick="confirmDeleteAccount()">مسح حسابي</button>
-            </div>
+            <button class="modal-btn" id="confirmDeleteBtn" style="background: #f44336; color: white; border: none; width: 100%; padding: 14px; font-size: 1rem; opacity: 0.5; cursor: not-allowed;" disabled onclick="confirmDeleteAccount()">مسح حسابي</button>
             <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
         </div>
     </div>
@@ -274,7 +271,6 @@
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') performSearch(); });
 
-        // ✅ تفعيل زر التأكيد عند الضغط على علامة الصح
         const confirmCheckbox = document.getElementById('confirmDelete');
         const confirmBtn = document.getElementById('confirmDeleteBtn');
         if (confirmCheckbox && confirmBtn) {
@@ -295,7 +291,6 @@
     window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
     window.onerror = function(msg, url, line) { return false; };
 
-    // ✅ فتح نافذة مسح الحساب
     window.showDeleteAccountModal = function() {
         document.getElementById('deleteAccountModal').classList.add('active');
         document.getElementById('confirmDelete').checked = false;
@@ -303,7 +298,6 @@
         document.getElementById('confirmDeleteBtn').style.opacity = '0.5';
     };
 
-    // ✅ تأكيد مسح الحساب
     window.confirmDeleteAccount = async function() {
         if (typeof requestAccountDeletion === 'function') {
             await requestAccountDeletion();
