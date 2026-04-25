@@ -38,21 +38,15 @@ const SecureChatSystem = {
             const sk = await this.deriveSharedKey(pr, pu);
             
             if (msg.package.type === 'text') { const d = await this.decryptData(msg.package.data, sk); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, d); }
-            else if (msg.package.type === 'voice') { const d = await this.decryptData(msg.package.data, sk); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'voice', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '🎤 بصمة'); }
-            else if (msg.package.type === 'image') { const d = await this.decryptData(msg.package.data, sk); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '📷 صورة'); }
-            else if (msg.package.type === 'video') { const d = await this.decryptData(msg.package.data, sk); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'video', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '🎥 فيديو'); }
-            else if (msg.package.type === 'file') { const d = await this.decryptData(msg.package.data, sk); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'file', data: d, fileName: msg.package.fileName || 'ملف', sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '📎 ملف'); }
             else if (msg.package.type === 'p2p') {
                 const d = JSON.parse(await this.decryptData(msg.package.data, sk));
-                const typeMap = { image: '📷 صورة', voice: '🎤 بصمة', video: '🎥 فيديو', file: '📎 ملف' };
-                
                 if (d.type === 'call-offer') { P2PSystem.showIncomingCall(msg.from, d); }
                 else if (d.type === 'call-accept') { P2PSystem.handleAnswer(d); }
                 else if (d.type === 'call-reject') { P2PSystem.handleReject(); }
                 else if (d.type === 'file-offer') {
                     const name = document.querySelector('#conversationName')?.textContent || 'صديق';
-                    const tn = typeMap[d.fileType] || '📎 ملف';
-                    if (confirm(`${name} يرسل ${tn} (${(d.size/1024).toFixed(1)}KB) - استلام؟`)) {
+                    const typeMap = { image: '📷 صورة', voice: '🎤 بصمة', video: '🎥 فيديو', file: '📎 ملف' };
+                    if (confirm(`${name} يرسل ${typeMap[d.fileType]||'📎 ملف'} (${(d.size/1024).toFixed(1)}KB) - استلام؟`)) {
                         P2PSystem.handleFileOffer(msg.from, d);
                     }
                 }
@@ -94,7 +88,6 @@ const P2PSystem = {
         this.pc = new RTCPeerConnection(this.iceServers);
         this.pc.onicecandidate = e => { if (e.candidate) this.sendP2PMsg(peerId, { type: 'ice-candidate', candidate: e.candidate }); };
         this.pc.onconnectionstatechange = () => {
-            if (this.pc && this.pc.connectionState === 'connected') console.log('✅ P2P متصل');
             if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
                 if (!this.isInCall) { this.pc.close(); this.pc = null; this.dc = null; }
             }
@@ -102,8 +95,6 @@ const P2PSystem = {
         this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(); };
         this.dc = this.pc.createDataChannel('fileTransfer');
         this.setupDataChannel();
-        
-        // إنشاء offer تلقائي للاتصال
         const offer = await this.pc.createOffer();
         await this.pc.setLocalDescription(offer);
         this.sendP2PMsg(peerId, { type: 'answer', sdp: this.pc.localDescription });
@@ -113,25 +104,18 @@ const P2PSystem = {
         if (!this.dc) return;
         this.dc.onopen = () => console.log('✅ قناة بيانات مفتوحة');
         this.dc.onmessage = e => {
-            try {
-                const msg = JSON.parse(e.data);
-                if (msg.type === 'file-complete') { this.receiveComplete(msg); }
-            } catch (ex) {}
+            try { const msg = JSON.parse(e.data); if (msg.type === 'file-complete') { this.receiveComplete(msg); } } catch (ex) {}
         };
     },
     
-    // ========== الاتصال الصوتي ==========
     async startCall(peerId) {
-        if (this.isInCall) return;
-        this.isInCall = true;
+        if (this.isInCall) return; this.isInCall = true;
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            this.showCallUI();
-            await this.createConnection(peerId);
+            this.showCallUI(); await this.createConnection(peerId);
             this.pc.ontrack = e => { const rv = document.getElementById('remoteAudio'); if (rv) rv.srcObject = e.streams[0]; };
             this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
-            const offer = await this.pc.createOffer();
-            await this.pc.setLocalDescription(offer);
+            const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer);
             this.sendP2PMsg(peerId, { type: 'call-offer', sdp: this.pc.localDescription });
         } catch (e) { this.endCall(); }
     },
@@ -154,32 +138,13 @@ const P2PSystem = {
             this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
             this.showCallUI();
-            if (data.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                const answer = await this.pc.createAnswer();
-                await this.pc.setLocalDescription(answer);
-                this.sendP2PMsg(peerId, { type: 'call-accept', sdp: this.pc.localDescription });
-            }
+            if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); const ans = await this.pc.createAnswer(); await this.pc.setLocalDescription(ans); this.sendP2PMsg(peerId, { type: 'call-accept', sdp: this.pc.localDescription }); }
         } catch (e) { this.endCall(); }
     },
     
     async handleAnswer(data) { try { if (this.pc && data.sdp) await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); } catch (e) {} },
     handleReject() { this.endCall(); alert('تم رفض المكالمة'); },
-    
-    async handleSignaling(data) {
-        try {
-            if (!this.pc) return;
-            if (data.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                if (data.sdp.type === 'offer') {
-                    const answer = await this.pc.createAnswer();
-                    await this.pc.setLocalDescription(answer);
-                }
-            } else if (data.candidate) {
-                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-            }
-        } catch (e) {}
-    },
+    async handleSignaling(data) { try { if (!this.pc) return; if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); if (data.sdp.type === 'offer') { const ans = await this.pc.createAnswer(); await this.pc.setLocalDescription(ans); } } else if (data.candidate) { await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } } catch (e) {} },
     
     showCallUI() {
         document.body.classList.add('in-call');
@@ -189,108 +154,44 @@ const P2PSystem = {
     },
     
     toggleAudio() { if (this.localStream) { const t = this.localStream.getAudioTracks()[0]; if (t) t.enabled = !t.enabled; } },
+    endCall() { this.isInCall = false; document.body.classList.remove('in-call'); if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } if (this.pc && !this.pendingFile) { this.pc.close(); this.pc = null; this.dc = null; } ['callUI','incomingCall'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); }); },
     
-    endCall() {
-        this.isInCall = false; document.body.classList.remove('in-call');
-        if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
-        if (this.pc && !this.pendingFile) { this.pc.close(); this.pc = null; this.dc = null; }
-        ['callUI', 'incomingCall'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
-    },
-    
-    // ========== إرسال ملفات P2P ==========
-    async sendFileP2P(peerId, file, fileType) {
-        this.pendingFile = file; this.pendingFileInfo = { name: file.name, type: fileType, size: file.size };
-        this.sendP2PMsg(peerId, { type: 'file-offer', fileType, name: file.name, size: file.size });
-    },
-    
-    async handleFileOffer(senderId, info) {
-        this.receiveBuffer = []; this.receiveInfo = info;
-        this.sendP2PMsg(senderId, { type: 'file-accept' });
-    },
-    
+    async sendFileP2P(peerId, file, fileType) { this.pendingFile = file; this.pendingFileInfo = { name: file.name, type: fileType, size: file.size }; this.sendP2PMsg(peerId, { type: 'file-offer', fileType, name: file.name, size: file.size }); },
+    async handleFileOffer(senderId, info) { this.receiveBuffer = []; this.receiveInfo = info; this.sendP2PMsg(senderId, { type: 'file-accept' }); },
     async handleFileAccept(data) {
         if (!this.pendingFile || !this.dc || this.dc.readyState !== 'open') return;
-        const chunkSize = 16384; // 16KB chunks
-        const totalChunks = Math.ceil(this.pendingFile.size / chunkSize);
-        let offset = 0;
-        
+        const chunkSize = 16384; let offset = 0;
         const sendChunk = () => {
-            if (offset >= this.pendingFile.size) {
-                this.dc.send(JSON.stringify({ type: 'file-complete', fileType: this.pendingFileInfo.type, fileName: this.pendingFileInfo.name }));
-                this.showSentFile(this.pendingFileInfo);
-                this.pendingFile = null; this.pendingFileInfo = null;
-                return;
-            }
+            if (offset >= this.pendingFile.size) { this.dc.send(JSON.stringify({ type: 'file-complete', fileType: this.pendingFileInfo.type, fileName: this.pendingFileInfo.name })); this.showSentFile(this.pendingFileInfo); this.pendingFile = null; this.pendingFileInfo = null; return; }
             const end = Math.min(offset + chunkSize, this.pendingFile.size);
-            const chunk = this.pendingFile.slice(offset, end);
-            const reader = new FileReader();
-            reader.onload = () => {
-                this.dc.send(JSON.stringify({ type: 'file-chunk', data: reader.result, index: Math.floor(offset / chunkSize) }));
-                offset = end;
-                setTimeout(sendChunk, 10);
-            };
-            reader.readAsDataURL(chunk);
+            const reader = new FileReader(); reader.onload = () => { this.dc.send(JSON.stringify({ type: 'file-chunk', data: reader.result })); offset = end; setTimeout(sendChunk, 10); };
+            reader.readAsDataURL(this.pendingFile.slice(offset, end));
         };
         sendChunk();
     },
     
     receiveComplete(msg) {
-        let fullData;
-        if (this.receiveBuffer && this.receiveBuffer.length > 0) {
-            fullData = this.receiveBuffer.join('');
-        } else {
-            fullData = msg.data || '';
-        }
+        let fullData = (this.receiveBuffer && this.receiveBuffer.length > 0) ? this.receiveBuffer.join('') : (msg.data || '');
         this.receiveBuffer = [];
-        
-        const messageObj = {
-            id: Date.now().toString(),
-            type: msg.fileType || this.receiveInfo?.type || 'file',
-            data: fullData,
-            fileName: msg.fileName || this.receiveInfo?.name || 'ملف',
-            sender: 'friend',
-            time: new Date().toISOString()
-        };
-        
-        const currentChat = ChatSystem.currentChat;
-        ChatSystem.saveMessage(currentChat, messageObj);
-        ChatSystem.displayMessages(currentChat);
-        const typeMap = { image: '📷 صورة', voice: '🎤 بصمة', video: '🎥 فيديو', file: '📎 ملف' };
-        ChatSystem.updateLastMessage(currentChat, typeMap[msg.fileType] || '📎 ملف');
-        loadChats();
+        const messageObj = { id: Date.now().toString(), type: msg.fileType || this.receiveInfo?.type || 'file', data: fullData, fileName: msg.fileName || this.receiveInfo?.name || 'ملف', sender: 'friend', time: new Date().toISOString() };
+        const cc = ChatSystem.currentChat; ChatSystem.saveMessage(cc, messageObj); ChatSystem.displayMessages(cc);
+        const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' };
+        ChatSystem.updateLastMessage(cc, tm[msg.fileType]||'📎 ملف'); loadChats();
     },
     
     showSentFile(info) {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const messageObj = {
-                id: Date.now().toString(),
-                type: info.type,
-                data: reader.result,
-                fileName: info.name,
-                sender: 'me',
-                time: new Date().toISOString(),
-                status: 'sent'
-            };
-            ChatSystem.saveMessage(ChatSystem.currentChat, messageObj);
-            ChatSystem.displayMessages(ChatSystem.currentChat);
-            const typeMap = { image: '📷 صورة', voice: '🎤 بصمة', video: '🎥 فيديو', file: '📎 ملف' };
-            ChatSystem.updateLastMessage(ChatSystem.currentChat, typeMap[info.type] || '📎 ملف');
-            loadChats();
+        const reader = new FileReader(); reader.onload = () => {
+            const msg = { id: Date.now().toString(), type: info.type, data: reader.result, fileName: info.name, sender: 'me', time: new Date().toISOString(), status: 'sent' };
+            ChatSystem.saveMessage(ChatSystem.currentChat, msg); ChatSystem.displayMessages(ChatSystem.currentChat);
+            const tm = { image:'📷 صورة', voice:'🎤 بصمة', video:'🎥 فيديو', file:'📎 ملف' };
+            ChatSystem.updateLastMessage(ChatSystem.currentChat, tm[info.type]||'📎 ملف'); loadChats();
         };
         reader.readAsDataURL(this.pendingFile);
     },
     
-    async sendP2PMsg(peerId, data) {
-        const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(peerId);
-        if (!pr || !pu) return;
-        const sk = await SecureChatSystem.deriveSharedKey(pr, pu);
-        const enc = await SecureChatSystem.encryptData(JSON.stringify(data), sk);
-        await SecureChatSystem.sendToServer(peerId, { id: Date.now().toString(), type: 'p2p', data: enc, timestamp: Date.now() });
-    }
+    async sendP2PMsg(peerId, data) { const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(peerId); if (!pr || !pu) return; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(JSON.stringify(data), sk); await SecureChatSystem.sendToServer(peerId, { id: Date.now().toString(), type: 'p2p', data: enc, timestamp: Date.now() }); }
 };
 
-// ========== بدء الاتصال ==========
 window.startAudioCall = async () => { if (ChatSystem.currentChat) await P2PSystem.startCall(ChatSystem.currentChat); };
 
 document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); if (window.auth?.currentUser) SecureChatSystem.init(); });
@@ -321,34 +222,24 @@ const ChatSystem = {
     },
     async sendMessage(text) { if (!this.currentChat || !text.trim()) return false; const mid = Date.now().toString(); try { const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return false; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(text, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); return true; } catch (e) { return false; } },
     
-    async sendFileP2PorServer(file, fileType) {
+    // P2P فقط - بدون Firebase احتياطي
+    async sendFileP2POnly(file, fileType) {
         if (!this.currentChat) return;
         try {
             const connected = await P2PSystem.ensureConnection(this.currentChat);
             if (connected && P2PSystem.dc && P2PSystem.dc.readyState === 'open') {
                 console.log('🚀 إرسال P2P مباشر');
                 await P2PSystem.sendFileP2P(this.currentChat, file, fileType);
-                return;
+            } else {
+                alert('⚠️ الطرف الآخر غير متصل. لا يمكن الإرسال حالياً. افتح اتصال أولاً.');
             }
-        } catch (e) { console.log('P2P فشل، استخدام Firebase'); }
-        // احتياطي Firebase
-        try {
-            const b64 = await SecureChatSystem.fileToBase64(file);
-            const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!pr || !pu) return;
-            const sk = await SecureChatSystem.deriveSharedKey(pr, pu);
-            const enc = await SecureChatSystem.encryptData(b64, sk);
-            const mid = Date.now().toString();
-            await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: fileType, data: enc, fileName: file.name, timestamp: Date.now() });
-            const msg = { id: mid, type: fileType, data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' };
-            this.saveMessage(this.currentChat, msg); this.displayMessage(msg);
-        } catch (e) {}
+        } catch (e) { alert('❌ فشل الاتصال P2P. تأكد من فتح اتصال أولاً.'); }
     },
     
-    async sendImage(file) { if (!this.currentChat) return; const comp = await SecureChatSystem.compressImage(file); await this.sendFileP2PorServer(comp, 'image'); },
-    async sendVoiceNote(blob) { await this.sendFileP2PorServer(blob, 'voice'); },
-    async sendVideo(file) { await this.sendFileP2PorServer(file, 'video'); },
-    async sendFile(file) { await this.sendFileP2PorServer(file, 'file'); },
+    async sendImage(file) { if (!this.currentChat) return; const comp = await SecureChatSystem.compressImage(file); await this.sendFileP2POnly(comp, 'image'); },
+    async sendVoiceNote(blob) { await this.sendFileP2POnly(blob, 'voice'); },
+    async sendVideo(file) { await this.sendFileP2POnly(file, 'video'); },
+    async sendFile(file) { await this.sendFileP2POnly(file, 'file'); },
     
     saveMessage(fid, msg) { const k = `chat_${fid}`; let h = []; try { h = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { h = []; } h.push(msg); if (h.length > 100) h = h.slice(-100); localStorage.setItem(k, JSON.stringify(h)); this.messages[fid] = h; },
     updateLastMessage(fid, lm) { document.querySelectorAll('.chat-item').forEach(i => { if (i.getAttribute('onclick')?.includes(fid)) { const l = i.querySelector('.last-message'), t = i.querySelector('.chat-time'); if (l) l.textContent = lm; if (t) t.textContent = 'الآن'; } }); },
