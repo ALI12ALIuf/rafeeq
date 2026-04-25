@@ -74,7 +74,7 @@ const SecureChatSystem = {
             else if (msg.package.type === 'image') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '📷 صورة'); }
             else if (msg.package.type === 'video') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'video', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '🎥 فيديو'); }
             else if (msg.package.type === 'file') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'file', data: d, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '📎 ملف'); }
-            else if (msg.package.type === 'webrtc') { const d = await this.decryptData(msg.package.data, sharedKey); CallSystem.handleSignaling(JSON.parse(d)); }
+            else if (msg.package.type === 'webrtc') { const d = await this.decryptData(msg.package.data, sharedKey); const signalData = JSON.parse(d); if (signalData.sdp && signalData.sdp.type === 'offer' && !CallSystem.isInCall) { CallSystem.showIncomingCall(msg.from, signalData); } else { CallSystem.handleSignaling(signalData); } }
             loadChats();
         } catch (error) {}
     }
@@ -96,50 +96,60 @@ const CallSystem = {
     async startCall(calleeId, callType = 'video') {
         if (!window.auth?.currentUser || this.isInCall) return;
         this.isInCall = true; this.isCaller = true;
-        
         try {
-            const constraints = { audio: true, video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } } : false };
+            const constraints = { audio: true, video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(callType);
-            
             this.pc = new RTCPeerConnection(this.servers);
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
-            
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => { const remoteVideo = document.getElementById('remoteVideo'); if (remoteVideo) remoteVideo.srcObject = e.streams[0]; };
-            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'disconnected' || this.pc.connectionState === 'failed')) this.endCall(); };
-            
+            this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv) rv.srcObject = e.streams[0]; };
+            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
             const offer = await this.pc.createOffer();
             await this.pc.setLocalDescription(offer);
             this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-            
-        } catch (e) { console.error('فشل بدء المكالمة:', e); this.endCall(); }
+        } catch (e) { this.endCall(); }
+    },
+    
+    showIncomingCall(callerId, callData) {
+        const callerName = ChatSystem.messages[callerId]?.length ? 'صديقك' : 'مستخدم';
+        const callType = callData.sdp?.type === 'offer' ? (document.querySelector('#conversationName')?.textContent || 'مستخدم') : 'مستخدم';
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'incomingCall';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+        overlay.innerHTML = `
+            <div style="font-size:1.5rem;">📞 ${callType} يتصل بك...</div>
+            <div style="display:flex;gap:30px;">
+                <button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button>
+                <button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button>
+            </div>`;
+        document.body.appendChild(overlay);
+        
+        document.getElementById('btnAccept').onclick = () => { overlay.remove(); this.receiveCall(callerId, callData); };
+        document.getElementById('btnReject').onclick = () => { overlay.remove(); };
     },
     
     async receiveCall(callerId, callData) {
         if (this.isInCall) return;
         this.isInCall = true; this.isCaller = false;
-        
         try {
-            const callType = callData.type || 'video';
-            const constraints = { audio: true, video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } } : false };
+            const hasVideo = callData.sdp?.sdp?.includes('video') !== false;
+            const constraints = { audio: true, video: hasVideo ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            this.showCallUI(callType);
-            
+            this.showCallUI(hasVideo ? 'video' : 'audio');
             this.pc = new RTCPeerConnection(this.servers);
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
-            
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => { const remoteVideo = document.getElementById('remoteVideo'); if (remoteVideo) remoteVideo.srcObject = e.streams[0]; };
-            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'disconnected' || this.pc.connectionState === 'failed')) this.endCall(); };
-            
+            this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv) rv.srcObject = e.streams[0]; };
+            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
             if (callData.sdp) {
                 await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
                 const answer = await this.pc.createAnswer();
                 await this.pc.setLocalDescription(answer);
                 this.sendSignal(callerId, { sdp: this.pc.localDescription });
             }
-        } catch (e) { console.error('فشل استقبال المكالمة:', e); this.endCall(); }
+        } catch (e) { this.endCall(); }
     },
     
     async handleSignaling(data) {
@@ -155,7 +165,7 @@ const CallSystem = {
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
         if (!myPrivateKey || !receiverPublicKey) return;
         const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ ...data, type: data.sdp ? (data.sdp.type === 'offer' ? 'video' : 'answer') : 'candidate' }), sharedKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
         await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
     },
     
@@ -166,12 +176,28 @@ const CallSystem = {
         ui.innerHTML = `
             <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video>
             <video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video>
-            <div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:20px;">
+            <div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;">
+                <button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button>
                 <button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button>
+                <button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">📹</button>
             </div>`;
         document.body.appendChild(ui);
-        const localVideo = document.getElementById('localVideo');
-        if (localVideo && this.localStream) localVideo.srcObject = this.localStream;
+        const lv = document.getElementById('localVideo');
+        if (lv && this.localStream) lv.srcObject = this.localStream;
+    },
+    
+    toggleAudio() {
+        if (this.localStream) {
+            const at = this.localStream.getAudioTracks()[0];
+            if (at) at.enabled = !at.enabled;
+        }
+    },
+    
+    toggleVideo() {
+        if (this.localStream) {
+            const vt = this.localStream.getVideoTracks()[0];
+            if (vt) vt.enabled = !vt.enabled;
+        }
     },
     
     endCall() {
@@ -180,21 +206,18 @@ const CallSystem = {
         if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
         if (this.pc) { this.pc.close(); this.pc = null; }
         const ui = document.getElementById('callUI'); if (ui) ui.remove();
+        const inc = document.getElementById('incomingCall'); if (inc) inc.remove();
     }
 };
 
 window.startVideoCall = async () => {
     if (!ChatSystem.currentChat) return;
-    if (confirm('هل تريد بدء اتصال فيديو؟')) {
-        await CallSystem.startCall(ChatSystem.currentChat, 'video');
-    }
+    await CallSystem.startCall(ChatSystem.currentChat, 'video');
 };
 
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) return;
-    if (confirm('هل تريد بدء اتصال صوتي؟')) {
-        await CallSystem.startCall(ChatSystem.currentChat, 'audio');
-    }
+    await CallSystem.startCall(ChatSystem.currentChat, 'audio');
 };
 
 document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); if (window.auth?.currentUser) SecureChatSystem.init(); });
@@ -205,7 +228,6 @@ function ensureSinglePage() { document.querySelectorAll('.profile-subpage').forE
 function setupNavigation() { const nav = document.querySelectorAll('.nav-item'); const pages = document.querySelectorAll('.page'); if (!nav.length || !pages.length) return; function switchPage(id) { pages.forEach(p => p.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } pages.forEach(p => { if (!p.classList.contains('active')) p.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); if (id === 'chat') loadChats(); document.body.classList.remove('conversation-open'); nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); } nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); }
 function setupModals() { window.openLanguageModal = () => document.getElementById('languageModal')?.classList.add('active'); window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); })); document.querySelectorAll('.settings-item').forEach(i => { if (i.querySelector('[data-i18n="language"]')) i.addEventListener('click', openLanguageModal); }); }
 
-// ========== نظام الدردشة E2EE ==========
 const ChatSystem = {
     currentChat: null, messages: {},
     init() { this.loadAllChats(); },
