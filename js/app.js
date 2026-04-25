@@ -74,9 +74,117 @@ const SecureChatSystem = {
             else if (msg.package.type === 'image') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '📷 صورة'); }
             else if (msg.package.type === 'video') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'video', data: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '🎥 فيديو'); }
             else if (msg.package.type === 'file') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'file', data: d, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, '📎 ملف'); }
+            else if (msg.package.type === 'call') { const d = await this.decryptData(msg.package.data, sharedKey); const callData = JSON.parse(d); CallSystem.receiveCall(msg.from, callData); }
             loadChats();
         } catch (error) {}
     }
+};
+
+// ========== نظام الاتصال الصوت والفيديو ==========
+const CallSystem = {
+    jitsiApi: null,
+    currentRoom: null,
+    isInCall: false,
+    
+    async startCall(calleeId, callType = 'video') {
+        if (!window.auth?.currentUser) return;
+        
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            
+            const roomName = `rafeeq-call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            
+            const callData = JSON.stringify({
+                room: roomName,
+                type: callType,
+                caller: window.auth.currentUser.uid,
+                callerName: document.getElementById('profileName')?.textContent || 'مستخدم',
+                timestamp: Date.now()
+            });
+            
+            const encrypted = await SecureChatSystem.encryptData(callData, sharedKey);
+            await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'call', data: encrypted, timestamp: Date.now() });
+            
+            this.openCallRoom(roomName, callType);
+        } catch (e) { console.error('فشل بدء المكالمة:', e); }
+    },
+    
+    receiveCall(callerId, callData) {
+        if (this.isInCall) return;
+        
+        const callerName = callData.callerName || 'مستخدم';
+        const callType = callData.type === 'audio' ? 'صوتي' : 'فيديو';
+        
+        if (confirm(`📞 ${callerName} يتصل بك ${callType}... هل تريد الرد؟`)) {
+            this.openCallRoom(callData.room, callData.type);
+        }
+    },
+    
+    openCallRoom(roomName, callType) {
+        this.isInCall = true;
+        this.currentRoom = roomName;
+        
+        document.body.classList.add('in-call');
+        
+        const callContainer = document.createElement('div');
+        callContainer.id = 'jitsiContainer';
+        callContainer.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#000;';
+        document.body.appendChild(callContainer);
+        
+        if (typeof JitsiMeetExternalAPI !== 'undefined') {
+            this.jitsiApi = new JitsiMeetExternalAPI('meet.jit.si', {
+                roomName: roomName,
+                parentNode: callContainer,
+                configOverrides: {
+                    startWithVideoMuted: callType === 'audio',
+                    startWithAudioMuted: false,
+                    prejoinPageEnabled: false,
+                    disableDeepLinking: true,
+                    toolbarButtons: ['microphone', 'camera', 'hangup', 'tileview'],
+                },
+                interfaceConfigOverrides: {
+                    SHOW_JITSI_WATERMARK: false,
+                    SHOW_WATERMARK_FOR_GUESTS: false,
+                    TOOLBAR_ALWAYS_VISIBLE: true,
+                    DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+                    MOBILE_APP_PROMO: false,
+                }
+            });
+            
+            this.jitsiApi.addEventListener('readyToClose', () => this.endCall());
+        } else {
+            callContainer.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:center;height:100%;color:white;flex-direction:column;gap:20px;">
+                    <h3>📞 جاري الاتصال...</h3>
+                    <button onclick="CallSystem.endCall()" style="background:var(--danger);color:white;border:none;padding:15px 40px;border-radius:30px;font-size:1.1rem;cursor:pointer;">إنهاء المكالمة</button>
+                </div>`;
+        }
+    },
+    
+    endCall() {
+        this.isInCall = false;
+        this.currentRoom = null;
+        document.body.classList.remove('in-call');
+        
+        if (this.jitsiApi) {
+            this.jitsiApi.dispose();
+            this.jitsiApi = null;
+        }
+        
+        const container = document.getElementById('jitsiContainer');
+        if (container) container.remove();
+    }
+};
+
+window.startVideoCall = () => {
+    if (ChatSystem.currentChat) CallSystem.startCall(ChatSystem.currentChat, 'video');
+};
+
+window.startAudioCall = () => {
+    if (ChatSystem.currentChat) CallSystem.startCall(ChatSystem.currentChat, 'audio');
 };
 
 document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); if (window.auth?.currentUser) SecureChatSystem.init(); });
@@ -142,7 +250,7 @@ window.sendFile = () => { const i = document.createElement('input'); i.type = 'f
 window.sendVoiceNote = () => { navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => ch.push(e.data); mr.onstop = () => { ChatSystem.sendVoiceNote(new Blob(ch, { type: 'audio/webm' })); s.getTracks().forEach(t => t.stop()); }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') { mr.stop(); sb.style.display = 'flex'; vb.style.display = 'none'; } }; } setTimeout(() => { if (mr.state === 'recording') { mr.stop(); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; } }, 60000); }); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.shareLocation = () => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`)); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.closeConversation = () => ChatSystem.closeChat();
-window.viewContactInfo = () => { /* تم إزالة معلومات الاتصال */ };
+window.viewContactInfo = () => { };
 window.openEditProfileModal = () => { document.getElementById('editName').value = document.getElementById('profileName').textContent; document.getElementById('currentAvatarEmoji').textContent = document.getElementById('profileAvatarEmoji').textContent; document.getElementById('editProfileModal').classList.add('active'); };
 window.saveProfile = () => { const n = document.getElementById('editName').value.trim(); if (!n || n.length > 25) return; if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { document.getElementById('profileName').textContent = n; closeModal(); }); };
 window.showUserTrips = () => { document.querySelector('.profile-page').style.display = 'none'; document.getElementById('tripsPage').style.display = 'block'; };
@@ -152,4 +260,3 @@ window.openAvatarModal = () => document.getElementById('avatarModal')?.classList
 window.getEmojiForUser = u => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; return m[u?.avatarType] || '👤'; };
 window.clearMessages = () => { const c = document.getElementById('messagesContainer'); if (c) c.innerHTML = ''; };
 if ('Notification' in window) Notification.requestPermission();
-console.log('✅ جاهز');
