@@ -8,9 +8,9 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" id="theme-color" content="#2196F3">
-    <script src="https://meet.jit.si/external_api.js"></script>
 </head>
 <body class="theme-light" data-page="home">
+    <!-- شاشة التحميل -->
     <div class="splash-screen" id="splash">
         <div class="splash-content">
             <div class="app-icon">🛡️</div>
@@ -20,6 +20,7 @@
         </div>
     </div>
 
+    <!-- المحتوى الرئيسي -->
     <div class="app-container" id="app" style="display: none;">
         <header class="app-header">
             <div class="header-left"></div>
@@ -65,20 +66,12 @@
             <div class="conversation-page" id="conversationPage" style="display: none;">
                 <div class="conversation-header">
                     <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
-                    <div class="conversation-user-info">
+                    <div class="conversation-user-info" onclick="viewContactInfo()">
                         <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
                         <div class="conversation-user-details">
                             <h3 id="conversationName"></h3>
-                            <span class="conversation-status" id="conversationStatus"></span>
+                            <span class="conversation-status" id="conversationStatus">آخر زيارة اليوم</span>
                         </div>
-                    </div>
-                    <div class="call-buttons" style="display:flex;gap:12px;margin-right:auto;">
-                        <button onclick="startAudioCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال صوت">
-                            <i class="fas fa-phone"></i>
-                        </button>
-                        <button onclick="startVideoCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال فيديو">
-                            <i class="fas fa-video"></i>
-                        </button>
                     </div>
                 </div>
 
@@ -95,6 +88,7 @@
                         <button class="voice-btn" onclick="startVoiceRecording()" style="display: none;"><i class="fas fa-microphone"></i></button>
                     </div>
                     
+                    <!-- ✅ قائمة المرفقات - جميع الأزرار -->
                     <div class="attachment-menu" id="attachmentMenu" style="display: none;">
                         <button onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
                         <button onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
@@ -231,6 +225,7 @@
         window.auth = firebase.auth();
         window.db = firebase.firestore();
         window.googleProvider = new firebase.auth.GoogleAuthProvider();
+        console.log('Firebase initialized successfully');
     </script>
     
     <script src="js/i18n.js"></script>
@@ -266,6 +261,7 @@
     });
     
     window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
+    window.onerror = function(msg, url, line) { console.log('خطأ:', msg, 'السطر:', line); return false; };
     </script>
 </body>
 </html>
