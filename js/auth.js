@@ -188,12 +188,18 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
+// ========== نظام تسجيل الدخول ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
             console.log('✅ مسجل:', user.uid);
-            await loadUserData(user.uid); setupFriendRequestsListener(user.uid);
+            await loadUserData(user.uid); 
+            setupFriendRequestsListener(user.uid);
+            
+            // ✅ أرسل إشارة إن auth جاهز
+            document.dispatchEvent(new Event('authReady'));
+            
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
             if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
         } else {
