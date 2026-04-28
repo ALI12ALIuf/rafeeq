@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Rafeeq - رفيق</title>
     
-    <!-- منع الكاش -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -14,7 +13,6 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" id="theme-color" content="#2196F3">
-    <script src="https://meet.jit.si/external_api.js"></script>
 </head>
 <body class="theme-light" data-page="home">
     <div class="splash-screen" id="splash">
@@ -102,11 +100,11 @@
                     </div>
                     
                     <div class="attachment-menu" id="attachmentMenu" style="display: none;">
-                        <button onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
-                        <button onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
-                        <button onclick="sendFile()"><i class="fas fa-file"></i> ملف</button>
-                        <button onclick="sendVoiceNote()"><i class="fas fa-microphone"></i> بصمة صوت</button>
-                        <button onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
+                        <button onclick="sendImage()" data-dc><i class="fas fa-image"></i> صورة</button>
+                        <button onclick="sendVideo()" data-dc><i class="fas fa-video"></i> فيديو</button>
+                        <button onclick="sendFile()" data-dc><i class="fas fa-file"></i> ملف</button>
+                        <button onclick="sendVoiceNote()" data-dc><i class="fas fa-microphone"></i> بصمة صوت</button>
+                        <button onclick="shareLocation()" data-dc><i class="fas fa-map-marker-alt"></i> موقع</button>
                     </div>
 
                     <div class="emoji-picker" id="emojiPicker" style="display: none;">
