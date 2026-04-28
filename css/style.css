@@ -56,73 +56,25 @@ body {
     overflow: hidden;
 }
 
-.splash-screen {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: var(--primary);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 9999;
-    transition: opacity 0.5s;
-}
-
+.splash-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--primary); display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s; }
 .splash-screen.hide { opacity: 0; pointer-events: none; }
-
 .splash-content { text-align: center; color: white; }
-
 .splash-content .app-icon { font-size: 5rem; margin-bottom: 1rem; }
-
 .splash-content h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
-
-.spinner {
-    width: 40px; height: 40px;
-    border: 3px solid rgba(255,255,255,0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 2rem auto 0;
-}
-
+.spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin: 2rem auto 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
-
-.app-header {
-    height: var(--header-height);
-    background: var(--card-bg);
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 1rem;
-    position: sticky; top: 0; z-index: 100;
-}
-
+.app-header { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; position: sticky; top: 0; z-index: 100; }
 .header-left, .header-right { display: flex; gap: 0.5rem; }
-
-.icon-btn {
-    width: 40px; height: 40px; border: none; background: none;
-    border-radius: 50%; color: var(--text); font-size: 1.2rem;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-}
-
+.icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .header-title h1 { font-size: 1.2rem; font-weight: 600; }
-
 .app-content { flex: 1; overflow-y: auto; padding-bottom: var(--nav-height); -webkit-overflow-scrolling: touch; }
-
 .page { display: none; padding: 1rem; }
 .page.active { display: block; }
 
-.bottom-nav {
-    height: var(--nav-height); background: var(--card-bg);
-    border-top: 1px solid var(--border);
-    display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-}
-
-.nav-item {
-    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 0.25rem; background: none; border: none;
-    color: var(--text-light); font-size: 0.8rem; cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-}
-
+.bottom-nav { height: var(--nav-height); background: var(--card-bg); border-top: 1px solid var(--border); display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; }
+.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; background: none; border: none; color: var(--text-light); font-size: 0.8rem; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .nav-item i { font-size: 1.2rem; }
 .nav-item.active { color: var(--primary); }
 
@@ -135,7 +87,6 @@ body {
 .post-menu { background: none; border: none; color: var(--text-light); cursor: pointer; }
 .post-content { padding: 0 1rem 1rem; }
 .post-location { display: flex; align-items: center; gap: 0.5rem; color: var(--text-light); font-size: 0.9rem; margin-bottom: 0.5rem; }
-.post-map-placeholder { background: var(--light); border-radius: var(--radius); padding: 2rem; text-align: center; color: var(--text-light); }
 .post-actions { display: flex; gap: 1rem; padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--border); }
 .post-action { background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
 
@@ -193,7 +144,7 @@ body {
 .modal-content { background: var(--card-bg); border-radius: var(--radius); padding: 2rem; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
 .modal-content h3 { margin-bottom: 1.5rem; color: var(--primary); text-align: center; }
 .edit-field { margin-bottom: 1.5rem; text-align: center; }
-.edit-field label { display: block; margin-bottom: 0.5rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
+.edit-field label { display: block; margin-bottom: 0.5rem; color: var(--text-light); font-size: 0.9rem; }
 .input-wrapper { position: relative; width: 100%; max-width: 300px; margin: 0 auto; direction: ltr; }
 .edit-field input { width: 100%; padding: 0.75rem; padding-left: 50px; padding-right: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--light); color: var(--text); font-size: 1rem; text-align: center; }
 .edit-field input:focus { outline: none; border-color: var(--primary); }
@@ -222,7 +173,6 @@ input:checked + .slider { background-color: var(--primary); }
 input:checked + .slider:before { transform: translateX(26px); }
 
 @media (min-width: 768px) { .bottom-nav { display: none; } }
-
 @media (max-width: 480px) {
     .profile-cover { height: 120px; }
     .profile-avatar-center { width: 80px; height: 80px; }
@@ -232,77 +182,37 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 /* ========== المحادثة ========== */
-body.in-call .app-container,
-body.in-call .bottom-nav,
-body.in-call .app-header { display: none !important; }
+body.in-call .app-container, body.in-call .bottom-nav, body.in-call .app-header { display: none !important; }
+body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
+body.conversation-open .conversation-page { display: flex !important; flex-direction: column; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: var(--bg); }
 
-body.conversation-open .bottom-nav,
-body.conversation-open .app-header { display: none !important; }
-
-body.conversation-open .conversation-page {
-    display: flex !important; flex-direction: column;
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 2000; background: var(--bg);
-}
-
-.conversation-header {
-    display: flex; align-items: center; padding: 12px 16px;
-    background: var(--card-bg); border-bottom: 1px solid var(--border);
-    box-shadow: var(--shadow); height: 70px;
-}
-
-.conversation-header .back-btn {
-    width: 40px; height: 40px; border-radius: 50%; border: none;
-    background: var(--light); color: var(--text); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; margin-left: 12px;
-}
-
+.conversation-header { display: flex; align-items: center; padding: 12px 16px; background: var(--card-bg); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); height: 70px; }
+.conversation-header .back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 12px; }
 .conversation-header .back-btn:hover { background: var(--primary); color: white; }
-
-.conversation-user-info {
-    display: flex; align-items: center; gap: 12px; flex: 1;
-    padding: 4px 8px; border-radius: 8px; -webkit-tap-highlight-color: transparent;
-}
-
-.conversation-avatar-emoji {
-    width: 45px; height: 45px; border-radius: 50%;
-    background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.2rem;
-}
-
+.conversation-user-info { display: flex; align-items: center; gap: 12px; flex: 1; padding: 4px 8px; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+.conversation-avatar-emoji { width: 45px; height: 45px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; }
 .conversation-user-details { flex: 1; }
 .conversation-user-details h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 2px; }
 .conversation-status { font-size: 0.75rem; color: var(--text-light); }
+.conversation-status.online { color: #4CAF50; }
+.conversation-status.offline { color: var(--text-light); }
 
 /* أزرار الاتصال */
-.call-buttons button {
-    width: 40px; height: 40px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-    -webkit-tap-highlight-color: transparent;
-}
-
+.call-buttons button { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
 .call-buttons button:hover { background: var(--light); }
 .call-buttons button i { font-size: 1.2rem; }
 
-.messages-container {
-    flex: 1; overflow-y: auto; padding: 20px 16px;
-    background: var(--bg); display: flex; flex-direction: column; gap: 8px;
-}
+/* أزرار المرفقات مقفولة */
+.attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
+.attachment-menu button.locked::after { content: " 🔒"; font-size: 0.8rem; }
 
+.messages-container { flex: 1; overflow-y: auto; padding: 20px 16px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
 .message { max-width: 70%; margin-bottom: 4px; animation: messagePop 0.2s ease; }
 .message.sent { align-self: flex-end; }
 .message.received { align-self: flex-start; }
-
-.message-content {
-    padding: 12px 16px; border-radius: 20px;
-    background: var(--card-bg); color: var(--text);
-    box-shadow: var(--shadow); word-wrap: break-word;
-    -webkit-tap-highlight-color: transparent;
-}
-
+.message-content { padding: 12px 16px; border-radius: 20px; background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); word-wrap: break-word; -webkit-tap-highlight-color: transparent; }
 .message.sent .message-content { background: var(--primary); color: white; }
 .message.received .message-content { background: var(--light); color: var(--text); }
-
 .message-info { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 2px; font-size: 0.7rem; color: var(--text-light); }
 .message.sent .message-info { color: rgba(255,255,255,0.7); }
 .message-time { font-size: 0.65rem; }
