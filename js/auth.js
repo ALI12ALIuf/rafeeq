@@ -22,42 +22,20 @@ async function signInWithGoogle() {
         if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return false; }
         const result = await window.auth.signInWithPopup(window.googleProvider);
         const user = result.user;
-        console.log('✅ تسجيل دخول - UID:', user.uid);
-        
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
-            const newShareableId = generateShareableId();
-            console.log('🆕 مستخدم جديد - ID:', newShareableId);
-            await window.db.collection('users').doc(user.uid).set({ 
-                uid: user.uid, 
-                name: (user.displayName || 'مستخدم').substring(0, 25), 
-                email: user.email || '', 
-                shareableId: newShareableId, 
-                bio: '', 
-                avatarType: 'male', 
-                friends: [], 
-                blocked: [], 
-                publicKey: '',
-                createdAt: new Date() 
-            });
+            await window.db.collection('users').doc(user.uid).set({ uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25), email: user.email || '', shareableId: generateShareableId(), bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date() });
         } else {
-            console.log('👤 مستخدم موجود:', userDoc.data().shareableId);
-            const userData = userDoc.data(); 
-            const updates = {};
+            const userData = userDoc.data(); const updates = {};
             if (!userData.friends) updates.friends = [];
-            if (!userData.publicKey && typeof SecureChatSystem !== 'undefined') {
-                const keyPair = await SecureChatSystem.generateKeyPair();
-                updates.publicKey = await SecureChatSystem.exportPublicKey(keyPair.publicKey);
-            }
-            if (Object.keys(updates).length > 0) {
-                await window.db.collection('users').doc(user.uid).update(updates);
-            }
+            if (userData.followers) updates.followers = [];
+            if (userData.following) updates.following = [];
+            if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
         }
         updateUserUI();
         if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
         return true;
     } catch (error) {
-        console.error('❌ خطأ:', error);
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
@@ -169,7 +147,6 @@ async function updateFriendRequestsCount() {
 window.addNewFriend = async function(targetUserId) {
     if (!window.auth?.currentUser) return;
     const uid = window.auth.currentUser.uid;
-    console.log('➕ إضافة صديق:', uid, '←', targetUserId);
     if (uid === targetUserId) { alert('لا يمكنك إضافة نفسك'); return; }
     try {
         const exist = await window.db.collection('friendRequests').where('from', '==', uid).where('to', '==', targetUserId).where('status', '==', 'pending').get();
@@ -177,11 +154,10 @@ window.addNewFriend = async function(targetUserId) {
         const me = await window.db.collection('users').doc(uid).get();
         if (me.exists && (me.data().friends||[]).includes(targetUserId)) { alert('صديقك بالفعل'); return; }
         await window.db.collection('friendRequests').add({ from: uid, to: targetUserId, status: 'pending', timestamp: new Date() });
-        console.log('✅ طلب صداقة أرسل');
         const rc = document.getElementById('searchResultsContainer'); if (rc) { rc.style.display = 'none'; rc.innerHTML = ''; }
         const si = document.getElementById('searchInput'); if (si) si.value = '';
         alert('تم إرسال طلب الصداقة');
-    } catch (e) { console.error('❌ خطأ:', e); alert('حدث خطأ'); }
+    } catch (e) { alert('حدث خطأ'); }
 };
 
 function setupFriendRequestsListener(userId) {
@@ -193,13 +169,7 @@ if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
-            console.log('✅ مسجل:', user.uid);
-            await loadUserData(user.uid); 
-            setupFriendRequestsListener(user.uid);
-            
-            // ✅ أرسل إشارة إن auth جاهز
-            document.dispatchEvent(new Event('authReady'));
-            
+            await loadUserData(user.uid); setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
             if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
         } else {
