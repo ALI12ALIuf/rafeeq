@@ -127,7 +127,7 @@ const CallSystem = {
     },
     
     async ensureDataChannel(calleeId) {
-        if (this.channels[calleeId] && this.channels[calleeId].dc && this.channels[calleeId].dc.readyState === 'open') return;
+        if (this.channels[calleeId] && this.channels[calleeId].dc && this.channels[calleeId].dc.readyState === 'open') return true;
         const pc = new RTCPeerConnection(this.servers);
         const dc = pc.createDataChannel('chat');
         this.channels[calleeId] = { pc, dc };
@@ -137,6 +137,17 @@ const CallSystem = {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         this.sendSignal(calleeId, { sdp: pc.localDescription });
+        return true;
+    },
+    
+    async waitForChannel(friendId, timeout = 60000) {
+        const start = Date.now();
+        while (Date.now() - start < timeout) {
+            const dc = this.getChannel(friendId) || this.dc;
+            if (dc && dc.readyState === 'open') return true;
+            await new Promise(r => setTimeout(r, 500));
+        }
+        return false;
     },
     
     getChannel(friendId) { return this.channels[friendId]?.dc; },
@@ -166,12 +177,11 @@ const CallSystem = {
         channel.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
-                const sender = ChatSystem.currentChat;
-                if (msg.type === 'image') { const dm = { id: msg.id || Date.now().toString(), type: 'image', data: msg.data, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(sender || ChatSystem.currentChat, dm); if (ChatSystem.currentChat === sender || ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
-                else if (msg.type === 'file') { const dm = { id: msg.id || Date.now().toString(), type: 'file', data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(sender || ChatSystem.currentChat, dm); if (ChatSystem.currentChat === sender || ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
-                else if (msg.type === 'voice') { const dm = { id: msg.id || Date.now().toString(), type: 'voice', data: msg.data, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(sender || ChatSystem.currentChat, dm); if (ChatSystem.currentChat === sender || ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
-                else if (msg.type === 'video') { const dm = { id: msg.id || Date.now().toString(), type: 'video', data: msg.data, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(sender || ChatSystem.currentChat, dm); if (ChatSystem.currentChat === sender || ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
-                else if (msg.type === 'location') { const dm = { id: msg.id || Date.now().toString(), type: 'text', text: msg.data, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(sender || ChatSystem.currentChat, dm); if (ChatSystem.currentChat === sender || ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
+                if (msg.type === 'image') { const dm = { id: msg.id || Date.now().toString(), type: 'image', data: msg.data, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(ChatSystem.currentChat, dm); if (ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
+                else if (msg.type === 'file') { const dm = { id: msg.id || Date.now().toString(), type: 'file', data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(ChatSystem.currentChat, dm); if (ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
+                else if (msg.type === 'voice') { const dm = { id: msg.id || Date.now().toString(), type: 'voice', data: msg.data, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(ChatSystem.currentChat, dm); if (ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
+                else if (msg.type === 'video') { const dm = { id: msg.id || Date.now().toString(), type: 'video', data: msg.data, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(ChatSystem.currentChat, dm); if (ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
+                else if (msg.type === 'location') { const dm = { id: msg.id || Date.now().toString(), type: 'text', text: msg.data, sender: 'friend', time: new Date().toISOString() }; ChatSystem.saveMessage(ChatSystem.currentChat, dm); if (ChatSystem.currentChat) ChatSystem.displayMessage(dm); }
             } catch (er) {}
         };
         channel.onopen = () => console.log('📡 Data Channel مفتوح');
@@ -181,10 +191,14 @@ const CallSystem = {
         const dc = this.getChannel(friendId) || this.dc;
         if (!dc || dc.readyState !== 'open') return false;
         try {
-            let b64;
-            if (type === 'image') { const comp = await SecureChatSystem.compressImage(file); b64 = await SecureChatSystem.fileToBase64(comp); }
-            else { b64 = await SecureChatSystem.fileToBase64(file); }
-            dc.send(JSON.stringify({ type, data: b64, id: Date.now().toString(), fileName: file.name }));
+            const b64 = await SecureChatSystem.fileToBase64(file);
+            const chunkSize = 16000;
+            const id = Date.now().toString();
+            const total = Math.ceil(b64.length / chunkSize);
+            for (let i = 0; i < total; i++) {
+                dc.send(JSON.stringify({ type, data: b64.substring(i * chunkSize, (i + 1) * chunkSize), chunk: i, total, id, fileName: file.name }));
+                await new Promise(r => setTimeout(r, 50));
+            }
             return true;
         } catch (e) { return false; }
     },
@@ -269,7 +283,7 @@ window.startAudioCall = async () => { if (!ChatSystem.currentChat) return; await
 
 // ========== نظام الدردشة E2EE ==========
 const ChatSystem = {
-    currentChat: null, messages: {}, friendOnline: false,
+    currentChat: null, messages: {}, friendOnline: false, connectionReady: false, connectionTimer: null,
     
     init() { this.loadAllChats(); },
     loadAllChats() { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('chat_')) { const fid = k.replace('chat_', ''); try { this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[fid] = []; } } } },
@@ -282,22 +296,56 @@ const ChatSystem = {
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
         CallSystem.ensureDataChannel(friendId);
+        this.startConnectionTimer();
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+    },
+    
+    startConnectionTimer() {
+        this.connectionReady = false;
+        this.updateAttachmentButtons(false);
+        const statusEl = document.getElementById('conversationStatus');
+        if (statusEl) { statusEl.textContent = '⏳ جاري الاتصال... 0/60'; statusEl.className = 'conversation-status'; }
+        
+        let seconds = 0;
+        if (this.connectionTimer) clearInterval(this.connectionTimer);
+        this.connectionTimer = setInterval(() => {
+            seconds++;
+            if (statusEl) statusEl.textContent = `⏳ جاري الاتصال... ${seconds}/60`;
+            
+            const dc = CallSystem.getChannel(this.currentChat) || CallSystem.dc;
+            if (dc && dc.readyState === 'open') {
+                clearInterval(this.connectionTimer);
+                this.connectionReady = true;
+                this.updateAttachmentButtons(true);
+                if (statusEl) { statusEl.textContent = '🟢 متصل'; statusEl.className = 'conversation-status online'; }
+            }
+            
+            if (seconds >= 60) {
+                clearInterval(this.connectionTimer);
+                this.connectionReady = true;
+                this.updateAttachmentButtons(true);
+                if (statusEl) { statusEl.textContent = '🟢 متصل'; statusEl.className = 'conversation-status online'; }
+            }
+        }, 1000);
     },
     
     updateFriendStatus(friendId, isOnline) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
-        if (isOnline) CallSystem.ensureDataChannel(friendId);
-        const statusEl = document.getElementById('conversationStatus');
-        if (statusEl) { statusEl.textContent = isOnline ? '🟢 متصل' : '🔴 غير متصل'; statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`; }
-        this.updateAttachmentButtons(isOnline);
+        if (isOnline) { CallSystem.ensureDataChannel(friendId); this.startConnectionTimer(); }
+        else {
+            if (this.connectionTimer) clearInterval(this.connectionTimer);
+            this.connectionReady = false;
+            this.updateAttachmentButtons(false);
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl) { statusEl.textContent = '🔴 غير متصل'; statusEl.className = 'conversation-status offline'; }
+        }
     },
     
-    updateAttachmentButtons(isOnline) {
+    updateAttachmentButtons(ready) {
         const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
-        btns.forEach(btn => { if (isOnline) { btn.classList.remove('locked'); btn.title = ''; } else { btn.classList.add('locked'); btn.title = 'غير متاح - المستخدم غير متصل'; } });
+        btns.forEach(btn => { if (ready) { btn.classList.remove('locked'); btn.title = ''; } else { btn.classList.add('locked'); btn.title = 'جاري الاتصال...'; } });
     },
     
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
@@ -317,16 +365,42 @@ const ChatSystem = {
     
     async sendMessage(text) { if (!this.currentChat || !text.trim()) return false; const mid = Date.now().toString(); try { const pr = await SecureChatSystem.getMyPrivateKey(); const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); if (!pr || !pu) return false; const sk = await SecureChatSystem.deriveSharedKey(pr, pu); const enc = await SecureChatSystem.encryptData(text, sk); await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); this.saveMessage(this.currentChat, { id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: mid, type: 'text', text, sender: 'me', time: new Date().toISOString(), status: 'sent' }); return true; } catch (e) { return false; } },
     
-    async sendImage(file) { if (!this.currentChat) return; if (this.friendOnline) { const sent = await CallSystem.sendFileDirect(this.currentChat, file, 'image'); if (sent) { const comp = await SecureChatSystem.compressImage(file); const b64 = await SecureChatSystem.fileToBase64(comp); this.saveMessage(this.currentChat, { id: Date.now().toString(), type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: Date.now().toString(), type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } } },
-    async sendVideoFile(file) { if (!this.currentChat) return; if (this.friendOnline) { const sent = await CallSystem.sendFileDirect(this.currentChat, file, 'video'); if (sent) { const b64 = await SecureChatSystem.fileToBase64(file); this.saveMessage(this.currentChat, { id: Date.now().toString(), type: 'video', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: Date.now().toString(), type: 'video', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } } },
-    async sendFile(file) { if (!this.currentChat) return; if (this.friendOnline) { const sent = await CallSystem.sendFileDirect(this.currentChat, file, 'file'); if (sent) { const b64 = await SecureChatSystem.fileToBase64(file); this.saveMessage(this.currentChat, { id: Date.now().toString(), type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: Date.now().toString(), type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } } },
-    async sendVoiceNote(audioBlob) { if (!this.currentChat) return; if (this.friendOnline) { const sent = await CallSystem.sendFileDirect(this.currentChat, audioBlob, 'voice'); if (sent) { const b64 = await SecureChatSystem.fileToBase64(audioBlob); this.saveMessage(this.currentChat, { id: Date.now().toString(), type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.displayMessage({ id: Date.now().toString(), type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); } } },
+    async sendAnyFile(file, type) {
+        if (!this.currentChat || !this.friendOnline) return;
+        CallSystem.ensureDataChannel(this.currentChat);
+        const ready = await CallSystem.waitForChannel(this.currentChat, 60000);
+        if (!ready) return;
+        const sent = await CallSystem.sendFileDirect(this.currentChat, file, type);
+        if (sent) {
+            const b64 = await SecureChatSystem.fileToBase64(file);
+            const msg = { id: Date.now().toString(), type, data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' };
+            if (type === 'file') msg.fileName = file.name;
+            this.saveMessage(this.currentChat, msg);
+            this.displayMessage(msg);
+        }
+    },
     
-    async shareLocationDirect() { if (!this.currentChat) return; if (this.friendOnline) { navigator.geolocation.getCurrentPosition(p => { const locMsg = `📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`; const dc = CallSystem.getChannel(this.currentChat) || CallSystem.dc; if (dc && dc.readyState === 'open') { dc.send(JSON.stringify({ type: 'location', data: locMsg, id: Date.now().toString() })); } this.displayMessage({ id: Date.now().toString(), type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); this.saveMessage(this.currentChat, { id: Date.now().toString(), type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); }); } },
+    async sendImage(file) { await this.sendAnyFile(file, 'image'); },
+    async sendVideoFile(file) { await this.sendAnyFile(file, 'video'); },
+    async sendFile(file) { await this.sendAnyFile(file, 'file'); },
+    async sendVoiceNote(audioBlob) { await this.sendAnyFile(audioBlob, 'voice'); },
+    
+    async shareLocationDirect() {
+        if (!this.currentChat || !this.friendOnline) return;
+        navigator.geolocation.getCurrentPosition(async p => {
+            const locMsg = `📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
+            const dc = CallSystem.getChannel(this.currentChat) || CallSystem.dc;
+            if (dc && dc.readyState === 'open') {
+                dc.send(JSON.stringify({ type: 'location', data: locMsg, id: Date.now().toString() }));
+            }
+            this.displayMessage({ id: Date.now().toString(), type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            this.saveMessage(this.currentChat, { id: Date.now().toString(), type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+        });
+    },
     
     saveMessage(friendId, message) { const key = `chat_${friendId}`; let h = []; try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; } h.push(message); if (h.length > 100) h = h.slice(-100); localStorage.setItem(key, JSON.stringify(h)); this.messages[friendId] = h; },
     updateLastMessage(friendId, lastMessage) { document.querySelectorAll('.chat-item').forEach(item => { if (item.getAttribute('onclick')?.includes(friendId)) { const lm = item.querySelector('.last-message'); const tm = item.querySelector('.chat-time'); if (lm) lm.textContent = lastMessage; if (tm) tm.textContent = 'الآن'; } }); },
-    closeChat() { document.body.classList.remove('conversation-open'); document.getElementById('conversationPage').style.display = 'none'; document.querySelector('.chat-page').style.display = 'block'; PresenceSystem.stopAll(); this.currentChat = null; },
+    closeChat() { if (this.connectionTimer) clearInterval(this.connectionTimer); document.body.classList.remove('conversation-open'); document.getElementById('conversationPage').style.display = 'none'; document.querySelector('.chat-page').style.display = 'block'; PresenceSystem.stopAll(); this.currentChat = null; },
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 ChatSystem.init();
