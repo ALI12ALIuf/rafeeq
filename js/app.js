@@ -119,15 +119,23 @@ const CallSystem = {
     },
     
     async ensureDataChannel(calleeId) {
+        // إذا القناة موجودة وشغالة، لا تنشئ واحدة جديدة
         if (this.dc && this.dc.readyState === 'open') return;
+        
+        // تنظيف القديم
+        if (this.dc) { this.dc.close(); this.dc = null; }
+        if (this.pc) { this.pc.close(); this.pc = null; }
+        
         this.pc = new RTCPeerConnection(this.servers);
         this.dc = this.pc.createDataChannel('chat');
         this.setupDataChannel(this.dc);
         this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
         this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); };
+        
         const offer = await this.pc.createOffer();
         await this.pc.setLocalDescription(offer);
         this.sendSignal(calleeId, { sdp: this.pc.localDescription });
+        console.log('📡 قناة بيانات جديدة أنشئت');
     },
     
     async startCall(calleeId, callType = 'video') {
@@ -361,7 +369,21 @@ const ChatSystem = {
     
     saveMessage(friendId, message) { const key = `chat_${friendId}`; let h = []; try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; } h.push(message); if (h.length > 100) h = h.slice(-100); localStorage.setItem(key, JSON.stringify(h)); this.messages[friendId] = h; },
     updateLastMessage(friendId, lastMessage) { document.querySelectorAll('.chat-item').forEach(item => { if (item.getAttribute('onclick')?.includes(friendId)) { const lm = item.querySelector('.last-message'); const tm = item.querySelector('.chat-time'); if (lm) lm.textContent = lastMessage; if (tm) tm.textContent = 'الآن'; } }); },
-    closeChat() { document.body.classList.remove('conversation-open'); document.getElementById('conversationPage').style.display = 'none'; document.querySelector('.chat-page').style.display = 'block'; PresenceSystem.stopAll(); this.currentChat = null; },
+    
+    closeChat() {
+        document.body.classList.remove('conversation-open');
+        document.getElementById('conversationPage').style.display = 'none';
+        document.querySelector('.chat-page').style.display = 'block';
+        PresenceSystem.stopAll();
+        
+        // ✅ تنظيف WebRTC
+        if (CallSystem.dc) { CallSystem.dc.close(); CallSystem.dc = null; }
+        if (CallSystem.pc) { CallSystem.pc.close(); CallSystem.pc = null; }
+        
+        this.currentChat = null;
+        this.friendOnline = false;
+    },
+    
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 ChatSystem.init();
