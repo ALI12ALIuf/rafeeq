@@ -108,9 +108,24 @@ const CallSystem = {
     },
     
     async ensureDataChannel(calleeId) {
-        if (this.dc && this.dc.readyState === 'open') return;
+        // ✅ إذا القناة موجودة، تأكد إنها شغالة فعلاً
+        if (this.dc && this.dc.readyState === 'open') {
+            try {
+                this.dc.send(JSON.stringify({ type: 'ping' }));
+                console.log('✅ القناة موجودة وشغالة');
+                return;
+            } catch(e) {
+                console.log('⚠️ القناة موجودة لكن ما تستجيب، إعادة بناء');
+                this.dc.close();
+                this.dc = null;
+            }
+        }
+        
+        // تنظيف القديم
         if (this.dc) { this.dc.close(); this.dc = null; }
         if (this.pc) { this.pc.close(); this.pc = null; }
+        
+        console.log('📡 إنشاء قناة بيانات جديدة...');
         this.pc = new RTCPeerConnection(this.servers);
         this.dc = this.pc.createDataChannel('chat');
         this.setupDataChannel(this.dc);
@@ -146,6 +161,18 @@ const CallSystem = {
         channel.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
+                
+                // ===== نظام Ping/Pong للحفاظ على الاتصال =====
+                if (msg.type === 'ping') {
+                    channel.send(JSON.stringify({ type: 'pong' }));
+                    return;
+                }
+                if (msg.type === 'pong') {
+                    console.log('💓 نبض - القناة شغالة');
+                    return;
+                }
+                // ===========================================
+                
                 if (msg.chunk !== undefined) {
                     if (!this.incomingChunks[msg.id]) { this.incomingChunks[msg.id] = []; this.incomingFileInfo[msg.id] = { type: msg.type, fileName: msg.fileName, total: msg.total, received: 0 }; }
                     this.incomingChunks[msg.id][msg.chunk] = msg.data;
@@ -162,12 +189,33 @@ const CallSystem = {
                 if (ChatSystem.currentChat) { ChatSystem.saveMessage(ChatSystem.currentChat, dm); ChatSystem.displayMessage(dm); }
             } catch (er) {}
         };
-        channel.onopen = () => console.log('📡 Data Channel مفتوح');
-        channel.onclose = () => { console.log('⚠️ Data Channel انغلق'); if (ChatSystem.currentChat && ChatSystem.friendOnline) { setTimeout(() => CallSystem.ensureDataChannel(ChatSystem.currentChat), 1000); } };
+        channel.onopen = () => {
+            console.log('📡 Data Channel مفتوح');
+            // إرسال ping كل 10 ثواني للتأكد من استمرار الاتصال
+            channel.heartbeat = setInterval(() => {
+                if (channel.readyState === 'open') {
+                    channel.send(JSON.stringify({ type: 'ping' }));
+                } else {
+                    clearInterval(channel.heartbeat);
+                }
+            }, 10000);
+        };
+        channel.onclose = () => {
+            console.log('⚠️ Data Channel انغلق');
+            if (channel.heartbeat) clearInterval(channel.heartbeat);
+            if (ChatSystem.currentChat && ChatSystem.friendOnline) {
+                console.log('🔄 محاولة إعادة الاتصال...');
+                setTimeout(() => CallSystem.ensureDataChannel(ChatSystem.currentChat), 1000);
+            }
+        };
     },
     
     async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') return false;
+        if (!this.dc || this.dc.readyState !== 'open') {
+            console.error('❌ القناة غير مفتوحة، جاري إعادة الاتصال...');
+            if (ChatSystem.currentChat) await this.ensureDataChannel(ChatSystem.currentChat);
+            return false;
+        }
         try {
             let b64;
             if (type === 'image') { const comp = await SecureChatSystem.compressImage(file); b64 = await SecureChatSystem.fileToBase64(comp); }
@@ -177,13 +225,15 @@ const CallSystem = {
             const chunkSize = 16000;
             const totalChunks = Math.ceil(b64.length / chunkSize);
             const fileId = Date.now().toString();
+            console.log(`📤 إرسال ${type}: ${(b64.length/1024).toFixed(1)}KB, ${totalChunks} أجزاء`);
             for (let i = 0; i < totalChunks; i++) {
                 if (this.dc.readyState !== 'open') return false;
                 this.dc.send(JSON.stringify({ type, data: b64.substring(i * chunkSize, (i + 1) * chunkSize), chunk: i, total: totalChunks, id: fileId, fileName: file.name }));
                 await new Promise(r => setTimeout(r, 50));
             }
+            console.log('✅ تم إرسال جميع الأجزاء');
             return true;
-        } catch (e) { return false; }
+        } catch (e) { console.error('❌ فشل الإرسال:', e); return false; }
     },
     
     showIncomingCall(callerId, callData) {
@@ -268,7 +318,7 @@ const ChatSystem = {
         document.querySelector('.chat-page').style.display = 'none'; document.getElementById('conversationPage').style.display = 'flex';
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
-        setTimeout(() => { if (this.friendOnline) CallSystem.ensureDataChannel(friendId); }, 500);
+        setTimeout(() => { if (this.friendOnline) CallSystem.ensureDataChannel(friendId); }, 800);
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
@@ -318,7 +368,7 @@ const ChatSystem = {
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
         PresenceSystem.stopAll();
-        if (CallSystem.dc) { CallSystem.dc.close(); CallSystem.dc = null; }
+        if (CallSystem.dc) { clearInterval(CallSystem.dc.heartbeat); CallSystem.dc.close(); CallSystem.dc = null; }
         if (CallSystem.pc) { CallSystem.pc.close(); CallSystem.pc = null; }
         this.currentChat = null; this.friendOnline = false;
     },
