@@ -107,8 +107,9 @@ const CallSystem = {
         ]
     },
     
+    // ✅ 1. دالة ensureDataChannel (مُحسَّنة مع نظام نبضات القلب)
     async ensureDataChannel(calleeId) {
-        // ✅ إذا القناة موجودة، تأكد إنها شغالة فعلاً
+        // إذا القناة موجودة، تأكد إنها شغالة فعلاً
         if (this.dc && this.dc.readyState === 'open') {
             try {
                 this.dc.send(JSON.stringify({ type: 'ping' }));
@@ -162,7 +163,6 @@ const CallSystem = {
             try {
                 const msg = JSON.parse(e.data);
                 
-                // ===== نظام Ping/Pong للحفاظ على الاتصال =====
                 if (msg.type === 'ping') {
                     channel.send(JSON.stringify({ type: 'pong' }));
                     return;
@@ -171,7 +171,6 @@ const CallSystem = {
                     console.log('💓 نبض - القناة شغالة');
                     return;
                 }
-                // ===========================================
                 
                 if (msg.chunk !== undefined) {
                     if (!this.incomingChunks[msg.id]) { this.incomingChunks[msg.id] = []; this.incomingFileInfo[msg.id] = { type: msg.type, fileName: msg.fileName, total: msg.total, received: 0 }; }
@@ -191,13 +190,9 @@ const CallSystem = {
         };
         channel.onopen = () => {
             console.log('📡 Data Channel مفتوح');
-            // إرسال ping كل 10 ثواني للتأكد من استمرار الاتصال
             channel.heartbeat = setInterval(() => {
-                if (channel.readyState === 'open') {
-                    channel.send(JSON.stringify({ type: 'ping' }));
-                } else {
-                    clearInterval(channel.heartbeat);
-                }
+                if (channel.readyState === 'open') channel.send(JSON.stringify({ type: 'ping' }));
+                else clearInterval(channel.heartbeat);
             }, 10000);
         };
         channel.onclose = () => {
@@ -210,11 +205,18 @@ const CallSystem = {
         };
     },
     
+    // ✅ 2. دالة sendFileDirect (تحاول إعادة الاتصال تلقائياً)
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') {
-            console.error('❌ القناة غير مفتوحة، جاري إعادة الاتصال...');
-            if (ChatSystem.currentChat) await this.ensureDataChannel(ChatSystem.currentChat);
-            return false;
+            console.warn('⚠️ القناة ليست مفتوحة، جاري强制 إعادة الاتصال...');
+            if (ChatSystem.currentChat) {
+                await this.ensureDataChannel(ChatSystem.currentChat);
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            if (!this.dc || this.dc.readyState !== 'open') {
+                console.error('❌ فشل بناء قناة البيانات');
+                return false;
+            }
         }
         try {
             let b64;
@@ -225,15 +227,15 @@ const CallSystem = {
             const chunkSize = 16000;
             const totalChunks = Math.ceil(b64.length / chunkSize);
             const fileId = Date.now().toString();
-            console.log(`📤 إرسال ${type}: ${(b64.length/1024).toFixed(1)}KB, ${totalChunks} أجزاء`);
+            console.log(`📤 بدء إرسال ${type}: ${totalChunks} أجزاء`);
             for (let i = 0; i < totalChunks; i++) {
                 if (this.dc.readyState !== 'open') return false;
                 this.dc.send(JSON.stringify({ type, data: b64.substring(i * chunkSize, (i + 1) * chunkSize), chunk: i, total: totalChunks, id: fileId, fileName: file.name }));
-                await new Promise(r => setTimeout(r, 50));
+                await new Promise(r => setTimeout(r, 80));
             }
             console.log('✅ تم إرسال جميع الأجزاء');
             return true;
-        } catch (e) { console.error('❌ فشل الإرسال:', e); return false; }
+        } catch (e) { console.error('❌ فشل إرسال الملف:', e); return false; }
     },
     
     showIncomingCall(callerId, callData) {
@@ -311,6 +313,7 @@ const ChatSystem = {
     init() { this.loadAllChats(); },
     loadAllChats() { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('chat_')) { const fid = k.replace('chat_', ''); try { this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[fid] = []; } } } },
     
+    // ✅ 3. دالة openChat (تحاول بناء القناة 3 مرات)
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId; document.body.classList.add('conversation-open');
         document.getElementById('conversationName').textContent = friendName;
@@ -318,15 +321,27 @@ const ChatSystem = {
         document.querySelector('.chat-page').style.display = 'none'; document.getElementById('conversationPage').style.display = 'flex';
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
-        setTimeout(() => { if (this.friendOnline) CallSystem.ensureDataChannel(friendId); }, 800);
+        
+        let attempts = 0;
+        const tryConnect = () => {
+            if (this.friendOnline && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
+                console.log(`🔄 محاولة بناء القناة (${attempts + 1}/3)...`);
+                CallSystem.ensureDataChannel(friendId);
+                attempts++;
+                if (attempts < 3) setTimeout(tryConnect, 1500);
+            }
+        };
+        setTimeout(tryConnect, 800);
+        
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
+    // ✅ 4. دالة updateFriendStatus (تأخير بسيط لضمان الجاهزية)
     updateFriendStatus(friendId, isOnline) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
-        if (isOnline) CallSystem.ensureDataChannel(friendId);
+        if (isOnline) setTimeout(() => CallSystem.ensureDataChannel(friendId), 500);
         const statusEl = document.getElementById('conversationStatus');
         if (statusEl) { statusEl.textContent = isOnline ? '🟢 متصل' : '🔴 غير متصل'; statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`; }
         this.updateAttachmentButtons(isOnline);
