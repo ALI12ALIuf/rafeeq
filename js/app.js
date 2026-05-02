@@ -4,7 +4,8 @@ const SecureChatSystem = {
     keyCache: new Map(),
     sharedKeyCache: new Map(),
     
-    VIDEO_MAX_DURATION: 180, // 3 دقائق
+    VIDEO_MAX_DURATION: 300, // 5 دقائق (الحد الفعلي)
+    VIDEO_WARNING_DURATION: 290, // 4:50 دقائق (اللي يظهر في رسالة التحذير)
     VIDEO_MAX_INPUT_SIZE: 100 * 1024 * 1024, // 100MB
     
     async init() {
@@ -152,7 +153,6 @@ const SecureChatSystem = {
         }); 
     },
     
-    // ========== فحص الفيديو فقط (بدون ضغط) ==========
     getVideoDuration(file) {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
@@ -165,20 +165,30 @@ const SecureChatSystem = {
         });
     },
     
-    // ========== إرسال الفيديو مباشرة بدون ضغط ==========
+    // ========== فحص الفيديو - حد فعلي 5 دقائق، رسالة تحذير 4:50 ==========
     validateVideo(file) {
-        // هذه الدالة فقط تتحقق من صلاحية الفيديو، لا تضغطه
         return this.getVideoDuration(file).then(duration => {
+            const durationSec = Math.floor(duration);
+            const mins = Math.floor(durationSec / 60);
+            const secs = durationSec % 60;
+            
             if (duration > this.VIDEO_MAX_DURATION) {
-                const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), limitMins = Math.floor(this.VIDEO_MAX_DURATION / 60);
-                throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${limitMins} دقائق\n💡 قم بقص الجزء المهم فقط`);
+                const warnMins = Math.floor(this.VIDEO_WARNING_DURATION / 60);
+                const warnSecs = this.VIDEO_WARNING_DURATION % 60;
+                throw new Error(
+                    `❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\n` +
+                    `الحد الأقصى: ${warnMins}:${warnSecs.toString().padStart(2, '0')} دقائق\n` +
+                    `💡 قم بقص الفيديو قبل الإرسال`
+                );
             }
+            
             if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
                 const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
                 throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
             }
-            console.log(`⚡ فيديو جاهز للإرسال المباشر: ${Math.floor(duration)}s | ${(file.size/1024/1024).toFixed(1)}MB`);
-            return file; // نرجع الملف كما هو بدون أي ضغط
+            
+            console.log(`⚡ فيديو جاهز للإرسال المباشر: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            return file;
         });
     },
     
@@ -349,17 +359,11 @@ const CallSystem = {
         } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
     },
     
-    // ========== إرسال الملفات (فيديو بدون ضغط) ==========
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') return false;
         try {
             let blobToSend = file;
-            
-            // الصور فقط نضغطها، الفيديو والملفات الأخرى ترسل كما هي
-            if (type === 'image') {
-                blobToSend = await SecureChatSystem.compressImage(file);
-            }
-            // الفيديو يرسل مباشرة بدون ضغط
+            if (type === 'image') blobToSend = await SecureChatSystem.compressImage(file);
             
             const b64 = await SecureChatSystem.fileToBase64(blobToSend);
             const chunkSize = 16000;
@@ -564,11 +568,9 @@ const ChatSystem = {
         } else alert('المستخدم غير متصل حالياً');
     },
     
-    // ========== إرسال الفيديو مباشرة بدون ضغط ==========
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         
-        // فحص المدة والحجم فقط
         try {
             await SecureChatSystem.validateVideo(file);
         } catch (error) {
@@ -588,32 +590,18 @@ const ChatSystem = {
                     const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
                     
-                    // عرض الفيديو في الدردشة
                     this.displayMessage({ 
-                        id: msgId, 
-                        type: 'video', 
-                        data: b64,
-                        fileName: file.name,
-                        sender: 'me', 
-                        time: new Date().toISOString(), 
-                        status: 'sent' 
+                        id: msgId, type: 'video', data: b64, fileName: file.name,
+                        sender: 'me', time: new Date().toISOString(), status: 'sent' 
                     });
                     
-                    // حفظ في localStorage بيانات خفيفة فقط (بدون base64 الكامل)
                     this.saveMessage(this.currentChat, { 
-                        id: msgId, 
-                        type: 'video', 
-                        data: b64.substring(0, 100) + '...',
+                        id: msgId, type: 'video', data: b64.substring(0, 100) + '...',
                         _videoPlaceholder: true,
-                        sender: 'me', 
-                        time: new Date().toISOString(), 
-                        status: 'sent' 
+                        sender: 'me', time: new Date().toISOString(), status: 'sent' 
                     });
                     
-                } catch (error) { 
-                    console.error('❌ فشل معالجة الفيديو:', error);
-                    alert('فشل معالجة الفيديو'); 
-                }
+                } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
     },
