@@ -4,9 +4,8 @@ const SecureChatSystem = {
     keyCache: new Map(),
     sharedKeyCache: new Map(),
     
-    VIDEO_MAX_DURATION: 180,
-    VIDEO_MAX_INPUT_SIZE: 100 * 1024 * 1024,
-    VIDEO_MAX_OUTPUT_SIZE: 35 * 1024 * 1024,
+    VIDEO_MAX_DURATION: 180, // 3 دقائق
+    VIDEO_MAX_INPUT_SIZE: 100 * 1024 * 1024, // 100MB
     
     async init() {
         if (!window.auth?.currentUser) { 
@@ -153,6 +152,7 @@ const SecureChatSystem = {
         }); 
     },
     
+    // ========== فحص الفيديو فقط (بدون ضغط) ==========
     getVideoDuration(file) {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
@@ -165,98 +165,20 @@ const SecureChatSystem = {
         });
     },
     
-    getBestVideoMimeType() {
-        const types = ['video/webm;codecs=vp8,opus','video/webm;codecs=vp8','video/webm;codecs=vp9,opus','video/webm;codecs=vp9','video/webm','video/mp4'];
-        for (const type of types) { if (MediaRecorder.isTypeSupported(type)) return type; }
-        return 'video/webm';
-    },
-    
-    async compressVideo(file) {
-        let duration;
-        try { duration = await this.getVideoDuration(file); } catch (error) { throw new Error('❌ فشل قراءة الفيديو'); }
-        
-        if (duration > this.VIDEO_MAX_DURATION) {
-            const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), limitMins = Math.floor(this.VIDEO_MAX_DURATION / 60);
-            throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${limitMins} دقائق\n💡 قم بقص الجزء المهم فقط`);
-        }
-        
-        if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
-            const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
-            throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
-        }
-        
-        if (duration <= 60 && file.size <= 15 * 1024 * 1024) { console.log('⚡ فيديو صغير - إرسال مباشر'); return file; }
-        
-        console.log(`🎬 ضغط فيديو: ${Math.floor(duration)}s | ${(file.size/1024/1024).toFixed(1)}MB`);
-        
-        return new Promise((resolve, reject) => {
-            const video = document.createElement('video');
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const url = URL.createObjectURL(file);
-            video.preload = 'auto';
-            video.muted = true;
-            
-            video.onloadedmetadata = () => {
-                URL.revokeObjectURL(url);
-                const targetHeight = 360, targetBitrate = 400000, targetFPS = 20;
-                let width = video.videoWidth, height = video.videoHeight;
-                if (height > targetHeight) { width = Math.round((width * targetHeight) / height); height = targetHeight; }
-                canvas.width = Math.round(width / 2) * 2;
-                canvas.height = Math.round(height / 2) * 2;
-                
-                const mimeType = this.getBestVideoMimeType();
-                const stream = canvas.captureStream(targetFPS);
-                const mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: targetBitrate, audioBitsPerSecond: 32000 });
-                
-                const chunks = [];
-                const startTime = Date.now();
-                let lastProgressUpdate = 0;
-                
-                mediaRecorder.ondataavailable = e => {
-                    if (e.data.size > 0) {
-                        chunks.push(e.data);
-                        const now = Date.now();
-                        if (now - lastProgressUpdate > 200) {
-                            lastProgressUpdate = now;
-                            const elapsed = (now - startTime) / 1000;
-                            const progress = Math.min((elapsed / duration) * 100, 95);
-                            const currentSize = chunks.reduce((sum, c) => sum + c.size, 0);
-                            ChatSystem.updateProgressBar(progress, `جاري ضغط الفيديو... ${(currentSize/1024/1024).toFixed(1)}MB`);
-                        }
-                    }
-                };
-                
-                mediaRecorder.onstop = () => {
-                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                    if (chunks.length === 0) { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تسجيل الفيديو')); return; }
-                    
-                    const blob = new Blob(chunks, { type: mimeType });
-                    const finalSizeMB = (blob.size / 1024 / 1024).toFixed(1);
-                    console.log(`✅ اكتمل في ${elapsed}s | ${(file.size/1024/1024).toFixed(1)}MB → ${finalSizeMB}MB`);
-                    
-                    ChatSystem.updateProgressBar(100, '✅ الضغط مكتمل! جاري الإرسال...');
-                    
-                    if (blob.size > this.VIDEO_MAX_OUTPUT_SIZE) { ChatSystem.hideProgressBar(); reject(new Error(`❌ الحجم بعد الضغط كبير (${finalSizeMB}MB)`)); return; }
-                    
-                    setTimeout(() => resolve(blob), 300);
-                };
-                
-                mediaRecorder.onerror = () => { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تسجيل الفيديو')); };
-                
-                video.currentTime = 0;
-                const playPromise = video.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        ChatSystem.showProgressBar('جاري ضغط الفيديو...', 0);
-                        mediaRecorder.start(500);
-                        setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); video.pause(); }, duration * 1000);
-                    }).catch(() => { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تشغيل الفيديو')); });
-                } else { reject(new Error('❌ المتصفح لا يدعم تشغيل الفيديو')); }
-            };
-            
-            video.onerror = () => { URL.revokeObjectURL(url); ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تحميل الفيديو')); };
-            video.src = url;
+    // ========== إرسال الفيديو مباشرة بدون ضغط ==========
+    validateVideo(file) {
+        // هذه الدالة فقط تتحقق من صلاحية الفيديو، لا تضغطه
+        return this.getVideoDuration(file).then(duration => {
+            if (duration > this.VIDEO_MAX_DURATION) {
+                const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), limitMins = Math.floor(this.VIDEO_MAX_DURATION / 60);
+                throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${limitMins} دقائق\n💡 قم بقص الجزء المهم فقط`);
+            }
+            if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
+                const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
+                throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
+            }
+            console.log(`⚡ فيديو جاهز للإرسال المباشر: ${Math.floor(duration)}s | ${(file.size/1024/1024).toFixed(1)}MB`);
+            return file; // نرجع الملف كما هو بدون أي ضغط
         });
     },
     
@@ -427,17 +349,24 @@ const CallSystem = {
         } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
     },
     
+    // ========== إرسال الملفات (فيديو بدون ضغط) ==========
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') return false;
         try {
             let blobToSend = file;
-            if (type === 'image') blobToSend = await SecureChatSystem.compressImage(file);
-            else if (type === 'video') blobToSend = await SecureChatSystem.compressVideo(file);
+            
+            // الصور فقط نضغطها، الفيديو والملفات الأخرى ترسل كما هي
+            if (type === 'image') {
+                blobToSend = await SecureChatSystem.compressImage(file);
+            }
+            // الفيديو يرسل مباشرة بدون ضغط
             
             const b64 = await SecureChatSystem.fileToBase64(blobToSend);
             const chunkSize = 16000;
             const totalChunks = Math.ceil(b64.length / chunkSize);
             const fileId = Date.now().toString();
+            
+            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
             
             for (let i = 0; i < totalChunks; i++) {
                 if (this.dc.readyState !== 'open') { ChatSystem.hideProgressBar(); return false; }
@@ -449,6 +378,7 @@ const CallSystem = {
                 await new Promise(r => setTimeout(r, 50));
             }
             ChatSystem.hideProgressBar();
+            console.log('✅ تم الإرسال بنجاح');
             return true;
         } catch (e) { ChatSystem.hideProgressBar(); return false; }
     },
@@ -634,47 +564,31 @@ const ChatSystem = {
         } else alert('المستخدم غير متصل حالياً');
     },
     
-    // ========== إرسال الفيديو (بدون تخزين base64 في localStorage) ==========
+    // ========== إرسال الفيديو مباشرة بدون ضغط ==========
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         
-        // فحص المدة
+        // فحص المدة والحجم فقط
         try {
-            const duration = await SecureChatSystem.getVideoDuration(file);
-            const maxDuration = SecureChatSystem.VIDEO_MAX_DURATION;
-            if (duration > maxDuration) {
-                const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), maxMins = Math.floor(maxDuration / 60);
-                alert(`❌ الفيديو طويل جداً\n\n📹 ${mins}:${secs.toString().padStart(2, '0')} دقيقة\n⏱️ الحد الأقصى: ${maxMins} دقائق`);
-                return;
-            }
-        } catch (error) { alert('❌ فشل قراءة الفيديو'); return; }
+            await SecureChatSystem.validateVideo(file);
+        } catch (error) {
+            alert(error.message);
+            return;
+        }
         
         if (!this.friendOnline) { alert('المستخدم غير متصل حالياً'); return; }
         
         await CallSystem.ensureDataChannel(this.currentChat);
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
             const success = await this.sendFileWithRetry(file, 'video');
             if (success) {
                 try {
-                    // إعادة ضغط الفيديو للعرض فقط (للمرسل)
-                    const compressed = await SecureChatSystem.compressVideo(file);
-                    const b64 = await SecureChatSystem.fileToBase64(compressed); 
+                    const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
                     
-                    // حفظ الرسالة بدون تخزين base64 للفيديو (نخزن نوع الملف فقط)
-                    const msgData = { 
-                        id: msgId, 
-                        type: 'video', 
-                        data: b64.substring(0, 100) + '...', // نخزن جزء صغير فقط للدلالة
-                        _videoPlaceholder: true,
-                        _videoDuration: file.duration || 0,
-                        sender: 'me', 
-                        time: new Date().toISOString(), 
-                        status: 'sent' 
-                    };
-                    
-                    // عرض الرسالة مباشرة مع البيانات الكاملة
+                    // عرض الفيديو في الدردشة
                     this.displayMessage({ 
                         id: msgId, 
                         type: 'video', 
@@ -685,12 +599,20 @@ const ChatSystem = {
                         status: 'sent' 
                     });
                     
-                    // حفظ في localStorage فقط بيانات خفيفة (بدون base64)
-                    this.saveMessage(this.currentChat, msgData);
+                    // حفظ في localStorage بيانات خفيفة فقط (بدون base64 الكامل)
+                    this.saveMessage(this.currentChat, { 
+                        id: msgId, 
+                        type: 'video', 
+                        data: b64.substring(0, 100) + '...',
+                        _videoPlaceholder: true,
+                        sender: 'me', 
+                        time: new Date().toISOString(), 
+                        status: 'sent' 
+                    });
                     
                 } catch (error) { 
                     console.error('❌ فشل معالجة الفيديو:', error);
-                    alert(error.message || 'فشل معالجة الفيديو'); 
+                    alert('فشل معالجة الفيديو'); 
                 }
             } else alert('فشل إرسال الفيديو');
         }
@@ -705,7 +627,6 @@ const ChatSystem = {
                 if (success) {
                     const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
-                    // للملفات العادية: نخزن فقط إذا كان حجمها أقل من 500KB
                     if (b64.length < 500000) {
                         this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
                     } else {
@@ -726,7 +647,6 @@ const ChatSystem = {
                 if (success) {
                     const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
                     const msgId = Date.now().toString();
-                    // البصمات الصوتية صغيرة، نخزنها عادي
                     this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
                     this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
                 } else alert('فشل إرسال البصمة الصوتية');
@@ -751,47 +671,21 @@ const ChatSystem = {
     saveMessage(friendId, message) { 
         const key = `chat_${friendId}`; 
         let h = []; 
-        try { 
-            h = JSON.parse(localStorage.getItem(key)) || []; 
-        } catch (e) { h = []; }
-        
+        try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
         h.push(message); 
-        
-        // ========== تنظيف تلقائي للمساحة ==========
-        // إذا وصلت المساحة للحد، نحذف الملفات الكبيرة القديمة
         let serialized = JSON.stringify(h);
-        while (serialized.length > 4000000) { // 4MB حد أقصى للدردشة الواحدة
-            // حذف أقدم رسالة فيديو أو صورة أو ملف
+        while (serialized.length > 4000000) {
             let removed = false;
             for (let i = 0; i < h.length; i++) {
-                if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') {
-                    h.splice(i, 1);
-                    removed = true;
-                    break;
-                }
+                if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') { h.splice(i, 1); removed = true; break; }
             }
-            if (!removed) {
-                // إذا ما فيه ملفات، احذف أقدم رسالة نصية
-                h.splice(0, 1);
-            }
+            if (!removed) h.splice(0, 1);
             serialized = JSON.stringify(h);
         }
-        
-        try {
-            localStorage.setItem(key, JSON.stringify(h)); 
-        } catch (e) {
-            console.warn('⚠️ ما زالت المساحة ممتلئة، جاري حذف رسائل قديمة...');
-            // حذف 20% من الرسائل القديمة
+        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
             h = h.slice(Math.floor(h.length * 0.2));
-            try {
-                localStorage.setItem(key, JSON.stringify(h));
-            } catch (e2) {
-                console.error('❌ فشل حفظ الرسائل:', e2);
-                h = h.slice(-10); // احتفظ بآخر 10 رسائل فقط
-                try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {}
-            }
+            try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
         }
-        
         this.messages[friendId] = h; 
     },
     
