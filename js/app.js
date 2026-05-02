@@ -4,10 +4,9 @@ const SecureChatSystem = {
     keyCache: new Map(),
     sharedKeyCache: new Map(),
     
-    // ========== إعدادات الفيديو ==========
-    VIDEO_MAX_DURATION: 180, // 3 دقائق كحد أقصى
-    VIDEO_MAX_INPUT_SIZE: 100 * 1024 * 1024, // 100MB قبل الضغط
-    VIDEO_MAX_OUTPUT_SIZE: 35 * 1024 * 1024, // 35MB بعد الضغط
+    VIDEO_MAX_DURATION: 180,
+    VIDEO_MAX_INPUT_SIZE: 100 * 1024 * 1024,
+    VIDEO_MAX_OUTPUT_SIZE: 35 * 1024 * 1024,
     
     async init() {
         if (!window.auth?.currentUser) { 
@@ -42,16 +41,9 @@ const SecureChatSystem = {
                 publicKeyCreatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             
-            const privateExport = await window.crypto.subtle.exportKey(
-                'pkcs8', 
-                keyPair.privateKey
-            );
+            const privateExport = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
             
-            localStorage.setItem(
-                `enc_private_key_${uid}`, 
-                btoa(String.fromCharCode(...new Uint8Array(privateExport)))
-            );
-            
+            localStorage.setItem(`enc_private_key_${uid}`, btoa(String.fromCharCode(...new Uint8Array(privateExport))));
             this.keyCache.set(uid, keyPair.privateKey);
             console.log('✅ تم إنشاء المفاتيح بنجاح');
         } else {
@@ -67,318 +59,134 @@ const SecureChatSystem = {
                     publicKeyCreatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                const privateExport = await window.crypto.subtle.exportKey(
-                    'pkcs8', 
-                    keyPair.privateKey
-                );
-                
-                localStorage.setItem(
-                    `enc_private_key_${uid}`, 
-                    btoa(String.fromCharCode(...new Uint8Array(privateExport)))
-                );
-                
+                const privateExport = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+                localStorage.setItem(`enc_private_key_${uid}`, btoa(String.fromCharCode(...new Uint8Array(privateExport))));
                 this.keyCache.set(uid, keyPair.privateKey);
             }
         }
     },
     
-    async generateKeyPair() { 
-        return await window.crypto.subtle.generateKey(
-            { name: 'ECDH', namedCurve: 'P-256' }, 
-            true, 
-            ['deriveKey']
-        ); 
-    },
-    
-    async exportPublicKey(key) { 
-        const raw = await window.crypto.subtle.exportKey('raw', key); 
-        return btoa(String.fromCharCode(...new Uint8Array(raw))); 
-    },
+    async generateKeyPair() { return await window.crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']); },
+    async exportPublicKey(key) { const raw = await window.crypto.subtle.exportKey('raw', key); return btoa(String.fromCharCode(...new Uint8Array(raw))); },
     
     async importPublicKey(base64Key) { 
         if (!base64Key) throw new Error('المفتاح العام فارغ');
-        
         try {
             const binary = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
-            return await window.crypto.subtle.importKey(
-                'raw', 
-                binary, 
-                { name: 'ECDH', namedCurve: 'P-256' }, 
-                true, 
-                []
-            );
-        } catch (error) {
-            console.error('❌ فشل استيراد المفتاح العام:', error);
-            throw error;
-        }
+            return await window.crypto.subtle.importKey('raw', binary, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+        } catch (error) { throw error; }
     },
     
     async getMyPrivateKey() {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return null;
-        
-        if (this.keyCache.has(uid)) {
-            return this.keyCache.get(uid);
-        }
+        if (this.keyCache.has(uid)) return this.keyCache.get(uid);
         
         const stored = localStorage.getItem(`enc_private_key_${uid}`);
-        if (!stored) {
-            console.error('❌ المفتاح الخاص غير موجود');
-            return null;
-        }
+        if (!stored) return null;
         
         try {
             const binary = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
-            const key = await window.crypto.subtle.importKey(
-                'pkcs8', 
-                binary, 
-                { name: 'ECDH', namedCurve: 'P-256' }, 
-                false, 
-                ['deriveKey']
-            );
-            
+            const key = await window.crypto.subtle.importKey('pkcs8', binary, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']);
             this.keyCache.set(uid, key);
             return key;
-        } catch (error) {
-            console.error('❌ فشل استيراد المفتاح الخاص:', error);
-            return null;
-        }
+        } catch (error) { return null; }
     },
     
     async getReceiverPublicKey(userId) {
         if (!userId) return null;
-        
         try {
             const doc = await window.db.collection('users').doc(userId).get();
-            if (!doc.exists) {
-                console.warn('⚠️ المستخدم غير موجود:', userId);
-                return null;
-            }
-            
-            const userData = doc.data();
-            if (!userData?.publicKey) {
-                console.warn('⚠️ المفتاح العام للمستخدم غير موجود:', userId);
-                return null;
-            }
-            
-            return await this.importPublicKey(userData.publicKey);
-        } catch (error) {
-            console.error('❌ فشل جلب المفتاح العام:', error);
-            return null;
-        }
+            if (!doc.exists || !doc.data()?.publicKey) return null;
+            return await this.importPublicKey(doc.data().publicKey);
+        } catch (error) { return null; }
     },
     
     async deriveSharedKey(privateKey, publicKey) {
         const cacheKey = `${window.auth.currentUser.uid}_${await this.exportPublicKey(publicKey)}`;
-        
-        if (this.sharedKeyCache.has(cacheKey)) {
-            return this.sharedKeyCache.get(cacheKey);
-        }
+        if (this.sharedKeyCache.has(cacheKey)) return this.sharedKeyCache.get(cacheKey);
         
         try {
-            const sharedKey = await window.crypto.subtle.deriveKey(
-                { name: 'ECDH', public: publicKey },
-                privateKey,
-                { name: 'AES-GCM', length: 256 },
-                false,
-                ['encrypt', 'decrypt']
-            );
-            
+            const sharedKey = await window.crypto.subtle.deriveKey({ name: 'ECDH', public: publicKey }, privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
             this.sharedKeyCache.set(cacheKey, sharedKey);
             setTimeout(() => this.sharedKeyCache.delete(cacheKey), 300000);
-            
             return sharedKey;
-        } catch (error) {
-            console.error('❌ فشل اشتقاق المفتاح المشترك:', error);
-            throw error;
-        }
+        } catch (error) { throw error; }
     },
     
     async encryptData(data, sharedKey) {
         const encoder = new TextEncoder();
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        
         try {
-            const encrypted = await window.crypto.subtle.encrypt(
-                { 
-                    name: 'AES-GCM', 
-                    iv, 
-                    additionalData: encoder.encode('rafeeq-secure') 
-                },
-                sharedKey,
-                typeof data === 'string' ? encoder.encode(data) : data
-            );
-            
+            const encrypted = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, typeof data === 'string' ? encoder.encode(data) : data);
             const combined = new Uint8Array(iv.length + encrypted.byteLength);
             combined.set(iv);
             combined.set(new Uint8Array(encrypted), iv.length);
-            
             return btoa(String.fromCharCode(...combined));
-        } catch (error) {
-            console.error('❌ فشل التشفير:', error);
-            throw error;
-        }
+        } catch (error) { throw error; }
     },
     
     async decryptData(encryptedBase64, sharedKey) {
         const encoder = new TextEncoder();
-        
         try {
             const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
             const iv = combined.slice(0, 12);
             const data = combined.slice(12);
-            
-            const decrypted = await window.crypto.subtle.decrypt(
-                { 
-                    name: 'AES-GCM', 
-                    iv, 
-                    additionalData: encoder.encode('rafeeq-secure') 
-                },
-                sharedKey,
-                data
-            );
-            
+            const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, data);
             return new TextDecoder().decode(decrypted);
-        } catch (error) {
-            console.error('❌ فشل فك التشفير:', error);
-            throw error;
-        }
+        } catch (error) { throw error; }
     },
     
     async compressImage(file) { 
         return new Promise((resolve, reject) => { 
-            const img = new Image(); 
-            const canvas = document.createElement('canvas'); 
-            const ctx = canvas.getContext('2d');
-            
+            const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
             const url = URL.createObjectURL(file);
-            
             img.onload = () => { 
                 URL.revokeObjectURL(url);
-                
                 let w = img.width, h = img.height; 
-                
-                if (w > 1200 || h > 1200) { 
-                    if (w > h) { 
-                        h *= 1200 / w; 
-                        w = 1200; 
-                    } else { 
-                        w *= 1200 / h; 
-                        h = 1200; 
-                    } 
-                } 
-                
-                canvas.width = w; 
-                canvas.height = h; 
-                ctx.drawImage(img, 0, 0, w, h); 
-                
-                canvas.toBlob(
-                    (blob) => {
-                        if (blob) {
-                            resolve(blob);
-                        } else {
-                            reject(new Error('فشل ضغط الصورة'));
-                        }
-                    }, 
-                    'image/jpeg', 
-                    0.8
-                ); 
+                if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } 
+                canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); 
+                canvas.toBlob((blob) => { if (blob) resolve(blob); else reject(new Error('فشل ضغط الصورة')); }, 'image/jpeg', 0.8); 
             };
-            
-            img.onerror = () => {
-                URL.revokeObjectURL(url);
-                reject(new Error('فشل تحميل الصورة'));
-            };
-            
+            img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('فشل تحميل الصورة')); };
             img.src = url;
         }); 
     },
     
-    // ========== الحصول على مدة الفيديو ==========
     getVideoDuration(file) {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
             const url = URL.createObjectURL(file);
-            
-            const timeout = setTimeout(() => {
-                URL.revokeObjectURL(url);
-                reject(new Error('انتهت مهلة قراءة الفيديو'));
-            }, 10000);
-            
-            video.onloadedmetadata = () => {
-                clearTimeout(timeout);
-                URL.revokeObjectURL(url);
-                resolve(video.duration);
-            };
-            
-            video.onerror = () => {
-                clearTimeout(timeout);
-                URL.revokeObjectURL(url);
-                reject(new Error('فشل تحميل الفيديو. تأكد من صيغة الملف.'));
-            };
-            
+            const timeout = setTimeout(() => { URL.revokeObjectURL(url); reject(new Error('انتهت مهلة قراءة الفيديو')); }, 10000);
+            video.onloadedmetadata = () => { clearTimeout(timeout); URL.revokeObjectURL(url); resolve(video.duration); };
+            video.onerror = () => { clearTimeout(timeout); URL.revokeObjectURL(url); reject(new Error('فشل تحميل الفيديو')); };
             video.preload = 'metadata';
             video.src = url;
         });
     },
     
-    // ========== الحصول على أفضل تنسيق متوافق ==========
     getBestVideoMimeType() {
-        const types = [
-            'video/webm;codecs=vp8,opus',
-            'video/webm;codecs=vp8',
-            'video/webm;codecs=vp9,opus',
-            'video/webm;codecs=vp9',
-            'video/webm',
-            'video/mp4'
-        ];
-        
-        for (const type of types) {
-            if (MediaRecorder.isTypeSupported(type)) {
-                return type;
-            }
-        }
-        
+        const types = ['video/webm;codecs=vp8,opus','video/webm;codecs=vp8','video/webm;codecs=vp9,opus','video/webm;codecs=vp9','video/webm','video/mp4'];
+        for (const type of types) { if (MediaRecorder.isTypeSupported(type)) return type; }
         return 'video/webm';
     },
     
-    // ========== ضغط الفيديو - نسخة سريعة ومحسنة ==========
     async compressVideo(file) {
-        // 1. فحص سريع لمدة الفيديو
         let duration;
-        try {
-            duration = await this.getVideoDuration(file);
-        } catch (error) {
-            throw new Error('❌ فشل قراءة الفيديو. تأكد من صيغة الملف.');
-        }
+        try { duration = await this.getVideoDuration(file); } catch (error) { throw new Error('❌ فشل قراءة الفيديو'); }
         
-        // 2. رفض الفيديوهات الطويلة (أكثر من 3 دقائق)
         if (duration > this.VIDEO_MAX_DURATION) {
-            const mins = Math.floor(duration / 60);
-            const secs = Math.floor(duration % 60);
-            const limitMins = Math.floor(this.VIDEO_MAX_DURATION / 60);
-            
-            throw new Error(
-                `❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\n` +
-                `الحد الأقصى: ${limitMins} دقائق\n` +
-                `💡 قم بقص الجزء المهم فقط`
-            );
+            const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), limitMins = Math.floor(this.VIDEO_MAX_DURATION / 60);
+            throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${limitMins} دقائق\n💡 قم بقص الجزء المهم فقط`);
         }
         
-        // 3. رفض الملفات الكبيرة جداً (أكثر من 100MB)
         if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
-            const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-            const maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
+            const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
             throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
         }
         
-        // 4. إذا الفيديو قصير وصغير - أرسله مباشرة بدون ضغط (أسرع)
-        if (duration <= 60 && file.size <= 15 * 1024 * 1024) {
-            console.log('⚡ فيديو قصير وصغير - إرسال مباشر بدون ضغط');
-            return file;
-        }
+        if (duration <= 60 && file.size <= 15 * 1024 * 1024) { console.log('⚡ فيديو صغير - إرسال مباشر'); return file; }
         
-        // 5. بدء الضغط السريع
         console.log(`🎬 ضغط فيديو: ${Math.floor(duration)}s | ${(file.size/1024/1024).toFixed(1)}MB`);
         
         return new Promise((resolve, reject) => {
@@ -386,37 +194,20 @@ const SecureChatSystem = {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const url = URL.createObjectURL(file);
-            
             video.preload = 'auto';
             video.muted = true;
             
             video.onloadedmetadata = () => {
                 URL.revokeObjectURL(url);
-                
-                // ========== إعدادات الضغط السريع ==========
-                const targetHeight = 360;
-                const targetBitrate = 400000;
-                const targetFPS = 20;
-                
-                let width = video.videoWidth;
-                let height = video.videoHeight;
-                
-                if (height > targetHeight) {
-                    width = Math.round((width * targetHeight) / height);
-                    height = targetHeight;
-                }
-                
+                const targetHeight = 360, targetBitrate = 400000, targetFPS = 20;
+                let width = video.videoWidth, height = video.videoHeight;
+                if (height > targetHeight) { width = Math.round((width * targetHeight) / height); height = targetHeight; }
                 canvas.width = Math.round(width / 2) * 2;
                 canvas.height = Math.round(height / 2) * 2;
                 
                 const mimeType = this.getBestVideoMimeType();
                 const stream = canvas.captureStream(targetFPS);
-                
-                const mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: mimeType,
-                    videoBitsPerSecond: targetBitrate,
-                    audioBitsPerSecond: 32000
-                });
+                const mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: targetBitrate, audioBitsPerSecond: 32000 });
                 
                 const chunks = [];
                 const startTime = Date.now();
@@ -425,88 +216,46 @@ const SecureChatSystem = {
                 mediaRecorder.ondataavailable = e => {
                     if (e.data.size > 0) {
                         chunks.push(e.data);
-                        
                         const now = Date.now();
                         if (now - lastProgressUpdate > 200) {
                             lastProgressUpdate = now;
                             const elapsed = (now - startTime) / 1000;
                             const progress = Math.min((elapsed / duration) * 100, 95);
                             const currentSize = chunks.reduce((sum, c) => sum + c.size, 0);
-                            const sizeMB = (currentSize / 1024 / 1024).toFixed(1);
-                            
-                            ChatSystem.updateProgressBar(
-                                progress, 
-                                `جاري ضغط الفيديو... ${sizeMB}MB`
-                            );
+                            ChatSystem.updateProgressBar(progress, `جاري ضغط الفيديو... ${(currentSize/1024/1024).toFixed(1)}MB`);
                         }
                     }
                 };
                 
                 mediaRecorder.onstop = () => {
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                    
-                    if (chunks.length === 0) {
-                        ChatSystem.hideProgressBar();
-                        reject(new Error('❌ فشل تسجيل الفيديو - لا توجد بيانات'));
-                        return;
-                    }
+                    if (chunks.length === 0) { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تسجيل الفيديو')); return; }
                     
                     const blob = new Blob(chunks, { type: mimeType });
                     const finalSizeMB = (blob.size / 1024 / 1024).toFixed(1);
-                    const originalSizeMB = (file.size / 1024 / 1024).toFixed(1);
-                    const ratio = ((1 - blob.size / file.size) * 100).toFixed(0);
-                    
-                    console.log(`✅ اكتمل في ${elapsed}s | ${originalSizeMB}MB → ${finalSizeMB}MB (-${ratio}%)`);
+                    console.log(`✅ اكتمل في ${elapsed}s | ${(file.size/1024/1024).toFixed(1)}MB → ${finalSizeMB}MB`);
                     
                     ChatSystem.updateProgressBar(100, '✅ الضغط مكتمل! جاري الإرسال...');
                     
-                    if (blob.size > this.VIDEO_MAX_OUTPUT_SIZE) {
-                        ChatSystem.hideProgressBar();
-                        reject(new Error(
-                            `❌ الحجم بعد الضغط كبير (${finalSizeMB}MB)\n` +
-                            `الحد: ${(this.VIDEO_MAX_OUTPUT_SIZE/1024/1024).toFixed(0)}MB`
-                        ));
-                        return;
-                    }
+                    if (blob.size > this.VIDEO_MAX_OUTPUT_SIZE) { ChatSystem.hideProgressBar(); reject(new Error(`❌ الحجم بعد الضغط كبير (${finalSizeMB}MB)`)); return; }
                     
                     setTimeout(() => resolve(blob), 300);
                 };
                 
-                mediaRecorder.onerror = () => {
-                    ChatSystem.hideProgressBar();
-                    reject(new Error('❌ فشل تسجيل الفيديو'));
-                };
+                mediaRecorder.onerror = () => { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تسجيل الفيديو')); };
                 
                 video.currentTime = 0;
                 const playPromise = video.play();
-                
                 if (playPromise !== undefined) {
                     playPromise.then(() => {
                         ChatSystem.showProgressBar('جاري ضغط الفيديو...', 0);
                         mediaRecorder.start(500);
-                        
-                        setTimeout(() => {
-                            if (mediaRecorder.state === 'recording') {
-                                mediaRecorder.stop();
-                            }
-                            video.pause();
-                        }, duration * 1000);
-                        
-                    }).catch(() => {
-                        ChatSystem.hideProgressBar();
-                        reject(new Error('❌ فشل تشغيل الفيديو'));
-                    });
-                } else {
-                    reject(new Error('❌ المتصفح لا يدعم تشغيل الفيديو'));
-                }
+                        setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); video.pause(); }, duration * 1000);
+                    }).catch(() => { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تشغيل الفيديو')); });
+                } else { reject(new Error('❌ المتصفح لا يدعم تشغيل الفيديو')); }
             };
             
-            video.onerror = () => {
-                URL.revokeObjectURL(url);
-                ChatSystem.hideProgressBar();
-                reject(new Error('❌ فشل تحميل الفيديو'));
-            };
-            
+            video.onerror = () => { URL.revokeObjectURL(url); ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تحميل الفيديو')); };
             video.src = url;
         });
     },
@@ -521,325 +270,112 @@ const SecureChatSystem = {
     },
     
     async sendToServer(receiverId, encryptedPackage) { 
-        if (!receiverId || !encryptedPackage) {
-            throw new Error('بيانات غير صالحة للإرسال');
-        }
-        
+        if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
         try {
             await window.db.collection('secure_messages').add({ 
-                to: receiverId, 
-                from: window.auth.currentUser.uid, 
-                package: encryptedPackage, 
+                to: receiverId, from: window.auth.currentUser.uid, package: encryptedPackage, 
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
-                expiresAt: firebase.firestore.Timestamp.fromDate(
-                    new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000)
-                ) 
+                expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000))
             });
-            
-            console.log('✅ تم إرسال الرسالة بنجاح');
-        } catch (error) {
-            console.error('❌ فشل إرسال الرسالة للخادم:', error);
-            throw error;
-        }
+        } catch (error) { throw error; }
     },
     
     startReceiving() { 
-        if (!window.auth?.currentUser) {
-            console.warn('⚠️ لا يوجد مستخدم لبدء استقبال الرسائل');
-            return null;
-        }
-        
+        if (!window.auth?.currentUser) return null;
         const uid = window.auth.currentUser.uid;
-        console.log('👂 بدء الاستماع للرسائل الواردة...');
-        
-        return window.db.collection('secure_messages')
-            .where('to', '==', uid)
-            .onSnapshot(async snapshot => { 
-                for (const change of snapshot.docChanges()) { 
-                    if (change.type === 'added') { 
-                        const msg = { id: change.doc.id, ...change.doc.data() }; 
-                        await this.processReceivedMessage(msg); 
-                        try {
-                            await change.doc.ref.delete();
-                        } catch (deleteError) {
-                            console.warn('⚠️ فشل حذف الرسالة:', deleteError);
-                        }
-                    } 
+        return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
+            for (const change of snapshot.docChanges()) { 
+                if (change.type === 'added') { 
+                    const msg = { id: change.doc.id, ...change.doc.data() }; 
+                    await this.processReceivedMessage(msg); 
+                    try { await change.doc.ref.delete(); } catch (deleteError) {}
                 } 
-            }, error => {
-                console.error('❌ خطأ في الاستماع للرسائل:', error);
-                setTimeout(() => this.startReceiving(), 5000);
-            }); 
+            } 
+        }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
             const senderPublicKey = await this.getReceiverPublicKey(msg.from);
-            
-            if (!myPrivateKey) {
-                console.error('❌ المفتاح الخاص غير متوفر');
-                return;
-            }
-            
-            if (!senderPublicKey) {
-                console.error('❌ المفتاح العام للمرسل غير متوفر');
-                return;
-            }
-            
+            if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
-                ChatSystem.saveMessage(msg.from, { 
-                    id: msg.package.id, 
-                    type: 'text', 
-                    text: decryptedText, 
-                    sender: 'friend', 
-                    time: new Date().toISOString() 
-                }); 
-                
-                if (ChatSystem.currentChat === msg.from) {
-                    ChatSystem.displayMessages(msg.from);
-                }
-                
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            }
-            else if (msg.package.type === 'webrtc') { 
+            } else if (msg.package.type === 'webrtc') { 
                 const signalData = await this.decryptData(msg.package.data, sharedKey); 
                 CallSystem.handleSignaling(JSON.parse(signalData)); 
             }
-            
-            if (typeof loadChats === 'function') {
-                loadChats();
-            }
-        } catch (error) {
-            console.error('❌ فشل معالجة الرسالة المستلمة:', error);
-        }
+            if (typeof loadChats === 'function') loadChats();
+        } catch (error) {}
     }
 };
 
 // ========== نظام الحضور Presence ==========
 const PresenceSystem = {
-    listeners: {},
-    heartbeatInterval: null,
-    
-    async setOnline() { 
-        if (!window.auth?.currentUser) return; 
-        
-        try {
-            console.log('🟢 تحديث الحالة: متصل');
-            await window.db.collection('users').doc(window.auth.currentUser.uid).update({ 
-                online: true, 
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp() 
-            });
-            
-            this.startHeartbeat();
-        } catch (e) {
-            console.error('❌ فشل تحديث الحالة لمتصل:', e);
-        }
-    },
-    
-    async setOffline() { 
-        if (!window.auth?.currentUser) return; 
-        
-        try {
-            console.log('🔴 تحديث الحالة: غير متصل');
-            await window.db.collection('users').doc(window.auth.currentUser.uid).update({ 
-                online: false, 
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp() 
-            });
-            
-            this.stopHeartbeat();
-        } catch (e) {
-            console.error('❌ فشل تحديث الحالة لغير متصل:', e);
-        }
-    },
-    
-    startHeartbeat() {
-        this.stopHeartbeat();
-        
-        this.heartbeatInterval = setInterval(() => {
-            if (window.auth?.currentUser) {
-                window.db.collection('users')
-                    .doc(window.auth.currentUser.uid)
-                    .update({ 
-                        lastSeen: firebase.firestore.FieldValue.serverTimestamp() 
-                    })
-                    .catch(err => console.warn('⚠️ فشل نبض القلب:', err));
-            }
-        }, 30000);
-    },
-    
-    stopHeartbeat() {
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval);
-            this.heartbeatInterval = null;
-        }
-    },
-    
-    watchFriend(friendId) { 
-        if (!friendId) return;
-        
-        if (this.listeners[friendId]) {
-            this.listeners[friendId]();
-        }
-        
-        this.listeners[friendId] = window.db.collection('users')
-            .doc(friendId)
-            .onSnapshot(doc => { 
-                if (doc.exists) { 
-                    const isOnline = doc.data().online === true;
-                    ChatSystem.updateFriendStatus(friendId, isOnline); 
-                } else {
-                    ChatSystem.updateFriendStatus(friendId, false);
-                }
-            }, error => {
-                console.error(`❌ خطأ في مراقبة المستخدم ${friendId}:`, error);
-            }); 
-    },
-    
-    stopAll() { 
-        Object.values(this.listeners).forEach(unsub => {
-            if (typeof unsub === 'function') {
-                unsub();
-            }
-        }); 
-        this.listeners = {}; 
-        this.stopHeartbeat();
-    }
+    listeners: {}, heartbeatInterval: null,
+    async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
+    async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
+    startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
+    stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
+    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
+    stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
 };
 
 // ========== نظام اتصال WebRTC مباشر ==========
 const CallSystem = {
-    pc: null, 
-    dc: null, 
-    localStream: null, 
-    isInCall: false,
-    incomingChunks: {}, 
-    incomingFileInfo: {},
-    reconnectTimer: null,
-    maxReconnectAttempts: 3,
-    reconnectAttempts: 0,
-    
-    servers: {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-        ]
-    },
+    pc: null, dc: null, localStream: null, isInCall: false,
+    incomingChunks: {}, incomingFileInfo: {},
+    reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
+    servers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' },{ urls: 'stun:stun1.l.google.com:19302' },{ urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
     
     async ensureDataChannel(calleeId) {
         if (!calleeId) return;
-        
         if (this.dc && this.dc.readyState === 'open') return;
-        
         if (this.dc && this.dc.readyState === 'connecting') {
             return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    clearInterval(checkInterval);
-                    reject(new Error('انتهت مهلة انتظار القناة'));
-                }, 10000);
-                
+                const timeout = setTimeout(() => { clearInterval(checkInterval); reject(new Error('انتهت مهلة انتظار القناة')); }, 10000);
                 const checkInterval = setInterval(() => {
-                    if (!this.dc) {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                    } else if (this.dc.readyState === 'open') {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        resolve();
-                    } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                    }
+                    if (!this.dc) { clearInterval(checkInterval); clearTimeout(timeout); this.createNewDataChannel(calleeId).then(resolve).catch(reject); }
+                    else if (this.dc.readyState === 'open') { clearInterval(checkInterval); clearTimeout(timeout); resolve(); }
+                    else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') { clearInterval(checkInterval); clearTimeout(timeout); this.createNewDataChannel(calleeId).then(resolve).catch(reject); }
                 }, 500);
             });
         }
-        
         return this.createNewDataChannel(calleeId);
     },
     
     async createNewDataChannel(calleeId) {
-        this.reconnectAttempts = 0;
-        this.cleanupConnections();
-        
+        this.reconnectAttempts = 0; this.cleanupConnections();
         try {
             this.pc = new RTCPeerConnection(this.servers);
             this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
             this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => {
-                if (e.candidate) {
-                    this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
-                }
-            };
-            
-            this.pc.oniceconnectionstatechange = () => {
-                if (this.pc?.iceConnectionState === 'failed') {
-                    this.pc.restartIce();
-                }
-            };
-            
-            this.pc.ondatachannel = e => {
-                this.setupDataChannel(e.channel);
-                this.dc = e.channel;
-            };
-            
-            this.pc.onconnectionstatechange = () => {
-                switch(this.pc?.connectionState) {
-                    case 'connected': this.reconnectAttempts = 0; break;
-                    case 'failed':
-                    case 'disconnected': this.scheduleReconnect(); break;
-                }
-            };
-            
+            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
+            this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
+            this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
+            this.pc.onconnectionstatechange = () => { switch(this.pc?.connectionState) { case 'connected': this.reconnectAttempts = 0; break; case 'failed': case 'disconnected': this.scheduleReconnect(); break; } };
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
             await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-            
-        } catch (error) {
-            throw error;
-        }
+        } catch (error) { throw error; }
     },
     
     setupDataChannel(channel) {
         if (!channel) return;
-        
         channel.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
-                
-                if (msg.chunk !== undefined) {
-                    this.handleChunkMessage(msg);
-                    return;
-                }
-                
-                const displayMsg = { 
-                    id: msg.id || Date.now().toString(), 
-                    type: msg.type, 
-                    data: msg.data, 
-                    fileName: msg.fileName, 
-                    sender: 'friend', 
-                    time: new Date().toISOString() 
-                };
-                
-                if (ChatSystem.currentChat) { 
-                    ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg); 
-                    ChatSystem.displayMessage(displayMsg); 
-                }
+                if (msg.chunk !== undefined) { this.handleChunkMessage(msg); return; }
+                const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
+                if (ChatSystem.currentChat) { ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg); ChatSystem.displayMessage(displayMsg); }
             } catch (error) {}
         };
-        
-        channel.onopen = () => {
-            if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
-            this.reconnectAttempts = 0;
-        };
-        
+        channel.onopen = () => { if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; } this.reconnectAttempts = 0; };
         channel.onclose = () => this.scheduleReconnect();
         channel.onerror = () => this.scheduleReconnect();
     },
@@ -847,36 +383,20 @@ const CallSystem = {
     handleChunkMessage(msg) {
         if (!this.incomingChunks[msg.id]) { 
             this.incomingChunks[msg.id] = []; 
-            this.incomingFileInfo[msg.id] = { 
-                type: msg.type, fileName: msg.fileName, total: msg.total, received: 0 
-            };
+            this.incomingFileInfo[msg.id] = { type: msg.type, fileName: msg.fileName, total: msg.total, received: 0 };
             ChatSystem.showProgressBar('جاري استلام الملف...', 0);
         }
-        
         this.incomingChunks[msg.id][msg.chunk] = msg.data;
         this.incomingFileInfo[msg.id].received++;
-        
         const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
         const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
         ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-        
         if (this.incomingFileInfo[msg.id].received === msg.total) {
             const fullData = this.incomingChunks[msg.id].join('');
-            const displayMsg = { 
-                id: msg.id, 
-                type: msg.type === 'location' ? 'text' : msg.type, 
-                data: fullData, fileName: msg.fileName, 
-                sender: 'friend', time: new Date().toISOString() 
-            };
-            
-            if (ChatSystem.currentChat) { 
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg); 
-                ChatSystem.displayMessage(displayMsg); 
-            }
-            
+            const displayMsg = { id: msg.id, type: msg.type === 'location' ? 'text' : msg.type, data: fullData, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
+            if (ChatSystem.currentChat) { ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg); ChatSystem.displayMessage(displayMsg); }
             ChatSystem.hideProgressBar();
-            delete this.incomingChunks[msg.id]; 
-            delete this.incomingFileInfo[msg.id];
+            delete this.incomingChunks[msg.id]; delete this.incomingFileInfo[msg.id];
         }
     },
     
@@ -884,56 +404,31 @@ const CallSystem = {
         if (!ChatSystem.currentChat || !ChatSystem.friendOnline) return;
         if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        
         this.reconnectAttempts++;
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
-        
-        this.reconnectTimer = setTimeout(async () => {
-            try {
-                if (ChatSystem.currentChat && ChatSystem.friendOnline) {
-                    await this.ensureDataChannel(ChatSystem.currentChat);
-                }
-            } catch (error) {}
-            this.reconnectTimer = null;
-        }, delay);
+        this.reconnectTimer = setTimeout(async () => { try { if (ChatSystem.currentChat && ChatSystem.friendOnline) await this.ensureDataChannel(ChatSystem.currentChat); } catch (error) {} this.reconnectTimer = null; }, delay);
     },
     
     async startCall(calleeId, callType = 'video') {
         if (!window.auth?.currentUser || this.isInCall) return;
         this.isInCall = true;
-        
         try {
-            const constraints = { 
-                audio: true, 
-                video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false 
-            };
-            
+            const constraints = { audio: true, video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(callType);
             this.pc = new RTCPeerConnection(this.servers);
-            
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
-            
+            this.dc = this.pc.createDataChannel('chat'); this.setupDataChannel(this.dc);
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
             this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv && e.streams[0]) rv.srcObject = e.streams[0]; };
             this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
-            
-            const offer = await this.pc.createOffer();
-            await this.pc.setLocalDescription(offer);
+            const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-            
-        } catch (e) {
-            this.endCall();
-            if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون');
-            else alert('فشل بدء المكالمة. يرجى المحاولة مرة أخرى.');
-        }
+        } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
     },
     
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') return false;
-        
         try {
             let blobToSend = file;
             if (type === 'image') blobToSend = await SecureChatSystem.compressImage(file);
@@ -946,35 +441,21 @@ const CallSystem = {
             
             for (let i = 0; i < totalChunks; i++) {
                 if (this.dc.readyState !== 'open') { ChatSystem.hideProgressBar(); return false; }
-                
-                const chunk = {
-                    type, 
-                    data: b64.substring(i * chunkSize, (i + 1) * chunkSize), 
-                    chunk: i, total: totalChunks, id: fileId, 
-                    fileName: file.name || 'ملف'
-                };
-                
+                const chunk = { type, data: b64.substring(i * chunkSize, (i + 1) * chunkSize), chunk: i, total: totalChunks, id: fileId, fileName: file.name || 'ملف' };
                 this.dc.send(JSON.stringify(chunk));
-                
                 const progress = ((i + 1) / totalChunks) * 100;
                 const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
                 ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-                
                 await new Promise(r => setTimeout(r, 50));
             }
-            
             ChatSystem.hideProgressBar();
             return true;
-        } catch (e) {
-            ChatSystem.hideProgressBar();
-            return false;
-        }
+        } catch (e) { ChatSystem.hideProgressBar(); return false; }
     },
     
     showIncomingCall(callerId, callData) {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        const overlay = document.createElement('div'); 
-        overlay.id = 'incomingCall';
+        const overlay = document.createElement('div'); overlay.id = 'incomingCall';
         overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
         overlay.innerHTML = `<div style="font-size:1.5rem;">📞 ${contactName} يتصل بك...</div><div style="display:flex;gap:30px;"><button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button><button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button></div>`;
         document.body.appendChild(overlay);
@@ -985,50 +466,26 @@ const CallSystem = {
     async receiveCall(callerId, callData) {
         if (this.isInCall) return;
         this.isInCall = true;
-        
         try {
             const hasVideo = callData.sdp?.sdp?.includes('video') !== false;
             const constraints = { audio: true, video: hasVideo ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
-            
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(hasVideo ? 'video' : 'audio');
             this.pc = new RTCPeerConnection(this.servers);
-            
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
             this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv && e.streams[0]) rv.srcObject = e.streams[0]; };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
             this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
-            
-            if (callData.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
-                const answer = await this.pc.createAnswer();
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
-            }
-        } catch (e) {
-            this.endCall();
-            if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون');
-        }
+            if (callData.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); await this.sendSignal(callerId, { sdp: this.pc.localDescription }); }
+        } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
     },
     
     async handleSignaling(data) {
         try {
-            if (!this.pc) {
-                this.pc = new RTCPeerConnection(this.servers);
-                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
-                this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
-            }
-            if (data.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                if (data.sdp.type === 'offer') {
-                    const answer = await this.pc.createAnswer();
-                    await this.pc.setLocalDescription(answer);
-                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
-                }
-            } else if (data.candidate) {
-                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-            }
+            if (!this.pc) { this.pc = new RTCPeerConnection(this.servers); this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); }; }
+            if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); if (data.sdp.type === 'offer') { const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); } }
+            else if (data.candidate) await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
         } catch (e) {}
     },
     
@@ -1037,38 +494,17 @@ const CallSystem = {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
             if (!myPrivateKey || !receiverPublicKey) return;
-            
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
             await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
         } catch (error) {}
     },
     
-    showCallUI(callType) {
-        document.body.classList.add('in-call');
-        const ui = document.createElement('div'); ui.id = 'callUI';
-        ui.innerHTML = `<video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video><video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video><div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;"><button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button><button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button><button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">📹</button></div>`;
-        document.body.appendChild(ui);
-        const lv = document.getElementById('localVideo'); if (lv && this.localStream) lv.srcObject = this.localStream;
-    },
-    
+    showCallUI(callType) { document.body.classList.add('in-call'); const ui = document.createElement('div'); ui.id = 'callUI'; ui.innerHTML = `<video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video><video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video><div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;"><button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button><button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button><button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">📹</button></div>`; document.body.appendChild(ui); const lv = document.getElementById('localVideo'); if (lv && this.localStream) lv.srcObject = this.localStream; },
     toggleAudio() { if (this.localStream) { const at = this.localStream.getAudioTracks()[0]; if (at) at.enabled = !at.enabled; } },
     toggleVideo() { if (this.localStream) { const vt = this.localStream.getVideoTracks()[0]; if (vt) vt.enabled = !vt.enabled; } },
-    
-    endCall() {
-        this.isInCall = false; document.body.classList.remove('in-call');
-        if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
-        this.cleanupConnections();
-        const ui = document.getElementById('callUI'); if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall'); if (inc) inc.remove();
-    },
-    
-    cleanupConnections() {
-        if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
-        if (this.dc) { this.dc.close(); this.dc = null; }
-        if (this.pc) { this.pc.close(); this.pc = null; }
-        this.incomingChunks = {}; this.incomingFileInfo = {};
-    }
+    endCall() { this.isInCall = false; document.body.classList.remove('in-call'); if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } this.cleanupConnections(); const ui = document.getElementById('callUI'); if (ui) ui.remove(); const inc = document.getElementById('incomingCall'); if (inc) inc.remove(); },
+    cleanupConnections() { if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; } if (this.dc) { this.dc.close(); this.dc = null; } if (this.pc) { this.pc.close(); this.pc = null; } this.incomingChunks = {}; this.incomingFileInfo = {}; }
 };
 
 window.startVideoCall = async () => { if (!ChatSystem.currentChat) return; await CallSystem.startCall(ChatSystem.currentChat, 'video'); };
@@ -1101,24 +537,17 @@ const ChatSystem = {
     },
     
     updateProgressBar(percent, message) {
-        const fill = document.getElementById('progressFill');
-        const text = document.getElementById('progressText');
-        const perc = document.getElementById('progressPercent');
+        const fill = document.getElementById('progressFill'), text = document.getElementById('progressText'), perc = document.getElementById('progressPercent');
         if (fill) fill.style.width = Math.min(percent, 100) + '%';
         if (text && message) text.textContent = message;
         if (perc) perc.textContent = Math.round(percent) + '%';
     },
     
-    hideProgressBar() {
-        const bar = document.getElementById('progressBar');
-        if (bar) bar.remove();
-    },
+    hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
     openChat(friendId, friendName, friendAvatar) {
-        this.currentChat = friendId; 
-        document.body.classList.add('conversation-open');
-        const nameEl = document.getElementById('conversationName');
-        const avatarEl = document.getElementById('conversationAvatar');
+        this.currentChat = friendId; document.body.classList.add('conversation-open');
+        const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
         if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
         document.querySelector('.chat-page').style.display = 'none'; 
@@ -1141,10 +570,7 @@ const ChatSystem = {
     
     updateAttachmentButtons(isOnline) {
         const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
-        btns.forEach(btn => { 
-            if (isOnline) { btn.classList.remove('locked'); btn.title = ''; } 
-            else { btn.classList.add('locked'); btn.title = 'غير متاح - المستخدم غير متصل'; } 
-        });
+        btns.forEach(btn => { if (isOnline) { btn.classList.remove('locked'); btn.title = ''; } else { btn.classList.add('locked'); btn.title = 'غير متاح - المستخدم غير متصل'; } });
     },
     
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
@@ -1154,12 +580,7 @@ const ChatSystem = {
         const div = document.createElement('div'); div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; div.id = `msg-${msg.id}`;
         const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
         let statusHtml = ''; 
-        if (msg.sender === 'me') { 
-            let icon = '✓', cls = 'sent'; 
-            if (msg.status === 'delivered') { icon = '✓✓'; cls = 'delivered'; } 
-            else if (msg.status === 'read') { icon = '✓✓'; cls = 'read'; } 
-            statusHtml = `<span class="message-status ${cls}">${icon}</span>`; 
-        }
+        if (msg.sender === 'me') { let icon = '✓', cls = 'sent'; if (msg.status === 'delivered') { icon = '✓✓'; cls = 'delivered'; } else if (msg.status === 'read') { icon = '✓✓'; cls = 'read'; } statusHtml = `<span class="message-status ${cls}">${icon}</span>`; }
         
         if (msg.type === 'text') div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
         else if (msg.type === 'image') div.innerHTML = `<img src="${msg.data}" class="message-image" onclick="window.openImage('${msg.data}')" loading="lazy"><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
@@ -1174,11 +595,9 @@ const ChatSystem = {
         if (!this.currentChat || !text.trim()) return false; 
         const mid = Date.now().toString(); 
         try { 
-            const pr = await SecureChatSystem.getMyPrivateKey(); 
-            const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
+            const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
             if (!pr || !pu) return false;
-            const sk = await SecureChatSystem.deriveSharedKey(pr, pu); 
-            const enc = await SecureChatSystem.encryptData(text.trim(), sk); 
+            const sk = await SecureChatSystem.deriveSharedKey(pr, pu), enc = await SecureChatSystem.encryptData(text.trim(), sk); 
             await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
             this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
             this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
@@ -1195,8 +614,7 @@ const ChatSystem = {
                 if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
             } catch (error) {}
         }
-        this.hideProgressBar();
-        return false;
+        this.hideProgressBar(); return false;
     },
     
     async sendImage(file) { 
@@ -1211,38 +629,70 @@ const ChatSystem = {
                     const msgId = Date.now().toString();
                     this.saveMessage(this.currentChat, { id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
                     this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                } else alert('فشل إرسال الصورة. يرجى المحاولة مرة أخرى.');
+                } else alert('فشل إرسال الصورة');
             }
         } else alert('المستخدم غير متصل حالياً');
     },
     
+    // ========== إرسال الفيديو (بدون تخزين base64 في localStorage) ==========
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
+        
+        // فحص المدة
         try {
             const duration = await SecureChatSystem.getVideoDuration(file);
             const maxDuration = SecureChatSystem.VIDEO_MAX_DURATION;
             if (duration > maxDuration) {
-                const mins = Math.floor(duration / 60);
-                const secs = Math.floor(duration % 60);
-                const maxMins = Math.floor(maxDuration / 60);
-                alert(`❌ الفيديو طويل جداً\n\n📹 مدة الفيديو: ${mins}:${secs.toString().padStart(2, '0')} دقيقة\n⏱️ الحد الأقصى: ${maxMins} دقائق\n\n💡 الحل: قم بقص الفيديو قبل الإرسال`);
+                const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), maxMins = Math.floor(maxDuration / 60);
+                alert(`❌ الفيديو طويل جداً\n\n📹 ${mins}:${secs.toString().padStart(2, '0')} دقيقة\n⏱️ الحد الأقصى: ${maxMins} دقائق`);
                 return;
             }
-        } catch (error) { alert('❌ فشل قراءة الفيديو. تأكد من صيغة الملف.'); return; }
+        } catch (error) { alert('❌ فشل قراءة الفيديو'); return; }
         
         if (!this.friendOnline) { alert('المستخدم غير متصل حالياً'); return; }
+        
         await CallSystem.ensureDataChannel(this.currentChat);
+        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'video');
             if (success) {
                 try {
+                    // إعادة ضغط الفيديو للعرض فقط (للمرسل)
                     const compressed = await SecureChatSystem.compressVideo(file);
                     const b64 = await SecureChatSystem.fileToBase64(compressed); 
                     const msgId = Date.now().toString();
-                    this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                } catch (error) { alert(error.message || 'فشل معالجة الفيديو'); }
-            } else alert('فشل إرسال الفيديو. يرجى المحاولة مرة أخرى.');
+                    
+                    // حفظ الرسالة بدون تخزين base64 للفيديو (نخزن نوع الملف فقط)
+                    const msgData = { 
+                        id: msgId, 
+                        type: 'video', 
+                        data: b64.substring(0, 100) + '...', // نخزن جزء صغير فقط للدلالة
+                        _videoPlaceholder: true,
+                        _videoDuration: file.duration || 0,
+                        sender: 'me', 
+                        time: new Date().toISOString(), 
+                        status: 'sent' 
+                    };
+                    
+                    // عرض الرسالة مباشرة مع البيانات الكاملة
+                    this.displayMessage({ 
+                        id: msgId, 
+                        type: 'video', 
+                        data: b64,
+                        fileName: file.name,
+                        sender: 'me', 
+                        time: new Date().toISOString(), 
+                        status: 'sent' 
+                    });
+                    
+                    // حفظ في localStorage فقط بيانات خفيفة (بدون base64)
+                    this.saveMessage(this.currentChat, msgData);
+                    
+                } catch (error) { 
+                    console.error('❌ فشل معالجة الفيديو:', error);
+                    alert(error.message || 'فشل معالجة الفيديو'); 
+                }
+            } else alert('فشل إرسال الفيديو');
         }
     },
     
@@ -1255,9 +705,14 @@ const ChatSystem = {
                 if (success) {
                     const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
-                    this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                    // للملفات العادية: نخزن فقط إذا كان حجمها أقل من 500KB
+                    if (b64.length < 500000) {
+                        this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    } else {
+                        this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64.substring(0, 100) + '...', _filePlaceholder: true, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    }
                     this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                } else alert('فشل إرسال الملف. يرجى المحاولة مرة أخرى.');
+                } else alert('فشل إرسال الملف');
             }
         } else alert('المستخدم غير متصل حالياً');
     },
@@ -1271,9 +726,10 @@ const ChatSystem = {
                 if (success) {
                     const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
                     const msgId = Date.now().toString();
+                    // البصمات الصوتية صغيرة، نخزنها عادي
                     this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
                     this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                } else alert('فشل إرسال البصمة الصوتية. يرجى المحاولة مرة أخرى.');
+                } else alert('فشل إرسال البصمة الصوتية');
             }
         } else alert('المستخدم غير متصل حالياً');
     },
@@ -1286,26 +742,63 @@ const ChatSystem = {
                 const locMsg = `📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`; 
                 CallSystem.dc.send(JSON.stringify({ type: 'location', data: locMsg, id: Date.now().toString() })); 
                 const msgId = Date.now().toString();
-                this.displayMessage({ id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
                 this.saveMessage(this.currentChat, { id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            }, () => alert('فشل تحديد الموقع. يرجى المحاولة مرة أخرى.'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                this.displayMessage({ id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            }, () => alert('فشل تحديد الموقع'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
         }
     },
     
     saveMessage(friendId, message) { 
-        const key = `chat_${friendId}`; let h = []; 
-        try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; } 
+        const key = `chat_${friendId}`; 
+        let h = []; 
+        try { 
+            h = JSON.parse(localStorage.getItem(key)) || []; 
+        } catch (e) { h = []; }
+        
         h.push(message); 
-        if (h.length > 500) h = h.slice(-500);
-        localStorage.setItem(key, JSON.stringify(h)); 
+        
+        // ========== تنظيف تلقائي للمساحة ==========
+        // إذا وصلت المساحة للحد، نحذف الملفات الكبيرة القديمة
+        let serialized = JSON.stringify(h);
+        while (serialized.length > 4000000) { // 4MB حد أقصى للدردشة الواحدة
+            // حذف أقدم رسالة فيديو أو صورة أو ملف
+            let removed = false;
+            for (let i = 0; i < h.length; i++) {
+                if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') {
+                    h.splice(i, 1);
+                    removed = true;
+                    break;
+                }
+            }
+            if (!removed) {
+                // إذا ما فيه ملفات، احذف أقدم رسالة نصية
+                h.splice(0, 1);
+            }
+            serialized = JSON.stringify(h);
+        }
+        
+        try {
+            localStorage.setItem(key, JSON.stringify(h)); 
+        } catch (e) {
+            console.warn('⚠️ ما زالت المساحة ممتلئة، جاري حذف رسائل قديمة...');
+            // حذف 20% من الرسائل القديمة
+            h = h.slice(Math.floor(h.length * 0.2));
+            try {
+                localStorage.setItem(key, JSON.stringify(h));
+            } catch (e2) {
+                console.error('❌ فشل حفظ الرسائل:', e2);
+                h = h.slice(-10); // احتفظ بآخر 10 رسائل فقط
+                try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {}
+            }
+        }
+        
         this.messages[friendId] = h; 
     },
     
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
             if (item.getAttribute('onclick')?.includes(friendId)) { 
-                const lm = item.querySelector('.last-message'); 
-                const tm = item.querySelector('.chat-time'); 
+                const lm = item.querySelector('.last-message'), tm = item.querySelector('.chat-time'); 
                 if (lm) lm.textContent = lastMessage; 
                 if (tm) tm.textContent = 'الآن'; 
             } 
@@ -1327,51 +820,9 @@ const ChatSystem = {
 ChatSystem.init();
 
 // ========== وظائف الواجهة العامة ==========
+async function loadChats() { if (!window.auth || !window.auth.currentUser) return; const list = document.getElementById('chatsList'); if (!list) return; try { const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); if (!udoc.exists) return; const friends = udoc.data().friends || []; if (!friends.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3></div>`; return; } let html = ''; for (const fid of friends) { try { const fdoc = await window.db.collection('users').doc(fid).get(); if (fdoc.exists) { const f = fdoc.data(); const key = `chat_${fid}`; let lm = 'اضغط لبدء المحادثة', lt = ''; try { const h = JSON.parse(localStorage.getItem(key)) || []; if (h.length > 0) { const l = h[h.length - 1]; if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; else if (l.type === 'image') lm = '📷 صورة'; else if (l.type === 'voice') lm = '🎤 بصمة'; else if (l.type === 'video') lm = '🎥 فيديو'; else if (l.type === 'file') lm = '📎 ملف'; lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); } } catch (e) {} html += `<div class="chat-item" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`; } } catch (e) {} } list.innerHTML = html || `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3></div>`; } catch (e) {} }
 
-async function loadChats() { 
-    if (!window.auth || !window.auth.currentUser) return; 
-    const list = document.getElementById('chatsList'); 
-    if (!list) return; 
-    try { 
-        const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); 
-        if (!udoc.exists) return; 
-        const friends = udoc.data().friends || []; 
-        if (!friends.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; return; } 
-        let html = ''; 
-        for (const fid of friends) { 
-            try { 
-                const fdoc = await window.db.collection('users').doc(fid).get(); 
-                if (fdoc.exists) { 
-                    const f = fdoc.data(); const key = `chat_${fid}`; 
-                    let lm = 'اضغط لبدء المحادثة', lt = ''; 
-                    try { 
-                        const h = JSON.parse(localStorage.getItem(key)) || []; 
-                        if (h.length > 0) { 
-                            const l = h[h.length - 1]; 
-                            if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text;
-                            else if (l.type === 'image') lm = '📷 صورة';
-                            else if (l.type === 'voice') lm = '🎤 بصمة صوتية';
-                            else if (l.type === 'video') lm = '🎥 فيديو';
-                            else if (l.type === 'file') lm = '📎 ملف';
-                            lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
-                        } 
-                    } catch (e) {} 
-                    html += `<div class="chat-item" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`; 
-                } 
-            } catch (e) {} 
-        } 
-        list.innerHTML = html || `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`; 
-    } catch (e) {} 
-}
-
-function setupChatListeners() { 
-    document.addEventListener('click', e => { 
-        const m = document.getElementById('attachmentMenu'); const ab = document.querySelector('.attach-btn'); 
-        if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; 
-        const ep = document.getElementById('emojiPicker'); const eb = document.querySelector('.emoji-btn'); 
-        if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; 
-    }); 
-}
+function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
 
 window.openChat = friendId => { window.db.collection('users').doc(friendId).get().then(doc => { if (doc.exists) { const f = doc.data(); ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤'); } }).catch(() => {}); };
 window.sendMessage = () => { const inp = document.getElementById('messageInput'); if (inp && inp.value.trim()) ChatSystem.sendMessage(inp.value.trim()).then(s => { if (s) { inp.value = ''; inp.style.height = 'auto'; } }); };
@@ -1381,27 +832,17 @@ window.showEmojiPicker = () => { const p = document.getElementById('emojiPicker'
 window.sendImage = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendImage(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.sendVideo = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'video/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendVideoFile(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.sendFile = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '*/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
-window.sendVoiceNote = () => { if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('المتصفح لا يدعم تسجيل الصوت'); return; } navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => { if (e.data.size > 0) ch.push(e.data); }; mr.onstop = () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: 'audio/webm' }); if (blob.size > 0) ChatSystem.sendVoiceNote(blob); const sb = document.querySelector('.send-btn'); const vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; }; mr.onerror = () => { s.getTracks().forEach(t => t.stop()); const sb = document.querySelector('.send-btn'); const vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; alert('فشل تسجيل الصوت'); }; mr.start(); const sb = document.querySelector('.send-btn'); const vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') mr.stop(); }; } setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 900000); }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); document.getElementById('attachmentMenu').style.display = 'none'; };
-window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc && CallSystem.dc.readyState === 'open') ChatSystem.shareLocationDirect(); else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`), () => alert('فشل تحديد الموقع')); else alert('المتصفح لا يدعم تحديد الموقع'); document.getElementById('attachmentMenu').style.display = 'none'; };
+window.sendVoiceNote = () => { if (!navigator.mediaDevices?.getUserMedia) { alert('المتصفح لا يدعم تسجيل الصوت'); return; } navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => { if (e.data.size > 0) ch.push(e.data); }; mr.onstop = () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: 'audio/webm' }); if (blob.size > 0) ChatSystem.sendVoiceNote(blob); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') mr.stop(); }; } setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 900000); }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); document.getElementById('attachmentMenu').style.display = 'none'; };
+window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc?.readyState === 'open') ChatSystem.shareLocationDirect(); else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`), () => alert('فشل تحديد الموقع')); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.closeConversation = () => { CallSystem.endCall(); ChatSystem.closeChat(); };
 window.openImage = (data) => { const win = window.open('', '_blank'); if (win) win.document.write(`<img src="${data}" style="max-width:100%;height:auto;">`); };
 window.openFile = (data, fileName) => { const link = document.createElement('a'); link.href = data; link.download = fileName || 'file'; link.click(); };
-window.openEditProfileModal = () => { const nameInput = document.getElementById('editName'); const currentName = document.getElementById('profileName')?.textContent; const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent; if (nameInput) nameInput.value = currentName || ''; const avatarPreview = document.getElementById('currentAvatarEmoji'); if (avatarPreview) avatarPreview.textContent = currentEmoji || '👤'; document.getElementById('editProfileModal')?.classList.add('active'); };
-window.saveProfile = () => { const n = document.getElementById('editName')?.value?.trim(); if (!n || n.length > 25) { alert('الاسم مطلوب ولا يزيد عن 25 حرف'); return; } if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { const nameEl = document.getElementById('profileName'); if (nameEl) nameEl.textContent = n; closeModal(); }).catch(() => alert('فشل حفظ التغييرات')); };
-window.showUserTrips = () => { document.querySelector('.profile-page') && (document.querySelector('.profile-page').style.display = 'none'); document.getElementById('tripsPage') && (document.getElementById('tripsPage').style.display = 'block'); };
-window.goBack = () => { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); const pp = document.querySelector('.profile-page'); if (pp) { pp.style.display = 'block'; pp.classList.add('active'); } };
-window.selectAvatar = t => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; const e = m[t] || '👤'; const profileAvatar = document.getElementById('profileAvatarEmoji'); const currentAvatar = document.getElementById('currentAvatarEmoji'); if (profileAvatar) profileAvatar.textContent = e; if (currentAvatar) currentAvatar.textContent = e; if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ avatarType: t }).then(() => closeModal()).catch(() => {}); };
-window.openAvatarModal = () => document.getElementById('avatarModal')?.classList.add('active');
 window.getEmojiForUser = u => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; return m[u?.avatarType] || '👤'; };
-window.clearMessages = () => { if (confirm('هل أنت متأكد من مسح جميع الرسائل؟')) { const c = document.getElementById('messagesContainer'); if (c) c.innerHTML = ''; if (ChatSystem.currentChat) { const key = `chat_${ChatSystem.currentChat}`; localStorage.removeItem(key); ChatSystem.messages[ChatSystem.currentChat] = []; } } };
 
 function formatNumber(num) { if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return num.toString(); }
-async function updateTripsCount() { if (!window.auth || !window.auth.currentUser) return; try { const s = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).where('status', '==', 'ended').get(); const c = document.getElementById('tripsCount'); if (c) c.textContent = formatNumber(s.size); } catch (error) {} }
-function ensureSinglePage() { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.querySelectorAll('.page').forEach(p => { p.style.display = p.classList.contains('active') ? 'block' : 'none'; }); }
 function setupNavigation() { const nav = document.querySelectorAll('.nav-item'); const pages = document.querySelectorAll('.page'); if (!nav.length || !pages.length) return; function switchPage(id) { pages.forEach(p => p.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } pages.forEach(p => { if (!p.classList.contains('active')) p.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); if (id === 'chat') loadChats(); document.body.classList.remove('conversation-open'); nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); } nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); }
-function setupModals() { window.openLanguageModal = () => document.getElementById('languageModal')?.classList.add('active'); window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); })); document.querySelectorAll('.settings-item').forEach(i => { if (i.querySelector('[data-i18n="language"]')) i.addEventListener('click', window.openLanguageModal); }); }
 
-document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); });
+document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.querySelectorAll('.page').forEach(p => { p.style.display = p.classList.contains('active') ? 'block' : 'none'; }); setupNavigation(); loadChats(); setupChatListeners(); });
 window.addEventListener('authReady', async () => { if (window.auth?.currentUser) await SecureChatSystem.init(); });
 window.addEventListener('beforeunload', () => { PresenceSystem.setOffline(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) PresenceSystem.setOffline(); else { PresenceSystem.setOnline(); if (ChatSystem.currentChat && ChatSystem.friendOnline) setTimeout(() => CallSystem.ensureDataChannel(ChatSystem.currentChat).catch(() => {}), 1000); } });
