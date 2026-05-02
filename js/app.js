@@ -4,7 +4,13 @@ const SecureChatSystem = {
     
     async init() {
         if (!window.auth?.currentUser) { return false; }
-        try { await this.setupKeys(); this.startReceiving(); PresenceSystem.setOnline(); return true; } catch (error) { return false; }
+        try { 
+            await this.setupKeys(); 
+            this.startReceiving(); 
+            CallSystem.startSignalingListener(); // ✅ مستمع الإشارات المنفصل
+            PresenceSystem.setOnline(); 
+            return true; 
+        } catch (error) { return false; }
     },
     
     async setupKeys() {
@@ -60,7 +66,6 @@ const SecureChatSystem = {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             if (msg.package.type === 'text') { const d = await this.decryptData(msg.package.data, sharedKey); ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: d, sender: 'friend', time: new Date().toISOString() }); if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from); ChatSystem.updateLastMessage(msg.from, d); }
-            else if (msg.package.type === 'webrtc') { const d = await this.decryptData(msg.package.data, sharedKey); CallSystem.handleSignaling(JSON.parse(d)); }
             else if (msg.package.type === 'connect_request') { const d = await this.decryptData(msg.package.data, sharedKey); CallSystem.showConnectionRequest(msg.from, JSON.parse(d)); }
             else if (msg.package.type === 'connect_accept') { const d = await this.decryptData(msg.package.data, sharedKey); CallSystem.confirmConnection(msg.from, JSON.parse(d)); }
             loadChats();
@@ -89,6 +94,33 @@ const CallSystem = {
             { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
             { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
         ]
+    },
+
+    // ✅ مستمع منفصل للإشارات
+    startSignalingListener() {
+        if (!window.auth?.currentUser) return;
+        window.db.collection('secure_messages')
+            .where('to', '==', window.auth.currentUser.uid)
+            .onSnapshot(async snapshot => {
+                for (const change of snapshot.docChanges()) {
+                    if (change.type === 'added') {
+                        const msg = { id: change.doc.id, ...change.doc.data() };
+                        try {
+                            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+                            const senderPublicKey = await SecureChatSystem.getReceiverPublicKey(msg.from);
+                            if (!myPrivateKey || !senderPublicKey) continue;
+                            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, senderPublicKey);
+                            if (msg.package && msg.package.type === 'webrtc') {
+                                const d = await SecureChatSystem.decryptData(msg.package.data, sharedKey);
+                                this.handleSignaling(JSON.parse(d));
+                                console.log('🚦 إشارة WebRTC تم استلامها');
+                            }
+                        } catch(e) {}
+                        await change.doc.ref.delete();
+                    }
+                }
+            });
+        console.log('👂 مستمع الإشارات جاهز');
     },
 
     async requestConnection(calleeId) {
