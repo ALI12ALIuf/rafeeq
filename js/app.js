@@ -6,7 +6,7 @@ const SecureChatSystem = {
     
     VIDEO_MAX_DURATION: 300, // 5 دقائق (الحد الفعلي)
     VIDEO_WARNING_DURATION: 290, // 4:50 دقائق (اللي يظهر في رسالة التحذير)
-    VIDEO_MAX_INPUT_SIZE: 100 * 1024 * 1024, // 100MB
+    VIDEO_MAX_INPUT_SIZE: 250 * 1024 * 1024, // 250MB (بدل 100MB)
     
     async init() {
         if (!window.auth?.currentUser) { 
