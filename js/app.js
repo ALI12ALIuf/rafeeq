@@ -5,9 +5,8 @@ const SecureChatSystem = {
     sharedKeyCache: new Map(),
     
     VIDEO_MAX_DURATION: 600, // 10 دقائق
-    VIDEO_WARNING_DURATION: 590, // 9:50 رسالة التحذير
     VIDEO_MAX_INPUT_SIZE: 250 * 1024 * 1024, // 250MB
-    VIDEO_MAX_OUTPUT_SIZE: 30 * 1024 * 1024, // 30MB بعد الضغط
+    VIDEO_MAX_OUTPUT_SIZE: 50 * 1024 * 1024, // 50MB بعد الضغط
     
     async init() {
         if (!window.auth?.currentUser) { 
@@ -166,15 +165,14 @@ const SecureChatSystem = {
         });
     },
     
-    // ========== الحصول على أفضل تنسيق متوافق مع جميع المتصفحات ==========
+    // ========== اختيار أفضل تنسيق متوافق مع جميع المتصفحات ==========
     getBestVideoMimeType() {
         const types = [
-            'video/webm;codecs=vp8,opus',
-            'video/webm;codecs=vp8',
-            'video/webm;codecs=vp9,opus',
-            'video/webm;codecs=vp9',
-            'video/webm',
-            'video/mp4'
+            'video/webm;codecs=vp8,opus',  // Chrome, Firefox, Edge
+            'video/webm;codecs=vp8',       // معظم المتصفحات
+            'video/webm;codecs=vp9,opus',  // Chrome, Firefox
+            'video/webm',                   // WebM عام
+            'video/mp4'                     // Safari, iOS
         ];
         for (const type of types) {
             if (MediaRecorder.isTypeSupported(type)) return type;
@@ -182,29 +180,37 @@ const SecureChatSystem = {
         return 'video/webm';
     },
     
-    // ========== ضغط الفيديو متوافق مع جميع المتصفحات ==========
+    // ========== ضغط الفيديو - متوافق مع جميع المتصفحات ==========
     async compressVideo(file) {
+        // 1. فحص المدة
         let duration;
-        try { duration = await this.getVideoDuration(file); } catch (error) { throw new Error('❌ فشل قراءة الفيديو'); }
-        
-        if (duration > this.VIDEO_MAX_DURATION) {
-            const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), limitMins = Math.floor(this.VIDEO_WARNING_DURATION / 60), limitSecs = this.VIDEO_WARNING_DURATION % 60;
-            throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${limitMins}:${limitSecs.toString().padStart(2, '0')} دقائق`);
+        try {
+            duration = await this.getVideoDuration(file);
+        } catch (error) {
+            throw new Error('❌ فشل قراءة الفيديو');
         }
         
+        // 2. رفض الفيديوهات الطويلة
+        if (duration > this.VIDEO_MAX_DURATION) {
+            const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), maxMins = Math.floor(this.VIDEO_MAX_DURATION / 60);
+            throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${maxMins} دقائق`);
+        }
+        
+        // 3. رفض الملفات الكبيرة
         if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
             const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
             throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
         }
         
-        // إذا الفيديو صغير (أقل من 5MB)، أرسله بدون ضغط
-        if (file.size <= 5 * 1024 * 1024) {
+        // 4. فيديو صغير = بدون ضغط
+        if (file.size <= 15 * 1024 * 1024 && duration <= 60) {
             console.log('⚡ فيديو صغير - إرسال مباشر بدون ضغط');
             return file;
         }
         
         console.log(`🎬 ضغط فيديو: ${Math.floor(duration)}s | ${(file.size/1024/1024).toFixed(1)}MB`);
         
+        // 5. بدء الضغط
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
             const canvas = document.createElement('canvas');
@@ -216,11 +222,8 @@ const SecureChatSystem = {
             video.onloadedmetadata = () => {
                 URL.revokeObjectURL(url);
                 
-                // إعدادات الضغط المتوازنة
-                const targetHeight = 360;
-                const targetBitrate = 500000;
-                const targetFPS = 24;
-                
+                // إعدادات الضغط
+                const targetHeight = 360, targetBitrate = 400000, targetFPS = 20;
                 let width = video.videoWidth, height = video.videoHeight;
                 if (height > targetHeight) { width = Math.round((width * targetHeight) / height); height = targetHeight; }
                 canvas.width = Math.round(width / 2) * 2;
@@ -230,11 +233,10 @@ const SecureChatSystem = {
                 console.log('📼 تنسيق الضغط:', mimeType);
                 
                 const stream = canvas.captureStream(targetFPS);
-                
-                const mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: mimeType,
+                const mediaRecorder = new MediaRecorder(stream, { 
+                    mimeType, 
                     videoBitsPerSecond: targetBitrate,
-                    audioBitsPerSecond: 64000
+                    audioBitsPerSecond: 32000 
                 });
                 
                 const chunks = [];
@@ -245,10 +247,10 @@ const SecureChatSystem = {
                     if (e.data.size > 0) {
                         chunks.push(e.data);
                         const now = Date.now();
-                        if (now - lastProgressUpdate > 300) {
+                        if (now - lastProgressUpdate > 200) {
                             lastProgressUpdate = now;
                             const elapsed = (now - startTime) / 1000;
-                            const progress = Math.min((elapsed / duration) * 100, 98);
+                            const progress = Math.min((elapsed / duration) * 100, 95);
                             const currentSize = chunks.reduce((sum, c) => sum + c.size, 0);
                             ChatSystem.updateProgressBar(progress, `جاري ضغط الفيديو... ${(currentSize/1024/1024).toFixed(1)}MB`);
                         }
@@ -257,62 +259,40 @@ const SecureChatSystem = {
                 
                 mediaRecorder.onstop = () => {
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                    
-                    if (chunks.length === 0) {
-                        ChatSystem.hideProgressBar();
-                        reject(new Error('❌ فشل تسجيل الفيديو'));
-                        return;
-                    }
+                    if (chunks.length === 0) { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تسجيل الفيديو')); return; }
                     
                     const blob = new Blob(chunks, { type: mimeType });
                     const finalSizeMB = (blob.size / 1024 / 1024).toFixed(1);
                     const originalSizeMB = (file.size / 1024 / 1024).toFixed(1);
                     const ratio = ((1 - blob.size / file.size) * 100).toFixed(0);
                     
-                    console.log(`✅ ضغط مكتمل في ${elapsed}s | ${originalSizeMB}MB → ${finalSizeMB}MB (-${ratio}%)`);
+                    console.log(`✅ ضغط في ${elapsed}s | ${originalSizeMB}MB → ${finalSizeMB}MB (توفير ${ratio}%)`);
                     
-                    ChatSystem.updateProgressBar(100, '✅ الضغط مكتمل! جاري الإرسال...');
+                    ChatSystem.updateProgressBar(100, '✅ الضغط مكتمل!');
                     
                     if (blob.size > this.VIDEO_MAX_OUTPUT_SIZE) {
                         ChatSystem.hideProgressBar();
-                        reject(new Error(`❌ حجم الفيديو بعد الضغط كبير (${finalSizeMB}MB)\nجرب فيديو أقصر`));
+                        reject(new Error(`❌ الحجم بعد الضغط كبير (${finalSizeMB}MB)`));
                         return;
                     }
                     
-                    setTimeout(() => resolve(blob), 300);
+                    setTimeout(() => { ChatSystem.hideProgressBar(); resolve(blob); }, 500);
                 };
                 
-                mediaRecorder.onerror = () => {
-                    ChatSystem.hideProgressBar();
-                    reject(new Error('❌ فشل تسجيل الفيديو'));
-                };
+                mediaRecorder.onerror = () => { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تسجيل الفيديو')); };
                 
                 video.currentTime = 0;
                 const playPromise = video.play();
-                
                 if (playPromise !== undefined) {
                     playPromise.then(() => {
                         ChatSystem.showProgressBar('جاري ضغط الفيديو...', 0);
                         mediaRecorder.start(500);
-                        setTimeout(() => {
-                            if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-                            video.pause();
-                        }, duration * 1000);
-                    }).catch(() => {
-                        ChatSystem.hideProgressBar();
-                        reject(new Error('❌ فشل تشغيل الفيديو'));
-                    });
-                } else {
-                    reject(new Error('❌ المتصفح لا يدعم تشغيل الفيديو'));
-                }
+                        setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); video.pause(); }, duration * 1000);
+                    }).catch(() => { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تشغيل الفيديو')); });
+                } else { reject(new Error('❌ المتصفح لا يدعم تشغيل الفيديو')); }
             };
             
-            video.onerror = () => {
-                URL.revokeObjectURL(url);
-                ChatSystem.hideProgressBar();
-                reject(new Error('❌ فشل تحميل الفيديو'));
-            };
-            
+            video.onerror = () => { URL.revokeObjectURL(url); ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تحميل الفيديو')); };
             video.src = url;
         });
     },
@@ -484,18 +464,13 @@ const CallSystem = {
         } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
     },
     
-    // ========== إرسال الملفات (الصور + الفيديو مع ضغط) ==========
+    // ========== إرسال الملفات (مع ضغط الفيديو) ==========
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') return false;
         try {
             let blobToSend = file;
-            
-            if (type === 'image') {
-                blobToSend = await SecureChatSystem.compressImage(file);
-            } else if (type === 'video') {
-                ChatSystem.showProgressBar('جاري ضغط الفيديو...', 0);
-                blobToSend = await SecureChatSystem.compressVideo(file);
-            }
+            if (type === 'image') blobToSend = await SecureChatSystem.compressImage(file);
+            else if (type === 'video') blobToSend = await SecureChatSystem.compressVideo(file);
             
             const b64 = await SecureChatSystem.fileToBase64(blobToSend);
             const chunkSize = 16000;
@@ -674,7 +649,7 @@ const ChatSystem = {
     async sendFileWithRetry(file, type, maxRetries = 3) {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                this.showProgressBar(`جاري تحضير ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+                this.showProgressBar(`جاري ${type === 'video' ? 'ضغط وإرسال' : 'إرسال'} ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
                 const success = await CallSystem.sendFileDirect(file, type);
                 if (success) { this.hideProgressBar(); return true; }
                 if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
@@ -700,16 +675,16 @@ const ChatSystem = {
         } else alert('المستخدم غير متصل حالياً');
     },
     
+    // ========== إرسال الفيديو مع ضغط ==========
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         
-        // فحص المدة والحجم
+        // فحص الفيديو (المدة والحجم)
         try {
             const duration = await SecureChatSystem.getVideoDuration(file);
             if (duration > SecureChatSystem.VIDEO_MAX_DURATION) {
-                const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60);
-                const limitMins = Math.floor(SecureChatSystem.VIDEO_WARNING_DURATION / 60), limitSecs = SecureChatSystem.VIDEO_WARNING_DURATION % 60;
-                alert(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${limitMins}:${limitSecs.toString().padStart(2, '0')} دقائق`);
+                const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), maxMins = Math.floor(SecureChatSystem.VIDEO_MAX_DURATION / 60);
+                alert(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${maxMins} دقائق`);
                 return;
             }
             if (file.size > SecureChatSystem.VIDEO_MAX_INPUT_SIZE) {
@@ -720,34 +695,22 @@ const ChatSystem = {
         } catch (error) { alert('❌ فشل قراءة الفيديو'); return; }
         
         if (!this.friendOnline) { alert('المستخدم غير متصل حالياً'); return; }
-        
         await CallSystem.ensureDataChannel(this.currentChat);
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            console.log(`🎬 إرسال فيديو مع ضغط: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            console.log(`🎬 بدء معالجة الفيديو: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
             const success = await this.sendFileWithRetry(file, 'video');
             if (success) {
                 try {
-                    const duration = await SecureChatSystem.getVideoDuration(file);
+                    // ضغط الفيديو للعرض
                     const compressed = await SecureChatSystem.compressVideo(file);
                     const b64 = await SecureChatSystem.fileToBase64(compressed); 
                     const msgId = Date.now().toString();
                     
-                    this.displayMessage({ 
-                        id: msgId, type: 'video', data: b64, fileName: file.name,
-                        sender: 'me', time: new Date().toISOString(), status: 'sent' 
-                    });
+                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64.substring(0, 100) + '...', _videoPlaceholder: true, sender: 'me', time: new Date().toISOString(), status: 'sent' });
                     
-                    this.saveMessage(this.currentChat, { 
-                        id: msgId, type: 'video', data: b64.substring(0, 100) + '...',
-                        _videoPlaceholder: true,
-                        sender: 'me', time: new Date().toISOString(), status: 'sent' 
-                    });
-                    
-                } catch (error) { 
-                    console.error('❌ فشل معالجة الفيديو:', error);
-                    alert('فشل معالجة الفيديو: ' + (error.message || 'خطأ غير معروف')); 
-                }
+                } catch (error) { console.error('❌ فشل معالجة الفيديو:', error); }
             } else alert('فشل إرسال الفيديو');
         }
     },
