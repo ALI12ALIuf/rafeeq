@@ -1,12 +1,13 @@
-// ========== نظام التشفير E2EE + ضغط + حذف 24 ساعة ==========
+// ========== نظام التشفير E2EE + إرسال مباشر + حذف 24 ساعة ==========
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
     keyCache: new Map(),
     sharedKeyCache: new Map(),
     
-    VIDEO_MAX_DURATION: 600, // 10 دقائق
+    // ========== إعدادات الفيديو ==========
+    VIDEO_MAX_DURATION: 180, // 3 دقائق (الحد الفعلي)
+    VIDEO_WARNING_DURATION: 170, // 2:50 دقائق (رسالة التحذير)
     VIDEO_MAX_INPUT_SIZE: 250 * 1024 * 1024, // 250MB
-    VIDEO_MAX_OUTPUT_SIZE: 50 * 1024 * 1024, // 50MB بعد الضغط
     
     async init() {
         if (!window.auth?.currentUser) { 
@@ -153,6 +154,7 @@ const SecureChatSystem = {
         }); 
     },
     
+    // ========== فحص الفيديو فقط (إرسال مباشر بدون ضغط) ==========
     getVideoDuration(file) {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
@@ -165,135 +167,29 @@ const SecureChatSystem = {
         });
     },
     
-    // ========== اختيار أفضل تنسيق متوافق مع جميع المتصفحات ==========
-    getBestVideoMimeType() {
-        const types = [
-            'video/webm;codecs=vp8,opus',  // Chrome, Firefox, Edge
-            'video/webm;codecs=vp8',       // معظم المتصفحات
-            'video/webm;codecs=vp9,opus',  // Chrome, Firefox
-            'video/webm',                   // WebM عام
-            'video/mp4'                     // Safari, iOS
-        ];
-        for (const type of types) {
-            if (MediaRecorder.isTypeSupported(type)) return type;
-        }
-        return 'video/webm';
-    },
-    
-    // ========== ضغط الفيديو - متوافق مع جميع المتصفحات ==========
-    async compressVideo(file) {
-        // 1. فحص المدة
-        let duration;
-        try {
-            duration = await this.getVideoDuration(file);
-        } catch (error) {
-            throw new Error('❌ فشل قراءة الفيديو');
-        }
-        
-        // 2. رفض الفيديوهات الطويلة
-        if (duration > this.VIDEO_MAX_DURATION) {
-            const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), maxMins = Math.floor(this.VIDEO_MAX_DURATION / 60);
-            throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${maxMins} دقائق`);
-        }
-        
-        // 3. رفض الملفات الكبيرة
-        if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
-            const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
-            throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
-        }
-        
-        // 4. فيديو صغير = بدون ضغط
-        if (file.size <= 15 * 1024 * 1024 && duration <= 60) {
-            console.log('⚡ فيديو صغير - إرسال مباشر بدون ضغط');
+    validateVideo(file) {
+        return this.getVideoDuration(file).then(duration => {
+            const durationSec = Math.floor(duration);
+            const mins = Math.floor(durationSec / 60);
+            const secs = durationSec % 60;
+            
+            if (duration > this.VIDEO_MAX_DURATION) {
+                const warnMins = Math.floor(this.VIDEO_WARNING_DURATION / 60);
+                const warnSecs = this.VIDEO_WARNING_DURATION % 60;
+                throw new Error(
+                    `❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\n` +
+                    `الحد الأقصى: ${warnMins}:${warnSecs.toString().padStart(2, '0')} دقائق\n` +
+                    `💡 قم بقص الفيديو قبل الإرسال`
+                );
+            }
+            
+            if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
+                const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
+                throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
+            }
+            
+            console.log(`⚡ فيديو جاهز للإرسال المباشر: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
             return file;
-        }
-        
-        console.log(`🎬 ضغط فيديو: ${Math.floor(duration)}s | ${(file.size/1024/1024).toFixed(1)}MB`);
-        
-        // 5. بدء الضغط
-        return new Promise((resolve, reject) => {
-            const video = document.createElement('video');
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const url = URL.createObjectURL(file);
-            video.preload = 'auto';
-            video.muted = true;
-            
-            video.onloadedmetadata = () => {
-                URL.revokeObjectURL(url);
-                
-                // إعدادات الضغط
-                const targetHeight = 360, targetBitrate = 400000, targetFPS = 20;
-                let width = video.videoWidth, height = video.videoHeight;
-                if (height > targetHeight) { width = Math.round((width * targetHeight) / height); height = targetHeight; }
-                canvas.width = Math.round(width / 2) * 2;
-                canvas.height = Math.round(height / 2) * 2;
-                
-                const mimeType = this.getBestVideoMimeType();
-                console.log('📼 تنسيق الضغط:', mimeType);
-                
-                const stream = canvas.captureStream(targetFPS);
-                const mediaRecorder = new MediaRecorder(stream, { 
-                    mimeType, 
-                    videoBitsPerSecond: targetBitrate,
-                    audioBitsPerSecond: 32000 
-                });
-                
-                const chunks = [];
-                const startTime = Date.now();
-                let lastProgressUpdate = 0;
-                
-                mediaRecorder.ondataavailable = e => {
-                    if (e.data.size > 0) {
-                        chunks.push(e.data);
-                        const now = Date.now();
-                        if (now - lastProgressUpdate > 200) {
-                            lastProgressUpdate = now;
-                            const elapsed = (now - startTime) / 1000;
-                            const progress = Math.min((elapsed / duration) * 100, 95);
-                            const currentSize = chunks.reduce((sum, c) => sum + c.size, 0);
-                            ChatSystem.updateProgressBar(progress, `جاري ضغط الفيديو... ${(currentSize/1024/1024).toFixed(1)}MB`);
-                        }
-                    }
-                };
-                
-                mediaRecorder.onstop = () => {
-                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                    if (chunks.length === 0) { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تسجيل الفيديو')); return; }
-                    
-                    const blob = new Blob(chunks, { type: mimeType });
-                    const finalSizeMB = (blob.size / 1024 / 1024).toFixed(1);
-                    const originalSizeMB = (file.size / 1024 / 1024).toFixed(1);
-                    const ratio = ((1 - blob.size / file.size) * 100).toFixed(0);
-                    
-                    console.log(`✅ ضغط في ${elapsed}s | ${originalSizeMB}MB → ${finalSizeMB}MB (توفير ${ratio}%)`);
-                    
-                    ChatSystem.updateProgressBar(100, '✅ الضغط مكتمل!');
-                    
-                    if (blob.size > this.VIDEO_MAX_OUTPUT_SIZE) {
-                        ChatSystem.hideProgressBar();
-                        reject(new Error(`❌ الحجم بعد الضغط كبير (${finalSizeMB}MB)`));
-                        return;
-                    }
-                    
-                    setTimeout(() => { ChatSystem.hideProgressBar(); resolve(blob); }, 500);
-                };
-                
-                mediaRecorder.onerror = () => { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تسجيل الفيديو')); };
-                
-                video.currentTime = 0;
-                const playPromise = video.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        ChatSystem.showProgressBar('جاري ضغط الفيديو...', 0);
-                        mediaRecorder.start(500);
-                        setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); video.pause(); }, duration * 1000);
-                    }).catch(() => { ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تشغيل الفيديو')); });
-                } else { reject(new Error('❌ المتصفح لا يدعم تشغيل الفيديو')); }
-            };
-            
-            video.onerror = () => { URL.revokeObjectURL(url); ChatSystem.hideProgressBar(); reject(new Error('❌ فشل تحميل الفيديو')); };
-            video.src = url;
         });
     },
     
@@ -464,20 +360,18 @@ const CallSystem = {
         } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
     },
     
-    // ========== إرسال الملفات (مع ضغط الفيديو) ==========
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') return false;
         try {
             let blobToSend = file;
             if (type === 'image') blobToSend = await SecureChatSystem.compressImage(file);
-            else if (type === 'video') blobToSend = await SecureChatSystem.compressVideo(file);
             
             const b64 = await SecureChatSystem.fileToBase64(blobToSend);
             const chunkSize = 16000;
             const totalChunks = Math.ceil(b64.length / chunkSize);
             const fileId = Date.now().toString();
             
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء | ${(blobToSend.size/1024/1024).toFixed(1)}MB)`);
+            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
             
             for (let i = 0; i < totalChunks; i++) {
                 if (this.dc.readyState !== 'open') { ChatSystem.hideProgressBar(); return false; }
@@ -649,7 +543,7 @@ const ChatSystem = {
     async sendFileWithRetry(file, type, maxRetries = 3) {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                this.showProgressBar(`جاري ${type === 'video' ? 'ضغط وإرسال' : 'إرسال'} ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+                this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
                 const success = await CallSystem.sendFileDirect(file, type);
                 if (success) { this.hideProgressBar(); return true; }
                 if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
@@ -675,42 +569,33 @@ const ChatSystem = {
         } else alert('المستخدم غير متصل حالياً');
     },
     
-    // ========== إرسال الفيديو مع ضغط ==========
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         
-        // فحص الفيديو (المدة والحجم)
         try {
-            const duration = await SecureChatSystem.getVideoDuration(file);
-            if (duration > SecureChatSystem.VIDEO_MAX_DURATION) {
-                const mins = Math.floor(duration / 60), secs = Math.floor(duration % 60), maxMins = Math.floor(SecureChatSystem.VIDEO_MAX_DURATION / 60);
-                alert(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${maxMins} دقائق`);
-                return;
-            }
-            if (file.size > SecureChatSystem.VIDEO_MAX_INPUT_SIZE) {
-                const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (SecureChatSystem.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
-                alert(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
-                return;
-            }
-        } catch (error) { alert('❌ فشل قراءة الفيديو'); return; }
+            await SecureChatSystem.validateVideo(file);
+        } catch (error) {
+            alert(error.message);
+            return;
+        }
         
         if (!this.friendOnline) { alert('المستخدم غير متصل حالياً'); return; }
+        
         await CallSystem.ensureDataChannel(this.currentChat);
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            console.log(`🎬 بدء معالجة الفيديو: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
             const success = await this.sendFileWithRetry(file, 'video');
             if (success) {
                 try {
-                    // ضغط الفيديو للعرض
-                    const compressed = await SecureChatSystem.compressVideo(file);
-                    const b64 = await SecureChatSystem.fileToBase64(compressed); 
+                    const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
                     
                     this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
                     this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64.substring(0, 100) + '...', _videoPlaceholder: true, sender: 'me', time: new Date().toISOString(), status: 'sent' });
                     
-                } catch (error) { console.error('❌ فشل معالجة الفيديو:', error); }
+                } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
     },
@@ -811,7 +696,7 @@ const ChatSystem = {
 ChatSystem.init();
 
 // ========== وظائف الواجهة العامة ==========
-async function loadChats() { if (!window.auth || !window.auth.currentUser) return; const list = document.getElementById('chatsList'); if (!list) return; try { const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); if (!udoc.exists) return; const friends = udoc.data().friends || []; if (!friends.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3></div>`; return; } let html = ''; for (const fid of friends) { try { const fdoc = await window.db.collection('users').doc(fid).get(); if (fdoc.exists) { const f = fdoc.data(); const key = `chat_${fid}`; let lm = 'اضغط لبدء المحادثة', lt = ''; try { const h = JSON.parse(localStorage.getItem(key)) || []; if (h.length > 0) { const l = h[h.length - 1]; if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; else if (l.type === 'image') lm = '📷 صورة'; else if (l.type === 'voice') lm = '🎤 بصمة'; else if (l.type === 'video') lm = '🎥 فيديو'; else if (l.type === 'file') lm = '📎 ملف'; lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); } } catch (e) {} html += `<div class="chat-item" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`; } } catch (e) {} } list.innerHTML = html || `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3></div>`; } catch (e) {} }
+async function loadChats() { if (!window.auth || !window.auth.currentUser) return; const list = document.getElementById('chatsList'); if (!list) return; try { const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); if (!udoc.exists) return; const friends = udoc.data().friends || []; if (!friends.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; return; } let html = ''; for (const fid of friends) { try { const fdoc = await window.db.collection('users').doc(fid).get(); if (fdoc.exists) { const f = fdoc.data(); const key = `chat_${fid}`; let lm = 'اضغط لبدء المحادثة', lt = ''; try { const h = JSON.parse(localStorage.getItem(key)) || []; if (h.length > 0) { const l = h[h.length - 1]; if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; else if (l.type === 'image') lm = '📷 صورة'; else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; else if (l.type === 'video') lm = '🎥 فيديو'; else if (l.type === 'file') lm = '📎 ملف'; lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); } } catch (e) {} html += `<div class="chat-item" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`; } } catch (e) {} } list.innerHTML = html || `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`; } catch (e) {} }
 
 function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
 
@@ -824,16 +709,26 @@ window.sendImage = () => { const i = document.createElement('input'); i.type = '
 window.sendVideo = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'video/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendVideoFile(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.sendFile = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '*/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.sendVoiceNote = () => { if (!navigator.mediaDevices?.getUserMedia) { alert('المتصفح لا يدعم تسجيل الصوت'); return; } navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => { if (e.data.size > 0) ch.push(e.data); }; mr.onstop = () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: 'audio/webm' }); if (blob.size > 0) ChatSystem.sendVoiceNote(blob); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') mr.stop(); }; } setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 900000); }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); document.getElementById('attachmentMenu').style.display = 'none'; };
-window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc?.readyState === 'open') ChatSystem.shareLocationDirect(); else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`), () => alert('فشل تحديد الموقع')); document.getElementById('attachmentMenu').style.display = 'none'; };
+window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc?.readyState === 'open') ChatSystem.shareLocationDirect(); else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`), () => alert('فشل تحديد الموقع')); else alert('المتصفح لا يدعم تحديد الموقع'); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.closeConversation = () => { CallSystem.endCall(); ChatSystem.closeChat(); };
 window.openImage = (data) => { const win = window.open('', '_blank'); if (win) win.document.write(`<img src="${data}" style="max-width:100%;height:auto;">`); };
 window.openFile = (data, fileName) => { const link = document.createElement('a'); link.href = data; link.download = fileName || 'file'; link.click(); };
+window.openEditProfileModal = () => { const nameInput = document.getElementById('editName'); const currentName = document.getElementById('profileName')?.textContent; const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent; if (nameInput) nameInput.value = currentName || ''; const avatarPreview = document.getElementById('currentAvatarEmoji'); if (avatarPreview) avatarPreview.textContent = currentEmoji || '👤'; document.getElementById('editProfileModal')?.classList.add('active'); };
+window.saveProfile = () => { const n = document.getElementById('editName')?.value?.trim(); if (!n || n.length > 25) { alert('الاسم مطلوب ولا يزيد عن 25 حرف'); return; } if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { const nameEl = document.getElementById('profileName'); if (nameEl) nameEl.textContent = n; closeModal(); }).catch(() => alert('فشل حفظ التغييرات')); };
+window.showUserTrips = () => { document.querySelector('.profile-page') && (document.querySelector('.profile-page').style.display = 'none'); document.getElementById('tripsPage') && (document.getElementById('tripsPage').style.display = 'block'); };
+window.goBack = () => { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); const pp = document.querySelector('.profile-page'); if (pp) { pp.style.display = 'block'; pp.classList.add('active'); } };
+window.selectAvatar = t => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; const e = m[t] || '👤'; const profileAvatar = document.getElementById('profileAvatarEmoji'), currentAvatar = document.getElementById('currentAvatarEmoji'); if (profileAvatar) profileAvatar.textContent = e; if (currentAvatar) currentAvatar.textContent = e; if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ avatarType: t }).then(() => closeModal()).catch(() => {}); };
+window.openAvatarModal = () => document.getElementById('avatarModal')?.classList.add('active');
 window.getEmojiForUser = u => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; return m[u?.avatarType] || '👤'; };
+window.clearMessages = () => { if (confirm('هل أنت متأكد من مسح جميع الرسائل؟')) { const c = document.getElementById('messagesContainer'); if (c) c.innerHTML = ''; if (ChatSystem.currentChat) { const key = `chat_${ChatSystem.currentChat}`; localStorage.removeItem(key); ChatSystem.messages[ChatSystem.currentChat] = []; } } };
 
 function formatNumber(num) { if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return num.toString(); }
+async function updateTripsCount() { if (!window.auth || !window.auth.currentUser) return; try { const s = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).where('status', '==', 'ended').get(); const c = document.getElementById('tripsCount'); if (c) c.textContent = formatNumber(s.size); } catch (error) {} }
+function ensureSinglePage() { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.querySelectorAll('.page').forEach(p => { p.style.display = p.classList.contains('active') ? 'block' : 'none'; }); }
 function setupNavigation() { const nav = document.querySelectorAll('.nav-item'); const pages = document.querySelectorAll('.page'); if (!nav.length || !pages.length) return; function switchPage(id) { pages.forEach(p => p.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } pages.forEach(p => { if (!p.classList.contains('active')) p.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); if (id === 'chat') loadChats(); document.body.classList.remove('conversation-open'); nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); } nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); }
+function setupModals() { window.openLanguageModal = () => document.getElementById('languageModal')?.classList.add('active'); window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); })); document.querySelectorAll('.settings-item').forEach(i => { if (i.querySelector('[data-i18n="language"]')) i.addEventListener('click', window.openLanguageModal); }); }
 
-document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.querySelectorAll('.page').forEach(p => { p.style.display = p.classList.contains('active') ? 'block' : 'none'; }); setupNavigation(); loadChats(); setupChatListeners(); });
+document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); });
 window.addEventListener('authReady', async () => { if (window.auth?.currentUser) await SecureChatSystem.init(); });
 window.addEventListener('beforeunload', () => { PresenceSystem.setOffline(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) PresenceSystem.setOffline(); else { PresenceSystem.setOnline(); if (ChatSystem.currentChat && ChatSystem.friendOnline) setTimeout(() => CallSystem.ensureDataChannel(ChatSystem.currentChat).catch(() => {}), 1000); } });
