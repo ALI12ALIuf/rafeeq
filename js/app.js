@@ -360,6 +360,7 @@ const CallSystem = {
         } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
     },
     
+    // ========== إرسال الملفات (فيديو مباشر بدون ضغط) ==========
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') return false;
         try {
@@ -569,6 +570,7 @@ const ChatSystem = {
         } else alert('المستخدم غير متصل حالياً');
     },
     
+    // ========== إرسال الفيديو مباشرة بدون ضغط ==========
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         
@@ -733,3 +735,5 @@ window.addEventListener('authReady', async () => { if (window.auth?.currentUser)
 window.addEventListener('beforeunload', () => { PresenceSystem.setOffline(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) PresenceSystem.setOffline(); else { PresenceSystem.setOnline(); if (ChatSystem.currentChat && ChatSystem.friendOnline) setTimeout(() => CallSystem.ensureDataChannel(ChatSystem.currentChat).catch(() => {}), 1000); } });
 if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+window.addEventListener('error', (event) => { console.error('❌ خطأ عام:', event.error); });
+window.addEventListener('unhandledrejection', (event) => { console.error('❌ خطأ غير معالج:', event.reason); });
