@@ -1,3 +1,4 @@
+
 * {
     margin: 0;
     padding: 0;
@@ -320,5 +321,57 @@ body.conversation-open .conversation-page {
 
 /* إخفاء الهيدر عند فتح المحادثة */
 body.conversation-open .app-header {
+    display: none !important;
+}
+
+/* ========== إصلاح تداخل الصفحات - نهائي ========== */
+
+/* إخفاء جميع الصفحات الفرعية عند فتح المحادثة */
+body.conversation-open .page:not(.conversation-page) {
+    display: none !important;
+}
+body.conversation-open .profile-pages,
+body.conversation-open .profile-subpage {
+    display: none !important;
+}
+
+/* صفحة المحادثة تكون فوق الكل */
+.conversation-page {
+    display: none !important;
+}
+body.conversation-open .conversation-page {
+    display: flex !important;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    background: var(--bg);
+}
+
+/* إخفاء الهيدر والتنقل عند فتح المحادثة */
+body.conversation-open .app-header,
+body.conversation-open .bottom-nav {
+    display: none !important;
+}
+
+/* عند فتح الصفحات الفرعية للملف الشخصي */
+body.profile-subpage-open .page:not(.profile-page),
+body.profile-subpage-open .chat-page,
+body.profile-subpage-open .home-page,
+body.profile-subpage-open .settings-page {
+    display: none !important;
+}
+body.profile-subpage-open .page.profile-page {
+    display: none !important;
+}
+body.profile-subpage-open .profile-pages {
+    display: block !important;
+}
+
+/* لما تنغلق المحادثة - تأكد إنه ما تبقى أي صفحة مفتوحة */
+body:not(.conversation-open) .conversation-page {
     display: none !important;
 }
