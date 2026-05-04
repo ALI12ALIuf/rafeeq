@@ -56,6 +56,33 @@ body {
     overflow: hidden;
 }
 
+/* ========== إصلاح عام - منع النصوص من الخروج ========== */
+h1, h2, h3, h4, h5, h6, p, span, div {
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    margin: 0;
+    padding: 0;
+}
+
+/* ========== إصلاح الإيموجي داخل الإطارات الدائرية ========== */
+.profile-avatar-emoji,
+.conversation-avatar-emoji,
+.chat-avatar-emoji,
+.post-avatar-emoji,
+.user-avatar-emoji,
+.current-avatar {
+    overflow: hidden !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    text-align: center !important;
+}
+
 .splash-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--primary); display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s; }
 .splash-screen.hide { opacity: 0; pointer-events: none; }
 .splash-content { text-align: center; color: white; }
@@ -80,48 +107,62 @@ body {
 
 .post-card { background: var(--card-bg); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; box-shadow: var(--shadow); }
 .post-header { display: flex; align-items: center; padding: 1rem; gap: 0.75rem; }
-.post-avatar-emoji { width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2rem; }
-.post-user { flex: 1; }
-.post-user h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
+.post-avatar-emoji { width: 40px; height: 40px; border-radius: 50%; background: var(--light); font-size: 2rem; }
+.post-user { flex: 1; min-width: 0; }
+.post-user h4 { font-size: 0.9rem; margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .post-time { font-size: 0.8rem; color: var(--text-light); }
-.post-menu { background: none; border: none; color: var(--text-light); cursor: pointer; }
+.post-menu { background: none; border: none; color: var(--text-light); cursor: pointer; flex-shrink: 0; }
 .post-content { padding: 0 1rem 1rem; }
 .post-location { display: flex; align-items: center; gap: 0.5rem; color: var(--text-light); font-size: 0.9rem; margin-bottom: 0.5rem; }
 .post-actions { display: flex; gap: 1rem; padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--border); }
 .post-action { background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
 
 .search-box { display: flex; align-items: center; background: var(--light); border-radius: 25px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
-.search-box i { color: var(--text-light); margin-left: 0.5rem; }
-.search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; }
+.search-box i { color: var(--text-light); margin-left: 0.5rem; flex-shrink: 0; }
+.search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; min-width: 0; }
 .chats-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.chat-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.chat-avatar-emoji { width: 50px; height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
-.chat-info { flex: 1; }
-.chat-info h4 { margin-bottom: 0.25rem; font-size: 0.9rem; }
-.chat-info p { color: var(--text-light); font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-time { color: var(--text-light); font-size: 0.7rem; }
 
+/* ========== إصلاح عنصر الدردشة ========== */
+.chat-item { 
+    display: flex; 
+    align-items: center; 
+    gap: 0.75rem; 
+    padding: 0.75rem; 
+    background: var(--card-bg); 
+    border-radius: var(--radius); 
+    cursor: pointer; 
+    -webkit-tap-highlight-color: transparent; 
+    border-bottom: 1px solid var(--border);
+}
+.chat-avatar-emoji { width: 45px; height: 45px; border-radius: 50%; background: var(--light); font-size: 2rem; }
+.chat-info { flex: 1; min-width: 0; }
+.chat-info h4 { margin-bottom: 0.25rem; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-info p { color: var(--text-light); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-meta { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.chat-time { color: var(--text-light); font-size: 0.7rem; white-space: nowrap; }
+
+/* ========== إصلاح الملف الشخصي ========== */
 .profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
 .profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
 .profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
-.profile-avatar-emoji { width: 100%; height: 100%; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 5rem; border: 4px solid white; box-shadow: var(--shadow); }
+.profile-avatar-emoji { width: 100%; height: 100%; border-radius: 50%; background: var(--light); font-size: 4.5rem; border: 4px solid white; box-shadow: var(--shadow); }
 .edit-profile-btn-left { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; border-radius: 50%; background: white; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; box-shadow: var(--shadow); z-index: 10; }
-.profile-info-container { padding: 1rem; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.profile-info-container { padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
 .profile-name-wrapper { text-align: center; width: 100%; }
-.profile-name-wrapper h2 { font-size: 1.3rem; color: var(--text); margin: 0; }
-.profile-id-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--light); padding: 0.5rem 1rem; border-radius: 25px; width: fit-content; max-width: 100%; min-width: 250px; }
-.copy-btn-left { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1.1rem; padding: 0 5px; -webkit-tap-highlight-color: transparent; }
-.id-value-numbers { font-family: monospace; font-size: 1.1rem; font-weight: 500; color: var(--primary); direction: ltr; letter-spacing: 1px; flex: 1; text-align: center; }
-.id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
+.profile-name-wrapper h2 { font-size: 1.3rem; color: var(--text); word-break: break-word; }
+.profile-id-row { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: var(--light); padding: 0.5rem 1rem; border-radius: 25px; width: fit-content; max-width: 100%; }
+.copy-btn-left { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1.1rem; padding: 0 5px; flex-shrink: 0; }
+.id-value-numbers { font-family: monospace; font-size: 1rem; font-weight: 500; color: var(--primary); direction: ltr; letter-spacing: 1px; word-break: break-all; }
+.id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; flex-shrink: 0; }
 .profile-bio { padding: 0 1rem 1rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
 .profile-stats { display: flex; justify-content: space-around; padding: 1rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.stat-link { text-decoration: none; color: var(--text); text-align: center; padding: 10px; border-radius: var(--radius); display: inline-block; flex: 1; -webkit-tap-highlight-color: transparent; }
-.stat-value { display: block; font-size: 1.2rem; font-weight: bold; color: var(--primary); }
+.stat-link { text-decoration: none; color: var(--text); text-align: center; padding: 10px; border-radius: var(--radius); flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.stat-value { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
 .stat-link span:last-child { font-size: 0.8rem; color: var(--text-light); }
 
 .profile-subpage { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 1000; overflow-y: auto; padding: 0; }
 .subpage-header { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow); }
-.back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .back-btn:hover { background: var(--primary); color: white; }
 .subpage-header h3 { flex: 1; text-align: center; font-size: 1.2rem; font-weight: 600; color: var(--primary); }
 .trips-grid, .users-list { padding: 1rem; }
@@ -129,12 +170,14 @@ body {
 .empty-state i { font-size: 4rem; margin-bottom: 1rem; color: var(--primary); opacity: 0.5; }
 .empty-state h3 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--text); font-weight: 600; }
 .empty-state p { font-size: 1rem; max-width: 300px; margin: 0 auto; line-height: 1.6; color: var(--text-light); }
-.user-item { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); margin-bottom: 0.75rem; box-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
-.user-avatar-emoji { width: 50px; height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
-.user-info { flex: 1; }
-.user-info h4 { margin-bottom: 0.25rem; font-size: 1rem; font-weight: 600; }
-.user-info p { color: var(--text-light); font-size: 0.85rem; }
-.user-actions { display: flex; gap: 0.5rem; }
+
+/* ========== إصلاح عنصر المستخدم ========== */
+.user-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--card-bg); border-radius: var(--radius); margin-bottom: 0.75rem; box-shadow: var(--shadow); border-bottom: 1px solid var(--border); }
+.user-avatar-emoji { width: 45px; height: 45px; border-radius: 50%; background: var(--light); font-size: 2rem; }
+.user-info { flex: 1; min-width: 0; }
+.user-info h4 { margin-bottom: 0.25rem; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-info p { color: var(--text-light); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
 .action-btn { width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .action-btn.following { background: var(--primary); color: white; }
 .action-btn.remove { background: var(--danger); color: white; }
@@ -150,7 +193,7 @@ body {
 .edit-field input:focus { outline: none; border-color: var(--primary); }
 .char-counter { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--text-light); font-weight: 500; direction: ltr; }
 .char-counter.full { color: var(--danger); font-weight: bold; }
-.current-avatar { width: 80px; height: 80px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 4rem; margin: 0 auto 1rem; }
+.current-avatar { width: 70px; height: 70px; border-radius: 50%; background: var(--light); font-size: 3rem; margin: 0 auto 1rem; border: 3px solid var(--border); }
 .change-avatar-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 0 auto; padding: 0.5rem 1rem; background: var(--light); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; cursor: pointer; }
 .modal-actions { display: flex; gap: 1.2rem; margin-top: 2rem; justify-content: center; }
 .modal-btn { flex: 1; max-width: 140px; padding: 0.9rem 1.5rem; border: none; border-radius: var(--radius); font-weight: 600; font-size: 1rem; cursor: pointer; text-align: center; }
@@ -176,9 +219,9 @@ input:checked + .slider:before { transform: translateX(26px); }
 @media (max-width: 480px) {
     .profile-cover { height: 120px; }
     .profile-avatar-center { width: 80px; height: 80px; }
-    .profile-avatar-emoji { font-size: 4rem; }
+    .profile-avatar-emoji { font-size: 3.5rem; }
     .edit-profile-btn-left { width: 36px; height: 36px; top: 10px; left: 10px; font-size: 1.1rem; }
-    .profile-id-row { width: 100%; min-width: auto; }
+    .profile-id-row { width: 100%; }
 }
 
 /* ========== المحادثة ========== */
@@ -186,23 +229,22 @@ body.in-call .app-container, body.in-call .bottom-nav, body.in-call .app-header 
 body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
 body.conversation-open .conversation-page { display: flex !important; flex-direction: column; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: var(--bg); }
 
-.conversation-header { display: flex; align-items: center; padding: 12px 16px; background: var(--card-bg); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); height: 70px; }
-.conversation-header .back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 12px; }
+.conversation-header { display: flex; align-items: center; padding: 10px 14px; background: var(--card-bg); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); height: 65px; gap: 10px; }
+.conversation-header .back-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .conversation-header .back-btn:hover { background: var(--primary); color: white; }
-.conversation-user-info { display: flex; align-items: center; gap: 12px; flex: 1; padding: 4px 8px; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
-.conversation-avatar-emoji { width: 45px; height: 45px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; }
-.conversation-user-details { flex: 1; }
-.conversation-user-details h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.conversation-user-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.conversation-avatar-emoji { width: 42px; height: 42px; border-radius: 50%; background: var(--light); font-size: 2rem; }
+.conversation-user-details { flex: 1; min-width: 0; }
+.conversation-user-details h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .conversation-status { font-size: 0.75rem; color: var(--text-light); }
 .conversation-status.online { color: #4CAF50; }
 .conversation-status.offline { color: var(--text-light); }
 
-/* أزرار الاتصال */
-.call-buttons button { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+.call-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+.call-buttons button { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
 .call-buttons button:hover { background: var(--light); }
-.call-buttons button i { font-size: 1.2rem; }
+.call-buttons button i { font-size: 1.1rem; }
 
-/* أزرار المرفقات مقفولة */
 .attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
 .attachment-menu button.locked::after { content: " 🔒"; font-size: 0.8rem; }
 
@@ -224,8 +266,8 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
 .message-input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--light); border-radius: 30px; padding: 4px 8px; border: 1px solid var(--border); }
 .message-input-wrapper:focus-within { border-color: var(--primary); }
 .attach-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: transparent; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
-.input-area { flex: 1; display: flex; align-items: center; gap: 4px; }
-#messageInput { flex: 1; background: transparent; border: none; padding: 12px; color: var(--text); font-size: 1rem; outline: none; }
+.input-area { flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0; }
+#messageInput { flex: 1; background: transparent; border: none; padding: 12px; color: var(--text); font-size: 1rem; outline: none; min-width: 0; }
 .emoji-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 .send-btn, .voice-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 
@@ -241,7 +283,9 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
 .emoji-grid button { width: 40px; height: 40px; border-radius: 8px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; }
 
 @media (max-width: 480px) {
-    .conversation-header { padding: 8px 12px; height: 60px; }
+    .conversation-header { padding: 8px 10px; height: 58px; gap: 8px; }
+    .conversation-avatar-emoji { width: 36px; height: 36px; font-size: 1.7rem; }
+    .conversation-user-details h3 { font-size: 0.95rem; }
     .message { max-width: 85%; }
     .message-image { max-width: 150px; max-height: 150px; }
     .message-audio { width: 200px; }
