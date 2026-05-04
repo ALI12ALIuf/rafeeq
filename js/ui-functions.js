@@ -6,9 +6,17 @@ async function loadChats() { if (!window.auth || !window.auth.currentUser) retur
 function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
 
 window.openChat = friendId => {
+    // تأكد من إغلاق أي محادثة مفتوحة أولاً
     if (document.body.classList.contains('conversation-open')) {
-        window.closeConversation();
+        if (typeof ChatSystem !== 'undefined' && ChatSystem.closeChat) {
+            ChatSystem.closeChat();
+        }
+        document.body.classList.remove('conversation-open');
+        const oldConvPage = document.getElementById('conversationPage');
+        if (oldConvPage) oldConvPage.style.display = 'none';
     }
+    
+    // إخفاء جميع الصفحات
     document.querySelectorAll('.page').forEach(page => {
         page.style.display = 'none';
         page.classList.remove('active');
@@ -16,9 +24,13 @@ window.openChat = friendId => {
     document.querySelectorAll('.profile-subpage').forEach(sub => {
         sub.style.display = 'none';
     });
+    
+    // جلب بيانات الصديق وفتح المحادثة
     window.db.collection('users').doc(friendId).get().then(doc => {
         if (doc.exists) {
             const f = doc.data();
+            // التأكد من إضافة الكلاس إلى body قبل فتح المحادثة
+            document.body.classList.add('conversation-open');
             ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤');
         }
     }).catch(() => {});
@@ -49,12 +61,13 @@ window.closeConversation = () => {
     // 4. إخفاء جميع الصفحات الفرعية للملف الشخصي
     document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
 
-    // 5. إظهار شريط التنقل السفلي
+    // 5. إظهار شريط التنقل السفلي ورأس الصفحة
     const bottomNav = document.querySelector('.bottom-nav');
     if (bottomNav) bottomNav.style.display = 'flex';
+    const appHeader = document.querySelector('.app-header');
+    if (appHeader) appHeader.style.display = 'flex';
 
-    // 6. إعادة تفعيل الصفحة التي كنا فيها (الصفحة النشطة قبل المحادثة)
-    // نبحث عن الصفحة النشطة حاليًا (التي كانت ظاهرة قبل فتح المحادثة)
+    // 6. إعادة تفعيل الصفحة التي كنا فيها
     let activePageFound = false;
     document.querySelectorAll('.page').forEach(page => {
         if (page.classList.contains('active') && !page.classList.contains('conversation-page')) {
@@ -72,7 +85,6 @@ window.closeConversation = () => {
             chatPage.style.display = 'block';
             chatPage.classList.add('active');
         }
-        // التأكد من أن شريط التنقل يظهر الزر الصحيح
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(nav => {
             nav.classList.remove('active');
@@ -99,42 +111,30 @@ window.showUserTrips = () => {
     if (profilePage) profilePage.style.display = 'none';
     const tripsPage = document.getElementById('tripsPage');
     if (tripsPage) tripsPage.style.display = 'block';
-    // إخفاء شريط التنقل في الصفحات الفرعية
     const bottomNav = document.querySelector('.bottom-nav');
     if (bottomNav) bottomNav.style.display = 'none';
 };
 
 window.goBack = () => {
-    // إخفاء جميع الصفحات الفرعية للملف الشخصي
     document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
-    
-    // إظهار صفحة الملف الشخصي الرئيسية
     const profilePage = document.querySelector('.profile-page');
     if (profilePage) {
         profilePage.style.display = 'block';
         profilePage.classList.add('active');
     }
-    
-    // إخفاء باقي الصفحات الرئيسية
     document.querySelectorAll('.page').forEach(page => {
         if (page !== profilePage && !page.classList.contains('profile-page')) {
             page.style.display = 'none';
             page.classList.remove('active');
         }
     });
-    
-    // إزالة حالة المحادثة إذا كانت موجودة
     document.body.classList.remove('conversation-open');
-    
-    // إخفاء صفحة المحادثة
     const convPage = document.getElementById('conversationPage');
     if (convPage) convPage.style.display = 'none';
-    
-    // إظهار شريط التنقل السفلي مرة أخرى
     const bottomNav = document.querySelector('.bottom-nav');
     if (bottomNav) bottomNav.style.display = 'flex';
-    
-    // تحديث شريط التنقل ليظهر أننا في صفحة الملف الشخصي
+    const appHeader = document.querySelector('.app-header');
+    if (appHeader) appHeader.style.display = 'flex';
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(nav => {
         nav.classList.remove('active');
@@ -157,6 +157,8 @@ function ensureSinglePage() {
     document.body.classList.remove('conversation-open');
     const bottomNav = document.querySelector('.bottom-nav');
     if (bottomNav) bottomNav.style.display = 'flex';
+    const appHeader = document.querySelector('.app-header');
+    if (appHeader) appHeader.style.display = 'flex';
     document.querySelectorAll('.page').forEach(p => {
         if (p.classList.contains('active')) p.style.display = 'block';
         else p.style.display = 'none';
@@ -168,29 +170,24 @@ function setupNavigation() {
     const pages = document.querySelectorAll('.page');
     if (!nav.length || !pages.length) return;
     function switchPage(id) {
-        // إغلاق أي محادثة مفتوحة أولاً
         if (document.body.classList.contains('conversation-open')) {
             if (typeof ChatSystem !== 'undefined' && ChatSystem.closeChat) ChatSystem.closeChat();
             document.body.classList.remove('conversation-open');
             const convPage = document.getElementById('conversationPage');
             if (convPage) convPage.style.display = 'none';
         }
-        // إخفاء الصفحات الفرعية للملف الشخصي
         document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
-        // إخفاء جميع الصفحات الرئيسية
         pages.forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
-        // إظهار الصفحة المطلوبة
         const targetPage = document.querySelector(`.page.${id}-page`);
         if (targetPage) { 
             targetPage.classList.add('active'); 
             targetPage.style.display = 'block'; 
         }
-        // تحديث شريط التنقل
         nav.forEach(n => n.classList.toggle('active', n.dataset.page === id));
-        // إظهار شريط التنقل
         const bottomNav = document.querySelector('.bottom-nav');
         if (bottomNav) bottomNav.style.display = 'flex';
-        // تحميل البيانات حسب الصفحة
+        const appHeader = document.querySelector('.app-header');
+        if (appHeader) appHeader.style.display = 'flex';
         if (id === 'chat') { 
             if (typeof loadChats === 'function') setTimeout(() => loadChats(), 50); 
         } else if (id === 'profile') { 
