@@ -35,17 +35,55 @@ window.sendVoiceNote = () => { if (!navigator.mediaDevices?.getUserMedia) { aler
 window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc?.readyState === 'open') ChatSystem.shareLocationDirect(); else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`), () => alert('فشل تحديد الموقع')); else alert('المتصفح لا يدعم تحديد الموقع'); document.getElementById('attachmentMenu').style.display = 'none'; };
 
 window.closeConversation = () => {
+    // 1. إنهاء المكالمة والمحادثة
     if (typeof CallSystem !== 'undefined' && CallSystem.endCall) CallSystem.endCall();
     if (typeof ChatSystem !== 'undefined' && ChatSystem.closeChat) ChatSystem.closeChat();
+
+    // 2. إزالة كلاس المحادثة من الـ body
     document.body.classList.remove('conversation-open');
+
+    // 3. إخفاء صفحة المحادثة
     const convPage = document.getElementById('conversationPage');
     if (convPage) convPage.style.display = 'none';
-    const chatPage = document.querySelector('.chat-page');
-    if (chatPage) chatPage.style.display = 'block';
+
+    // 4. إخفاء جميع الصفحات الفرعية للملف الشخصي
+    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
+
+    // 5. إظهار شريط التنقل السفلي
+    const bottomNav = document.querySelector('.bottom-nav');
+    if (bottomNav) bottomNav.style.display = 'flex';
+
+    // 6. إعادة تفعيل الصفحة التي كنا فيها (الصفحة النشطة قبل المحادثة)
+    // نبحث عن الصفحة النشطة حاليًا (التي كانت ظاهرة قبل فتح المحادثة)
+    let activePageFound = false;
     document.querySelectorAll('.page').forEach(page => {
-        if (!page.classList.contains('chat-page')) page.style.display = 'none';
+        if (page.classList.contains('active') && !page.classList.contains('conversation-page')) {
+            page.style.display = 'block';
+            activePageFound = true;
+        } else if (!page.classList.contains('conversation-page')) {
+            page.style.display = 'none';
+        }
     });
+    
+    // إذا لم نجد صفحة نشطة، نعرض صفحة الدردشة (chats)
+    if (!activePageFound) {
+        const chatPage = document.querySelector('.chat-page');
+        if (chatPage) {
+            chatPage.style.display = 'block';
+            chatPage.classList.add('active');
+        }
+        // التأكد من أن شريط التنقل يظهر الزر الصحيح
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(nav => {
+            nav.classList.remove('active');
+            if (nav.dataset.page === 'chat') nav.classList.add('active');
+        });
+    }
+
+    // 7. إعادة تحميل قائمة المحادثات
     if (typeof loadChats === 'function') setTimeout(() => loadChats(), 100);
+
+    // 8. إخفاء القوائم المنبثقة العالقة
     const attachmentMenu = document.getElementById('attachmentMenu');
     if (attachmentMenu) attachmentMenu.style.display = 'none';
     const emojiPicker = document.getElementById('emojiPicker');
@@ -56,21 +94,52 @@ window.openImage = (data) => { const win = window.open('', '_blank'); if (win) w
 window.openFile = (data, fileName) => { const link = document.createElement('a'); link.href = data; link.download = fileName || 'file'; link.click(); };
 window.openEditProfileModal = () => { const nameInput = document.getElementById('editName'); const currentName = document.getElementById('profileName')?.textContent; const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent; if (nameInput) nameInput.value = currentName || ''; const avatarPreview = document.getElementById('currentAvatarEmoji'); if (avatarPreview) avatarPreview.textContent = currentEmoji || '👤'; document.getElementById('editProfileModal')?.classList.add('active'); };
 window.saveProfile = () => { const n = document.getElementById('editName')?.value?.trim(); if (!n || n.length > 25) { alert('الاسم مطلوب ولا يزيد عن 25 حرف'); return; } if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { const nameEl = document.getElementById('profileName'); if (nameEl) nameEl.textContent = n; closeModal(); }).catch(() => alert('فشل حفظ التغييرات')); };
-window.showUserTrips = () => { document.querySelector('.profile-page') && (document.querySelector('.profile-page').style.display = 'none'); document.getElementById('tripsPage') && (document.getElementById('tripsPage').style.display = 'block'); };
+window.showUserTrips = () => { 
+    const profilePage = document.querySelector('.profile-page');
+    if (profilePage) profilePage.style.display = 'none';
+    const tripsPage = document.getElementById('tripsPage');
+    if (tripsPage) tripsPage.style.display = 'block';
+    // إخفاء شريط التنقل في الصفحات الفرعية
+    const bottomNav = document.querySelector('.bottom-nav');
+    if (bottomNav) bottomNav.style.display = 'none';
+};
 
 window.goBack = () => {
+    // إخفاء جميع الصفحات الفرعية للملف الشخصي
     document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
-    const pp = document.querySelector('.profile-page');
-    if (pp) { pp.style.display = 'block'; pp.classList.add('active'); }
+    
+    // إظهار صفحة الملف الشخصي الرئيسية
+    const profilePage = document.querySelector('.profile-page');
+    if (profilePage) {
+        profilePage.style.display = 'block';
+        profilePage.classList.add('active');
+    }
+    
+    // إخفاء باقي الصفحات الرئيسية
     document.querySelectorAll('.page').forEach(page => {
-        if (page !== pp && !page.classList.contains('profile-page')) {
+        if (page !== profilePage && !page.classList.contains('profile-page')) {
             page.style.display = 'none';
             page.classList.remove('active');
         }
     });
+    
+    // إزالة حالة المحادثة إذا كانت موجودة
     document.body.classList.remove('conversation-open');
+    
+    // إخفاء صفحة المحادثة
     const convPage = document.getElementById('conversationPage');
     if (convPage) convPage.style.display = 'none';
+    
+    // إظهار شريط التنقل السفلي مرة أخرى
+    const bottomNav = document.querySelector('.bottom-nav');
+    if (bottomNav) bottomNav.style.display = 'flex';
+    
+    // تحديث شريط التنقل ليظهر أننا في صفحة الملف الشخصي
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(nav => {
+        nav.classList.remove('active');
+        if (nav.dataset.page === 'profile') nav.classList.add('active');
+    });
 };
 
 window.selectAvatar = t => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; const e = m[t] || '👤'; const profileAvatar = document.getElementById('profileAvatarEmoji'), currentAvatar = document.getElementById('currentAvatarEmoji'); if (profileAvatar) profileAvatar.textContent = e; if (currentAvatar) currentAvatar.textContent = e; if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ avatarType: t }).then(() => closeModal()).catch(() => {}); };
@@ -86,6 +155,8 @@ function ensureSinglePage() {
     const convPage = document.getElementById('conversationPage');
     if (convPage) convPage.style.display = 'none';
     document.body.classList.remove('conversation-open');
+    const bottomNav = document.querySelector('.bottom-nav');
+    if (bottomNav) bottomNav.style.display = 'flex';
     document.querySelectorAll('.page').forEach(p => {
         if (p.classList.contains('active')) p.style.display = 'block';
         else p.style.display = 'none';
@@ -97,19 +168,38 @@ function setupNavigation() {
     const pages = document.querySelectorAll('.page');
     if (!nav.length || !pages.length) return;
     function switchPage(id) {
+        // إغلاق أي محادثة مفتوحة أولاً
         if (document.body.classList.contains('conversation-open')) {
             if (typeof ChatSystem !== 'undefined' && ChatSystem.closeChat) ChatSystem.closeChat();
             document.body.classList.remove('conversation-open');
             const convPage = document.getElementById('conversationPage');
             if (convPage) convPage.style.display = 'none';
         }
+        // إخفاء الصفحات الفرعية للملف الشخصي
         document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
+        // إخفاء جميع الصفحات الرئيسية
         pages.forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
+        // إظهار الصفحة المطلوبة
         const targetPage = document.querySelector(`.page.${id}-page`);
-        if (targetPage) { targetPage.classList.add('active'); targetPage.style.display = 'block'; }
+        if (targetPage) { 
+            targetPage.classList.add('active'); 
+            targetPage.style.display = 'block'; 
+        }
+        // تحديث شريط التنقل
         nav.forEach(n => n.classList.toggle('active', n.dataset.page === id));
-        if (id === 'chat') { if (typeof loadChats === 'function') setTimeout(() => loadChats(), 50); }
-        else if (id === 'profile') { if (window.auth?.currentUser) { loadUserData(window.auth.currentUser.uid); updateFriendsCount(); updateFriendRequestsCount(); } }
+        // إظهار شريط التنقل
+        const bottomNav = document.querySelector('.bottom-nav');
+        if (bottomNav) bottomNav.style.display = 'flex';
+        // تحميل البيانات حسب الصفحة
+        if (id === 'chat') { 
+            if (typeof loadChats === 'function') setTimeout(() => loadChats(), 50); 
+        } else if (id === 'profile') { 
+            if (window.auth?.currentUser) { 
+                loadUserData(window.auth.currentUser.uid); 
+                updateFriendsCount(); 
+                updateFriendRequestsCount(); 
+            } 
+        }
     }
     nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page)));
 }
