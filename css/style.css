@@ -276,3 +276,49 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
     align-items: center;
     justify-content: center;
 }
+
+/* ========== إصلاح تداخل الصفحات ========== */
+
+/* إخفاء شريط التنقل السفلي عند فتح أي صفحة فرعية */
+body.conversation-open .bottom-nav,
+body.profile-subpage-open .bottom-nav {
+    display: none !important;
+}
+
+/* صفحة المحادثة - تخفي كل الصفحات الأخرى */
+body.conversation-open .page {
+    display: none !important;
+}
+body.conversation-open .profile-pages,
+body.conversation-open .profile-subpage {
+    display: none !important;
+}
+
+/* الصفحات الفرعية للملف الشخصي - تخفي المحتوى الرئيسي */
+.profile-subpage-open .page {
+    display: none !important;
+}
+.profile-subpage-open .profile-pages {
+    display: block !important;
+}
+
+/* منع تداخل صفحة المحادثة مع الصفحات الفرعية */
+.conversation-page {
+    display: none !important;
+}
+body.conversation-open .conversation-page {
+    display: flex !important;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    background: var(--bg);
+}
+
+/* إخفاء الهيدر عند فتح المحادثة */
+body.conversation-open .app-header {
+    display: none !important;
+}
