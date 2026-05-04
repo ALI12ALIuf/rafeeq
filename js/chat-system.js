@@ -46,51 +46,17 @@ const ChatSystem = {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
     openChat(friendId, friendName, friendAvatar) {
-        this.currentChat = friendId;
-        
-        // التأكد من إضافة الكلاس إلى body
-        document.body.classList.add('conversation-open');
-        
-        // تحديث واجهة المحادثة
-        const nameEl = document.getElementById('conversationName');
-        const avatarEl = document.getElementById('conversationAvatar');
+        this.currentChat = friendId; document.body.classList.add('conversation-open');
+        const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
         if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
-        
-        // إخفاء صفحة الدردشة وإظهار صفحة المحادثة
-        const chatPage = document.querySelector('.chat-page');
-        if (chatPage) chatPage.style.display = 'none';
-        
-        const convPage = document.getElementById('conversationPage');
-        if (convPage) {
-            convPage.style.display = 'flex';
-            convPage.style.flexDirection = 'column';
-        }
-        
-        // عرض الرسائل
+        document.querySelector('.chat-page').style.display = 'none'; 
+        document.getElementById('conversationPage').style.display = 'flex';
         this.displayMessages(friendId);
-        
-        // مراقبة حالة الصديق
         PresenceSystem.watchFriend(friendId);
-        
-        // تأخيرات صغيرة لتحسين التجربة
-        setTimeout(() => { 
-            if (this.friendOnline) CallSystem.ensureDataChannel(friendId).catch(() => {}); 
-        }, 500);
-        setTimeout(() => { 
-            const inp = document.getElementById('messageInput'); 
-            if (inp) inp.focus(); 
-        }, 300);
-        setTimeout(() => { 
-            const c = document.getElementById('messagesContainer'); 
-            if (c) c.scrollTop = c.scrollHeight; 
-        }, 100);
-        
-        // إخفاء شريط التنقل ورأس الصفحة يدوياً كضمان إضافي
-        const bottomNav = document.querySelector('.bottom-nav');
-        if (bottomNav) bottomNav.style.display = 'none';
-        const appHeader = document.querySelector('.app-header');
-        if (appHeader) appHeader.style.display = 'none';
+        setTimeout(() => { if (this.friendOnline) CallSystem.ensureDataChannel(friendId).catch(() => {}); }, 500);
+        setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
+        setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
     updateFriendStatus(friendId, isOnline) {
@@ -281,52 +247,12 @@ const ChatSystem = {
     },
     
     closeChat() {
-        // إزالة كلاس المحادثة من body
         document.body.classList.remove('conversation-open');
-        
-        // إخفاء صفحة المحادثة
-        const convPage = document.getElementById('conversationPage');
-        if (convPage) convPage.style.display = 'none';
-        
-        // إظهار شريط التنقل ورأس الصفحة
-        const bottomNav = document.querySelector('.bottom-nav');
-        if (bottomNav) bottomNav.style.display = 'flex';
-        const appHeader = document.querySelector('.app-header');
-        if (appHeader) appHeader.style.display = 'flex';
-        
-        // إظهار الصفحة التي كنا فيها
-        const activePage = document.querySelector('.page.active');
-        if (activePage && activePage !== convPage) {
-            activePage.style.display = 'block';
-        } else {
-            const chatPage = document.querySelector('.chat-page');
-            if (chatPage) {
-                chatPage.style.display = 'block';
-                chatPage.classList.add('active');
-            }
-        }
-        
-        // إخفاء جميع الصفحات الفرعية للملف الشخصي
-        document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
-        
-        // إيقاف مراقبة حالة الصديق
-        if (typeof PresenceSystem !== 'undefined' && PresenceSystem.stopAll) {
-            PresenceSystem.stopAll();
-        }
-        
-        // تنظيف اتصالات WebRTC
-        if (typeof CallSystem !== 'undefined' && !CallSystem.isInCall) {
-            CallSystem.cleanupConnections();
-        }
-        
-        // إعادة تعيين المتغيرات
-        this.currentChat = null;
-        this.friendOnline = false;
-        
-        // إعادة تحميل قائمة المحادثات
-        setTimeout(() => { 
-            if (typeof loadChats === 'function') loadChats(); 
-        }, 100);
+        document.getElementById('conversationPage').style.display = 'none';
+        document.querySelector('.chat-page').style.display = 'block';
+        PresenceSystem.stopAll();
+        if (!CallSystem.isInCall) CallSystem.cleanupConnections();
+        this.currentChat = null; this.friendOnline = false;
     },
     
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
