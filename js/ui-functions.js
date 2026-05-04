@@ -3,18 +3,31 @@
 
 // ========== دالة تنظيف جميع الصفحات ==========
 function cleanupAllPages() {
+    // إخفاء جميع الصفحات الفرعية
     document.querySelectorAll('.profile-subpage').forEach(p => { p.style.display = 'none'; });
+    
+    // إخفاء المحادثة إذا كانت مفتوحة
     const convPage = document.getElementById('conversationPage');
     if (convPage) convPage.style.display = 'none';
+    
+    // إزالة كلاسات المحادثة والمكالمات
     document.body.classList.remove('conversation-open');
     document.body.classList.remove('in-call');
+    
+    // إظهار شريط التنقل والأعلى
     const bottomNav = document.querySelector('.bottom-nav');
     const appHeader = document.querySelector('.app-header');
     if (bottomNav) bottomNav.style.display = 'flex';
     if (appHeader) appHeader.style.display = 'flex';
+    
+    // إظهار صفحة الدردشة الرئيسية
     const chatPage = document.querySelector('.chat-page');
     if (chatPage) chatPage.style.display = 'block';
+    
+    // إخفاء كل الصفحات
     document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
+    
+    // إغلاق Data Channel
     if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat) {
         ChatSystem.currentChat = null;
         ChatSystem.friendOnline = false;
@@ -39,6 +52,7 @@ window.sendFile = () => { const i = document.createElement('input'); i.type = 'f
 window.sendVoiceNote = () => { if (!navigator.mediaDevices?.getUserMedia) { alert('المتصفح لا يدعم تسجيل الصوت'); return; } navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => { if (e.data.size > 0) ch.push(e.data); }; mr.onstop = () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: 'audio/webm' }); if (blob.size > 0) ChatSystem.sendVoiceNote(blob); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') mr.stop(); }; } setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 900000); }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc?.readyState === 'open') ChatSystem.shareLocationDirect(); else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`), () => alert('فشل تحديد الموقع')); else alert('المتصفح لا يدعم تحديد الموقع'); document.getElementById('attachmentMenu').style.display = 'none'; };
 
+// ========== إغلاق المحادثة مع تنظيف كامل ==========
 window.closeConversation = () => {
     if (typeof CallSystem !== 'undefined') CallSystem.endCall();
     if (typeof ChatSystem !== 'undefined') ChatSystem.closeChat();
@@ -62,18 +76,41 @@ window.openEditProfileModal = () => { const nameInput = document.getElementById(
 window.saveProfile = () => { const n = document.getElementById('editName')?.value?.trim(); if (!n || n.length > 25) { alert('الاسم مطلوب ولا يزيد عن 25 حرف'); return; } if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { const nameEl = document.getElementById('profileName'); if (nameEl) nameEl.textContent = n; closeModal(); }).catch(() => alert('فشل حفظ التغييرات')); };
 window.showUserTrips = () => { document.querySelector('.profile-page') && (document.querySelector('.profile-page').style.display = 'none'); document.getElementById('tripsPage') && (document.getElementById('tripsPage').style.display = 'block'); };
 
-// ========== الرجوع مع تنظيف كامل + تثبيت أيقونة الملف الشخصي ==========
+// ========== الرجوع مع تنظيف كامل ==========
 window.goBack = () => {
-    cleanupAllPages();
+    // إخفاء جميع الصفحات الفرعية
+    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
     
-    // إظهار صفحة الملف الشخصي
+    // إخفاء المحادثة إذا كانت مفتوحة
+    const convPage = document.getElementById('conversationPage');
+    if (convPage) convPage.style.display = 'none';
+    document.body.classList.remove('conversation-open');
+    document.body.classList.remove('in-call');
+    
+    // إخفاء جميع الصفحات الرئيسية
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.remove('active');
+        p.style.display = 'none';
+    });
+    
+    // إظهار صفحة الملف الشخصي فقط
     const pp = document.querySelector('.profile-page');
     if (pp) {
         pp.style.display = 'block';
         pp.classList.add('active');
     }
     
-    // تحديث شريط التنقل - نجعل أيقونة الملف الشخصي نشطة
+    // إظهار شريط التنقل والأعلى
+    const bottomNav = document.querySelector('.bottom-nav');
+    const appHeader = document.querySelector('.app-header');
+    if (bottomNav) bottomNav.style.display = 'flex';
+    if (appHeader) appHeader.style.display = 'flex';
+    
+    // إظهار صفحة الدردشة الرئيسية (للتبويب)
+    const chatPage = document.querySelector('.chat-page');
+    if (chatPage) chatPage.style.display = 'block';
+    
+    // تحديث شريط التنقل - أيقونة الملف الشخصي تنشط
     const navItems = document.querySelectorAll('.bottom-nav .nav-item');
     navItems.forEach(n => {
         n.classList.remove('active');
@@ -81,6 +118,15 @@ window.goBack = () => {
             n.classList.add('active');
         }
     });
+    
+    // إغلاق اتصالات الدردشة
+    if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat) {
+        ChatSystem.currentChat = null;
+        ChatSystem.friendOnline = false;
+    }
+    if (typeof PresenceSystem !== 'undefined') {
+        PresenceSystem.stopAll();
+    }
 };
 
 window.selectAvatar = t => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; const e = m[t] || '👤'; const profileAvatar = document.getElementById('profileAvatarEmoji'), currentAvatar = document.getElementById('currentAvatarEmoji'); if (profileAvatar) profileAvatar.textContent = e; if (currentAvatar) currentAvatar.textContent = e; if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ avatarType: t }).then(() => closeModal()).catch(() => {}); };
@@ -92,6 +138,7 @@ function formatNumber(num) { if (num >= 1000000) return (num / 1000000).toFixed(
 async function updateTripsCount() { if (!window.auth || !window.auth.currentUser) return; try { const s = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).where('status', '==', 'ended').get(); const c = document.getElementById('tripsCount'); if (c) c.textContent = formatNumber(s.size); } catch (error) {} }
 function ensureSinglePage() { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.querySelectorAll('.page').forEach(p => { p.style.display = p.classList.contains('active') ? 'block' : 'none'; }); }
 
+// ========== التنقل بين الصفحات مع تنظيف كامل ==========
 function setupNavigation() {
     const nav = document.querySelectorAll('.nav-item');
     const pages = document.querySelectorAll('.page');
@@ -99,9 +146,16 @@ function setupNavigation() {
     
     function switchPage(id) {
         cleanupAllPages();
+        
+        // إظهار الصفحة المطلوبة
         const t = document.querySelector(`.page.${id}-page`);
-        if (t) { t.classList.add('active'); t.style.display = 'block'; }
+        if (t) {
+            t.classList.add('active');
+            t.style.display = 'block';
+        }
+        
         if (id === 'chat') loadChats();
+        
         nav.forEach(n => n.classList.toggle('active', n.dataset.page === id));
     }
     
