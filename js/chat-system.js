@@ -248,11 +248,20 @@ const ChatSystem = {
     
     closeChat() {
         document.body.classList.remove('conversation-open');
-        document.getElementById('conversationPage').style.display = 'none';
-        document.querySelector('.chat-page').style.display = 'block';
-        PresenceSystem.stopAll();
-        if (!CallSystem.isInCall) CallSystem.cleanupConnections();
-        this.currentChat = null; this.friendOnline = false;
+        const convPage = document.getElementById('conversationPage');
+        if (convPage) convPage.style.display = 'none';
+        const chatPage = document.querySelector('.chat-page');
+        if (chatPage) {
+            chatPage.style.display = 'block';
+            chatPage.classList.add('active');
+        }
+        if (typeof PresenceSystem !== 'undefined' && PresenceSystem.stopAll) PresenceSystem.stopAll();
+        if (typeof CallSystem !== 'undefined') {
+            if (!CallSystem.isInCall) CallSystem.cleanupConnections();
+        }
+        this.currentChat = null;
+        this.friendOnline = false;
+        setTimeout(() => { if (typeof loadChats === 'function') loadChats(); }, 100);
     },
     
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
