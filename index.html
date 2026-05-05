@@ -248,16 +248,11 @@
     <script src="js/auth.js?v=2"></script>
     
     <script>
+    // ========== Firebase هو اللي يتحكم بالسبلاش ==========
+    // auth.js يتولى إخفاء السبلاش عبر updateUserUI()
+    // إذا ما فيه مستخدم خلال 6 ثواني، نظهر شاشة تسجيل الدخول
+    
     window.addEventListener('load', function() {
-        setTimeout(function() {
-            var splash = document.getElementById('splash');
-            var app = document.getElementById('app');
-            if (splash && !splash.classList.contains('hide')) {
-                splash.classList.add('hide');
-                setTimeout(function() { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500);
-            }
-        }, 3000);
-        
         const nameInput = document.getElementById('editName');
         const charCounter = document.getElementById('charCounter');
         if (nameInput && charCounter) {
@@ -272,6 +267,21 @@
         
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') performSearch(); });
+        
+        // خطة طوارئ: إذا Firebase ما استجاب، نظهر تسجيل الدخول
+        setTimeout(function() {
+            const splash = document.getElementById('splash');
+            const app = document.getElementById('app');
+            if (splash && !splash.classList.contains('hide')) {
+                splash.classList.add('hide');
+                setTimeout(function() { 
+                    splash.style.display = 'none';
+                    if (typeof showLoginScreen === 'function') {
+                        showLoginScreen();
+                    }
+                }, 500);
+            }
+        }, 6000);
     });
     
     window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
