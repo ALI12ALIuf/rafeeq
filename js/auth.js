@@ -17,6 +17,10 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
+// ========== متغير لتتبع حالة التحميل ==========
+window._dataLoaded = false;
+window._uiReady = false;
+
 async function signInWithGoogle() {
     try {
         if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return false; }
@@ -32,8 +36,12 @@ async function signInWithGoogle() {
             if (userData.following) updates.following = [];
             if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
         }
-        updateUserUI();
+        // ننتظر تحميل كل البيانات قبل إظهار الواجهة
+        await loadUserData(user.uid);
+        setupFriendRequestsListener(user.uid);
         if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
+        window._dataLoaded = true;
+        showAppUI();
         return true;
     } catch (error) {
         let msg = 'حدث خطأ في تسجيل الدخول';
@@ -43,12 +51,16 @@ async function signInWithGoogle() {
     }
 }
 
-function updateUserUI() {
+function showAppUI() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
 }
 
-async function logout() { try { await window.auth.signOut(); window.location.reload(); } catch (e) {} }
+function updateUserUI() {
+    showAppUI();
+}
+
+async function logout() { try { window._dataLoaded = false; await window.auth.signOut(); window.location.reload(); } catch (e) { window.location.reload(); } }
 
 async function loadUserData(uid) {
     try {
@@ -61,11 +73,20 @@ async function loadUserData(uid) {
             if (si) si.textContent = d.shareableId || '0000000000';
             const emoji = getEmojiForUser(d);
             if (pa) pa.textContent = emoji; if (ca) ca.textContent = emoji;
+            
+            // تحميل عدد الأصدقاء وطلبات الصداقة بالتوازي
+            const [friendsSnap, requestsSnap] = await Promise.all([
+                Promise.resolve((d.friends || []).length),
+                window.db.collection('friendRequests').where('to', '==', uid).where('status', '==', 'pending').get()
+            ]);
+            
             const fc = document.getElementById('friendsCount'), frc = document.getElementById('friendRequestsCount');
-            if (fc) fc.textContent = formatNumber((d.friends || []).length);
-            if (frc) { try { const s = await window.db.collection('friendRequests').where('to', '==', uid).where('status', '==', 'pending').get(); frc.textContent = formatNumber(s.size); } catch (e) { frc.textContent = '0'; } }
+            if (fc) fc.textContent = formatNumber(friendsSnap);
+            if (frc) frc.textContent = formatNumber(requestsSnap.size);
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('❌ فشل تحميل بيانات المستخدم:', e);
+    }
 }
 
 // ========== نظام الصداقة ==========
@@ -75,6 +96,7 @@ async function loadFriendsList() {
     if (!window.auth?.currentUser) return;
     const list = document.getElementById('friendsList'); if (!list) return;
     try {
+        list.innerHTML = `<div style="text-align:center;padding:20px;">⏳ جاري التحميل...</div>`;
         const doc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
         if (!doc.exists) return;
         const friends = doc.data().friends || [];
@@ -106,6 +128,7 @@ async function loadFriendRequests() {
     if (!window.auth?.currentUser) return;
     const list = document.getElementById('friendRequestsList'); if (!list) return;
     try {
+        list.innerHTML = `<div style="text-align:center;padding:20px;">⏳ جاري التحميل...</div>`;
         const s = await window.db.collection('friendRequests').where('to', '==', window.auth.currentUser.uid).where('status', '==', 'pending').get();
         if (s.empty) { list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3><p>لم يرسل لك أحد طلب صداقة بعد</p></div>`; return; }
         let html = '', reqs = [];
@@ -164,18 +187,51 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== نظام تسجيل الدخول ==========
+// ========== نظام تسجيل الدخول - ينتظر تحميل كل البيانات ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
-            await loadUserData(user.uid); setupFriendRequestsListener(user.uid);
-            if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
-            if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
+            // نخفي الـ app لين تخلص كل التحميلات
+            if (app) app.style.display = 'none';
+            
+            // تحميل كل البيانات أولاً
+            await loadUserData(user.uid);
+            setupFriendRequestsListener(user.uid);
+            
+            if (typeof SecureChatSystem !== 'undefined') {
+                await SecureChatSystem.init();
+            }
+            
+            // انتظر 300ms زيادة عشان تتجهز ui-functions
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            window._dataLoaded = true;
+            
+            // الآن نعرض التطبيق
+            if (splash) { 
+                splash.classList.add('hide'); 
+                setTimeout(() => { 
+                    splash.style.display = 'none'; 
+                    if (app) app.style.display = 'flex';
+                    // حدث مخصص للـ ui-functions
+                    window.dispatchEvent(new CustomEvent('dataReady'));
+                }, 500); 
+            }
         } else {
             if (app) app.style.display = 'none';
             if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
-            setTimeout(() => { if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); } else showLoginScreen(); }, 2000);
+            setTimeout(() => { 
+                if (splash) { 
+                    splash.classList.add('hide'); 
+                    setTimeout(() => { 
+                        splash.style.display = 'none'; 
+                        showLoginScreen(); 
+                    }, 500); 
+                } else {
+                    showLoginScreen();
+                }
+            }, 2000);
         }
     });
 }
