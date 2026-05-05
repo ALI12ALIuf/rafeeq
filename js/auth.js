@@ -43,9 +43,25 @@ async function signInWithGoogle() {
     }
 }
 
-function updateUserUI() {
+// ========== تحديث واجهة المستخدم (معدلة) ==========
+async function updateUserUI() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
+    
+    // تحديث بيانات الملف الشخصي بعد تحميل Firebase
+    setTimeout(async () => {
+        if (window.auth?.currentUser) {
+            await loadUserData(window.auth.currentUser.uid);
+        }
+        // استدعاء تحديث واجهة الملف الشخصي من ui-functions.js
+        if (typeof window.refreshProfileUI === 'function') {
+            await window.refreshProfileUI();
+        }
+        // تحديث قائمة الدردشات
+        if (typeof loadChats === 'function') {
+            loadChats();
+        }
+    }, 1000);
 }
 
 async function logout() { try { await window.auth.signOut(); window.location.reload(); } catch (e) {} }
@@ -164,12 +180,24 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== نظام تسجيل الدخول ==========
+// ========== نظام تسجيل الدخول (معدل) ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
-            await loadUserData(user.uid); setupFriendRequestsListener(user.uid);
+            await loadUserData(user.uid);
+            setupFriendRequestsListener(user.uid);
+            
+            // تحديث إضافي للواجهة بعد تحميل Firebase
+            setTimeout(async () => {
+                if (typeof window.refreshProfileUI === 'function') {
+                    await window.refreshProfileUI();
+                }
+                if (typeof loadChats === 'function') {
+                    loadChats();
+                }
+            }, 1000);
+            
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
             if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
         } else {
