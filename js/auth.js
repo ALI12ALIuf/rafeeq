@@ -17,85 +17,47 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
-// ========== تسجيل الدخول - Redirect مباشر ==========
 async function signInWithGoogle() {
     try {
-        if (!window.auth || !window.googleProvider) { 
-            alert('مكتبة Firebase لم يتم تحميلها بعد.'); 
-            return false; 
-        }
-        
-        window.googleProvider.setCustomParameters({
-            prompt: 'select_account'
-        });
-        
-        await window.auth.signInWithRedirect(window.googleProvider);
-        return false;
-    } catch (error) {
-        console.error('❌ فشل تسجيل الدخول:', error);
-        alert('حدث خطأ في تسجيل الدخول. حاول مرة أخرى.');
-        return false;
-    }
-}
-
-// ========== معالجة إعادة التوجيه من Google Sign-In ==========
-async function handleRedirectResult() {
-    try {
-        const result = await window.auth.getRedirectResult();
-        if (result && result.user) {
-            console.log('✅ تسجيل دخول ناجح عبر إعادة التوجيه');
-            await setupNewUser(result.user);
-            updateUserUI();
-            if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
-        }
-    } catch (error) {
-        console.error('❌ فشل إعادة التوجيه:', error);
-    }
-}
-
-// ========== إعداد مستخدم جديد ==========
-async function setupNewUser(user) {
-    try {
+        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return false; }
+        const result = await window.auth.signInWithPopup(window.googleProvider);
+        const user = result.user;
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
-            await window.db.collection('users').doc(user.uid).set({
-                uid: user.uid,
-                name: (user.displayName || 'مستخدم').substring(0, 25),
-                email: user.email || '',
-                shareableId: generateShareableId(),
-                bio: '',
-                avatarType: 'male',
-                friends: [],
-                blocked: [],
-                createdAt: new Date()
-            });
+            await window.db.collection('users').doc(user.uid).set({ uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25), email: user.email || '', shareableId: generateShareableId(), bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date() });
         } else {
-            const userData = userDoc.data();
-            const updates = {};
+            const userData = userDoc.data(); const updates = {};
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
-            if (Object.keys(updates).length > 0) {
-                await window.db.collection('users').doc(user.uid).update(updates);
-            }
+            if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
         }
-    } catch (e) {
-        console.error('❌ فشل إعداد المستخدم:', e);
+        updateUserUI();
+        if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
+        return true;
+    } catch (error) {
+        let msg = 'حدث خطأ في تسجيل الدخول';
+        if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
+        else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
+        alert(msg); return false;
     }
 }
 
-// ========== تحديث واجهة المستخدم ==========
+// ========== تحديث واجهة المستخدم (معدلة) ==========
 async function updateUserUI() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
     
+    // تحديث بيانات الملف الشخصي بعد تحميل Firebase
     setTimeout(async () => {
         if (window.auth?.currentUser) {
             await loadUserData(window.auth.currentUser.uid);
         }
+        // استدعاء تحديث واجهة الملف الشخصي من ui-functions.js
         if (typeof window.refreshProfileUI === 'function') {
             await window.refreshProfileUI();
         }
+        // تحديث قائمة الدردشات
         if (typeof loadChats === 'function') {
             loadChats();
         }
@@ -218,19 +180,22 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== نظام تسجيل الدخول ==========
+// ========== نظام تسجيل الدخول (معدل) ==========
 if (typeof window.auth !== 'undefined') {
-    handleRedirectResult();
-    
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             
+            // تحديث إضافي للواجهة بعد تحميل Firebase
             setTimeout(async () => {
-                if (typeof window.refreshProfileUI === 'function') await window.refreshProfileUI();
-                if (typeof loadChats === 'function') loadChats();
+                if (typeof window.refreshProfileUI === 'function') {
+                    await window.refreshProfileUI();
+                }
+                if (typeof loadChats === 'function') {
+                    loadChats();
+                }
             }, 1000);
             
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
