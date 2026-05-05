@@ -17,37 +17,24 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
-// ========== تسجيل الدخول (معدل - يدعم popup + redirect) ==========
+// ========== تسجيل الدخول - Redirect مباشر ==========
 async function signInWithGoogle() {
     try {
-        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return false; }
-        
-        let result;
-        try {
-            // نجرب popup أولاً
-            result = await window.auth.signInWithPopup(window.googleProvider);
-        } catch (popupError) {
-            // إذا فشل، نجرب redirect (للمتصفحات اللي تحجب popup)
-            if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user' || popupError.code === 'auth/cancelled-popup-request') {
-                await window.auth.signInWithRedirect(window.googleProvider);
-                return false;
-            }
-            throw popupError;
+        if (!window.auth || !window.googleProvider) { 
+            alert('مكتبة Firebase لم يتم تحميلها بعد.'); 
+            return false; 
         }
         
-        if (!result || !result.user) return false;
+        window.googleProvider.setCustomParameters({
+            prompt: 'select_account'
+        });
         
-        const user = result.user;
-        await setupNewUser(user);
-        updateUserUI();
-        if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
-        return true;
+        await window.auth.signInWithRedirect(window.googleProvider);
+        return false;
     } catch (error) {
-        let msg = 'حدث خطأ في تسجيل الدخول';
-        if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
-        else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
-        else if (error.code === 'auth/popup-blocked') msg = 'الرجاء السماح بالنوافذ المنبثقة';
-        alert(msg); return false;
+        console.error('❌ فشل تسجيل الدخول:', error);
+        alert('حدث خطأ في تسجيل الدخول. حاول مرة أخرى.');
+        return false;
     }
 }
 
@@ -97,7 +84,7 @@ async function setupNewUser(user) {
     }
 }
 
-// ========== تحديث واجهة المستخدم (معدلة) ==========
+// ========== تحديث واجهة المستخدم ==========
 async function updateUserUI() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
@@ -233,7 +220,6 @@ function setupFriendRequestsListener(userId) {
 
 // ========== نظام تسجيل الدخول ==========
 if (typeof window.auth !== 'undefined') {
-    // معالجة إعادة التوجيه عند تحميل الصفحة
     handleRedirectResult();
     
     window.auth.onAuthStateChanged(async (user) => {
