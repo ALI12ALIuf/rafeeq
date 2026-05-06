@@ -17,40 +17,26 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
-// ========== متغير يمنع ظهور شاشة تسجيل الدخول أثناء المصادقة ==========
-let _isAuthenticating = false;
-let _loginScreenShown = false;
+// ========== متغير منع التكرار ==========
+let authStateProcessed = false;
 
-// ========== إظهار التطبيق ==========
-function showApp() {
-    const splash = document.getElementById('splash'), app = document.getElementById('app');
-    const loginScreen = document.querySelector('.login-screen');
-    if (loginScreen) loginScreen.remove();
-    _loginScreenShown = false;
-    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
-    if (app) { app.style.display = 'flex'; }
-}
-
-// ========== إظهار شاشة تسجيل الدخول ==========
-function showLoginScreen() {
-    if (_isAuthenticating) return; // جاري تسجيل الدخول
-    if (window.auth?.currentUser) return; // مسجل دخول فعلاً
-    if (_loginScreenShown) return; // ظهرت من قبل
-    _loginScreenShown = true;
-    
-    const el = document.querySelector('.login-screen'); if (el) el.remove();
-    const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
-    d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="signInWithGoogle()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
-    document.body.appendChild(d);
-}
-
-// ========== تسجيل الدخول بقوقل ==========
 async function signInWithGoogle() {
-    _isAuthenticating = true;
+    // ✅ منع تسجيل الدخول إذا كان هناك مستخدم بالفعل
+    if (window.auth?.currentUser) {
+        return false;
+    }
+    
     try {
-        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); _isAuthenticating = false; return false; }
+        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return false; }
         const result = await window.auth.signInWithPopup(window.googleProvider);
         const user = result.user;
+        
+        // ✅ إظهار شاشة البداية أثناء المعالجة
+        const splash = document.getElementById('splash');
+        const app = document.getElementById('app');
+        if (splash) splash.style.display = 'flex';
+        if (app) app.style.display = 'none';
+        
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
             await window.db.collection('users').doc(user.uid).set({ uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25), email: user.email || '', shareableId: generateShareableId(), bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date() });
@@ -61,19 +47,31 @@ async function signInWithGoogle() {
             if (userData.following) updates.following = [];
             if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
         }
+        
+        // ✅ تحديث الواجهة مباشرة
         await loadUserData(user.uid);
         setupFriendRequestsListener(user.uid);
         if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
-        showApp();
+        
+        // ✅ إخفاء شاشة البداية وإظهار التطبيق
+        if (splash) { 
+            splash.classList.add('hide'); 
+            setTimeout(() => { 
+                splash.style.display = 'none'; 
+                if (app) app.style.display = 'flex'; 
+            }, 500); 
+        }
+        
+        // ✅ إزالة شاشة تسجيل الدخول إن وجدت
+        const loginScreen = document.querySelector('.login-screen');
+        if (loginScreen) loginScreen.remove();
+        
         return true;
     } catch (error) {
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
-        alert(msg);
-        return false;
-    } finally {
-        _isAuthenticating = false;
+        alert(msg); return false;
     }
 }
 
@@ -198,27 +196,21 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول (معدل - ما يرجع لصفحة تسجيل الدخول) ==========
-if (typeof window.auth !== 'undefined') {
-    window.auth.onAuthStateChanged(async (user) => {
-        const splash = document.getElementById('splash'), app = document.getElementById('app');
-        if (user) {
-            // المستخدم مسجل - إظهار التطبيق فوراً
-            _loginScreenShown = false;
-            await loadUserData(user.uid);
-            setupFriendRequestsListener(user.uid);
-            if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
-            showApp();
-        } else {
-            // المستخدم غير مسجل - إخفاء التطبيق وإظهار شاشة تسجيل الدخول بعد تأخير
-            if (app) app.style.display = 'none';
-            if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
-            setTimeout(() => {
-                if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); }
-                else showLoginScreen();
-            }, 2000);
-        }
-    });
+// ========== شاشة تسجيل الدخول ==========
+function showLoginScreen() {
+    // ✅ لا تظهر الشاشة إذا كان المستخدم مسجل الدخول
+    if (window.auth?.currentUser) {
+        return;
+    }
+    
+    const el = document.querySelector('.login-screen'); 
+    if (el) el.remove();
+    
+    const d = document.createElement('div'); 
+    d.className = 'login-screen'; 
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="signInWithGoogle()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
+    document.body.appendChild(d);
 }
 
 function copyId() { const el = document.getElementById('shareableId'); if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ')); }
@@ -241,3 +233,53 @@ window.findUserById = async function() {
 };
 
 window.hideSearchResults = function() { const rc = document.getElementById('searchResultsContainer'); if (rc) { rc.style.display = 'none'; rc.innerHTML = ''; } };
+
+// ========== تسجيل الدخول - onAuthStateChanged المعدل ==========
+if (typeof window.auth !== 'undefined') {
+    window.auth.onAuthStateChanged(async (user) => {
+        // ✅ منع التنفيذ المتكرر
+        if (authStateProcessed) return;
+        
+        const splash = document.getElementById('splash');
+        const app = document.getElementById('app');
+        const loginScreen = document.querySelector('.login-screen');
+        
+        if (user) {
+            // ✅ وضع علامة اكتمال المعالجة
+            authStateProcessed = true;
+            
+            // ✅ إزالة شاشة الدخول فوراً
+            if (loginScreen) loginScreen.remove();
+            
+            // ✅ تحميل البيانات
+            await loadUserData(user.uid);
+            setupFriendRequestsListener(user.uid);
+            if (typeof SecureChatSystem !== 'undefined') {
+                await SecureChatSystem.init();
+            }
+            
+            // ✅ إظهار التطبيق
+            if (splash) {
+                splash.classList.add('hide');
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    if (app) app.style.display = 'flex';
+                }, 500);
+            } else if (app) {
+                app.style.display = 'flex';
+            }
+        } else {
+            // ✅ المستخدم غير مسجل الدخول
+            if (app) app.style.display = 'none';
+            if (splash) {
+                splash.style.display = 'flex';
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    showLoginScreen();
+                }, 2000);
+            } else {
+                showLoginScreen();
+            }
+        }
+    });
+}
