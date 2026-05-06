@@ -21,10 +21,8 @@ const FieldValue = firebase.firestore.FieldValue;
 let _captchaCode = '';
 let _captchaAttempts = 0;
 let _pendingGoogleUser = null;
-let _lockoutTimer = null;
-let _lockoutEndTime = 0;
+let _captchaActive = false;
 const MAX_CAPTCHA_ATTEMPTS = 3;
-const LOCKOUT_DURATION_MINUTES = 15; // مدة القفل بالدقائق
 
 // ========== إظهار التطبيق ==========
 function showApp() {
@@ -33,7 +31,7 @@ function showApp() {
     const captchaScreen = document.querySelector('.captcha-screen');
     if (loginScreen) loginScreen.remove();
     if (captchaScreen) captchaScreen.remove();
-    if (_lockoutTimer) { clearInterval(_lockoutTimer); _lockoutTimer = null; }
+    _captchaActive = false;
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
     if (app) { app.style.display = 'flex'; }
 }
@@ -42,100 +40,42 @@ function showApp() {
 function showLoginScreen() {
     const el = document.querySelector('.login-screen'); if (el) el.remove();
     const cap = document.querySelector('.captcha-screen'); if (cap) cap.remove();
-    if (_lockoutTimer) { clearInterval(_lockoutTimer); _lockoutTimer = null; }
-    
-    // التحقق إذا كان هناك قفل نشط
-    if (_lockoutEndTime > Date.now()) {
-        showLockoutScreen();
-        return;
-    }
-    
+    _captchaActive = false;
     const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
     d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
     document.body.appendChild(d);
 }
 
-// ========== شاشة القفل المؤقت ==========
-function showLockoutScreen() {
-    const el = document.querySelector('.login-screen'); if (el) el.remove();
-    const cap = document.querySelector('.captcha-screen'); if (cap) cap.remove();
-    
-    const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
-    d.innerHTML = `
-        <div style="text-align:center;padding:20px;max-width:350px;">
-            <div style="font-size:5rem;">🔒</div>
-            <h2 style="color:var(--danger);margin-bottom:1rem;">تم قفل تسجيل الدخول</h2>
-            <p style="color:var(--text-light);margin-bottom:1.5rem;">لقد تجاوزت الحد الأقصى من المحاولات. يرجى الانتظار قبل المحاولة مرة أخرى.</p>
-            <div style="background:var(--light);padding:15px;border-radius:15px;margin-bottom:1.5rem;">
-                <p style="color:var(--text-light);font-size:0.9rem;">الوقت المتبقي:</p>
-                <p style="font-size:2rem;font-weight:bold;color:var(--primary);font-family:monospace;" id="lockoutTimer">00:00</p>
-            </div>
-            <p style="color:var(--text-light);font-size:0.8rem;">سيتم فتح تسجيل الدخول تلقائياً بعد انتهاء الوقت</p>
-        </div>`;
-    document.body.appendChild(d);
-    
-    // بدء العداد التنازلي
-    if (_lockoutTimer) clearInterval(_lockoutTimer);
-    _lockoutTimer = setInterval(() => {
-        const remaining = _lockoutEndTime - Date.now();
-        const timerEl = document.getElementById('lockoutTimer');
-        if (remaining <= 0) {
-            clearInterval(_lockoutTimer);
-            _lockoutTimer = null;
-            _lockoutEndTime = 0;
-            const screen = document.querySelector('.login-screen');
-            if (screen) { screen.style.opacity = '0'; setTimeout(() => screen.remove(), 300); }
-            setTimeout(() => showLoginScreen(), 400);
-        } else {
-            const mins = Math.floor(remaining / 60000);
-            const secs = Math.floor((remaining % 60000) / 1000);
-            if (timerEl) timerEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        }
-    }, 1000);
-}
-
-// ========== بدء تسجيل الدخول بقوقل ==========
+// ========== بدء تسجيل الدخول بقوقل (مع كابتشا كل مرة) ==========
 async function startGoogleLogin() {
     try {
         if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
         
+        const loginScreen = document.querySelector('.login-screen');
+        
         // تسجيل الدخول بقوقل
         const result = await window.auth.signInWithPopup(window.googleProvider);
         _pendingGoogleUser = result.user;
+        _captchaActive = true;
         
         // إخفاء شاشة تسجيل الدخول فوراً
-        const loginScreen = document.querySelector('.login-screen');
-        if (loginScreen) { loginScreen.style.opacity = '0'; setTimeout(() => loginScreen.remove(), 300); }
+        if (loginScreen) loginScreen.style.opacity = '0';
+        setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 300);
         
         // إظهار الكابتشا
-        showCaptchaScreen(
-            async () => {
-                await saveUserAndEnter(_pendingGoogleUser);
-                _pendingGoogleUser = null;
-            },
-            () => {
-                // فشل 3 محاولات - قفل لمدة 15 دقيقة
-                _pendingGoogleUser = null;
-                _lockoutEndTime = Date.now() + (LOCKOUT_DURATION_MINUTES * 60 * 1000);
-                
-                window.auth.signOut().then(() => {
-                    const captchaScreen = document.querySelector('.captcha-screen');
-                    if (captchaScreen) { captchaScreen.style.opacity = '0'; setTimeout(() => captchaScreen.remove(), 300); }
-                    setTimeout(() => showLoginScreen(), 400);
-                }).catch(() => {
-                    const captchaScreen = document.querySelector('.captcha-screen');
-                    if (captchaScreen) { captchaScreen.style.opacity = '0'; setTimeout(() => captchaScreen.remove(), 300); }
-                    setTimeout(() => showLoginScreen(), 400);
-                });
-            }
-        );
+        showCaptchaScreen(async () => {
+            _captchaActive = false;
+            await saveUserAndEnter(_pendingGoogleUser);
+            _pendingGoogleUser = null;
+        });
         
     } catch (error) {
-        _pendingGoogleUser = null;
+        _captchaActive = false;
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
         alert(msg);
+        _pendingGoogleUser = null;
     }
 }
 
@@ -172,13 +112,13 @@ function generateCaptcha() {
     for (let i = 0; i < 6; i++) {
         _captchaCode += Math.floor(Math.random() * 10).toString();
     }
+    _captchaAttempts = 0;
     return _captchaCode;
 }
 
 // ========== إظهار شاشة الكابتشا ==========
-function showCaptchaScreen(onSuccess, onFail) {
+function showCaptchaScreen(onSuccess) {
     const captchaCode = generateCaptcha();
-    _captchaAttempts = 0;
     
     const existing = document.querySelector('.captcha-screen');
     if (existing) existing.remove();
@@ -203,17 +143,15 @@ function showCaptchaScreen(onSuccess, onFail) {
                 <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 5)" onkeydown="handleCaptchaKeyDown(event, this, 5)">
             </div>
             
-            <p style="color:var(--danger);font-size:0.85rem;margin-bottom:1rem;min-height:20px;" id="captchaError"></p>
+            <p style="color:var(--danger);font-size:0.85rem;margin-bottom:1rem;display:none;" id="captchaError"></p>
             
-            <button onclick="verifyCaptchaNow()" style="background:var(--primary);color:white;border:none;border-radius:25px;padding:12px 40px;font-size:1.1rem;cursor:pointer;width:100%;">تحقق</button>
-            <button onclick="generateNewCaptchaNow()" style="background:none;border:none;color:var(--primary);margin-top:1rem;cursor:pointer;font-size:0.9rem;">🔄 رمز جديد</button>
+            <button onclick="verifyCaptcha()" style="background:var(--primary);color:white;border:none;border-radius:25px;padding:12px 40px;font-size:1.1rem;cursor:pointer;width:100%;">تحقق</button>
+            <button onclick="generateNewCaptcha()" style="background:none;border:none;color:var(--primary);margin-top:1rem;cursor:pointer;font-size:0.9rem;">🔄 رمز جديد</button>
         </div>`;
     document.body.appendChild(d);
     
-    d._onSuccess = onSuccess;
-    d._onFail = onFail;
-    
     requestAnimationFrame(() => { d.style.opacity = '1'; });
+    d._onSuccess = onSuccess;
     
     setTimeout(() => {
         const firstInput = document.querySelector('.captcha-input');
@@ -235,7 +173,7 @@ window.handleCaptchaKeyDown = function(event, input, index) {
         const inputs = document.querySelectorAll('.captcha-input');
         if (inputs[index - 1]) { inputs[index - 1].focus(); inputs[index - 1].value = ''; }
     }
-    if (event.key === 'Enter') { verifyCaptchaNow(); }
+    if (event.key === 'Enter') { verifyCaptcha(); }
 };
 
 window.handleCaptchaPaste = function(event) {
@@ -244,17 +182,16 @@ window.handleCaptchaPaste = function(event) {
     const digits = paste.replace(/\D/g, '').slice(0, 6);
     const inputs = document.querySelectorAll('.captcha-input');
     for (let i = 0; i < 6; i++) { inputs[i].value = digits[i] || ''; }
-    if (digits.length === 6) { inputs[5].focus(); setTimeout(() => verifyCaptchaNow(), 200); }
+    if (digits.length === 6) { inputs[5].focus(); setTimeout(() => verifyCaptcha(), 200); }
 };
 
 // ========== التحقق من الكابتشا ==========
-window.verifyCaptchaNow = function() {
+window.verifyCaptcha = function() {
     const inputs = document.querySelectorAll('.captcha-input');
     let enteredCode = '';
     inputs.forEach(input => { enteredCode += input.value; });
     
     const errorEl = document.getElementById('captchaError');
-    const captchaScreen = document.querySelector('.captcha-screen');
     
     if (enteredCode.length < 6) {
         if (errorEl) { errorEl.textContent = 'الرجاء إدخال 6 أرقام كاملة'; errorEl.style.display = 'block'; }
@@ -262,7 +199,7 @@ window.verifyCaptchaNow = function() {
     }
     
     if (enteredCode === _captchaCode) {
-        // نجاح
+        const captchaScreen = document.querySelector('.captcha-screen');
         if (captchaScreen) {
             captchaScreen.style.opacity = '0';
             setTimeout(() => {
@@ -272,33 +209,28 @@ window.verifyCaptchaNow = function() {
             }, 300);
         }
     } else {
-        // فشل
         _captchaAttempts++;
-        if (_captchaAttempts >= MAX_CAPTCHA_ATTEMPTS) {
-            // خلصت المحاولات - قفل
-            if (captchaScreen) {
-                captchaScreen.style.opacity = '0';
+        if (errorEl) {
+            if (_captchaAttempts >= MAX_CAPTCHA_ATTEMPTS) {
+                errorEl.textContent = 'تجاوزت الحد الأقصى. جاري إنشاء رمز جديد...';
+                errorEl.style.display = 'block';
                 setTimeout(() => {
-                    const onFail = captchaScreen._onFail;
-                    captchaScreen.remove();
-                    if (onFail) onFail();
-                }, 300);
-            }
-        } else {
-            // باقي محاولات
-            if (errorEl) {
+                    generateNewCaptcha();
+                    if (errorEl) { errorEl.textContent = ''; errorEl.style.display = 'none'; }
+                }, 1500);
+            } else {
                 errorEl.textContent = `الرمز غير صحيح. متبقي ${MAX_CAPTCHA_ATTEMPTS - _captchaAttempts} محاولات`;
                 errorEl.style.display = 'block';
             }
-            inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--danger)'; });
-            setTimeout(() => { inputs.forEach(input => { input.style.borderColor = 'var(--border)'; }); }, 1500);
-            inputs[0].focus();
         }
+        inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--danger)'; });
+        setTimeout(() => { inputs.forEach(input => { input.style.borderColor = 'var(--border)'; }); }, 1500);
+        inputs[0].focus();
     }
 };
 
 // ========== إنشاء رمز جديد ==========
-window.generateNewCaptchaNow = function() {
+window.generateNewCaptcha = function() {
     const captchaCode = generateCaptcha();
     const display = document.getElementById('captchaDisplay');
     if (display) display.textContent = captchaCode;
@@ -309,10 +241,10 @@ window.generateNewCaptchaNow = function() {
     inputs[0].focus();
 };
 
-// ========== للتوافق ==========
-window.verifyCaptcha = function() { verifyCaptchaNow(); };
-window.generateNewCaptcha = function() { generateNewCaptchaNow(); };
-async function signInWithGoogle() { await startGoogleLogin(); }
+// ========== للتوافق مع الاستدعاءات القديمة ==========
+async function signInWithGoogle() {
+    await startGoogleLogin();
+}
 
 function updateUserUI() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
@@ -435,17 +367,19 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول ==========
+// ========== مراقب حالة تسجيل الدخول (الكابتشا تبقى ظاهرة) ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
-            if (!_pendingGoogleUser || _pendingGoogleUser.uid !== user.uid) {
-                await loadUserData(user.uid);
-                setupFriendRequestsListener(user.uid);
-                if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
-                showApp();
-            }
+            // إذا كان الكابتشا نشط، لا تفعل شيئاً
+            if (_captchaActive) return;
+            
+            // دخول عادي بدون كابتشا
+            await loadUserData(user.uid);
+            setupFriendRequestsListener(user.uid);
+            if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
+            showApp();
         } else {
             if (app) app.style.display = 'none';
             if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
