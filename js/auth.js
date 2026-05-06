@@ -21,7 +21,7 @@ const FieldValue = firebase.firestore.FieldValue;
 let _captchaCode = '';
 let _captchaAttempts = 0;
 let _pendingGoogleUser = null;
-let _captchaActive = false;
+let _captchaVerified = false;
 const MAX_CAPTCHA_ATTEMPTS = 3;
 
 // ========== إظهار التطبيق ==========
@@ -31,7 +31,6 @@ function showApp() {
     const captchaScreen = document.querySelector('.captcha-screen');
     if (loginScreen) loginScreen.remove();
     if (captchaScreen) captchaScreen.remove();
-    _captchaActive = false;
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
     if (app) { app.style.display = 'flex'; }
 }
@@ -40,7 +39,6 @@ function showApp() {
 function showLoginScreen() {
     const el = document.querySelector('.login-screen'); if (el) el.remove();
     const cap = document.querySelector('.captcha-screen'); if (cap) cap.remove();
-    _captchaActive = false;
     const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
     d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
     document.body.appendChild(d);
@@ -52,11 +50,11 @@ async function startGoogleLogin() {
         if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
         
         const loginScreen = document.querySelector('.login-screen');
+        _captchaVerified = false;
         
         // تسجيل الدخول بقوقل
         const result = await window.auth.signInWithPopup(window.googleProvider);
         _pendingGoogleUser = result.user;
-        _captchaActive = true;
         
         // إخفاء شاشة تسجيل الدخول فوراً
         if (loginScreen) loginScreen.style.opacity = '0';
@@ -64,18 +62,18 @@ async function startGoogleLogin() {
         
         // إظهار الكابتشا
         showCaptchaScreen(async () => {
-            _captchaActive = false;
+            _captchaVerified = true;
             await saveUserAndEnter(_pendingGoogleUser);
             _pendingGoogleUser = null;
         });
         
     } catch (error) {
-        _captchaActive = false;
+        _pendingGoogleUser = null;
+        _captchaVerified = false;
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
         alert(msg);
-        _pendingGoogleUser = null;
     }
 }
 
@@ -118,6 +116,7 @@ function generateCaptcha() {
 
 // ========== إظهار شاشة الكابتشا ==========
 function showCaptchaScreen(onSuccess) {
+    _captchaVerified = false;
     const captchaCode = generateCaptcha();
     
     const existing = document.querySelector('.captcha-screen');
@@ -199,6 +198,7 @@ window.verifyCaptcha = function() {
     }
     
     if (enteredCode === _captchaCode) {
+        _captchaVerified = true;
         const captchaScreen = document.querySelector('.captcha-screen');
         if (captchaScreen) {
             captchaScreen.style.opacity = '0';
@@ -367,15 +367,14 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول (الكابتشا تبقى ظاهرة) ==========
+// ========== مراقب حالة تسجيل الدخول ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
-            // إذا كان الكابتشا نشط، لا تفعل شيئاً
-            if (_captchaActive) return;
+            // إذا في كابتشا شغالة وما تم التحقق، لا تفعل شي
+            if (_pendingGoogleUser && !_captchaVerified) return;
             
-            // دخول عادي بدون كابتشا
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
