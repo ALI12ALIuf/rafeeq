@@ -17,55 +17,72 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
+// ========== متغيرات الكابتشا ==========
+let _captchaCode = '';
+let _captchaAttempts = 0;
+let _pendingGoogleUser = null;
+const MAX_CAPTCHA_ATTEMPTS = 3;
+
 // ========== إظهار التطبيق ==========
 function showApp() {
-    const loginScreen = document.querySelector('.login-screen');
-    if (loginScreen) loginScreen.remove();
     const splash = document.getElementById('splash'), app = document.getElementById('app');
-    if (splash) { splash.style.display = 'none'; }
+    const loginScreen = document.querySelector('.login-screen');
+    const captchaScreen = document.querySelector('.captcha-screen');
+    if (loginScreen) loginScreen.remove();
+    if (captchaScreen) captchaScreen.remove();
+    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
     if (app) { app.style.display = 'flex'; }
-}
-
-// ========== إخفاء التطبيق وإظهار splash ==========
-function hideApp() {
-    const app = document.getElementById('app');
-    const splash = document.getElementById('splash');
-    if (app) app.style.display = 'none';
-    if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
 }
 
 // ========== إظهار شاشة تسجيل الدخول ==========
 function showLoginScreen() {
-    const app = document.getElementById('app');
-    const splash = document.getElementById('splash');
-    if (app) app.style.display = 'none';
-    
-    // نخلي الـ splash يختفي بهدوء
-    if (splash) { splash.classList.add('hide'); }
-    
-    setTimeout(() => {
-        if (splash) splash.style.display = 'none';
-        const el = document.querySelector('.login-screen'); if (el) el.remove();
-        const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;opacity:0;transition:opacity 0.3s;';
-        d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="signInWithGoogle()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
-        document.body.appendChild(d);
-        requestAnimationFrame(() => { d.style.opacity = '1'; });
-    }, 600);
+    const el = document.querySelector('.login-screen'); if (el) el.remove();
+    const cap = document.querySelector('.captcha-screen'); if (cap) cap.remove();
+    const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
+    document.body.appendChild(d);
 }
 
-// ========== تسجيل الدخول بقوقل ==========
-async function signInWithGoogle() {
-    // إخفاء شاشة تسجيل الدخول فوراً
-    const loginScreen = document.querySelector('.login-screen');
-    if (loginScreen) loginScreen.style.opacity = '0';
-    
+// ========== بدء تسجيل الدخول بقوقل (مع كابتشا كل مرة) ==========
+async function startGoogleLogin() {
     try {
-        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); if (loginScreen) loginScreen.style.opacity = '1'; return false; }
+        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
+        
+        const loginScreen = document.querySelector('.login-screen');
+        
+        // تسجيل الدخول بقوقل
         const result = await window.auth.signInWithPopup(window.googleProvider);
-        const user = result.user;
+        _pendingGoogleUser = result.user;
+        
+        // إخفاء شاشة تسجيل الدخول فوراً
+        if (loginScreen) loginScreen.style.opacity = '0';
+        setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 300);
+        
+        // إظهار الكابتشا
+        showCaptchaScreen(async () => {
+            await saveUserAndEnter(_pendingGoogleUser);
+            _pendingGoogleUser = null;
+        });
+        
+    } catch (error) {
+        let msg = 'حدث خطأ في تسجيل الدخول';
+        if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
+        else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
+        alert(msg);
+        _pendingGoogleUser = null;
+    }
+}
+
+// ========== حفظ المستخدم ودخول الموقع ==========
+async function saveUserAndEnter(user) {
+    try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
-            await window.db.collection('users').doc(user.uid).set({ uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25), email: user.email || '', shareableId: generateShareableId(), bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date() });
+            await window.db.collection('users').doc(user.uid).set({
+                uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
+                email: user.email || '', shareableId: generateShareableId(),
+                bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date()
+            });
         } else {
             const userData = userDoc.data(); const updates = {};
             if (!userData.friends) updates.friends = [];
@@ -77,18 +94,156 @@ async function signInWithGoogle() {
         setupFriendRequestsListener(user.uid);
         if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
         showApp();
-        return true;
     } catch (error) {
-        if (loginScreen) loginScreen.style.opacity = '1';
-        let msg = 'حدث خطأ في تسجيل الدخول';
-        if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
-        else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
-        alert(msg);
-        return false;
+        console.error('خطأ في حفظ المستخدم:', error);
+        alert('حدث خطأ في إعداد الحساب');
     }
 }
 
-function updateUserUI() { showApp(); }
+// ========== دالة إنشاء أرقام عشوائية للكابتشا ==========
+function generateCaptcha() {
+    _captchaCode = '';
+    for (let i = 0; i < 6; i++) {
+        _captchaCode += Math.floor(Math.random() * 10).toString();
+    }
+    _captchaAttempts = 0;
+    return _captchaCode;
+}
+
+// ========== إظهار شاشة الكابتشا ==========
+function showCaptchaScreen(onSuccess) {
+    const captchaCode = generateCaptcha();
+    
+    const existing = document.querySelector('.captcha-screen');
+    if (existing) existing.remove();
+    
+    const d = document.createElement('div');
+    d.className = 'captcha-screen';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10001;opacity:0;transition:opacity 0.3s;';
+    d.innerHTML = `
+        <div style="text-align:center;padding:30px;max-width:400px;width:90%;background:var(--card-bg);border-radius:20px;box-shadow:var(--shadow);">
+            <div style="font-size:4rem;margin-bottom:1rem;">🔐</div>
+            <h2 style="color:var(--primary);margin-bottom:0.5rem;">تأكيد أنك لست روبوت</h2>
+            <p style="color:var(--text-light);margin-bottom:1.5rem;font-size:0.9rem;">أدخل الرمز الظاهر للمتابعة</p>
+            
+            <div style="background:var(--light);padding:20px;border-radius:15px;margin-bottom:1.5rem;letter-spacing:8px;font-size:2.2rem;font-weight:bold;color:var(--primary);font-family:monospace;user-select:none;" id="captchaDisplay">${captchaCode}</div>
+            
+            <div style="display:flex;gap:8px;justify-content:center;margin-bottom:1.5rem;">
+                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 0)" onkeydown="handleCaptchaKeyDown(event, this, 0)" onpaste="handleCaptchaPaste(event)">
+                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 1)" onkeydown="handleCaptchaKeyDown(event, this, 1)">
+                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 2)" onkeydown="handleCaptchaKeyDown(event, this, 2)">
+                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 3)" onkeydown="handleCaptchaKeyDown(event, this, 3)">
+                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 4)" onkeydown="handleCaptchaKeyDown(event, this, 4)">
+                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 5)" onkeydown="handleCaptchaKeyDown(event, this, 5)">
+            </div>
+            
+            <p style="color:var(--danger);font-size:0.85rem;margin-bottom:1rem;display:none;" id="captchaError"></p>
+            
+            <button onclick="verifyCaptcha()" style="background:var(--primary);color:white;border:none;border-radius:25px;padding:12px 40px;font-size:1.1rem;cursor:pointer;width:100%;">تحقق</button>
+            <button onclick="generateNewCaptcha()" style="background:none;border:none;color:var(--primary);margin-top:1rem;cursor:pointer;font-size:0.9rem;">🔄 رمز جديد</button>
+        </div>`;
+    document.body.appendChild(d);
+    
+    requestAnimationFrame(() => { d.style.opacity = '1'; });
+    d._onSuccess = onSuccess;
+    
+    setTimeout(() => {
+        const firstInput = document.querySelector('.captcha-input');
+        if (firstInput) firstInput.focus();
+    }, 400);
+}
+
+// ========== معالجة إدخال الكابتشا ==========
+window.handleCaptchaInput = function(input, index) {
+    input.value = input.value.replace(/\D/g, '');
+    if (input.value.length === 1 && index < 5) {
+        const inputs = document.querySelectorAll('.captcha-input');
+        if (inputs[index + 1]) inputs[index + 1].focus();
+    }
+};
+
+window.handleCaptchaKeyDown = function(event, input, index) {
+    if (event.key === 'Backspace' && input.value === '' && index > 0) {
+        const inputs = document.querySelectorAll('.captcha-input');
+        if (inputs[index - 1]) { inputs[index - 1].focus(); inputs[index - 1].value = ''; }
+    }
+    if (event.key === 'Enter') { verifyCaptcha(); }
+};
+
+window.handleCaptchaPaste = function(event) {
+    event.preventDefault();
+    const paste = (event.clipboardData || window.clipboardData).getData('text');
+    const digits = paste.replace(/\D/g, '').slice(0, 6);
+    const inputs = document.querySelectorAll('.captcha-input');
+    for (let i = 0; i < 6; i++) { inputs[i].value = digits[i] || ''; }
+    if (digits.length === 6) { inputs[5].focus(); setTimeout(() => verifyCaptcha(), 200); }
+};
+
+// ========== التحقق من الكابتشا ==========
+window.verifyCaptcha = function() {
+    const inputs = document.querySelectorAll('.captcha-input');
+    let enteredCode = '';
+    inputs.forEach(input => { enteredCode += input.value; });
+    
+    const errorEl = document.getElementById('captchaError');
+    
+    if (enteredCode.length < 6) {
+        if (errorEl) { errorEl.textContent = 'الرجاء إدخال 6 أرقام كاملة'; errorEl.style.display = 'block'; }
+        return;
+    }
+    
+    if (enteredCode === _captchaCode) {
+        const captchaScreen = document.querySelector('.captcha-screen');
+        if (captchaScreen) {
+            captchaScreen.style.opacity = '0';
+            setTimeout(() => {
+                const onSuccess = captchaScreen._onSuccess;
+                captchaScreen.remove();
+                if (onSuccess) onSuccess();
+            }, 300);
+        }
+    } else {
+        _captchaAttempts++;
+        if (errorEl) {
+            if (_captchaAttempts >= MAX_CAPTCHA_ATTEMPTS) {
+                errorEl.textContent = 'تجاوزت الحد الأقصى. جاري إنشاء رمز جديد...';
+                errorEl.style.display = 'block';
+                setTimeout(() => {
+                    generateNewCaptcha();
+                    if (errorEl) { errorEl.textContent = ''; errorEl.style.display = 'none'; }
+                }, 1500);
+            } else {
+                errorEl.textContent = `الرمز غير صحيح. متبقي ${MAX_CAPTCHA_ATTEMPTS - _captchaAttempts} محاولات`;
+                errorEl.style.display = 'block';
+            }
+        }
+        inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--danger)'; });
+        setTimeout(() => { inputs.forEach(input => { input.style.borderColor = 'var(--border)'; }); }, 1500);
+        inputs[0].focus();
+    }
+};
+
+// ========== إنشاء رمز جديد ==========
+window.generateNewCaptcha = function() {
+    const captchaCode = generateCaptcha();
+    const display = document.getElementById('captchaDisplay');
+    if (display) display.textContent = captchaCode;
+    const errorEl = document.getElementById('captchaError');
+    if (errorEl) { errorEl.textContent = ''; errorEl.style.display = 'none'; }
+    const inputs = document.querySelectorAll('.captcha-input');
+    inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; });
+    inputs[0].focus();
+};
+
+// ========== للتوافق مع الاستدعاءات القديمة ==========
+async function signInWithGoogle() {
+    await startGoogleLogin();
+}
+
+function updateUserUI() {
+    const splash = document.getElementById('splash'), app = document.getElementById('app');
+    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
+}
 
 async function logout() { try { await window.auth.signOut(); window.location.reload(); } catch (e) {} }
 
@@ -206,26 +361,24 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول (نهائي - بدون أي رجوع لصفحة تسجيل الدخول) ==========
+// ========== مراقب حالة تسجيل الدخول ==========
 if (typeof window.auth !== 'undefined') {
-    let _firstCheck = true;
-    
     window.auth.onAuthStateChanged(async (user) => {
+        const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
-            // المستخدم موجود - إظهار التطبيق
-            await loadUserData(user.uid);
-            setupFriendRequestsListener(user.uid);
-            if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
-            showApp();
-            _firstCheck = false;
-        } else {
-            if (_firstCheck) {
-                // أول فحص فقط - إذا ماكو مستخدم، نظهر شاشة تسجيل الدخول
-                _firstCheck = false;
-                hideApp();
-                setTimeout(() => showLoginScreen(), 2500);
+            if (!_pendingGoogleUser || _pendingGoogleUser.uid !== user.uid) {
+                await loadUserData(user.uid);
+                setupFriendRequestsListener(user.uid);
+                if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
+                showApp();
             }
-            // إذا مو أول فحص (يعني المستخدم سوى تسجيل خروج)، reload الصفحة
+        } else {
+            if (app) app.style.display = 'none';
+            if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
+            setTimeout(() => {
+                if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); }
+                else showLoginScreen();
+            }, 2000);
         }
     });
 }
