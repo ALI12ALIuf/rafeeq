@@ -17,7 +17,10 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
-// ========== إخفاء شاشة البداية وإظهار التطبيق ==========
+// ========== متغير يمنع ظهور شاشة تسجيل الدخول أثناء المصادقة ==========
+let _isAuthenticating = false;
+
+// ========== إظهار التطبيق ==========
 function showApp() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     const loginScreen = document.querySelector('.login-screen');
@@ -26,8 +29,9 @@ function showApp() {
     if (app) { app.style.display = 'flex'; }
 }
 
-// ========== إظهار شاشة تسجيل الدخول ==========
+// ========== إظهار شاشة تسجيل الدخول (فقط إذا ماكو مصادقة جارية) ==========
 function showLoginScreen() {
+    if (_isAuthenticating) return; // إذا جاري تسجيل الدخول، لا تظهر الشاشة
     const el = document.querySelector('.login-screen'); if (el) el.remove();
     const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
     d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="signInWithGoogle()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
@@ -36,8 +40,9 @@ function showLoginScreen() {
 
 // ========== تسجيل الدخول بقوقل ==========
 async function signInWithGoogle() {
+    _isAuthenticating = true; // نمنع ظهور شاشة تسجيل الدخول
     try {
-        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return false; }
+        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); _isAuthenticating = false; return false; }
         const result = await window.auth.signInWithPopup(window.googleProvider);
         const user = result.user;
         const userDoc = await window.db.collection('users').doc(user.uid).get();
@@ -50,7 +55,6 @@ async function signInWithGoogle() {
             if (userData.following) updates.following = [];
             if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
         }
-        // ========== هنا الحل: إظهار التطبيق مباشرة ==========
         await loadUserData(user.uid);
         setupFriendRequestsListener(user.uid);
         if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
@@ -60,7 +64,10 @@ async function signInWithGoogle() {
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
-        alert(msg); return false;
+        alert(msg);
+        return false;
+    } finally {
+        _isAuthenticating = false; // خلصت المصادقة
     }
 }
 
