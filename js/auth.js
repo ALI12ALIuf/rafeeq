@@ -17,6 +17,24 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
+// ========== إخفاء شاشة البداية وإظهار التطبيق ==========
+function showApp() {
+    const splash = document.getElementById('splash'), app = document.getElementById('app');
+    const loginScreen = document.querySelector('.login-screen');
+    if (loginScreen) loginScreen.remove();
+    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
+    if (app) { app.style.display = 'flex'; }
+}
+
+// ========== إظهار شاشة تسجيل الدخول ==========
+function showLoginScreen() {
+    const el = document.querySelector('.login-screen'); if (el) el.remove();
+    const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="signInWithGoogle()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
+    document.body.appendChild(d);
+}
+
+// ========== تسجيل الدخول بقوقل ==========
 async function signInWithGoogle() {
     try {
         if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return false; }
@@ -32,8 +50,11 @@ async function signInWithGoogle() {
             if (userData.following) updates.following = [];
             if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
         }
-        updateUserUI();
+        // ========== هنا الحل: إظهار التطبيق مباشرة ==========
+        await loadUserData(user.uid);
+        setupFriendRequestsListener(user.uid);
         if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
+        showApp();
         return true;
     } catch (error) {
         let msg = 'حدث خطأ في تسجيل الدخول';
@@ -164,27 +185,24 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== نظام تسجيل الدخول ==========
+// ========== مراقب حالة تسجيل الدخول ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
-            await loadUserData(user.uid); setupFriendRequestsListener(user.uid);
+            await loadUserData(user.uid);
+            setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
-            if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
+            showApp();
         } else {
             if (app) app.style.display = 'none';
             if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
-            setTimeout(() => { if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); } else showLoginScreen(); }, 2000);
+            setTimeout(() => {
+                if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); }
+                else showLoginScreen();
+            }, 2000);
         }
     });
-}
-
-function showLoginScreen() {
-    const el = document.querySelector('.login-screen'); if (el) el.remove();
-    const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
-    d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="signInWithGoogle()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
-    document.body.appendChild(d);
 }
 
 function copyId() { const el = document.getElementById('shareableId'); if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ')); }
