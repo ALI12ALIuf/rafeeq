@@ -249,6 +249,15 @@
     
     <script>
     window.addEventListener('load', function() {
+        setTimeout(function() {
+            var splash = document.getElementById('splash');
+            var app = document.getElementById('app');
+            if (splash && !splash.classList.contains('hide')) {
+                splash.classList.add('hide');
+                setTimeout(function() { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500);
+            }
+        }, 3000);
+        
         const nameInput = document.getElementById('editName');
         const charCounter = document.getElementById('charCounter');
         if (nameInput && charCounter) {
