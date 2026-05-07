@@ -18,6 +18,7 @@ exports.generateCaptcha = functions.https.onCall(async (data, context) => {
         blocked: false,
         blockUntil: null,
         blockCount: 0,
+        verified: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
     
@@ -47,14 +48,16 @@ exports.verifyCaptcha = functions.https.onCall(async (data, context) => {
             const remaining = Math.ceil((captchaData.blockUntil.toMillis() - now.toMillis()) / 1000);
             return { success: false, error: 'محظور', blocked: true, remaining: remaining };
         }
-        // فك الحظر
         await db.collection('captchas').doc(uid).update({ blocked: false, attempts: 0 });
         captchaData.attempts = 0;
     }
     
     // تحقق من الرمز
     if (enteredCode === captchaData.code) {
-        await db.collection('captchas').doc(uid).delete();
+        await db.collection('captchas').doc(uid).set({
+            verified: true,
+            verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
         return { success: true };
     }
     
@@ -94,4 +97,17 @@ exports.refreshCaptcha = functions.https.onCall(async (data, context) => {
     });
     
     return { code: code };
+});
+
+// ========== فحص حالة الكابتشا ==========
+exports.checkCaptchaStatus = functions.https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
+    
+    const uid = context.auth.uid;
+    const doc = await db.collection('captchas').doc(uid).get();
+    
+    if (!doc.exists) return { verified: true };
+    if (doc.data().verified) return { verified: true };
+    
+    return { verified: false };
 });
