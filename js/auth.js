@@ -26,8 +26,18 @@ let _captchaBlocked = false;
 let _captchaBlockTimer = null;
 let _captchaCountdownTimer = null;
 let _captchaRemainingSeconds = 0;
-let _isLoggingIn = false; // ← مفتاح منع ظهور شاشة تسجيل الدخول
+let _isLoggingIn = false;
 const MAX_CAPTCHA_ATTEMPTS = 3;
+
+// ========== استعادة حالة الكابتشا إذا المستخدم رجع للصفحة ==========
+(function() {
+    const savedUid = sessionStorage.getItem('_pendingGoogleUid');
+    if (savedUid && window.auth?.currentUser && window.auth.currentUser.uid === savedUid) {
+        _pendingGoogleUser = window.auth.currentUser;
+        _captchaActive = true;
+        _isLoggingIn = true;
+    }
+})();
 
 function getBlockTime(blockCount) {
     switch(blockCount) {
@@ -45,9 +55,13 @@ function showApp() {
     _captchaActive = false;
     _captchaBlocked = false;
     _isLoggingIn = false;
+    _pendingGoogleUser = null;
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
     if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
     sessionStorage.removeItem('_captchaBlockCount');
+    sessionStorage.removeItem('_pendingGoogleUid');
+    sessionStorage.removeItem('_pendingGoogleName');
+    sessionStorage.removeItem('_pendingGoogleEmail');
     
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     const loginScreen = document.querySelector('.login-screen');
@@ -87,10 +101,19 @@ async function startGoogleLogin() {
         _pendingGoogleUser = result.user;
         
         if (_pendingGoogleUser) {
+            sessionStorage.setItem('_pendingGoogleUid', _pendingGoogleUser.uid);
+            sessionStorage.setItem('_pendingGoogleName', _pendingGoogleUser.displayName || '');
+            sessionStorage.setItem('_pendingGoogleEmail', _pendingGoogleUser.email || '');
+        }
+        
+        if (_pendingGoogleUser) {
             showCaptchaScreen(async () => {
                 if (_pendingGoogleUser) {
                     await saveUserAndEnter(_pendingGoogleUser);
                     _pendingGoogleUser = null;
+                    sessionStorage.removeItem('_pendingGoogleUid');
+                    sessionStorage.removeItem('_pendingGoogleName');
+                    sessionStorage.removeItem('_pendingGoogleEmail');
                 }
             });
         }
@@ -99,6 +122,9 @@ async function startGoogleLogin() {
         _pendingGoogleUser = null;
         _captchaActive = false;
         _isLoggingIn = false;
+        sessionStorage.removeItem('_pendingGoogleUid');
+        sessionStorage.removeItem('_pendingGoogleName');
+        sessionStorage.removeItem('_pendingGoogleEmail');
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
@@ -496,7 +522,22 @@ if (typeof window.auth !== 'undefined') {
             // إذا الكابتشا شغالة - لا تفعل شي (saveUserAndEnter يتولى الموضوع)
             if (_captchaActive) return;
             
-            // مستخدم مسجل دخول سابقاً
+            // إذا كان فيه pendingGoogleUser (تسجيل دخول جديد وما اكتمل الكابتشا)
+            if (_pendingGoogleUser && !_captchaActive && sessionStorage.getItem('_pendingGoogleUid')) {
+                _captchaActive = true;
+                showCaptchaScreen(async () => {
+                    if (_pendingGoogleUser) {
+                        await saveUserAndEnter(_pendingGoogleUser);
+                        _pendingGoogleUser = null;
+                        sessionStorage.removeItem('_pendingGoogleUid');
+                        sessionStorage.removeItem('_pendingGoogleName');
+                        sessionStorage.removeItem('_pendingGoogleEmail');
+                    }
+                });
+                return;
+            }
+            
+            // دخول عادي
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
