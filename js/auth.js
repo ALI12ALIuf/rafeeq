@@ -19,6 +19,7 @@ const FieldValue = firebase.firestore.FieldValue;
 
 // ========== متغيرات الكابتشا ==========
 let _captchaCode = '';
+let _captchaAttempts = 0;
 let _captchaBlocked = false;
 let _captchaActive = false;
 let _pendingGoogleUser = null;
@@ -26,6 +27,19 @@ let _isLoggingIn = false;
 let _captchaBlockTimer = null;
 let _captchaCountdownTimer = null;
 let _captchaRemainingSeconds = 0;
+const MAX_CAPTCHA_ATTEMPTS = 3;
+
+function getBlockTime(blockCount) {
+    switch(blockCount) {
+        case 1: return 60000;
+        case 2: return 180000;
+        case 3: return 300000;
+        case 4: return 3600000;
+        case 5: return 10800000;
+        case 6: return 43200000;
+        default: return 86400000;
+    }
+}
 
 function showApp() {
     _captchaActive = false;
@@ -35,11 +49,6 @@ function showApp() {
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
     if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
     sessionStorage.removeItem('_captchaBlockCount');
-    
-    const user = window.auth?.currentUser;
-    if (user) {
-        try { window.db.collection('captchas').doc(user.uid).delete(); } catch (e) {}
-    }
     
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     const loginScreen = document.querySelector('.login-screen');
@@ -61,8 +70,9 @@ function showLoginScreen() {
 
 async function startGoogleLogin() {
     _isLoggingIn = true;
+    _captchaActive = true;
     try {
-        if (!window.auth || !window.googleProvider) { _isLoggingIn = false; alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
+        if (!window.auth || !window.googleProvider) { _isLoggingIn = false; _captchaActive = false; alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
         
         const splash = document.getElementById('splash');
         if (splash) { splash.style.display = 'none'; }
@@ -70,8 +80,8 @@ async function startGoogleLogin() {
         const loginScreen = document.querySelector('.login-screen');
         if (loginScreen) { loginScreen.style.opacity = '0'; setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 200); }
         
-        _captchaActive = true;
         _captchaBlocked = false;
+        _captchaAttempts = 0;
         _pendingGoogleUser = null;
         
         const result = await window.auth.signInWithPopup(window.googleProvider);
@@ -124,47 +134,28 @@ async function saveUserAndEnter(user) {
     }
 }
 
-// ========== توليد الكابتشا من السيرفر فقط ==========
 function generateCaptcha() {
-    return new Promise((resolve, reject) => {
-        const generateFn = firebase.functions().httpsCallable('generateCaptcha');
-        generateFn().then(result => {
-            _captchaCode = result.data.code;
-            resolve(_captchaCode);
-        }).catch(() => {
-            reject(new Error('فشل الاتصال بالسيرفر'));
-        });
-    });
+    _captchaCode = '';
+    for (let i = 0; i < 6; i++) {
+        _captchaCode += Math.floor(Math.random() * 10).toString();
+    }
+    return _captchaCode;
 }
 
 function refreshCaptchaDisplay() {
-    const refreshFn = firebase.functions().httpsCallable('refreshCaptcha');
-    refreshFn().then(result => {
-        _captchaCode = result.data.code;
-        const display = document.getElementById('captchaDisplay');
-        if (display) display.textContent = _captchaCode;
-    }).catch(() => {
-        const errorEl = document.getElementById('captchaError');
-        if (errorEl) { errorEl.textContent = 'خطأ في الاتصال. حاول مرة أخرى.'; errorEl.style.color = 'var(--danger)'; }
-    });
+    const captchaCode = generateCaptcha();
+    const display = document.getElementById('captchaDisplay');
+    if (display) display.textContent = captchaCode;
 }
 
-async function showCaptchaScreen(onSuccess) {
+function showCaptchaScreen(onSuccess) {
     _captchaActive = true;
     _captchaBlocked = false;
+    _captchaAttempts = 0;
+    const captchaCode = generateCaptcha();
     
     const existing = document.querySelector('.captcha-screen');
     if (existing) existing.remove();
-    
-    let captchaCode;
-    try {
-        captchaCode = await generateCaptcha();
-    } catch (e) {
-        alert('فشل الاتصال بالسيرفر. حاول مرة أخرى.');
-        _captchaActive = false;
-        _isLoggingIn = false;
-        return;
-    }
     
     const d = document.createElement('div');
     d.className = 'captcha-screen';
@@ -264,6 +255,7 @@ function startCountdown(totalMillis) {
             clearInterval(_captchaCountdownTimer);
             _captchaCountdownTimer = null;
             _captchaBlocked = false;
+            _captchaAttempts = 0;
             if (errorEl) { errorEl.textContent = ''; errorEl.style.color = 'var(--danger)'; }
             if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
             if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
@@ -292,7 +284,7 @@ function startCountdown(totalMillis) {
     _captchaCountdownTimer = setInterval(updateCountdown, 1000);
 }
 
-// ========== التحقق من الكابتشا عبر السيرفر فقط (لا نسخة احتياطية) ==========
+// ========== التحقق من الكابتشا (محلي) ==========
 window.verifyCaptcha = function() {
     if (_captchaBlocked) return;
     
@@ -309,49 +301,73 @@ window.verifyCaptcha = function() {
         return;
     }
     
-    const verifyFn = firebase.functions().httpsCallable('verifyCaptcha');
-    verifyFn({ code: enteredCode }).then(result => {
-        const data = result.data;
+    if (enteredCode === _captchaCode) {
+        _captchaActive = false;
+        _captchaBlocked = false;
+        if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
+        if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
+        sessionStorage.removeItem('_captchaBlockCount');
+        const captchaScreen = document.querySelector('.captcha-screen');
+        if (captchaScreen) {
+            inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
+            const onSuccess = captchaScreen._onSuccess;
+            captchaScreen.remove();
+            if (onSuccess) onSuccess();
+        }
+    } else {
+        _captchaAttempts++;
+        const remainingAttempts = MAX_CAPTCHA_ATTEMPTS - _captchaAttempts;
         
-        if (data.success) {
-            _captchaActive = false;
-            _captchaBlocked = false;
-            if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
-            if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
-            sessionStorage.removeItem('_captchaBlockCount');
-            const captchaScreen = document.querySelector('.captcha-screen');
-            if (captchaScreen) {
-                inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
-                const onSuccess = captchaScreen._onSuccess;
-                captchaScreen.remove();
-                if (onSuccess) onSuccess();
+        for (let i = 0; i < 6; i++) {
+            if (inputs[i].value !== _captchaCode[i]) {
+                inputs[i].style.borderColor = '#f44336';
+                inputs[i].style.background = 'rgba(244,67,54,0.2)';
             }
-        } else if (data.blocked) {
+        }
+        
+        if (_captchaAttempts >= MAX_CAPTCHA_ATTEMPTS) {
             _captchaBlocked = true;
             if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.style.opacity = '0.5'; }
             if (refreshBtn) { refreshBtn.style.opacity = '0.5'; refreshBtn.style.pointerEvents = 'none'; }
             inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
-            startCountdown(data.remaining * 1000);
+            
+            let blockCount = parseInt(sessionStorage.getItem('_captchaBlockCount') || '0');
+            blockCount++;
+            sessionStorage.setItem('_captchaBlockCount', blockCount.toString());
+            
+            const blockTime = getBlockTime(blockCount);
+            
+            if (_captchaBlockTimer) clearTimeout(_captchaBlockTimer);
+            _captchaBlockTimer = setTimeout(() => {
+                _captchaBlocked = false;
+                _captchaAttempts = 0;
+                if (errorEl) { errorEl.textContent = ''; }
+                if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
+                if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
+                inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; });
+                refreshCaptchaDisplay();
+                resetInputs();
+                _captchaBlockTimer = null;
+            }, blockTime);
+            
+            startCountdown(blockTime);
+            
         } else {
-            if (errorEl) { errorEl.textContent = data.error || 'رمز غير صحيح'; errorEl.style.color = 'var(--danger)'; }
-            for (let i = 0; i < 6; i++) {
-                inputs[i].style.borderColor = '#f44336';
-                inputs[i].style.background = 'rgba(244,67,54,0.2)';
-            }
-            setTimeout(() => { refreshCaptchaDisplay(); resetInputs(); }, 800);
+            if (errorEl) { errorEl.textContent = `الرمز غير صحيح. متبقي ${remainingAttempts} محاولات`; errorEl.style.color = 'var(--danger)'; }
+            setTimeout(() => {
+                refreshCaptchaDisplay();
+                resetInputs();
+            }, 800);
         }
-    }).catch(() => {
-        if (errorEl) { errorEl.textContent = 'خطأ في الاتصال. حاول مرة أخرى.'; errorEl.style.color = 'var(--danger)'; }
-    });
+    }
 };
-
-// ========== تم حذف verifyCaptchaFallback نهائياً ==========
 
 window.generateNewCaptcha = function() {
     if (_captchaBlocked) return;
     refreshCaptchaDisplay();
     const errorEl = document.getElementById('captchaError');
     if (errorEl) { errorEl.textContent = ''; }
+    _captchaAttempts = 0;
     resetInputs();
 };
 
@@ -473,54 +489,12 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول (فحص السيرفر - الكابتشا فقط أو الموقع فقط) ==========
+// ========== مراقب حالة تسجيل الدخول ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            // فحص السيرفر: هل المستخدم اجتاز الكابتشا؟
-            try {
-                const checkFn = firebase.functions().httpsCallable('checkCaptchaStatus');
-                const result = await checkFn();
-                
-                if (!result.data.verified) {
-                    _pendingGoogleUser = user;
-                    _captchaActive = true;
-                    _isLoggingIn = true;
-                    
-                    if (app) app.style.display = 'none';
-                    if (splash) { splash.style.display = 'none'; }
-                    const loginEl = document.querySelector('.login-screen');
-                    if (loginEl) loginEl.remove();
-                    const capEl = document.querySelector('.captcha-screen');
-                    if (capEl) capEl.remove();
-                    
-                    showCaptchaScreen(async () => {
-                        await saveUserAndEnter(user);
-                        _pendingGoogleUser = null;
-                    });
-                    return;
-                }
-            } catch (e) {
-                _pendingGoogleUser = user;
-                _captchaActive = true;
-                _isLoggingIn = true;
-                
-                if (app) app.style.display = 'none';
-                if (splash) { splash.style.display = 'none'; }
-                const loginEl = document.querySelector('.login-screen');
-                if (loginEl) loginEl.remove();
-                const capEl = document.querySelector('.captcha-screen');
-                if (capEl) capEl.remove();
-                
-                showCaptchaScreen(async () => {
-                    await saveUserAndEnter(user);
-                    _pendingGoogleUser = null;
-                });
-                return;
-            }
-            
             if (_captchaActive) return;
             
             await loadUserData(user.uid);
