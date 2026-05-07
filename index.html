@@ -221,6 +221,7 @@
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-functions.js"></script>
 
     <script>
         const firebaseConfig = {
@@ -245,19 +246,11 @@
     <script src="js/chat-system.js?v=3"></script>
     <script src="js/ui-functions.js?v=3"></script>
     <!-- ============================================================ -->
-    <script src="js/auth.js?v=2"></script>
+    <script src="js/auth.js?v=3"></script>
     
     <script>
+    // ========== لا يظهر التطبيق قبل تحقق onAuthStateChanged ==========
     window.addEventListener('load', function() {
-        setTimeout(function() {
-            var splash = document.getElementById('splash');
-            var app = document.getElementById('app');
-            if (splash && !splash.classList.contains('hide')) {
-                splash.classList.add('hide');
-                setTimeout(function() { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500);
-            }
-        }, 3000);
-        
         const nameInput = document.getElementById('editName');
         const charCounter = document.getElementById('charCounter');
         if (nameInput && charCounter) {
