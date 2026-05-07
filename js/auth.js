@@ -21,7 +21,6 @@ const FieldValue = firebase.firestore.FieldValue;
 let _captchaCode = '';
 let _captchaAttempts = 0;
 let _pendingGoogleUser = null;
-let _captchaVerified = false;
 let _captchaActive = false;
 const MAX_CAPTCHA_ATTEMPTS = 3;
 
@@ -47,13 +46,12 @@ function showLoginScreen() {
     document.body.appendChild(d);
 }
 
-// ========== بدء تسجيل الدخول بقوقل (مع كابتشا كل مرة) ==========
+// ========== بدء تسجيل الدخول بقوقل ==========
 async function startGoogleLogin() {
     try {
         if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
         
         const loginScreen = document.querySelector('.login-screen');
-        _captchaVerified = false;
         _captchaActive = true;
         _pendingGoogleUser = null;
         
@@ -65,11 +63,9 @@ async function startGoogleLogin() {
         setTimeout(() => {
             if (_pendingGoogleUser) {
                 showCaptchaScreen(async () => {
-                    _captchaVerified = true;
                     if (_pendingGoogleUser) {
                         await saveUserAndEnter(_pendingGoogleUser);
                         _pendingGoogleUser = null;
-                        _captchaActive = false;
                     }
                 });
             }
@@ -77,7 +73,6 @@ async function startGoogleLogin() {
         
     } catch (error) {
         _pendingGoogleUser = null;
-        _captchaVerified = false;
         _captchaActive = false;
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
@@ -88,7 +83,6 @@ async function startGoogleLogin() {
 
 // ========== حفظ المستخدم ودخول الموقع ==========
 async function saveUserAndEnter(user) {
-    if (!_captchaVerified) return;
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
@@ -126,7 +120,6 @@ function generateCaptcha() {
 
 // ========== إظهار شاشة الكابتشا ==========
 function showCaptchaScreen(onSuccess) {
-    _captchaVerified = false;
     _captchaActive = true;
     const captchaCode = generateCaptcha();
     
@@ -209,7 +202,7 @@ window.verifyCaptcha = function() {
     }
     
     if (enteredCode === _captchaCode) {
-        _captchaVerified = true;
+        _captchaActive = false;
         const captchaScreen = document.querySelector('.captcha-screen');
         if (captchaScreen) {
             captchaScreen.style.opacity = '0';
@@ -377,27 +370,37 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول ==========
+// ========== مراقب حالة تسجيل الدخول (نهائي) ==========
 if (typeof window.auth !== 'undefined') {
+    let _firstCheckDone = false;
+    
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
+        
         if (user) {
-            if (_pendingGoogleUser && !_captchaVerified) return;
-            if (_captchaVerified) return;
+            // إذا الكابتشا شغالة - امنع الدخول تماماً
+            if (_captchaActive) return;
             
+            // دخول عادي
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
             showApp();
         } else {
+            if (_captchaActive) return;
+            
             if (app) app.style.display = 'none';
             if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
-            setTimeout(() => {
-                if (!_pendingGoogleUser && !_captchaActive) {
-                    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); }
-                    else showLoginScreen();
-                }
-            }, 2000);
+            
+            if (!_firstCheckDone) {
+                _firstCheckDone = true;
+                setTimeout(() => {
+                    if (!_captchaActive) {
+                        if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); }
+                        else showLoginScreen();
+                    }
+                }, 2000);
+            }
         }
     });
 }
