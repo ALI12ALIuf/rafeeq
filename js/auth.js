@@ -22,7 +22,10 @@ let _captchaCode = '';
 let _captchaAttempts = 0;
 let _pendingGoogleUser = null;
 let _captchaActive = false;
+let _captchaBlocked = false;
+let _captchaBlockTimer = null;
 const MAX_CAPTCHA_ATTEMPTS = 3;
+const CAPTCHA_BLOCK_TIME = 60000; // 60 ثانية
 
 // ========== إظهار التطبيق ==========
 function showApp() {
@@ -32,6 +35,8 @@ function showApp() {
     if (loginScreen) loginScreen.remove();
     if (captchaScreen) captchaScreen.remove();
     _captchaActive = false;
+    _captchaBlocked = false;
+    if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
     if (app) { app.style.display = 'flex'; }
 }
@@ -53,6 +58,8 @@ async function startGoogleLogin() {
         
         const loginScreen = document.querySelector('.login-screen');
         _captchaActive = true;
+        _captchaBlocked = false;
+        _captchaAttempts = 0;
         _pendingGoogleUser = null;
         
         const result = await window.auth.signInWithPopup(window.googleProvider);
@@ -74,6 +81,7 @@ async function startGoogleLogin() {
     } catch (error) {
         _pendingGoogleUser = null;
         _captchaActive = false;
+        _captchaBlocked = false;
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
@@ -114,13 +122,14 @@ function generateCaptcha() {
     for (let i = 0; i < 6; i++) {
         _captchaCode += Math.floor(Math.random() * 10).toString();
     }
-    _captchaAttempts = 0;
     return _captchaCode;
 }
 
 // ========== إظهار شاشة الكابتشا ==========
 function showCaptchaScreen(onSuccess) {
     _captchaActive = true;
+    _captchaBlocked = false;
+    _captchaAttempts = 0;
     const captchaCode = generateCaptcha();
     
     const existing = document.querySelector('.captcha-screen');
@@ -132,24 +141,23 @@ function showCaptchaScreen(onSuccess) {
     d.innerHTML = `
         <div style="text-align:center;padding:30px;max-width:400px;width:90%;background:var(--card-bg);border-radius:20px;box-shadow:var(--shadow);">
             <div style="font-size:4rem;margin-bottom:1rem;">🔐</div>
-            <h2 style="color:var(--primary);margin-bottom:0.5rem;">تأكيد أنك لست روبوت</h2>
             <p style="color:var(--text-light);margin-bottom:1.5rem;font-size:0.9rem;">أدخل الرمز الظاهر للمتابعة</p>
             
-            <div style="background:var(--light);padding:20px;border-radius:15px;margin-bottom:1.5rem;letter-spacing:8px;font-size:2.2rem;font-weight:bold;color:var(--primary);font-family:monospace;user-select:none;" id="captchaDisplay">${captchaCode}</div>
+            <div style="background:var(--light);padding:20px;border-radius:15px;margin-bottom:1.5rem;letter-spacing:8px;font-size:2.2rem;font-weight:bold;color:var(--primary);font-family:monospace;user-select:none;direction:ltr;" id="captchaDisplay">${captchaCode}</div>
             
-            <div style="display:flex;gap:8px;justify-content:center;margin-bottom:1.5rem;">
-                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 0)" onkeydown="handleCaptchaKeyDown(event, this, 0)" onpaste="handleCaptchaPaste(event)">
-                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 1)" onkeydown="handleCaptchaKeyDown(event, this, 1)">
-                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 2)" onkeydown="handleCaptchaKeyDown(event, this, 2)">
-                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 3)" onkeydown="handleCaptchaKeyDown(event, this, 3)">
-                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 4)" onkeydown="handleCaptchaKeyDown(event, this, 4)">
-                <input type="text" maxlength="1" class="captcha-input" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);" oninput="handleCaptchaInput(this, 5)" onkeydown="handleCaptchaKeyDown(event, this, 5)">
+            <div style="display:flex;gap:8px;justify-content:center;margin-bottom:1.5rem;direction:ltr;">
+                <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 0)" onkeydown="handleCaptchaKeyDown(event, this, 0)" onpaste="handleCaptchaPaste(event)">
+                <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 1)" onkeydown="handleCaptchaKeyDown(event, this, 1)">
+                <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 2)" onkeydown="handleCaptchaKeyDown(event, this, 2)">
+                <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 3)" onkeydown="handleCaptchaKeyDown(event, this, 3)">
+                <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 4)" onkeydown="handleCaptchaKeyDown(event, this, 4)">
+                <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:45px;height:55px;text-align:center;font-size:1.5rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 5)" onkeydown="handleCaptchaKeyDown(event, this, 5)">
             </div>
             
-            <p style="color:var(--danger);font-size:0.85rem;margin-bottom:1rem;display:none;" id="captchaError"></p>
+            <p style="color:var(--danger);font-size:0.85rem;margin-bottom:1rem;min-height:20px;" id="captchaError"></p>
             
-            <button onclick="verifyCaptcha()" style="background:var(--primary);color:white;border:none;border-radius:25px;padding:12px 40px;font-size:1.1rem;cursor:pointer;width:100%;">تحقق</button>
-            <button onclick="generateNewCaptcha()" style="background:none;border:none;color:var(--primary);margin-top:1rem;cursor:pointer;font-size:0.9rem;">🔄 رمز جديد</button>
+            <button onclick="verifyCaptcha()" style="background:var(--primary);color:white;border:none;border-radius:25px;padding:12px 40px;font-size:1.1rem;cursor:pointer;width:100%;" id="captchaVerifyBtn">تحقق</button>
+            <button onclick="generateNewCaptcha()" style="background:none;border:none;color:var(--primary);margin-top:1rem;cursor:pointer;font-size:0.9rem;" id="captchaRefreshBtn">🔄 رمز جديد</button>
         </div>`;
     document.body.appendChild(d);
     
@@ -190,19 +198,24 @@ window.handleCaptchaPaste = function(event) {
 
 // ========== التحقق من الكابتشا ==========
 window.verifyCaptcha = function() {
+    if (_captchaBlocked) return;
+    
     const inputs = document.querySelectorAll('.captcha-input');
     let enteredCode = '';
     inputs.forEach(input => { enteredCode += input.value; });
     
     const errorEl = document.getElementById('captchaError');
+    const verifyBtn = document.getElementById('captchaVerifyBtn');
     
     if (enteredCode.length < 6) {
-        if (errorEl) { errorEl.textContent = 'الرجاء إدخال 6 أرقام كاملة'; errorEl.style.display = 'block'; }
+        if (errorEl) { errorEl.textContent = 'الرجاء إدخال 6 أرقام كاملة'; }
         return;
     }
     
     if (enteredCode === _captchaCode) {
         _captchaActive = false;
+        _captchaBlocked = false;
+        if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
         const captchaScreen = document.querySelector('.captcha-screen');
         if (captchaScreen) {
             captchaScreen.style.opacity = '0';
@@ -214,32 +227,43 @@ window.verifyCaptcha = function() {
         }
     } else {
         _captchaAttempts++;
-        if (errorEl) {
-            if (_captchaAttempts >= MAX_CAPTCHA_ATTEMPTS) {
-                errorEl.textContent = 'تجاوزت الحد الأقصى. جاري إنشاء رمز جديد...';
-                errorEl.style.display = 'block';
-                setTimeout(() => {
-                    generateNewCaptcha();
-                    if (errorEl) { errorEl.textContent = ''; errorEl.style.display = 'none'; }
-                }, 1500);
-            } else {
-                errorEl.textContent = `الرمز غير صحيح. متبقي ${MAX_CAPTCHA_ATTEMPTS - _captchaAttempts} محاولات`;
-                errorEl.style.display = 'block';
-            }
+        const remainingAttempts = MAX_CAPTCHA_ATTEMPTS - _captchaAttempts;
+        
+        if (_captchaAttempts >= MAX_CAPTCHA_ATTEMPTS) {
+            // حظر لمدة 60 ثانية
+            _captchaBlocked = true;
+            if (errorEl) { errorEl.textContent = 'تجاوزت الحد الأقصى. انتظر 60 ثانية...'; }
+            if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.style.opacity = '0.5'; }
+            inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
+            
+            _captchaBlockTimer = setTimeout(() => {
+                _captchaBlocked = false;
+                _captchaAttempts = 0;
+                if (errorEl) { errorEl.textContent = ''; }
+                if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
+                inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; input.value = ''; input.style.borderColor = 'var(--border)'; });
+                inputs[0].focus();
+                _captchaBlockTimer = null;
+            }, CAPTCHA_BLOCK_TIME);
+            
+        } else {
+            if (errorEl) { errorEl.textContent = `الرمز غير صحيح. متبقي ${remainingAttempts} محاولات`; }
+            inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--danger)'; });
+            setTimeout(() => { inputs.forEach(input => { input.style.borderColor = 'var(--border)'; }); }, 1500);
+            inputs[0].focus();
         }
-        inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--danger)'; });
-        setTimeout(() => { inputs.forEach(input => { input.style.borderColor = 'var(--border)'; }); }, 1500);
-        inputs[0].focus();
     }
 };
 
 // ========== إنشاء رمز جديد ==========
 window.generateNewCaptcha = function() {
+    if (_captchaBlocked) return;
     const captchaCode = generateCaptcha();
     const display = document.getElementById('captchaDisplay');
     if (display) display.textContent = captchaCode;
     const errorEl = document.getElementById('captchaError');
-    if (errorEl) { errorEl.textContent = ''; errorEl.style.display = 'none'; }
+    if (errorEl) { errorEl.textContent = ''; }
+    _captchaAttempts = 0;
     const inputs = document.querySelectorAll('.captcha-input');
     inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; });
     inputs[0].focus();
@@ -370,7 +394,7 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول (نهائي) ==========
+// ========== مراقب حالة تسجيل الدخول ==========
 if (typeof window.auth !== 'undefined') {
     let _firstCheckDone = false;
     
@@ -378,10 +402,8 @@ if (typeof window.auth !== 'undefined') {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            // إذا الكابتشا شغالة - امنع الدخول تماماً
             if (_captchaActive) return;
             
-            // دخول عادي
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
