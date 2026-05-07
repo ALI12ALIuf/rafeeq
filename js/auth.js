@@ -26,7 +26,7 @@ let _captchaBlocked = false;
 let _captchaBlockTimer = null;
 let _captchaCountdownTimer = null;
 let _captchaRemainingSeconds = 0;
-let _isLoggingIn = false;
+let _isLoggingIn = false; // ← مفتاح منع ظهور شاشة تسجيل الدخول
 const MAX_CAPTCHA_ATTEMPTS = 3;
 
 function getBlockTime(blockCount) {
@@ -45,7 +45,6 @@ function showApp() {
     _captchaActive = false;
     _captchaBlocked = false;
     _isLoggingIn = false;
-    _pendingGoogleUser = null;
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
     if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
     sessionStorage.removeItem('_captchaBlockCount');
@@ -70,10 +69,8 @@ function showLoginScreen() {
 
 async function startGoogleLogin() {
     _isLoggingIn = true;
-    _captchaActive = true;
-    
     try {
-        if (!window.auth || !window.googleProvider) { _isLoggingIn = false; _captchaActive = false; alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
+        if (!window.auth || !window.googleProvider) { _isLoggingIn = false; alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
         
         const splash = document.getElementById('splash');
         if (splash) { splash.style.display = 'none'; }
@@ -81,6 +78,7 @@ async function startGoogleLogin() {
         const loginScreen = document.querySelector('.login-screen');
         if (loginScreen) { loginScreen.style.opacity = '0'; setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 200); }
         
+        _captchaActive = true;
         _captchaBlocked = false;
         _captchaAttempts = 0;
         _pendingGoogleUser = null;
@@ -489,35 +487,33 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول ==========
+// ========== مراقب حالة تسجيل الدخول (نهائي 100%) ==========
 if (typeof window.auth !== 'undefined') {
-    let _firstCheckDone = false;
-    
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            if (_isLoggingIn || _captchaActive) return;
+            // إذا الكابتشا شغالة - لا تفعل شي (saveUserAndEnter يتولى الموضوع)
+            if (_captchaActive) return;
             
+            // مستخدم مسجل دخول سابقاً
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
             showApp();
         } else {
+            // إذا جاري تسجيل الدخول أو الكابتشا شغالة - لا تظهر شاشة تسجيل الدخول
             if (_isLoggingIn || _captchaActive) return;
             
             if (app) app.style.display = 'none';
             if (splash) { splash.style.display = 'flex'; }
             
-            if (!_firstCheckDone) {
-                _firstCheckDone = true;
-                setTimeout(() => {
-                    if (!_isLoggingIn && !_captchaActive) {
-                        if (splash) { splash.style.display = 'none'; }
-                        showLoginScreen();
-                    }
-                }, 2500);
-            }
+            setTimeout(() => {
+                if (!_isLoggingIn && !_captchaActive) {
+                    if (splash) { splash.style.display = 'none'; }
+                    showLoginScreen();
+                }
+            }, 2500);
         }
     });
 }
