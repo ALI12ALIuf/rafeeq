@@ -27,8 +27,19 @@ let _captchaBlockTimer = null;
 let _captchaCountdownTimer = null;
 let _captchaRemainingSeconds = 0;
 const MAX_CAPTCHA_ATTEMPTS = 3;
-const CAPTCHA_BLOCK_TIME = 60000; // 60 ثانية
-const CAPTCHA_BLOCK_TIME_LONG = 1800000; // 30 دقيقة
+
+// ========== جدول أوقات الحظر التصاعدي ==========
+function getBlockTime(blockCount) {
+    switch(blockCount) {
+        case 1: return 60000;        // دقيقة واحدة
+        case 2: return 180000;       // 3 دقائق
+        case 3: return 300000;       // 5 دقائق
+        case 4: return 3600000;      // ساعة
+        case 5: return 10800000;     // 3 ساعات
+        case 6: return 43200000;     // 12 ساعة
+        default: return 86400000;    // 24 ساعة
+    }
+}
 
 // ========== إظهار التطبيق ==========
 function showApp() {
@@ -126,8 +137,14 @@ function generateCaptcha() {
     for (let i = 0; i < 6; i++) {
         _captchaCode += Math.floor(Math.random() * 10).toString();
     }
-    _captchaAttempts = 0;
     return _captchaCode;
+}
+
+// ========== تحديث الرمز المعروض فقط (بدون إعادة تعيين الحقول) ==========
+function refreshCaptchaDisplay() {
+    const captchaCode = generateCaptcha();
+    const display = document.getElementById('captchaDisplay');
+    if (display) display.textContent = captchaCode;
 }
 
 // ========== إظهار شاشة الكابتشا ==========
@@ -194,6 +211,13 @@ function updateInputColors() {
     }
 }
 
+// ========== إعادة تعيين الحقول (بدون تغيير الرمز) ==========
+function resetInputs() {
+    const inputs = document.querySelectorAll('.captcha-input');
+    inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
+    inputs[0].focus();
+}
+
 // ========== معالجة إدخال الكابتشا ==========
 window.handleCaptchaInput = function(input, index) {
     input.value = input.value.replace(/\D/g, '');
@@ -223,8 +247,8 @@ window.handleCaptchaPaste = function(event) {
 };
 
 // ========== بدء عداد تنازلي ==========
-function startCountdown(seconds) {
-    _captchaRemainingSeconds = Math.ceil(seconds / 1000);
+function startCountdown(totalMillis) {
+    _captchaRemainingSeconds = Math.ceil(totalMillis / 1000);
     const errorEl = document.getElementById('captchaError');
     const verifyBtn = document.getElementById('captchaVerifyBtn');
     const refreshBtn = document.getElementById('captchaRefreshBtn');
@@ -241,15 +265,25 @@ function startCountdown(seconds) {
             if (errorEl) { errorEl.textContent = ''; errorEl.style.color = 'var(--danger)'; }
             if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
             if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
-            inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
-            inputs[0].focus();
+            inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; });
+            resetInputs();
             return;
         }
         
         const mins = Math.floor(_captchaRemainingSeconds / 60);
         const secs = _captchaRemainingSeconds % 60;
+        const hours = Math.floor(mins / 60);
+        const remainingMins = mins % 60;
+        
+        let timeStr;
+        if (hours > 0) {
+            timeStr = `${hours}:${remainingMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
         if (errorEl) {
-            errorEl.textContent = `تجاوزت الحد الأقصى. انتظر ${mins}:${secs.toString().padStart(2, '0')}`;
+            errorEl.textContent = `تجاوزت الحد الأقصى. انتظر ${timeStr}`;
         }
         _captchaRemainingSeconds--;
     };
@@ -276,13 +310,14 @@ window.verifyCaptcha = function() {
     }
     
     if (enteredCode === _captchaCode) {
+        // نجاح - دخول الموقع
         _captchaActive = false;
         _captchaBlocked = false;
         if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
         if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
+        sessionStorage.removeItem('_captchaBlockCount');
         const captchaScreen = document.querySelector('.captcha-screen');
         if (captchaScreen) {
-            // نجاح - كل الخانات خضراء
             inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
             captchaScreen.style.opacity = '0';
             setTimeout(() => {
@@ -292,6 +327,7 @@ window.verifyCaptcha = function() {
             }, 500);
         }
     } else {
+        // فشل - تغيير الرمز تلقائياً وإعادة تعيين الحقول
         _captchaAttempts++;
         const remainingAttempts = MAX_CAPTCHA_ATTEMPTS - _captchaAttempts;
         
@@ -304,18 +340,17 @@ window.verifyCaptcha = function() {
         }
         
         if (_captchaAttempts >= MAX_CAPTCHA_ATTEMPTS) {
-            // حظر
+            // تجاوز الحد الأقصى - حظر تصاعدي
             _captchaBlocked = true;
             if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.style.opacity = '0.5'; }
             if (refreshBtn) { refreshBtn.style.opacity = '0.5'; refreshBtn.style.pointerEvents = 'none'; }
             inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
             
-            // تحديد مدة الحظر حسب عدد مرات التجاوز الكلي (نتذكرها عبر sessionStorage)
             let blockCount = parseInt(sessionStorage.getItem('_captchaBlockCount') || '0');
             blockCount++;
             sessionStorage.setItem('_captchaBlockCount', blockCount.toString());
             
-            const blockTime = blockCount >= 3 ? CAPTCHA_BLOCK_TIME_LONG : CAPTCHA_BLOCK_TIME;
+            const blockTime = getBlockTime(blockCount);
             
             if (_captchaBlockTimer) clearTimeout(_captchaBlockTimer);
             _captchaBlockTimer = setTimeout(() => {
@@ -324,35 +359,33 @@ window.verifyCaptcha = function() {
                 if (errorEl) { errorEl.textContent = ''; }
                 if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
                 if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
-                inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
-                inputs[0].focus();
+                inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; });
+                refreshCaptchaDisplay();
+                resetInputs();
                 _captchaBlockTimer = null;
             }, blockTime);
             
             startCountdown(blockTime);
             
         } else {
+            // لم يتجاوز الحد - تغيير الرمز فقط
             if (errorEl) { errorEl.textContent = `الرمز غير صحيح. متبقي ${remainingAttempts} محاولات`; errorEl.style.color = 'var(--danger)'; }
             setTimeout(() => {
-                inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
-                inputs[0].focus();
-            }, 1000);
+                refreshCaptchaDisplay();
+                resetInputs();
+            }, 800);
         }
     }
 };
 
-// ========== إنشاء رمز جديد ==========
+// ========== إنشاء رمز جديد (يدوي) ==========
 window.generateNewCaptcha = function() {
     if (_captchaBlocked) return;
-    const captchaCode = generateCaptcha();
-    const display = document.getElementById('captchaDisplay');
-    if (display) display.textContent = captchaCode;
+    refreshCaptchaDisplay();
     const errorEl = document.getElementById('captchaError');
     if (errorEl) { errorEl.textContent = ''; }
     _captchaAttempts = 0;
-    const inputs = document.querySelectorAll('.captcha-input');
-    inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
-    inputs[0].focus();
+    resetInputs();
 };
 
 async function signInWithGoogle() {
