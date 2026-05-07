@@ -22,6 +22,7 @@ let _captchaCode = '';
 let _captchaAttempts = 0;
 let _pendingGoogleUser = null;
 let _captchaVerified = false;
+let _captchaActive = false;
 const MAX_CAPTCHA_ATTEMPTS = 3;
 
 // ========== إظهار التطبيق ==========
@@ -31,12 +32,14 @@ function showApp() {
     const captchaScreen = document.querySelector('.captcha-screen');
     if (loginScreen) loginScreen.remove();
     if (captchaScreen) captchaScreen.remove();
+    _captchaActive = false;
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
     if (app) { app.style.display = 'flex'; }
 }
 
 // ========== إظهار شاشة تسجيل الدخول ==========
 function showLoginScreen() {
+    if (_captchaActive) return;
     const el = document.querySelector('.login-screen'); if (el) el.remove();
     const cap = document.querySelector('.captcha-screen'); if (cap) cap.remove();
     const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
@@ -51,25 +54,31 @@ async function startGoogleLogin() {
         
         const loginScreen = document.querySelector('.login-screen');
         _captchaVerified = false;
+        _captchaActive = true;
+        _pendingGoogleUser = null;
         
-        // تسجيل الدخول بقوقل
         const result = await window.auth.signInWithPopup(window.googleProvider);
         _pendingGoogleUser = result.user;
         
-        // إخفاء شاشة تسجيل الدخول فوراً
-        if (loginScreen) loginScreen.style.opacity = '0';
-        setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 300);
+        if (loginScreen) { loginScreen.style.opacity = '0'; setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 200); }
         
-        // إظهار الكابتشا
-        showCaptchaScreen(async () => {
-            _captchaVerified = true;
-            await saveUserAndEnter(_pendingGoogleUser);
-            _pendingGoogleUser = null;
-        });
+        setTimeout(() => {
+            if (_pendingGoogleUser) {
+                showCaptchaScreen(async () => {
+                    _captchaVerified = true;
+                    if (_pendingGoogleUser) {
+                        await saveUserAndEnter(_pendingGoogleUser);
+                        _pendingGoogleUser = null;
+                        _captchaActive = false;
+                    }
+                });
+            }
+        }, 500);
         
     } catch (error) {
         _pendingGoogleUser = null;
         _captchaVerified = false;
+        _captchaActive = false;
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
@@ -79,6 +88,7 @@ async function startGoogleLogin() {
 
 // ========== حفظ المستخدم ودخول الموقع ==========
 async function saveUserAndEnter(user) {
+    if (!_captchaVerified) return;
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
@@ -117,6 +127,7 @@ function generateCaptcha() {
 // ========== إظهار شاشة الكابتشا ==========
 function showCaptchaScreen(onSuccess) {
     _captchaVerified = false;
+    _captchaActive = true;
     const captchaCode = generateCaptcha();
     
     const existing = document.querySelector('.captcha-screen');
@@ -241,7 +252,6 @@ window.generateNewCaptcha = function() {
     inputs[0].focus();
 };
 
-// ========== للتوافق مع الاستدعاءات القديمة ==========
 async function signInWithGoogle() {
     await startGoogleLogin();
 }
@@ -372,8 +382,8 @@ if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         if (user) {
-            // إذا في كابتشا شغالة وما تم التحقق، لا تفعل شي
             if (_pendingGoogleUser && !_captchaVerified) return;
+            if (_captchaVerified) return;
             
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
@@ -383,8 +393,10 @@ if (typeof window.auth !== 'undefined') {
             if (app) app.style.display = 'none';
             if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
             setTimeout(() => {
-                if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); }
-                else showLoginScreen();
+                if (!_pendingGoogleUser && !_captchaActive) {
+                    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); }
+                    else showLoginScreen();
+                }
             }, 2000);
         }
     });
