@@ -24,8 +24,11 @@ let _pendingGoogleUser = null;
 let _captchaActive = false;
 let _captchaBlocked = false;
 let _captchaBlockTimer = null;
+let _captchaCountdownTimer = null;
+let _captchaRemainingSeconds = 0;
 const MAX_CAPTCHA_ATTEMPTS = 3;
 const CAPTCHA_BLOCK_TIME = 60000; // 60 ثانية
+const CAPTCHA_BLOCK_TIME_LONG = 1800000; // 30 دقيقة
 
 // ========== إظهار التطبيق ==========
 function showApp() {
@@ -37,6 +40,7 @@ function showApp() {
     _captchaActive = false;
     _captchaBlocked = false;
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
+    if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
     if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
     if (app) { app.style.display = 'flex'; }
 }
@@ -122,6 +126,7 @@ function generateCaptcha() {
     for (let i = 0; i < 6; i++) {
         _captchaCode += Math.floor(Math.random() * 10).toString();
     }
+    _captchaAttempts = 0;
     return _captchaCode;
 }
 
@@ -141,7 +146,7 @@ function showCaptchaScreen(onSuccess) {
     d.innerHTML = `
         <div style="text-align:center;padding:30px;max-width:400px;width:90%;background:var(--card-bg);border-radius:20px;box-shadow:var(--shadow);">
             <div style="font-size:4rem;margin-bottom:1rem;">🔐</div>
-            <p style="color:var(--text-light);margin-bottom:1.5rem;font-size:0.9rem;">أدخل الرمز الظاهر للمتابعة</p>
+            <p style="color:var(--primary);margin-bottom:1.5rem;font-size:1.1rem;font-weight:600;">أدخل الرمز الظاهر للمتابعة</p>
             
             <div style="background:var(--light);padding:20px;border-radius:15px;margin-bottom:1.5rem;letter-spacing:8px;font-size:2.2rem;font-weight:bold;color:var(--primary);font-family:monospace;user-select:none;direction:ltr;" id="captchaDisplay">${captchaCode}</div>
             
@@ -157,7 +162,7 @@ function showCaptchaScreen(onSuccess) {
             <p style="color:var(--danger);font-size:0.85rem;margin-bottom:1rem;min-height:20px;" id="captchaError"></p>
             
             <button onclick="verifyCaptcha()" style="background:var(--primary);color:white;border:none;border-radius:25px;padding:12px 40px;font-size:1.1rem;cursor:pointer;width:100%;" id="captchaVerifyBtn">تحقق</button>
-            <button onclick="generateNewCaptcha()" style="background:none;border:none;color:var(--primary);margin-top:1rem;cursor:pointer;font-size:0.9rem;" id="captchaRefreshBtn">🔄 رمز جديد</button>
+            <button onclick="generateNewCaptcha()" style="background:none;border:none;color:var(--text-light);margin-top:1rem;cursor:pointer;font-size:0.9rem;" id="captchaRefreshBtn">رمز جديد</button>
         </div>`;
     document.body.appendChild(d);
     
@@ -170,9 +175,29 @@ function showCaptchaScreen(onSuccess) {
     }, 400);
 }
 
+// ========== تحديث لون الخانة حسب صحة الرقم ==========
+function updateInputColors() {
+    const inputs = document.querySelectorAll('.captcha-input');
+    for (let i = 0; i < 6; i++) {
+        if (inputs[i].value !== '') {
+            if (inputs[i].value === _captchaCode[i]) {
+                inputs[i].style.borderColor = '#4CAF50';
+                inputs[i].style.background = 'rgba(76,175,80,0.1)';
+            } else {
+                inputs[i].style.borderColor = '#f44336';
+                inputs[i].style.background = 'rgba(244,67,54,0.1)';
+            }
+        } else {
+            inputs[i].style.borderColor = 'var(--border)';
+            inputs[i].style.background = 'var(--bg)';
+        }
+    }
+}
+
 // ========== معالجة إدخال الكابتشا ==========
 window.handleCaptchaInput = function(input, index) {
     input.value = input.value.replace(/\D/g, '');
+    updateInputColors();
     if (input.value.length === 1 && index < 5) {
         const inputs = document.querySelectorAll('.captcha-input');
         if (inputs[index + 1]) inputs[index + 1].focus();
@@ -182,7 +207,7 @@ window.handleCaptchaInput = function(input, index) {
 window.handleCaptchaKeyDown = function(event, input, index) {
     if (event.key === 'Backspace' && input.value === '' && index > 0) {
         const inputs = document.querySelectorAll('.captcha-input');
-        if (inputs[index - 1]) { inputs[index - 1].focus(); inputs[index - 1].value = ''; }
+        if (inputs[index - 1]) { inputs[index - 1].focus(); inputs[index - 1].value = ''; updateInputColors(); }
     }
     if (event.key === 'Enter') { verifyCaptcha(); }
 };
@@ -193,8 +218,45 @@ window.handleCaptchaPaste = function(event) {
     const digits = paste.replace(/\D/g, '').slice(0, 6);
     const inputs = document.querySelectorAll('.captcha-input');
     for (let i = 0; i < 6; i++) { inputs[i].value = digits[i] || ''; }
+    updateInputColors();
     if (digits.length === 6) { inputs[5].focus(); setTimeout(() => verifyCaptcha(), 200); }
 };
+
+// ========== بدء عداد تنازلي ==========
+function startCountdown(seconds) {
+    _captchaRemainingSeconds = Math.ceil(seconds / 1000);
+    const errorEl = document.getElementById('captchaError');
+    const verifyBtn = document.getElementById('captchaVerifyBtn');
+    const refreshBtn = document.getElementById('captchaRefreshBtn');
+    const inputs = document.querySelectorAll('.captcha-input');
+    
+    if (_captchaCountdownTimer) clearInterval(_captchaCountdownTimer);
+    
+    const updateCountdown = () => {
+        if (_captchaRemainingSeconds <= 0) {
+            clearInterval(_captchaCountdownTimer);
+            _captchaCountdownTimer = null;
+            _captchaBlocked = false;
+            _captchaAttempts = 0;
+            if (errorEl) { errorEl.textContent = ''; errorEl.style.color = 'var(--danger)'; }
+            if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
+            if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
+            inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
+            inputs[0].focus();
+            return;
+        }
+        
+        const mins = Math.floor(_captchaRemainingSeconds / 60);
+        const secs = _captchaRemainingSeconds % 60;
+        if (errorEl) {
+            errorEl.textContent = `تجاوزت الحد الأقصى. انتظر ${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        _captchaRemainingSeconds--;
+    };
+    
+    updateCountdown();
+    _captchaCountdownTimer = setInterval(updateCountdown, 1000);
+}
 
 // ========== التحقق من الكابتشا ==========
 window.verifyCaptcha = function() {
@@ -206,9 +268,10 @@ window.verifyCaptcha = function() {
     
     const errorEl = document.getElementById('captchaError');
     const verifyBtn = document.getElementById('captchaVerifyBtn');
+    const refreshBtn = document.getElementById('captchaRefreshBtn');
     
     if (enteredCode.length < 6) {
-        if (errorEl) { errorEl.textContent = 'الرجاء إدخال 6 أرقام كاملة'; }
+        if (errorEl) { errorEl.textContent = 'الرجاء إدخال 6 أرقام كاملة'; errorEl.style.color = 'var(--danger)'; }
         return;
     }
     
@@ -216,41 +279,64 @@ window.verifyCaptcha = function() {
         _captchaActive = false;
         _captchaBlocked = false;
         if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
+        if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
         const captchaScreen = document.querySelector('.captcha-screen');
         if (captchaScreen) {
+            // نجاح - كل الخانات خضراء
+            inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
             captchaScreen.style.opacity = '0';
             setTimeout(() => {
                 const onSuccess = captchaScreen._onSuccess;
                 captchaScreen.remove();
                 if (onSuccess) onSuccess();
-            }, 300);
+            }, 500);
         }
     } else {
         _captchaAttempts++;
         const remainingAttempts = MAX_CAPTCHA_ATTEMPTS - _captchaAttempts;
         
+        // تحديد الخانات الخطأ باللون الأحمر
+        for (let i = 0; i < 6; i++) {
+            if (inputs[i].value !== _captchaCode[i]) {
+                inputs[i].style.borderColor = '#f44336';
+                inputs[i].style.background = 'rgba(244,67,54,0.2)';
+            }
+        }
+        
         if (_captchaAttempts >= MAX_CAPTCHA_ATTEMPTS) {
-            // حظر لمدة 60 ثانية
+            // حظر
             _captchaBlocked = true;
-            if (errorEl) { errorEl.textContent = 'تجاوزت الحد الأقصى. انتظر 60 ثانية...'; }
             if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.style.opacity = '0.5'; }
+            if (refreshBtn) { refreshBtn.style.opacity = '0.5'; refreshBtn.style.pointerEvents = 'none'; }
             inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
             
+            // تحديد مدة الحظر حسب عدد مرات التجاوز الكلي (نتذكرها عبر sessionStorage)
+            let blockCount = parseInt(sessionStorage.getItem('_captchaBlockCount') || '0');
+            blockCount++;
+            sessionStorage.setItem('_captchaBlockCount', blockCount.toString());
+            
+            const blockTime = blockCount >= 3 ? CAPTCHA_BLOCK_TIME_LONG : CAPTCHA_BLOCK_TIME;
+            
+            if (_captchaBlockTimer) clearTimeout(_captchaBlockTimer);
             _captchaBlockTimer = setTimeout(() => {
                 _captchaBlocked = false;
                 _captchaAttempts = 0;
                 if (errorEl) { errorEl.textContent = ''; }
                 if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
-                inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; input.value = ''; input.style.borderColor = 'var(--border)'; });
+                if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
+                inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
                 inputs[0].focus();
                 _captchaBlockTimer = null;
-            }, CAPTCHA_BLOCK_TIME);
+            }, blockTime);
+            
+            startCountdown(blockTime);
             
         } else {
-            if (errorEl) { errorEl.textContent = `الرمز غير صحيح. متبقي ${remainingAttempts} محاولات`; }
-            inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--danger)'; });
-            setTimeout(() => { inputs.forEach(input => { input.style.borderColor = 'var(--border)'; }); }, 1500);
-            inputs[0].focus();
+            if (errorEl) { errorEl.textContent = `الرمز غير صحيح. متبقي ${remainingAttempts} محاولات`; errorEl.style.color = 'var(--danger)'; }
+            setTimeout(() => {
+                inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
+                inputs[0].focus();
+            }, 1000);
         }
     }
 };
@@ -265,7 +351,7 @@ window.generateNewCaptcha = function() {
     if (errorEl) { errorEl.textContent = ''; }
     _captchaAttempts = 0;
     const inputs = document.querySelectorAll('.captcha-input');
-    inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; });
+    inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
     inputs[0].focus();
 };
 
