@@ -32,11 +32,11 @@ function showApp() {
     _captchaActive = false;
     _captchaBlocked = false;
     _isLoggingIn = false;
+    _pendingGoogleUser = null;
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
     if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
     sessionStorage.removeItem('_captchaBlockCount');
     
-    // تنظيف الكابتشا من السيرفر
     const user = window.auth?.currentUser;
     if (user) {
         try { window.db.collection('captchas').doc(user.uid).delete(); } catch (e) {}
@@ -502,29 +502,33 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول (مع فحص السيرفر) ==========
+// ========== مراقب حالة تسجيل الدخول (فحص السيرفر - الكابتشا فقط أو الموقع فقط) ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            // إذا الكابتشا شغالة - لا تفعل شي
-            if (_captchaActive) return;
-            
             // فحص السيرفر: هل المستخدم اجتاز الكابتشا؟
             try {
                 const checkFn = firebase.functions().httpsCallable('checkCaptchaStatus');
                 const result = await checkFn();
                 
                 if (!result.data.verified) {
-                    // ما مجتاز الكابتشا - نظهرها له
+                    // ===== الكابتشا مو محلول - إخفاء كل شيء وإظهار الكابتشا فقط =====
                     _pendingGoogleUser = user;
                     _captchaActive = true;
                     _isLoggingIn = true;
                     
+                    // إخفاء التطبيق وsplash تماماً
                     if (app) app.style.display = 'none';
                     if (splash) { splash.style.display = 'none'; }
+                    // إزالة أي شاشة قديمة
+                    const loginEl = document.querySelector('.login-screen');
+                    if (loginEl) loginEl.remove();
+                    const capEl = document.querySelector('.captcha-screen');
+                    if (capEl) capEl.remove();
                     
+                    // إظهار الكابتشا فقط
                     showCaptchaScreen(async () => {
                         await saveUserAndEnter(user);
                         _pendingGoogleUser = null;
@@ -532,10 +536,28 @@ if (typeof window.auth !== 'undefined') {
                     return;
                 }
             } catch (e) {
-                console.warn('فشل فحص الكابتشا:', e);
+                // فشل الاتصال - نظهر الكابتشا احتياطاً
+                _pendingGoogleUser = user;
+                _captchaActive = true;
+                _isLoggingIn = true;
+                
+                if (app) app.style.display = 'none';
+                if (splash) { splash.style.display = 'none'; }
+                const loginEl = document.querySelector('.login-screen');
+                if (loginEl) loginEl.remove();
+                const capEl = document.querySelector('.captcha-screen');
+                if (capEl) capEl.remove();
+                
+                showCaptchaScreen(async () => {
+                    await saveUserAndEnter(user);
+                    _pendingGoogleUser = null;
+                });
+                return;
             }
             
-            // دخول عادي
+            // ===== الكابتشا محلول - دخول عادي =====
+            if (_captchaActive) return;
+            
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
