@@ -26,6 +26,7 @@ let _captchaBlocked = false;
 let _captchaBlockTimer = null;
 let _captchaCountdownTimer = null;
 let _captchaRemainingSeconds = 0;
+let _isLoggingIn = false; // ← مفتاح منع ظهور شاشة تسجيل الدخول
 const MAX_CAPTCHA_ATTEMPTS = 3;
 
 function getBlockTime(blockCount) {
@@ -40,25 +41,25 @@ function getBlockTime(blockCount) {
     }
 }
 
-// ========== إظهار التطبيق ==========
 function showApp() {
+    _captchaActive = false;
+    _captchaBlocked = false;
+    _isLoggingIn = false;
+    if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
+    if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
+    sessionStorage.removeItem('_captchaBlockCount');
+    
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     const loginScreen = document.querySelector('.login-screen');
     const captchaScreen = document.querySelector('.captcha-screen');
     if (loginScreen) loginScreen.remove();
     if (captchaScreen) captchaScreen.remove();
-    _captchaActive = false;
-    _captchaBlocked = false;
-    if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
-    if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
-    sessionStorage.removeItem('_captchaBlockCount');
-    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; }, 500); }
+    if (splash) { splash.style.display = 'none'; }
     if (app) { app.style.display = 'flex'; }
 }
 
-// ========== إظهار شاشة تسجيل الدخول ==========
 function showLoginScreen() {
-    if (_captchaActive) return;
+    if (_captchaActive || _isLoggingIn) return;
     const el = document.querySelector('.login-screen'); if (el) el.remove();
     const cap = document.querySelector('.captcha-screen'); if (cap) cap.remove();
     const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
@@ -66,16 +67,17 @@ function showLoginScreen() {
     document.body.appendChild(d);
 }
 
-// ========== بدء تسجيل الدخول بقوقل ==========
 async function startGoogleLogin() {
+    _isLoggingIn = true;
     try {
-        if (!window.auth || !window.googleProvider) { alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
+        if (!window.auth || !window.googleProvider) { _isLoggingIn = false; alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
         
-        // إخفاء splash فوراً
         const splash = document.getElementById('splash');
         if (splash) { splash.style.display = 'none'; }
         
         const loginScreen = document.querySelector('.login-screen');
+        if (loginScreen) { loginScreen.style.opacity = '0'; setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 200); }
+        
         _captchaActive = true;
         _captchaBlocked = false;
         _captchaAttempts = 0;
@@ -84,10 +86,6 @@ async function startGoogleLogin() {
         const result = await window.auth.signInWithPopup(window.googleProvider);
         _pendingGoogleUser = result.user;
         
-        // إخفاء شاشة تسجيل الدخول فوراً
-        if (loginScreen) { loginScreen.style.opacity = '0'; setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 200); }
-        
-        // إظهار الكابتشا مباشرة
         if (_pendingGoogleUser) {
             showCaptchaScreen(async () => {
                 if (_pendingGoogleUser) {
@@ -100,7 +98,7 @@ async function startGoogleLogin() {
     } catch (error) {
         _pendingGoogleUser = null;
         _captchaActive = false;
-        _captchaBlocked = false;
+        _isLoggingIn = false;
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
@@ -108,7 +106,6 @@ async function startGoogleLogin() {
     }
 }
 
-// ========== حفظ المستخدم ودخول الموقع ==========
 async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
@@ -132,6 +129,7 @@ async function saveUserAndEnter(user) {
     } catch (error) {
         console.error('خطأ في حفظ المستخدم:', error);
         alert('حدث خطأ في إعداد الحساب');
+        _isLoggingIn = false;
     }
 }
 
@@ -160,7 +158,7 @@ function showCaptchaScreen(onSuccess) {
     
     const d = document.createElement('div');
     d.className = 'captcha-screen';
-    d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10001;opacity:0;transition:opacity 0.3s;';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10001;';
     d.innerHTML = `
         <div style="text-align:center;padding:30px;max-width:400px;width:90%;background:var(--card-bg);border-radius:20px;box-shadow:var(--shadow);">
             <div style="font-size:4rem;margin-bottom:1rem;">🔐</div>
@@ -183,14 +181,12 @@ function showCaptchaScreen(onSuccess) {
             <button onclick="generateNewCaptcha()" style="background:none;border:none;color:var(--text-light);margin-top:1rem;cursor:pointer;font-size:0.9rem;" id="captchaRefreshBtn">رمز جديد</button>
         </div>`;
     document.body.appendChild(d);
-    
-    requestAnimationFrame(() => { d.style.opacity = '1'; });
     d._onSuccess = onSuccess;
     
     setTimeout(() => {
         const firstInput = document.querySelector('.captcha-input');
         if (firstInput) firstInput.focus();
-    }, 400);
+    }, 300);
 }
 
 function updateInputColors() {
@@ -312,12 +308,9 @@ window.verifyCaptcha = function() {
         const captchaScreen = document.querySelector('.captcha-screen');
         if (captchaScreen) {
             inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
-            captchaScreen.style.opacity = '0';
-            setTimeout(() => {
-                const onSuccess = captchaScreen._onSuccess;
-                captchaScreen.remove();
-                if (onSuccess) onSuccess();
-            }, 500);
+            const onSuccess = captchaScreen._onSuccess;
+            captchaScreen.remove();
+            if (onSuccess) onSuccess();
         }
     } else {
         _captchaAttempts++;
@@ -376,15 +369,8 @@ window.generateNewCaptcha = function() {
     resetInputs();
 };
 
-async function signInWithGoogle() {
-    await startGoogleLogin();
-}
-
-function updateUserUI() {
-    const splash = document.getElementById('splash'), app = document.getElementById('app');
-    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); }
-}
-
+async function signInWithGoogle() { await startGoogleLogin(); }
+function updateUserUI() { const splash = document.getElementById('splash'), app = document.getElementById('app'); if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); } }
 async function logout() { try { await window.auth.signOut(); window.location.reload(); } catch (e) {} }
 
 async function loadUserData(uid) {
@@ -501,31 +487,31 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول ==========
+// ========== مراقب حالة تسجيل الدخول (نهائي 100%) ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            // إذا الكابتشا شغالة - امنع الدخول تماماً
+            // إذا الكابتشا شغالة - لا تفعل شي (saveUserAndEnter يتولى الموضوع)
             if (_captchaActive) return;
             
-            // دخول عادي لمستخدم مسجل سابقاً
+            // مستخدم مسجل دخول سابقاً
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
             showApp();
         } else {
-            // إذا الكابتشا شغالة - ما نظهر شاشة تسجيل الدخول
-            if (_captchaActive) return;
+            // إذا جاري تسجيل الدخول أو الكابتشا شغالة - لا تظهر شاشة تسجيل الدخول
+            if (_isLoggingIn || _captchaActive) return;
             
             if (app) app.style.display = 'none';
-            if (splash) { splash.classList.remove('hide'); splash.style.display = 'flex'; }
+            if (splash) { splash.style.display = 'flex'; }
             
             setTimeout(() => {
-                if (!_captchaActive) {
-                    if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; showLoginScreen(); }, 500); }
-                    else showLoginScreen();
+                if (!_isLoggingIn && !_captchaActive) {
+                    if (splash) { splash.style.display = 'none'; }
+                    showLoginScreen();
                 }
             }, 2500);
         }
