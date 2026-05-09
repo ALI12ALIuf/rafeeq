@@ -92,10 +92,14 @@ const ChatSystem = {
     updateFriendStatus(friendId, isOnline) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
-        if (isOnline) CallSystem.ensureDataChannel(friendId).catch(() => {});
+        if (isOnline) {
+            CallSystem.ensureDataChannel(friendId).catch(() => {});
+            this.updateAttachmentButtons(true);
+        } else {
+            this.updateAttachmentButtons(false);
+        }
         const statusEl = document.getElementById('conversationStatus');
         if (statusEl) { statusEl.textContent = isOnline ? '🟢 متصل' : '🔴 غير متصل'; statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`; }
-        this.updateAttachmentButtons(isOnline);
     },
     
     updateAttachmentButtons(isOnline) {
@@ -147,21 +151,62 @@ const ChatSystem = {
         this.hideProgressBar(); return false;
     },
     
-    async sendImage(file) { 
-        if (!this.currentChat) return; 
-        if (this.friendOnline) {
+    // ========== التأكد من جاهزية Data Channel ==========
+    async _ensureChannelReady() {
+        if (!this.friendOnline) {
+            alert('المستخدم غير متصل حالياً');
+            return false;
+        }
+        
+        // إذا القناة موجودة ومفتوحة = جاهز
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            return true;
+        }
+        
+        // نحاول نفتح قناة جديدة وننتظر
+        try {
             await CallSystem.ensureDataChannel(this.currentChat);
-            if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-                const success = await this.sendFileWithRetry(file, 'image');
-                if (success) {
-                    const comp = await SecureChatSystem.compressImage(file); 
-                    const b64 = await SecureChatSystem.fileToBase64(comp); 
-                    const msgId = Date.now().toString();
-                    this.saveMessage(this.currentChat, { id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-                    this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                } else alert('فشل إرسال الصورة');
-            }
-        } else alert('المستخدم غير متصل حالياً');
+            
+            // انتظر 5 ثواني لتتأكد القناة فتحت
+            const result = await new Promise((resolve) => {
+                let attempts = 0;
+                const check = setInterval(() => {
+                    attempts++;
+                    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                        clearInterval(check);
+                        resolve(true);
+                    }
+                    if (attempts > 10) { // 5 ثواني
+                        clearInterval(check);
+                        resolve(false);
+                    }
+                }, 500);
+            });
+            
+            if (result) return true;
+            
+            alert('تعذر الاتصال. اطلب من المستخدم الآخر إعادة فتح المحادثة.');
+            return false;
+        } catch (e) {
+            alert('فشل الاتصال. حاول مرة أخرى.');
+            return false;
+        }
+    },
+    
+    async sendImage(file) { 
+        if (!this.currentChat) return;
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'image');
+            if (success) {
+                const comp = await SecureChatSystem.compressImage(file); 
+                const b64 = await SecureChatSystem.fileToBase64(comp); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الصورة');
+        }
     },
     
     async sendVideoFile(file) { 
@@ -174,9 +219,7 @@ const ChatSystem = {
             return;
         }
         
-        if (!this.friendOnline) { alert('المستخدم غير متصل حالياً'); return; }
-        
-        await CallSystem.ensureDataChannel(this.currentChat);
+        if (!(await this._ensureChannelReady())) return;
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
@@ -196,44 +239,44 @@ const ChatSystem = {
     },
     
     async sendFile(file) { 
-        if (!this.currentChat) return; 
-        if (this.friendOnline) {
-            await CallSystem.ensureDataChannel(this.currentChat);
-            if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-                const success = await this.sendFileWithRetry(file, 'file');
-                if (success) {
-                    const b64 = await SecureChatSystem.fileToBase64(file); 
-                    const msgId = Date.now().toString();
-                    if (b64.length < 500000) {
-                        this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                    } else {
-                        this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64.substring(0, 100) + '...', _filePlaceholder: true, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                    }
-                    this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                } else alert('فشل إرسال الملف');
-            }
-        } else alert('المستخدم غير متصل حالياً');
+        if (!this.currentChat) return;
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'file');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(file); 
+                const msgId = Date.now().toString();
+                if (b64.length < 500000) {
+                    this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                } else {
+                    this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64.substring(0, 100) + '...', _filePlaceholder: true, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                }
+                this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الملف');
+        }
     },
     
     async sendVoiceNote(audioBlob) { 
-        if (!this.currentChat) return; 
-        if (this.friendOnline) {
-            await CallSystem.ensureDataChannel(this.currentChat);
-            if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-                const success = await this.sendFileWithRetry(audioBlob, 'voice');
-                if (success) {
-                    const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
-                    const msgId = Date.now().toString();
-                    this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-                    this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                } else alert('فشل إرسال البصمة الصوتية');
-            }
-        } else alert('المستخدم غير متصل حالياً');
+        if (!this.currentChat) return;
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(audioBlob, 'voice');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال البصمة الصوتية');
+        }
     },
     
     async shareLocationDirect() { 
         if (!this.currentChat) return; 
-        if (this.friendOnline && CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
             navigator.geolocation.getCurrentPosition(p => { 
                 const locMsg = `📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`; 
