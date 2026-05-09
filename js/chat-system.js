@@ -35,24 +35,32 @@ const ChatSystem = {
                 top: 70px;
                 left: 0;
                 right: 0;
-                height: 4px;
-                background: transparent;
+                height: 22px;
+                background: rgba(0,0,0,0.3);
                 z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             `;
             bar.innerHTML = `
                 <div id="progressFill" style="
                     background: linear-gradient(90deg, #4CAF50, #8BC34A);
                     height: 100%;
                     width: 0%;
+                    position: absolute;
+                    left: 0;
+                    top: 0;
                     transition: width 0.3s;
                     border-radius: 0 2px 2px 0;
                 "></div>
-                <div style="
-                    text-align: center;
-                    margin-top: 6px;
-                    font-size: 11px;
-                    color: var(--text-light);
-                " id="progressPercent">0%</div>
+                <span id="progressPercent" style="
+                    position: relative;
+                    z-index: 2;
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: white;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                ">0%</span>
             `;
             document.body.appendChild(bar);
         }
@@ -62,10 +70,7 @@ const ChatSystem = {
         const fill = document.getElementById('progressFill');
         const perc = document.getElementById('progressPercent');
         if (fill) fill.style.width = Math.min(percent, 100) + '%';
-        if (perc) {
-            perc.textContent = Math.round(percent) + '%';
-            if (message) perc.textContent += ' • ' + message;
-        }
+        if (perc) perc.textContent = Math.round(percent) + '%';
     },
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
