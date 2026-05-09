@@ -30,17 +30,42 @@ const ChatSystem = {
         let bar = document.getElementById('progressBar');
         if (!bar) {
             bar = document.createElement('div'); bar.id = 'progressBar';
-            bar.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:white;padding:15px 20px;border-radius:15px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10000;min-width:250px;direction:rtl;';
-            bar.innerHTML = `<div style="margin-bottom:8px;font-size:14px;text-align:center;" id="progressText">${message}</div><div style="background:#eee;height:6px;border-radius:3px;overflow:hidden;"><div id="progressFill" style="background:#4CAF50;height:100%;width:0%;transition:width 0.3s;"></div></div><div style="text-align:center;margin-top:5px;font-size:12px;color:#666;" id="progressPercent">0%</div>`;
+            bar.style.cssText = `
+                position: fixed;
+                top: 70px;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: transparent;
+                z-index: 10000;
+            `;
+            bar.innerHTML = `
+                <div id="progressFill" style="
+                    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+                    height: 100%;
+                    width: 0%;
+                    transition: width 0.3s;
+                    border-radius: 0 2px 2px 0;
+                "></div>
+                <div style="
+                    text-align: center;
+                    margin-top: 6px;
+                    font-size: 11px;
+                    color: var(--text-light);
+                " id="progressPercent">0%</div>
+            `;
             document.body.appendChild(bar);
         }
     },
     
     updateProgressBar(percent, message) {
-        const fill = document.getElementById('progressFill'), text = document.getElementById('progressText'), perc = document.getElementById('progressPercent');
+        const fill = document.getElementById('progressFill');
+        const perc = document.getElementById('progressPercent');
         if (fill) fill.style.width = Math.min(percent, 100) + '%';
-        if (text && message) text.textContent = message;
-        if (perc) perc.textContent = Math.round(percent) + '%';
+        if (perc) {
+            perc.textContent = Math.round(percent) + '%';
+            if (message) perc.textContent += ' • ' + message;
+        }
     },
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
