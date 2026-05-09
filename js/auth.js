@@ -36,11 +36,7 @@ function showApp() {
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
     if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
     sessionStorage.removeItem('_captchaBlockCount');
-    
-    const user = window.auth?.currentUser;
-    if (user) {
-        try { window.db.collection('captchas').doc(user.uid).delete(); } catch (e) {}
-    }
+    sessionStorage.setItem('_captchaVerified', 'true');
     
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     const loginScreen = document.querySelector('.login-screen');
@@ -62,6 +58,7 @@ function showLoginScreen() {
 
 async function startGoogleLogin() {
     _isLoggingIn = true;
+    sessionStorage.removeItem('_captchaVerified');
     try {
         if (!window.auth || !window.googleProvider) { _isLoggingIn = false; alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
         
@@ -125,50 +122,23 @@ async function saveUserAndEnter(user) {
     }
 }
 
-// ========== توليد الكابتشا من السيرفر ==========
-function generateCaptcha() {
-    return new Promise((resolve) => {
-        try {
-            const generateFn = firebase.functions().httpsCallable('generateCaptcha');
-            generateFn().then(result => {
-                _captchaCode = result.data.code;
-                resolve(_captchaCode);
-            }).catch(() => {
-                _captchaCode = Math.floor(100000 + Math.random() * 900000).toString();
-                resolve(_captchaCode);
-            });
-        } catch (e) {
-            _captchaCode = Math.floor(100000 + Math.random() * 900000).toString();
-            resolve(_captchaCode);
-        }
-    });
+// ========== توليد الكابتشا محلياً ==========
+function generateCaptchaLocal() {
+    _captchaCode = Math.floor(100000 + Math.random() * 900000).toString();
+    return _captchaCode;
 }
 
-function refreshCaptchaDisplay() {
-    try {
-        const refreshFn = firebase.functions().httpsCallable('refreshCaptcha');
-        refreshFn().then(result => {
-            _captchaCode = result.data.code;
-            const display = document.getElementById('captchaDisplay');
-            if (display) display.textContent = _captchaCode;
-        }).catch(() => {
-            const code = Math.floor(100000 + Math.random() * 900000).toString();
-            _captchaCode = code;
-            const display = document.getElementById('captchaDisplay');
-            if (display) display.textContent = code;
-        });
-    } catch (e) {
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        _captchaCode = code;
-        const display = document.getElementById('captchaDisplay');
-        if (display) display.textContent = code;
-    }
+function refreshCaptchaDisplayLocal() {
+    const code = generateCaptchaLocal();
+    const display = document.getElementById('captchaDisplay');
+    if (display) display.textContent = code;
+    return code;
 }
 
 async function showCaptchaScreen(onSuccess) {
     _captchaActive = true;
     _captchaBlocked = false;
-    const captchaCode = await generateCaptcha();
+    const captchaCode = generateCaptchaLocal();
     
     const existing = document.querySelector('.captcha-screen');
     if (existing) existing.remove();
@@ -257,49 +227,7 @@ window.handleCaptchaPaste = function(event) {
     if (digits.length === 6) { inputs[5].focus(); setTimeout(() => verifyCaptcha(), 200); }
 };
 
-function startCountdown(totalMillis) {
-    _captchaRemainingSeconds = Math.ceil(totalMillis / 1000);
-    const errorEl = document.getElementById('captchaError');
-    const verifyBtn = document.getElementById('captchaVerifyBtn');
-    const refreshBtn = document.getElementById('captchaRefreshBtn');
-    const inputs = document.querySelectorAll('.captcha-input');
-    
-    if (_captchaCountdownTimer) clearInterval(_captchaCountdownTimer);
-    
-    const updateCountdown = () => {
-        if (_captchaRemainingSeconds <= 0) {
-            clearInterval(_captchaCountdownTimer);
-            _captchaCountdownTimer = null;
-            _captchaBlocked = false;
-            if (errorEl) { errorEl.textContent = ''; errorEl.style.color = 'var(--danger)'; }
-            if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
-            if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
-            inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; });
-            resetInputs();
-            return;
-        }
-        
-        const mins = Math.floor(_captchaRemainingSeconds / 60);
-        const secs = _captchaRemainingSeconds % 60;
-        const hours = Math.floor(mins / 60);
-        const remainingMins = mins % 60;
-        
-        let timeStr;
-        if (hours > 0) {
-            timeStr = `${hours}:${remainingMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        } else {
-            timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        if (errorEl) { errorEl.textContent = `تجاوزت الحد الأقصى. انتظر ${timeStr}`; }
-        _captchaRemainingSeconds--;
-    };
-    
-    updateCountdown();
-    _captchaCountdownTimer = setInterval(updateCountdown, 1000);
-}
-
-// ========== التحقق من الكابتشا عبر السيرفر ==========
+// ========== التحقق من الكابتشا (محلي فقط) ==========
 window.verifyCaptcha = function() {
     if (_captchaBlocked) return;
     
@@ -308,59 +236,18 @@ window.verifyCaptcha = function() {
     inputs.forEach(input => { enteredCode += input.value; });
     
     const errorEl = document.getElementById('captchaError');
-    const verifyBtn = document.getElementById('captchaVerifyBtn');
-    const refreshBtn = document.getElementById('captchaRefreshBtn');
     
     if (enteredCode.length < 6) {
         if (errorEl) { errorEl.textContent = 'الرجاء إدخال 6 أرقام كاملة'; errorEl.style.color = 'var(--danger)'; }
         return;
     }
     
-    try {
-        const verifyFn = firebase.functions().httpsCallable('verifyCaptcha');
-        verifyFn({ code: enteredCode }).then(result => {
-            const data = result.data;
-            
-            if (data.success) {
-                _captchaActive = false;
-                _captchaBlocked = false;
-                if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
-                if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
-                sessionStorage.removeItem('_captchaBlockCount');
-                const captchaScreen = document.querySelector('.captcha-screen');
-                if (captchaScreen) {
-                    inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
-                    const onSuccess = captchaScreen._onSuccess;
-                    captchaScreen.remove();
-                    if (onSuccess) onSuccess();
-                }
-            } else if (data.blocked) {
-                _captchaBlocked = true;
-                if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.style.opacity = '0.5'; }
-                if (refreshBtn) { refreshBtn.style.opacity = '0.5'; refreshBtn.style.pointerEvents = 'none'; }
-                inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
-                startCountdown(data.remaining * 1000);
-            } else {
-                if (errorEl) { errorEl.textContent = data.error || 'رمز غير صحيح'; errorEl.style.color = 'var(--danger)'; }
-                for (let i = 0; i < 6; i++) {
-                    inputs[i].style.borderColor = '#f44336';
-                    inputs[i].style.background = 'rgba(244,67,54,0.2)';
-                }
-                setTimeout(() => { refreshCaptchaDisplay(); resetInputs(); }, 800);
-            }
-        }).catch(() => { verifyCaptchaFallback(enteredCode); });
-    } catch (e) { verifyCaptchaFallback(enteredCode); }
-};
-
-function verifyCaptchaFallback(enteredCode) {
-    const inputs = document.querySelectorAll('.captcha-input');
-    const errorEl = document.getElementById('captchaError');
-    
     if (enteredCode === _captchaCode) {
         _captchaActive = false;
         _captchaBlocked = false;
         if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
         if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
+        sessionStorage.setItem('_captchaVerified', 'true');
         sessionStorage.removeItem('_captchaBlockCount');
         const captchaScreen = document.querySelector('.captcha-screen');
         if (captchaScreen) {
@@ -371,14 +258,22 @@ function verifyCaptchaFallback(enteredCode) {
         }
     } else {
         if (errorEl) { errorEl.textContent = 'رمز غير صحيح'; errorEl.style.color = 'var(--danger)'; }
-        for (let i = 0; i < 6; i++) { inputs[i].style.borderColor = '#f44336'; inputs[i].style.background = 'rgba(244,67,54,0.2)'; }
-        setTimeout(() => { refreshCaptchaDisplay(); resetInputs(); }, 800);
+        for (let i = 0; i < 6; i++) {
+            if (inputs[i].value !== _captchaCode[i]) {
+                inputs[i].style.borderColor = '#f44336';
+                inputs[i].style.background = 'rgba(244,67,54,0.2)';
+            }
+        }
+        setTimeout(() => {
+            refreshCaptchaDisplayLocal();
+            resetInputs();
+        }, 800);
     }
-}
+};
 
 window.generateNewCaptcha = function() {
     if (_captchaBlocked) return;
-    refreshCaptchaDisplay();
+    refreshCaptchaDisplayLocal();
     const errorEl = document.getElementById('captchaError');
     if (errorEl) { errorEl.textContent = ''; }
     resetInputs();
@@ -386,7 +281,7 @@ window.generateNewCaptcha = function() {
 
 async function signInWithGoogle() { await startGoogleLogin(); }
 function updateUserUI() { const splash = document.getElementById('splash'), app = document.getElementById('app'); if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); } }
-async function logout() { try { await window.auth.signOut(); window.location.reload(); } catch (e) {} }
+async function logout() { sessionStorage.removeItem('_captchaVerified'); try { await window.auth.signOut(); window.location.reload(); } catch (e) {} }
 
 async function loadUserData(uid) {
     try {
@@ -502,41 +397,18 @@ function setupFriendRequestsListener(userId) {
     try { window.db.collection('friendRequests').where('to', '==', userId).where('status', '==', 'pending').onSnapshot(s => { const c = document.getElementById('friendRequestsCount'); if (c) c.textContent = formatNumber(s.size); if (document.getElementById('friendRequestsPage')?.style.display === 'block') loadFriendRequests(); }); } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول (فحص السيرفر - الكابتشا فقط أو الموقع فقط) ==========
+// ========== مراقب حالة تسجيل الدخول ==========
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            // فحص السيرفر: هل المستخدم اجتاز الكابتشا؟
-            try {
-                const checkFn = firebase.functions().httpsCallable('checkCaptchaStatus');
-                const result = await checkFn();
-                
-                if (!result.data.verified) {
-                    // ===== الكابتشا مو محلول - إخفاء كل شيء وإظهار الكابتشا فقط =====
-                    _pendingGoogleUser = user;
-                    _captchaActive = true;
-                    _isLoggingIn = true;
-                    
-                    // إخفاء التطبيق وsplash تماماً
-                    if (app) app.style.display = 'none';
-                    if (splash) { splash.style.display = 'none'; }
-                    // إزالة أي شاشة قديمة
-                    const loginEl = document.querySelector('.login-screen');
-                    if (loginEl) loginEl.remove();
-                    const capEl = document.querySelector('.captcha-screen');
-                    if (capEl) capEl.remove();
-                    
-                    // إظهار الكابتشا فقط
-                    showCaptchaScreen(async () => {
-                        await saveUserAndEnter(user);
-                        _pendingGoogleUser = null;
-                    });
-                    return;
-                }
-            } catch (e) {
-                // فشل الاتصال - نظهر الكابتشا احتياطاً
+            if (_captchaActive) return;
+            
+            // فحص محلي: هل المستخدم مجتاز الكابتشا؟
+            const isVerified = sessionStorage.getItem('_captchaVerified') === 'true';
+            
+            if (!isVerified) {
                 _pendingGoogleUser = user;
                 _captchaActive = true;
                 _isLoggingIn = true;
@@ -554,9 +426,6 @@ if (typeof window.auth !== 'undefined') {
                 });
                 return;
             }
-            
-            // ===== الكابتشا محلول - دخول عادي =====
-            if (_captchaActive) return;
             
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
