@@ -25,15 +25,17 @@ function updateChatBadge() {
     if (!badge) return;
     
     let totalUnread = 0;
+    const currentUser = window.auth?.currentUser?.uid;
     
-    // عد الرسائل غير المقروءة من localStorage
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('chat_')) {
             try {
                 const messages = JSON.parse(localStorage.getItem(key)) || [];
-                // عد الرسائل المستلمة اللي ما انقرأت
-                const unread = messages.filter(m => m.sender === 'friend' && !m.read).length;
+                const unread = messages.filter(m => 
+                    m.sender === 'friend' && 
+                    !m.read
+                ).length;
                 totalUnread += unread;
             } catch (e) {}
         }
@@ -51,9 +53,7 @@ async function loadChats() { if (!window.auth || !window.auth.currentUser) retur
 
 function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
 
-// ========== فتح محادثة (يضيف الصفحة الحالية للمكدس) ==========
 window.openChat = friendId => {
-    // تحديد الصفحة الحالية وإضافتها للمكدس
     if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
         pushPage('subpage', 'friendsPage');
     } else if (document.getElementById('friendRequestsPage') && document.getElementById('friendRequestsPage').style.display === 'block') {
@@ -84,12 +84,10 @@ window.sendFile = () => { const i = document.createElement('input'); i.type = 'f
 window.sendVoiceNote = () => { if (!navigator.mediaDevices?.getUserMedia) { alert('المتصفح لا يدعم تسجيل الصوت'); return; } navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => { if (e.data.size > 0) ch.push(e.data); }; mr.onstop = () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: 'audio/webm' }); if (blob.size > 0) ChatSystem.sendVoiceNote(blob); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') mr.stop(); }; } setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 900000); }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc?.readyState === 'open') ChatSystem.shareLocationDirect(); else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`), () => alert('فشل تحديد الموقع')); else alert('المتصفح لا يدعم تحديد الموقع'); document.getElementById('attachmentMenu').style.display = 'none'; };
 
-// ========== إغلاق المحادثة - يرجع لآخر صفحة في المكدس ==========
 window.closeConversation = () => { 
     CallSystem.endCall(); 
     ChatSystem.closeChat();
     
-    // تحديث الشارة بعد إغلاق المحادثة
     setTimeout(() => updateChatBadge(), 500);
     
     setTimeout(() => {
@@ -124,7 +122,6 @@ window.openFile = (data, fileName) => { const link = document.createElement('a')
 window.openEditProfileModal = () => { const nameInput = document.getElementById('editName'); const currentName = document.getElementById('profileName')?.textContent; const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent; if (nameInput) nameInput.value = currentName || ''; const avatarPreview = document.getElementById('currentAvatarEmoji'); if (avatarPreview) avatarPreview.textContent = currentEmoji || '👤'; document.getElementById('editProfileModal')?.classList.add('active'); };
 window.saveProfile = () => { const n = document.getElementById('editName')?.value?.trim(); if (!n || n.length > 25) { alert('الاسم مطلوب ولا يزيد عن 25 حرف'); return; } if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { const nameEl = document.getElementById('profileName'); if (nameEl) nameEl.textContent = n; closeModal(); }).catch(() => alert('فشل حفظ التغييرات')); };
 
-// ========== فتح صفحات فرعية (تضيف للمكدس) ==========
 window.showUserTrips = () => {
     pushPage('page', 'profile');
     document.body.classList.add('profile-subpage-open');
@@ -146,7 +143,6 @@ window.showFriendRequests = () => {
     document.getElementById('friendRequestsPage').style.display = 'block';
 };
 
-// ========== الرجوع من صفحة فرعية (يستخدم المكدس) ==========
 window.goBack = () => {
     const lastPage = popPage();
     
