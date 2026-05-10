@@ -13,7 +13,6 @@ const PresenceSystem = {
 
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
-    _unreadChats: {}, // متعقب الدردشات غير المقروءة
     
     init() { this.loadAllChats(); },
     
@@ -25,59 +24,6 @@ const ChatSystem = {
                 try { this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[fid] = []; } 
             } 
         } 
-    },
-    
-    // ========== تحديث شارة الإشعارات ==========
-    updateChatBadge() {
-        let totalUnread = 0;
-        for (const fid in this._unreadChats) {
-            totalUnread += this._unreadChats[fid] || 0;
-        }
-        
-        const badge = document.getElementById('chatBadge');
-        if (badge) {
-            if (totalUnread > 0) {
-                badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
-                badge.style.display = 'flex';
-            } else {
-                badge.textContent = '';
-                badge.style.display = 'none';
-            }
-        }
-    },
-    
-    // ========== إضافة رسالة غير مقروءة ==========
-    addUnreadMessage(friendId) {
-        if (this.currentChat === friendId) return; // إذا الدردشة مفتوحة، لا نحسبها
-        this._unreadChats[friendId] = (this._unreadChats[friendId] || 0) + 1;
-        this.updateChatBadge();
-        this.updateChatItemUnread(friendId);
-    },
-    
-    // ========== تحديث عنصر الدردشة ==========
-    updateChatItemUnread(friendId) {
-        const count = this._unreadChats[friendId] || 0;
-        const chatItem = document.querySelector(`.chat-item[data-fid="${friendId}"]`);
-        if (chatItem) {
-            let badge = chatItem.querySelector('.chat-unread-badge');
-            if (count > 0) {
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'chat-unread-badge';
-                    chatItem.appendChild(badge);
-                }
-                badge.textContent = count > 99 ? '99+' : count;
-            } else {
-                if (badge) badge.remove();
-            }
-        }
-    },
-    
-    // ========== مسح غير المقروء عند فتح الدردشة ==========
-    clearUnread(friendId) {
-        this._unreadChats[friendId] = 0;
-        this.updateChatBadge();
-        this.updateChatItemUnread(friendId);
     },
     
     showProgressBar(message, percent) {
@@ -130,9 +76,7 @@ const ChatSystem = {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
     openChat(friendId, friendName, friendAvatar) {
-        this.currentChat = friendId;
-        this.clearUnread(friendId); // مسح العداد عند الفتح
-        document.body.classList.add('conversation-open');
+        this.currentChat = friendId; document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
         if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
@@ -207,19 +151,23 @@ const ChatSystem = {
         this.hideProgressBar(); return false;
     },
     
+    // ========== التأكد من جاهزية Data Channel ==========
     async _ensureChannelReady() {
         if (!this.friendOnline) {
             alert('المستخدم غير متصل حالياً');
             return false;
         }
         
+        // إذا القناة موجودة ومفتوحة = جاهز
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             return true;
         }
         
+        // نحاول نفتح قناة جديدة وننتظر
         try {
             await CallSystem.ensureDataChannel(this.currentChat);
             
+            // انتظر 5 ثواني لتتأكد القناة فتحت
             const result = await new Promise((resolve) => {
                 let attempts = 0;
                 const check = setInterval(() => {
@@ -228,7 +176,7 @@ const ChatSystem = {
                         clearInterval(check);
                         resolve(true);
                     }
-                    if (attempts > 10) {
+                    if (attempts > 10) { // 5 ثواني
                         clearInterval(check);
                         resolve(false);
                     }
@@ -358,12 +306,7 @@ const ChatSystem = {
             h = h.slice(Math.floor(h.length * 0.2));
             try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
         }
-        this.messages[friendId] = h;
-        
-        // إذا الرسالة من الصديق (مو مني)، أضفها كغير مقروءة
-        if (message.sender === 'friend') {
-            this.addUnreadMessage(friendId);
-        }
+        this.messages[friendId] = h; 
     },
     
     updateLastMessage(friendId, lastMessage) { 
