@@ -174,7 +174,11 @@
 
         <nav class="bottom-nav">
             <button class="nav-item active" data-page="home"><i class="fas fa-home"></i><span data-i18n="home">الرئيسية</span></button>
-            <button class="nav-item" data-page="chat"><i class="fas fa-comment"></i><span data-i18n="chat">الدردشة</span></button>
+            <button class="nav-item" data-page="chat">
+                <i class="fas fa-comment"></i>
+                <span id="chatBadge" class="nav-badge" style="display:none;">0</span>
+                <span data-i18n="chat">الدردشة</span>
+            </button>
             <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span data-i18n="profile">الملف</span></button>
             <button class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span data-i18n="settings">الإعدادات</span></button>
         </nav>
@@ -239,12 +243,10 @@
     
     <script src="js/i18n.js?v=2"></script>
     <script src="js/theme.js?v=2"></script>
-    <!-- ========== ملفات النظام الأساسية (الترتيب مهم جداً) ========== -->
     <script src="js/secure-chat.js?v=3"></script>
     <script src="js/webrtc-call.js?v=3"></script>
     <script src="js/chat-system.js?v=3"></script>
     <script src="js/ui-functions.js?v=3"></script>
-    <!-- ============================================================ -->
     <script src="js/auth.js?v=2"></script>
     
     <script>
