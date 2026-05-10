@@ -152,17 +152,14 @@ function drawCaptchaCanvas(code) {
     const w = canvas.width;
     const h = canvas.height;
     
-    // خلفية
     ctx.fillStyle = '#f5f5f5';
     ctx.fillRect(0, 0, w, h);
     
-    // نقاط عشوائية للتشويش
     for (let i = 0; i < 100; i++) {
         ctx.fillStyle = `rgba(${Math.random()*200},${Math.random()*200},${Math.random()*200},0.4)`;
         ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
     }
     
-    // خطوط متعرجة للتشويش
     for (let i = 0; i < 6; i++) {
         ctx.beginPath();
         ctx.moveTo(0, Math.random() * h);
@@ -172,7 +169,6 @@ function drawCaptchaCanvas(code) {
         ctx.stroke();
     }
     
-    // رسم الأرقام مع تشويش
     for (let i = 0; i < code.length; i++) {
         const x = 25 + (i * 42) + Math.random() * 6;
         const y = 35 + Math.random() * 12;
@@ -207,7 +203,6 @@ async function showCaptchaScreen(onSuccess) {
                 <canvas id="captchaCanvas" width="280" height="60" style="border-radius:10px;border:1px solid var(--border);"></canvas>
             </div>
             
-            <!-- حقل مخفي للبوتات (Honeypot) -->
             <input type="text" name="hiddenField" style="position:absolute;left:-9999px;opacity:0;width:1px;height:1px;" autocomplete="off" tabindex="-1">
             
             <div style="display:flex;gap:8px;justify-content:center;margin-bottom:1.5rem;direction:ltr;">
@@ -227,7 +222,6 @@ async function showCaptchaScreen(onSuccess) {
     document.body.appendChild(d);
     d._onSuccess = onSuccess;
     
-    // رسم الكابتشا على Canvas بعد ما يضاف للـ DOM
     setTimeout(() => {
         drawCaptchaCanvas(captchaCode);
         const firstInput = document.querySelector('.captcha-input');
@@ -319,11 +313,10 @@ function startCountdown(totalSeconds) {
 window.verifyCaptcha = function() {
     if (_captchaBlocked) return;
     
-    // التحقق من Honeypot (حقل مخفي للبوتات)
     const honeypot = document.querySelector('input[name="hiddenField"]');
     if (honeypot && honeypot.value !== '') {
         console.warn('⚠️ بوت مكتشف عبر Honeypot');
-        return; // ارفض بهدوء
+        return;
     }
     
     const inputs = document.querySelectorAll('.captcha-input');
@@ -339,12 +332,10 @@ window.verifyCaptcha = function() {
         return;
     }
     
-    // تأخير عشوائي 200-600ms (يمنع البوتات السريعة)
     const randomDelay = 200 + Math.floor(Math.random() * 400);
     
     setTimeout(() => {
         if (enteredCode === _captchaCode) {
-            // نجاح
             _captchaActive = false;
             _captchaBlocked = false;
             _captchaAttempts = 0;
@@ -360,7 +351,6 @@ window.verifyCaptcha = function() {
                 if (onSuccess) onSuccess();
             }
         } else {
-            // فشل
             _captchaAttempts++;
             
             let totalAttempts = parseInt(sessionStorage.getItem('_captchaTotalAttempts') || '0');
@@ -421,7 +411,28 @@ window.generateNewCaptcha = function() {
 
 async function signInWithGoogle() { await startGoogleLogin(); }
 function updateUserUI() { const splash = document.getElementById('splash'), app = document.getElementById('app'); if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); } }
-async function logout() { sessionStorage.removeItem('_captchaVerified'); try { await window.auth.signOut(); window.location.reload(); } catch (e) {} }
+
+// ========== تسجيل الخروج مع تحديث الحالة ==========
+async function logout() { 
+    // تحديث الحالة إلى غير متصل قبل تسجيل الخروج
+    try {
+        if (window.auth?.currentUser) {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                online: false,
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+    } catch (e) {}
+    
+    sessionStorage.removeItem('_captchaVerified');
+    PresenceSystem.stopAll();
+    
+    try { 
+        await window.auth.signOut(); 
+    } catch (e) {}
+    
+    window.location.reload(); 
+}
 
 async function loadUserData(uid) {
     try {
