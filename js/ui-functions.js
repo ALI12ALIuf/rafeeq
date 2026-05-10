@@ -19,6 +19,34 @@ function clearStack() {
     window._pageStack = [];
 }
 
+// ========== تحديث شارة الإشعارات ==========
+function updateChatBadge() {
+    const badge = document.getElementById('chatBadge');
+    if (!badge) return;
+    
+    let totalUnread = 0;
+    
+    // عد الرسائل غير المقروءة من localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('chat_')) {
+            try {
+                const messages = JSON.parse(localStorage.getItem(key)) || [];
+                // عد الرسائل المستلمة اللي ما انقرأت
+                const unread = messages.filter(m => m.sender === 'friend' && !m.read).length;
+                totalUnread += unread;
+            } catch (e) {}
+        }
+    }
+    
+    if (totalUnread > 0) {
+        badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+        badge.classList.add('show');
+    } else {
+        badge.classList.remove('show');
+    }
+}
+
 async function loadChats() { if (!window.auth || !window.auth.currentUser) return; const list = document.getElementById('chatsList'); if (!list) return; try { const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); if (!udoc.exists) return; const friends = udoc.data().friends || []; if (!friends.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; return; } let html = ''; for (const fid of friends) { try { const fdoc = await window.db.collection('users').doc(fid).get(); if (fdoc.exists) { const f = fdoc.data(); const key = `chat_${fid}`; let lm = 'اضغط لبدء المحادثة', lt = ''; try { const h = JSON.parse(localStorage.getItem(key)) || []; if (h.length > 0) { const l = h[h.length - 1]; if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; else if (l.type === 'image') lm = '📷 صورة'; else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; else if (l.type === 'video') lm = '🎥 فيديو'; else if (l.type === 'file') lm = '📎 ملف'; lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); } } catch (e) {} html += `<div class="chat-item" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`; } } catch (e) {} } list.innerHTML = html || `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`; } catch (e) {} }
 
 function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
@@ -61,16 +89,17 @@ window.closeConversation = () => {
     CallSystem.endCall(); 
     ChatSystem.closeChat();
     
+    // تحديث الشارة بعد إغلاق المحادثة
+    setTimeout(() => updateChatBadge(), 500);
+    
     setTimeout(() => {
-        const lastPage = popPage(); // نجيب آخر صفحة من المكدس
+        const lastPage = popPage();
         
-        // إخفاء الكل أولاً
         document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
         document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
         document.body.classList.remove('profile-subpage-open');
         
         if (lastPage && lastPage.type === 'subpage') {
-            // رجوع لصفحة فرعية (مثلاً الأصدقاء)
             document.body.classList.add('profile-subpage-open');
             document.querySelector('.profile-page').style.display = 'none';
             if (lastPage.id && document.getElementById(lastPage.id)) {
@@ -78,12 +107,10 @@ window.closeConversation = () => {
             }
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
         } else if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
-            // رجوع للملف الشخصي
             document.querySelector('.profile-page').classList.add('active');
             document.querySelector('.profile-page').style.display = 'block';
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
         } else {
-            // رجوع للدردشة (الافتراضي)
             document.querySelector('.chat-page').classList.add('active');
             document.querySelector('.chat-page').style.display = 'block';
             loadChats();
@@ -127,11 +154,9 @@ window.goBack = () => {
     document.body.classList.remove('profile-subpage-open');
     
     if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
-        // رجوع للملف الشخصي
         document.querySelector('.profile-page').style.display = 'block';
         document.querySelector('.profile-page').classList.add('active');
     } else {
-        // رجوع للرئيسية
         document.querySelector('.profile-page').style.display = 'block';
         document.querySelector('.profile-page').classList.add('active');
     }
@@ -145,10 +170,10 @@ window.clearMessages = () => { if (confirm('هل أنت متأكد من مسح �
 function formatNumber(num) { if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return num.toString(); }
 async function updateTripsCount() { if (!window.auth || !window.auth.currentUser) return; try { const s = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).where('status', '==', 'ended').get(); const c = document.getElementById('tripsCount'); if (c) c.textContent = formatNumber(s.size); } catch (error) {} }
 function ensureSinglePage() { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.querySelectorAll('.page').forEach(p => { p.style.display = p.classList.contains('active') ? 'block' : 'none'; }); }
-function setupNavigation() { const nav = document.querySelectorAll('.nav-item'); const pages = document.querySelectorAll('.page'); if (!nav.length || !pages.length) return; function switchPage(id) { clearStack(); pages.forEach(p => p.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } pages.forEach(p => { if (!p.classList.contains('active')) p.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); document.body.classList.remove('profile-subpage-open'); document.body.classList.remove('conversation-open'); if (id === 'chat') loadChats(); nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); } nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); }
+function setupNavigation() { const nav = document.querySelectorAll('.nav-item'); const pages = document.querySelectorAll('.page'); if (!nav.length || !pages.length) return; function switchPage(id) { clearStack(); pages.forEach(p => p.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } pages.forEach(p => { if (!p.classList.contains('active')) p.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); document.body.classList.remove('profile-subpage-open'); document.body.classList.remove('conversation-open'); if (id === 'chat') { loadChats(); updateChatBadge(); } nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); } nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); }
 function setupModals() { window.openLanguageModal = () => document.getElementById('languageModal')?.classList.add('active'); window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); })); document.querySelectorAll('.settings-item').forEach(i => { if (i.querySelector('[data-i18n="language"]')) i.addEventListener('click', window.openLanguageModal); }); }
 
-document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); });
+document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); updateChatBadge(); });
 window.addEventListener('authReady', async () => { if (window.auth?.currentUser) await SecureChatSystem.init(); });
 window.addEventListener('beforeunload', () => { PresenceSystem.setOffline(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) PresenceSystem.setOffline(); else { PresenceSystem.setOnline(); if (ChatSystem.currentChat && ChatSystem.friendOnline) setTimeout(() => CallSystem.ensureDataChannel(ChatSystem.currentChat).catch(() => {}), 1000); } });
