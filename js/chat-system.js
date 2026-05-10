@@ -123,16 +123,6 @@ const ChatSystem = {
         else if (msg.type === 'file') div.innerHTML = `<div class="message-content" onclick="window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')" style="cursor:pointer;">📎 ${msg.fileName || 'ملف'}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
         
         c.appendChild(div); c.scrollTop = c.scrollHeight;
-        
-        // ========== إذا رسالة واردة والمحادثة مو مفتوحة = زيد العداد ==========
-        if (msg.sender === 'friend') {
-            const fid = msg._friendId;
-            if (fid && ChatSystem.currentChat !== fid) {
-                window._unreadCounts[fid] = (window._unreadCounts[fid] || 0) + 1;
-                if (typeof updateUnreadBadge === 'function') updateUnreadBadge();
-                if (typeof saveUnreadCounts === 'function') saveUnreadCounts();
-            }
-        }
     },
     
     async sendMessage(text) { 
@@ -161,31 +151,52 @@ const ChatSystem = {
         this.hideProgressBar(); return false;
     },
     
+    // ========== التأكد من جاهزية Data Channel ==========
     async _ensureChannelReady() {
         if (!this.friendOnline) {
             alert('المستخدم غير متصل حالياً');
             return false;
         }
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') return true;
+        
+        // إذا القناة موجودة ومفتوحة = جاهز
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            return true;
+        }
+        
+        // نحاول نفتح قناة جديدة وننتظر
         try {
             await CallSystem.ensureDataChannel(this.currentChat);
+            
+            // انتظر 5 ثواني لتتأكد القناة فتحت
             const result = await new Promise((resolve) => {
                 let attempts = 0;
                 const check = setInterval(() => {
                     attempts++;
-                    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { clearInterval(check); resolve(true); }
-                    if (attempts > 10) { clearInterval(check); resolve(false); }
+                    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                        clearInterval(check);
+                        resolve(true);
+                    }
+                    if (attempts > 10) { // 5 ثواني
+                        clearInterval(check);
+                        resolve(false);
+                    }
                 }, 500);
             });
+            
             if (result) return true;
+            
             alert('تعذر الاتصال. اطلب من المستخدم الآخر إعادة فتح المحادثة.');
             return false;
-        } catch (e) { alert('فشل الاتصال. حاول مرة أخرى.'); return false; }
+        } catch (e) {
+            alert('فشل الاتصال. حاول مرة أخرى.');
+            return false;
+        }
     },
     
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!(await this._ensureChannelReady())) return;
+        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'image');
             if (success) {
@@ -200,8 +211,16 @@ const ChatSystem = {
     
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
-        try { await SecureChatSystem.validateVideo(file); } catch (error) { alert(error.message); return; }
+        
+        try {
+            await SecureChatSystem.validateVideo(file);
+        } catch (error) {
+            alert(error.message);
+            return;
+        }
+        
         if (!(await this._ensureChannelReady())) return;
+        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
             const success = await this.sendFileWithRetry(file, 'video');
@@ -209,8 +228,11 @@ const ChatSystem = {
                 try {
                     const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
+                    
                     this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
                     this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64.substring(0, 100) + '...', _videoPlaceholder: true, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
                 } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
@@ -219,6 +241,7 @@ const ChatSystem = {
     async sendFile(file) { 
         if (!this.currentChat) return;
         if (!(await this._ensureChannelReady())) return;
+        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'file');
             if (success) {
@@ -237,6 +260,7 @@ const ChatSystem = {
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
         if (!(await this._ensureChannelReady())) return;
+        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(audioBlob, 'voice');
             if (success) {
@@ -251,6 +275,7 @@ const ChatSystem = {
     async shareLocationDirect() { 
         if (!this.currentChat) return; 
         if (!(await this._ensureChannelReady())) return;
+        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
             navigator.geolocation.getCurrentPosition(p => { 
@@ -264,11 +289,6 @@ const ChatSystem = {
     },
     
     saveMessage(friendId, message) { 
-        // إذا الرسالة واردة من صديق - نخزن معرف الصديق
-        if (message.sender === 'friend') {
-            message._friendId = friendId;
-        }
-        
         const key = `chat_${friendId}`; 
         let h = []; 
         try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
