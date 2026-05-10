@@ -375,3 +375,40 @@ body.profile-subpage-open .profile-pages {
 body:not(.conversation-open) .conversation-page {
     display: none !important;
 }
+
+/* ========== شارة المحادثات غير المقروءة ========== */
+.unread-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--danger);
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    min-width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    padding: 0 6px;
+    margin-top: 4px;
+}
+
+.chat-item.unread {
+    background: rgba(33, 150, 243, 0.05);
+    border-right: 3px solid var(--primary);
+}
+
+.chat-item.unread .last-message {
+    font-weight: bold;
+    color: var(--text);
+}
+
+/* تأثير نبض للشارة */
+@keyframes badgePulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+#chatBadge {
+    animation: badgePulse 0.3s ease;
+}
