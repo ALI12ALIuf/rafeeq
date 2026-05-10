@@ -16,19 +16,19 @@ function loadUnreadCounts() { try { const saved = sessionStorage.getItem('_unrea
 // ========== تحديث شارة الإشعارات ==========
 function updateUnreadBadge() {
     const totalUnread = Object.values(window._unreadCounts).reduce((sum, count) => sum + count, 0);
-    const badge = document.getElementById('chatBadge');
     const chatNav = document.querySelector('.nav-item[data-page="chat"]');
+    if (!chatNav) return;
+    
+    let badge = document.getElementById('chatBadge');
     
     if (totalUnread > 0) {
-        if (!badge && chatNav) {
-            const b = document.createElement('span');
-            b.id = 'chatBadge';
-            b.style.cssText = 'position:absolute;top:2px;right:50%;transform:translateX(18px);background:var(--danger);color:white;font-size:10px;font-weight:bold;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:10;';
-            chatNav.style.position = 'relative';
-            chatNav.appendChild(b);
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.id = 'chatBadge';
+            chatNav.appendChild(badge);
         }
-        const bdg = document.getElementById('chatBadge');
-        if (bdg) { bdg.textContent = totalUnread > 99 ? '99+' : totalUnread; bdg.style.display = 'flex'; }
+        badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+        badge.style.display = 'flex';
     } else {
         if (badge) badge.style.display = 'none';
     }
@@ -59,7 +59,6 @@ async function loadChats() {
             return; 
         } 
         
-        // ترتيب حسب وقت آخر رسالة
         let chatItems = []; 
         for (const fid of friends) { 
             try { 
@@ -83,13 +82,11 @@ async function loadChats() {
                     } catch (e) {} 
                     
                     const unreadCount = (window._unreadCounts && window._unreadCounts[fid]) || 0;
-                    
                     chatItems.push({ fid, f, lm, lt, lastTime, unreadCount });
                 } 
             } catch (e) {} 
         } 
         
-        // ترتيب: غير المقروء أولاً، ثم الأحدث
         chatItems.sort((a, b) => {
             if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
             if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
@@ -99,7 +96,7 @@ async function loadChats() {
         let html = ''; 
         for (const item of chatItems) {
             const unreadClass = item.unreadCount > 0 ? ' unread' : '';
-            const unreadBadge = item.unreadCount > 0 ? `<span class="unread-badge">${item.unreadCount}</span>` : '';
+            const unreadBadgeHtml = item.unreadCount > 0 ? `<span class="unread-badge">${item.unreadCount}</span>` : '';
             
             html += `<div class="chat-item${unreadClass}" onclick="openChat('${item.fid}')">
                 <div class="chat-avatar-emoji">${window.getEmojiForUser(item.f)}</div>
@@ -109,7 +106,7 @@ async function loadChats() {
                 </div>
                 <div class="chat-meta">
                     <span class="chat-time">${item.lt || ''}</span>
-                    ${unreadBadge}
+                    ${unreadBadgeHtml}
                 </div>
             </div>`; 
         }
@@ -120,7 +117,6 @@ async function loadChats() {
 
 function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
 
-// ========== فتح محادثة ==========
 window.openChat = friendId => {
     if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
         pushPage('subpage', 'friendsPage');
@@ -134,7 +130,6 @@ window.openChat = friendId => {
         pushPage('page', 'chat');
     }
     
-    // تصفير عداد هذه المحادثة
     window._unreadCounts[friendId] = 0;
     updateUnreadBadge();
     saveUnreadCounts();
