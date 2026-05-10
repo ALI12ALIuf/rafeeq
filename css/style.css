@@ -73,7 +73,7 @@ body {
 .page { display: none; padding: 1rem; }
 .page.active { display: block; }
 
-/* ========== القائمة السفلية - تصميم جديد مع شارة الإشعارات ========== */
+/* ========== القائمة السفلية ========== */
 .bottom-nav {
     height: var(--nav-height);
     background: var(--card-bg);
@@ -142,7 +142,7 @@ body {
     position: absolute;
     top: 2px;
     right: 50%;
-    transform: translateX(22px);
+    transform: translateX(18px);
     min-width: 18px;
     height: 18px;
     background: var(--danger);
@@ -156,10 +156,18 @@ body {
     padding: 0 5px;
     line-height: 1;
     border: 2px solid var(--card-bg);
+    z-index: 5;
 }
 
 .nav-badge.show {
     display: flex;
+    animation: badgePop 0.3s ease;
+}
+
+@keyframes badgePop {
+    0% { transform: translateX(18px) scale(0); }
+    50% { transform: translateX(18px) scale(1.2); }
+    100% { transform: translateX(18px) scale(1); }
 }
 
 .post-card { background: var(--card-bg); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; box-shadow: var(--shadow); }
