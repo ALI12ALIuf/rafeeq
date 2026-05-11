@@ -76,6 +76,10 @@ const ChatSystem = {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
     openChat(friendId, friendName, friendAvatar) {
+        // حفظ وقت آخر قراءة
+        sessionStorage.setItem(`lastRead_${friendId}`, Date.now().toString());
+        if (typeof updateUnreadBadge === 'function') updateUnreadBadge();
+        
         this.currentChat = friendId; document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
@@ -87,6 +91,9 @@ const ChatSystem = {
         setTimeout(() => { if (this.friendOnline) CallSystem.ensureDataChannel(friendId).catch(() => {}); }, 500);
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+        
+        // تحديث قائمة الدردشات لإزالة علامة غير مقروء
+        if (typeof loadChats === 'function') setTimeout(loadChats, 500);
     },
     
     updateFriendStatus(friendId, isOnline) {
@@ -151,52 +158,28 @@ const ChatSystem = {
         this.hideProgressBar(); return false;
     },
     
-    // ========== التأكد من جاهزية Data Channel ==========
     async _ensureChannelReady() {
-        if (!this.friendOnline) {
-            alert('المستخدم غير متصل حالياً');
-            return false;
-        }
-        
-        // إذا القناة موجودة ومفتوحة = جاهز
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            return true;
-        }
-        
-        // نحاول نفتح قناة جديدة وننتظر
+        if (!this.friendOnline) { alert('المستخدم غير متصل حالياً'); return false; }
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') return true;
         try {
             await CallSystem.ensureDataChannel(this.currentChat);
-            
-            // انتظر 5 ثواني لتتأكد القناة فتحت
             const result = await new Promise((resolve) => {
                 let attempts = 0;
                 const check = setInterval(() => {
                     attempts++;
-                    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-                        clearInterval(check);
-                        resolve(true);
-                    }
-                    if (attempts > 10) { // 5 ثواني
-                        clearInterval(check);
-                        resolve(false);
-                    }
+                    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { clearInterval(check); resolve(true); }
+                    if (attempts > 10) { clearInterval(check); resolve(false); }
                 }, 500);
             });
-            
             if (result) return true;
-            
             alert('تعذر الاتصال. اطلب من المستخدم الآخر إعادة فتح المحادثة.');
             return false;
-        } catch (e) {
-            alert('فشل الاتصال. حاول مرة أخرى.');
-            return false;
-        }
+        } catch (e) { alert('فشل الاتصال. حاول مرة أخرى.'); return false; }
     },
     
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!(await this._ensureChannelReady())) return;
-        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'image');
             if (success) {
@@ -211,16 +194,8 @@ const ChatSystem = {
     
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
-        
-        try {
-            await SecureChatSystem.validateVideo(file);
-        } catch (error) {
-            alert(error.message);
-            return;
-        }
-        
+        try { await SecureChatSystem.validateVideo(file); } catch (error) { alert(error.message); return; }
         if (!(await this._ensureChannelReady())) return;
-        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
             const success = await this.sendFileWithRetry(file, 'video');
@@ -228,11 +203,8 @@ const ChatSystem = {
                 try {
                     const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
-                    
                     this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                    
                     this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64.substring(0, 100) + '...', _videoPlaceholder: true, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                    
                 } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
@@ -241,7 +213,6 @@ const ChatSystem = {
     async sendFile(file) { 
         if (!this.currentChat) return;
         if (!(await this._ensureChannelReady())) return;
-        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'file');
             if (success) {
@@ -260,7 +231,6 @@ const ChatSystem = {
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
         if (!(await this._ensureChannelReady())) return;
-        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(audioBlob, 'voice');
             if (success) {
@@ -275,7 +245,6 @@ const ChatSystem = {
     async shareLocationDirect() { 
         if (!this.currentChat) return; 
         if (!(await this._ensureChannelReady())) return;
-        
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
             navigator.geolocation.getCurrentPosition(p => { 
@@ -326,6 +295,7 @@ const ChatSystem = {
         PresenceSystem.stopAll();
         if (!CallSystem.isInCall) CallSystem.cleanupConnections();
         this.currentChat = null; this.friendOnline = false;
+        if (typeof updateUnreadBadge === 'function') updateUnreadBadge();
     },
     
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
