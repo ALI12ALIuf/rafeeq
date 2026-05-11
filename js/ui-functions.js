@@ -4,73 +4,71 @@
 // ========== مكدس تتبع الصفحات للرجوع المتسلسل ==========
 window._pageStack = [];
 
-function pushPage(pageType, pageId) {
-    window._pageStack.push({ type: pageType, id: pageId });
-}
+function pushPage(pageType, pageId) { window._pageStack.push({ type: pageType, id: pageId }); }
+function popPage() { if (window._pageStack.length > 0) return window._pageStack.pop(); return null; }
+function clearStack() { window._pageStack = []; }
 
-function popPage() {
-    if (window._pageStack.length > 0) {
-        return window._pageStack.pop();
+// ========== دالة مساعدة للرسائل غير المقروءة ==========
+function getUnreadCount(friendId) {
+    const messages = ChatSystem.messages[friendId] || [];
+    const lastRead = parseInt(sessionStorage.getItem(`lastRead_${friendId}`) || '0');
+    let count = 0;
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.sender === 'friend' && new Date(msg.time).getTime() > lastRead) count++;
     }
-    return null;
+    return count;
 }
 
-function clearStack() {
-    window._pageStack = [];
-}
-
-// ========== تحديث شارة الإشعارات ==========
-function updateChatBadge() {
-    const badge = document.getElementById('chatBadge');
-    if (!badge) return;
-    
-    let totalUnread = 0;
-    const currentUser = window.auth?.currentUser?.uid;
-    
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('chat_')) {
+async function loadChats() {
+    if (!window.auth || !window.auth.currentUser) return;
+    const list = document.getElementById('chatsList'); if (!list) return;
+    try {
+        const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+        if (!udoc.exists) return;
+        const friends = udoc.data().friends || [];
+        if (!friends.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; return; }
+        let html = '';
+        for (const fid of friends) {
             try {
-                const messages = JSON.parse(localStorage.getItem(key)) || [];
-                const unread = messages.filter(m => 
-                    m.sender === 'friend' && 
-                    !m.read
-                ).length;
-                totalUnread += unread;
+                const fdoc = await window.db.collection('users').doc(fid).get();
+                if (fdoc.exists) {
+                    const f = fdoc.data(); const key = `chat_${fid}`;
+                    let lm = 'اضغط لبدء المحادثة', lt = '';
+                    try {
+                        const h = JSON.parse(localStorage.getItem(key)) || [];
+                        if (h.length > 0) {
+                            const l = h[h.length - 1];
+                            if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text;
+                            else if (l.type === 'image') lm = '📷 صورة';
+                            else if (l.type === 'voice') lm = '🎤 بصمة صوتية';
+                            else if (l.type === 'video') lm = '🎥 فيديو';
+                            else if (l.type === 'file') lm = '📎 ملف';
+                            lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+                        }
+                    } catch (e) {}
+                    
+                    const hasUnread = getUnreadCount(fid) > 0;
+                    html += `<div class="chat-item ${hasUnread ? 'unread' : ''}" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`;
+                }
             } catch (e) {}
         }
-    }
-    
-    if (totalUnread > 0) {
-        badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
-        badge.classList.add('show');
-    } else {
-        badge.classList.remove('show');
-    }
+        list.innerHTML = html || `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`;
+    } catch (e) {}
+    updateUnreadBadge();
 }
-
-async function loadChats() { if (!window.auth || !window.auth.currentUser) return; const list = document.getElementById('chatsList'); if (!list) return; try { const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); if (!udoc.exists) return; const friends = udoc.data().friends || []; if (!friends.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; return; } let html = ''; for (const fid of friends) { try { const fdoc = await window.db.collection('users').doc(fid).get(); if (fdoc.exists) { const f = fdoc.data(); const key = `chat_${fid}`; let lm = 'اضغط لبدء المحادثة', lt = ''; try { const h = JSON.parse(localStorage.getItem(key)) || []; if (h.length > 0) { const l = h[h.length - 1]; if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; else if (l.type === 'image') lm = '📷 صورة'; else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; else if (l.type === 'video') lm = '🎥 فيديو'; else if (l.type === 'file') lm = '📎 ملف'; lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); } } catch (e) {} html += `<div class="chat-item" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`; } } catch (e) {} } list.innerHTML = html || `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`; } catch (e) {} }
 
 function setupChatListeners() { document.addEventListener('click', e => { const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; }); }
 
 window.openChat = friendId => {
-    if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
-        pushPage('subpage', 'friendsPage');
-    } else if (document.getElementById('friendRequestsPage') && document.getElementById('friendRequestsPage').style.display === 'block') {
-        pushPage('subpage', 'friendRequestsPage');
-    } else if (document.getElementById('tripsPage') && document.getElementById('tripsPage').style.display === 'block') {
-        pushPage('subpage', 'tripsPage');
-    } else if (document.querySelector('.profile-page') && getComputedStyle(document.querySelector('.profile-page')).display === 'block') {
-        pushPage('page', 'profile');
-    } else {
-        pushPage('page', 'chat');
-    }
+    if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') pushPage('subpage', 'friendsPage');
+    else if (document.getElementById('friendRequestsPage') && document.getElementById('friendRequestsPage').style.display === 'block') pushPage('subpage', 'friendRequestsPage');
+    else if (document.getElementById('tripsPage') && document.getElementById('tripsPage').style.display === 'block') pushPage('subpage', 'tripsPage');
+    else if (document.querySelector('.profile-page') && getComputedStyle(document.querySelector('.profile-page')).display === 'block') pushPage('page', 'profile');
+    else pushPage('page', 'chat');
     
     window.db.collection('users').doc(friendId).get().then(doc => {
-        if (doc.exists) {
-            const f = doc.data();
-            ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤');
-        }
+        if (doc.exists) { const f = doc.data(); ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤'); }
     }).catch(() => {});
 };
 
@@ -87,22 +85,15 @@ window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc?.rea
 window.closeConversation = () => { 
     CallSystem.endCall(); 
     ChatSystem.closeChat();
-    
-    setTimeout(() => updateChatBadge(), 500);
-    
     setTimeout(() => {
         const lastPage = popPage();
-        
         document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
         document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
         document.body.classList.remove('profile-subpage-open');
-        
         if (lastPage && lastPage.type === 'subpage') {
             document.body.classList.add('profile-subpage-open');
             document.querySelector('.profile-page').style.display = 'none';
-            if (lastPage.id && document.getElementById(lastPage.id)) {
-                document.getElementById(lastPage.id).style.display = 'block';
-            }
+            if (lastPage.id && document.getElementById(lastPage.id)) document.getElementById(lastPage.id).style.display = 'block';
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
         } else if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
             document.querySelector('.profile-page').classList.add('active');
@@ -121,43 +112,10 @@ window.openImage = (data) => { const win = window.open('', '_blank'); if (win) w
 window.openFile = (data, fileName) => { const link = document.createElement('a'); link.href = data; link.download = fileName || 'file'; link.click(); };
 window.openEditProfileModal = () => { const nameInput = document.getElementById('editName'); const currentName = document.getElementById('profileName')?.textContent; const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent; if (nameInput) nameInput.value = currentName || ''; const avatarPreview = document.getElementById('currentAvatarEmoji'); if (avatarPreview) avatarPreview.textContent = currentEmoji || '👤'; document.getElementById('editProfileModal')?.classList.add('active'); };
 window.saveProfile = () => { const n = document.getElementById('editName')?.value?.trim(); if (!n || n.length > 25) { alert('الاسم مطلوب ولا يزيد عن 25 حرف'); return; } if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { const nameEl = document.getElementById('profileName'); if (nameEl) nameEl.textContent = n; closeModal(); }).catch(() => alert('فشل حفظ التغييرات')); };
-
-window.showUserTrips = () => {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('tripsPage').style.display = 'block';
-};
-
-window.showFriendsList = () => {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('friendsPage').style.display = 'block';
-};
-
-window.showFriendRequests = () => {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('friendRequestsPage').style.display = 'block';
-};
-
-window.goBack = () => {
-    const lastPage = popPage();
-    
-    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
-    document.body.classList.remove('profile-subpage-open');
-    
-    if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
-        document.querySelector('.profile-page').style.display = 'block';
-        document.querySelector('.profile-page').classList.add('active');
-    } else {
-        document.querySelector('.profile-page').style.display = 'block';
-        document.querySelector('.profile-page').classList.add('active');
-    }
-};
-
+window.showUserTrips = () => { pushPage('page', 'profile'); document.body.classList.add('profile-subpage-open'); document.querySelector('.profile-page').style.display = 'none'; document.getElementById('tripsPage').style.display = 'block'; };
+window.showFriendsList = () => { pushPage('page', 'profile'); document.body.classList.add('profile-subpage-open'); document.querySelector('.profile-page').style.display = 'none'; document.getElementById('friendsPage').style.display = 'block'; };
+window.showFriendRequests = () => { pushPage('page', 'profile'); document.body.classList.add('profile-subpage-open'); document.querySelector('.profile-page').style.display = 'none'; document.getElementById('friendRequestsPage').style.display = 'block'; };
+window.goBack = () => { const lastPage = popPage(); document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.body.classList.remove('profile-subpage-open'); if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') { document.querySelector('.profile-page').style.display = 'block'; document.querySelector('.profile-page').classList.add('active'); } else { document.querySelector('.profile-page').style.display = 'block'; document.querySelector('.profile-page').classList.add('active'); } };
 window.selectAvatar = t => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; const e = m[t] || '👤'; const profileAvatar = document.getElementById('profileAvatarEmoji'), currentAvatar = document.getElementById('currentAvatarEmoji'); if (profileAvatar) profileAvatar.textContent = e; if (currentAvatar) currentAvatar.textContent = e; if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ avatarType: t }).then(() => closeModal()).catch(() => {}); };
 window.openAvatarModal = () => document.getElementById('avatarModal')?.classList.add('active');
 window.getEmojiForUser = u => { const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; return m[u?.avatarType] || '👤'; };
@@ -166,10 +124,39 @@ window.clearMessages = () => { if (confirm('هل أنت متأكد من مسح �
 function formatNumber(num) { if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return num.toString(); }
 async function updateTripsCount() { if (!window.auth || !window.auth.currentUser) return; try { const s = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).where('status', '==', 'ended').get(); const c = document.getElementById('tripsCount'); if (c) c.textContent = formatNumber(s.size); } catch (error) {} }
 function ensureSinglePage() { document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); document.querySelectorAll('.page').forEach(p => { p.style.display = p.classList.contains('active') ? 'block' : 'none'; }); }
-function setupNavigation() { const nav = document.querySelectorAll('.nav-item'); const pages = document.querySelectorAll('.page'); if (!nav.length || !pages.length) return; function switchPage(id) { clearStack(); pages.forEach(p => p.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } pages.forEach(p => { if (!p.classList.contains('active')) p.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); document.body.classList.remove('profile-subpage-open'); document.body.classList.remove('conversation-open'); if (id === 'chat') { loadChats(); updateChatBadge(); } nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); } nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); }
+function setupNavigation() { const nav = document.querySelectorAll('.nav-item'); const pages = document.querySelectorAll('.page'); if (!nav.length || !pages.length) return; function switchPage(id) { clearStack(); pages.forEach(p => p.classList.remove('active')); const t = document.querySelector(`.page.${id}-page`); if (t) { t.classList.add('active'); t.style.display = 'block'; } pages.forEach(p => { if (!p.classList.contains('active')) p.style.display = 'none'; }); document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); document.body.classList.remove('profile-subpage-open'); document.body.classList.remove('conversation-open'); if (id === 'chat') loadChats(); nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); } nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); }
 function setupModals() { window.openLanguageModal = () => document.getElementById('languageModal')?.classList.add('active'); window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); })); document.querySelectorAll('.settings-item').forEach(i => { if (i.querySelector('[data-i18n="language"]')) i.addEventListener('click', window.openLanguageModal); }); }
 
-document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); updateChatBadge(); });
+// ========== تحديث إشارة الرسائل غير المقروءة ==========
+function updateUnreadBadge() {
+    const chatNav = document.querySelector('.nav-item[data-page="chat"]');
+    if (!chatNav) return;
+    const oldBadge = chatNav.querySelector('.unread-badge');
+    if (oldBadge) oldBadge.remove();
+    
+    let totalUnread = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('chat_')) {
+            const fid = key.replace('chat_', '');
+            if (ChatSystem.messages[fid]) {
+                const unread = getUnreadCount(fid);
+                if (unread > 0) totalUnread++;
+            }
+        }
+    }
+    
+    if (totalUnread > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'unread-badge';
+        badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+        chatNav.appendChild(badge);
+    }
+}
+
+setInterval(updateUnreadBadge, 3000);
+
+document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); setTimeout(updateUnreadBadge, 2000); });
 window.addEventListener('authReady', async () => { if (window.auth?.currentUser) await SecureChatSystem.init(); });
 window.addEventListener('beforeunload', () => { PresenceSystem.setOffline(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) PresenceSystem.setOffline(); else { PresenceSystem.setOnline(); if (ChatSystem.currentChat && ChatSystem.friendOnline) setTimeout(() => CallSystem.ensureDataChannel(ChatSystem.currentChat).catch(() => {}), 1000); } });
