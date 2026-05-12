@@ -22,6 +22,8 @@ const FieldValue = firebase.firestore.FieldValue;
 
 function showApp() {
     _captchaActive = false;
+    _captchaBlocked = false;
+    _captchaAttempts = 0;
     _isLoggingIn = false;
     _pendingGoogleUser = null;
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
@@ -61,6 +63,8 @@ async function startGoogleLogin() {
         if (loginScreen) { loginScreen.style.opacity = '0'; setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 200); }
         
         _captchaActive = true;
+        _captchaBlocked = false;
+        _captchaAttempts = 0;
         _pendingGoogleUser = null;
         
         const result = await window.auth.signInWithPopup(window.googleProvider);
@@ -159,51 +163,24 @@ if (typeof window.auth !== 'undefined') {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
+            // ===== سطر واحد يمنع الدخول تماماً إذا كان في حظر =====
+            if (localStorage.getItem('_captchaBlockedUntil')) return;
+            
             if (_captchaActive) return;
             
-            // ===== فحص الحظر مباشرة من localStorage =====
-            const blockedUntil = localStorage.getItem('_captchaBlockedUntil');
-            if (blockedUntil) {
-                const remaining = Math.ceil((parseInt(blockedUntil) - Date.now()) / 1000);
-                if (remaining > 0) {
-                    // لسه محظور - إخفاء كل شي وإظهار الكابتشا فقط
-                    if (app) app.style.display = 'none';
-                    if (splash) { splash.style.display = 'none'; }
-                    
-                    const loginEl = document.querySelector('.login-screen');
-                    if (loginEl) loginEl.remove();
-                    const capEl = document.querySelector('.captcha-screen');
-                    if (capEl) capEl.remove();
-                    
-                    _pendingGoogleUser = user;
-                    _captchaActive = true;
-                    _isLoggingIn = true;
-                    
-                    showCaptchaScreen(async () => {
-                        await saveUserAndEnter(user);
-                        _pendingGoogleUser = null;
-                    });
-                    return;
-                } else {
-                    localStorage.removeItem('_captchaBlockedUntil');
-                }
-            }
-            
-            // ===== فحص الكابتشا =====
             const isVerified = sessionStorage.getItem('_captchaVerified') === 'true';
             
             if (!isVerified) {
+                _pendingGoogleUser = user;
+                _captchaActive = true;
+                _isLoggingIn = true;
+                
                 if (app) app.style.display = 'none';
                 if (splash) { splash.style.display = 'none'; }
-                
                 const loginEl = document.querySelector('.login-screen');
                 if (loginEl) loginEl.remove();
                 const capEl = document.querySelector('.captcha-screen');
                 if (capEl) capEl.remove();
-                
-                _pendingGoogleUser = user;
-                _captchaActive = true;
-                _isLoggingIn = true;
                 
                 showCaptchaScreen(async () => {
                     await saveUserAndEnter(user);
@@ -212,7 +189,6 @@ if (typeof window.auth !== 'undefined') {
                 return;
             }
             
-            // ===== دخول عادي =====
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
