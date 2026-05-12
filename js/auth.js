@@ -28,7 +28,8 @@ function showApp() {
     _pendingGoogleUser = null;
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
     if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
-    sessionStorage.removeItem('_captchaTotalAttempts');
+    localStorage.removeItem('_captchaTotalAttempts');
+    localStorage.removeItem('_captchaBlockedUntil');
     sessionStorage.setItem('_captchaVerified', 'true');
     
     const splash = document.getElementById('splash'), app = document.getElementById('app');
@@ -130,6 +131,8 @@ async function logout() {
     } catch (e) {}
     
     sessionStorage.removeItem('_captchaVerified');
+    localStorage.removeItem('_captchaBlockedUntil');
+    localStorage.removeItem('_captchaTotalAttempts');
     PresenceSystem.stopAll();
     
     try { await window.auth.signOut(); } catch (e) {}
@@ -161,6 +164,35 @@ if (typeof window.auth !== 'undefined') {
         
         if (user) {
             if (_captchaActive) return;
+            
+            // ===== فحص الحظر من localStorage (يمنع الدخول حتى لو كان verified) =====
+            const blockedUntil = localStorage.getItem('_captchaBlockedUntil');
+            if (blockedUntil) {
+                const remaining = Math.ceil((parseInt(blockedUntil) - Date.now()) / 1000);
+                if (remaining > 0) {
+                    // لسه محظور - إظهار الكابتشا مع العداد فقط
+                    _pendingGoogleUser = user;
+                    _captchaActive = true;
+                    _captchaBlocked = true;
+                    _isLoggingIn = true;
+                    
+                    if (app) app.style.display = 'none';
+                    if (splash) { splash.style.display = 'none'; }
+                    const loginEl = document.querySelector('.login-screen');
+                    if (loginEl) loginEl.remove();
+                    const capEl = document.querySelector('.captcha-screen');
+                    if (capEl) capEl.remove();
+                    
+                    showCaptchaScreen(async () => {
+                        await saveUserAndEnter(user);
+                        _pendingGoogleUser = null;
+                    });
+                    return;
+                } else {
+                    localStorage.removeItem('_captchaBlockedUntil');
+                }
+            }
+            // =====================================================================
             
             const isVerified = sessionStorage.getItem('_captchaVerified') === 'true';
             
