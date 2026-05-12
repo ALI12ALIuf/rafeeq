@@ -46,17 +46,11 @@ let _captchaRemainingSeconds = 0;
     }
 })();
 
-// ========== جدول الحظر التصاعدي ==========
 function getBlockTime(totalAttempts) {
-    if (totalAttempts <= 3) return 60;
-    if (totalAttempts <= 6) return 180;
-    if (totalAttempts <= 9) return 360;
-    if (totalAttempts <= 12) return 900;
-    if (totalAttempts <= 15) return 1800;
-    if (totalAttempts <= 20) return 2400;
-    if (totalAttempts <= 25) return 3600;
-    if (totalAttempts <= 30) return 86400;
-    return 86400;
+    if (totalAttempts <= 3) return 60;      // دقيقة
+    if (totalAttempts <= 6) return 300;     // 5 دقائق
+    if (totalAttempts <= 9) return 1800;    // 30 دقيقة
+    return 86400;                            // 24 ساعة
 }
 
 // ========== توليد الكابتشا ==========
