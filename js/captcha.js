@@ -12,6 +12,22 @@ let _captchaBlockTimer = null;
 let _captchaCountdownTimer = null;
 let _captchaRemainingSeconds = 0;
 
+// ========== استعادة حالة الحظر من localStorage ==========
+(function() {
+    const blockedUntil = localStorage.getItem('_captchaBlockedUntil');
+    
+    if (blockedUntil) {
+        const remaining = Math.ceil((parseInt(blockedUntil) - Date.now()) / 1000);
+        if (remaining > 0) {
+            _captchaBlocked = true;
+            _captchaActive = true;
+            _captchaRemainingSeconds = remaining;
+        } else {
+            localStorage.removeItem('_captchaBlockedUntil');
+        }
+    }
+})();
+
 // ========== جدول الحظر التصاعدي ==========
 function getBlockTime(totalAttempts) {
     if (totalAttempts <= 3) return 60;
@@ -72,7 +88,7 @@ function drawCaptchaCanvas(code) {
 
 async function showCaptchaScreen(onSuccess) {
     _captchaActive = true;
-    _captchaBlocked = false;
+    _captchaBlocked = _captchaBlocked || false;
     _captchaAttempts = 0;
     const captchaCode = generateCaptchaLocal();
     
@@ -114,6 +130,19 @@ async function showCaptchaScreen(onSuccess) {
         drawCaptchaCanvas(captchaCode);
         const firstInput = document.querySelector('.captcha-input');
         if (firstInput) firstInput.focus();
+        
+        // إذا كان في حظر مستعاد، ابدأ العداد
+        if (_captchaBlocked && _captchaRemainingSeconds > 0) {
+            const verifyBtn = document.getElementById('captchaVerifyBtn');
+            const refreshBtn = document.getElementById('captchaRefreshBtn');
+            const inputs = document.querySelectorAll('.captcha-input');
+            
+            if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.style.opacity = '0.5'; }
+            if (refreshBtn) { refreshBtn.style.opacity = '0.5'; refreshBtn.style.pointerEvents = 'none'; }
+            inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
+            
+            startCountdown(_captchaRemainingSeconds);
+        }
     }, 300);
 }
 
@@ -169,6 +198,7 @@ function startCountdown(totalSeconds) {
             clearInterval(_captchaCountdownTimer);
             _captchaCountdownTimer = null;
             _captchaBlocked = false;
+            localStorage.removeItem('_captchaBlockedUntil');
             if (errorEl) { errorEl.textContent = ''; errorEl.style.color = 'var(--danger)'; }
             if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
             if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
@@ -228,6 +258,7 @@ window.verifyCaptcha = function() {
             if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
             sessionStorage.setItem('_captchaVerified', 'true');
             localStorage.removeItem('_captchaTotalAttempts');
+            localStorage.removeItem('_captchaBlockedUntil');
             const captchaScreen = document.querySelector('.captcha-screen');
             if (captchaScreen) {
                 inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
@@ -258,10 +289,13 @@ window.verifyCaptcha = function() {
                 inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
                 
                 const blockSeconds = getBlockTime(totalAttempts);
+                const blockedUntil = Date.now() + (blockSeconds * 1000);
+                localStorage.setItem('_captchaBlockedUntil', blockedUntil.toString());
                 
                 if (_captchaBlockTimer) clearTimeout(_captchaBlockTimer);
                 _captchaBlockTimer = setTimeout(() => {
                     _captchaBlocked = false;
+                    localStorage.removeItem('_captchaBlockedUntil');
                     if (errorEl) { errorEl.textContent = ''; }
                     if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
                     if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
