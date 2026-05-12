@@ -19,9 +19,27 @@ let _captchaRemainingSeconds = 0;
     if (blockedUntil) {
         const remaining = Math.ceil((parseInt(blockedUntil) - Date.now()) / 1000);
         if (remaining > 0) {
+            // إخفاء التطبيق فوراً
+            const app = document.getElementById('app');
+            const splash = document.getElementById('splash');
+            if (app) app.style.display = 'none';
+            if (splash) splash.style.display = 'none';
+            
             _captchaBlocked = true;
             _captchaActive = true;
             _captchaRemainingSeconds = remaining;
+            
+            // إظهار الكابتشا مع العداد بعد تحميل الصفحة
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    if (_captchaBlocked) {
+                        const loginEl = document.querySelector('.login-screen');
+                        if (loginEl) loginEl.remove();
+                        
+                        showCaptchaScreen(function() {});
+                    }
+                }, 500);
+            });
         } else {
             localStorage.removeItem('_captchaBlockedUntil');
         }
@@ -131,7 +149,6 @@ async function showCaptchaScreen(onSuccess) {
         const firstInput = document.querySelector('.captcha-input');
         if (firstInput) firstInput.focus();
         
-        // إذا كان في حظر مستعاد، ابدأ العداد
         if (_captchaBlocked && _captchaRemainingSeconds > 0) {
             const verifyBtn = document.getElementById('captchaVerifyBtn');
             const refreshBtn = document.getElementById('captchaRefreshBtn');
