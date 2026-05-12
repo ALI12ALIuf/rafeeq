@@ -227,7 +227,7 @@ window.verifyCaptcha = function() {
             if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
             if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
             sessionStorage.setItem('_captchaVerified', 'true');
-            sessionStorage.removeItem('_captchaTotalAttempts');
+            localStorage.removeItem('_captchaTotalAttempts');
             const captchaScreen = document.querySelector('.captcha-screen');
             if (captchaScreen) {
                 inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
@@ -238,9 +238,9 @@ window.verifyCaptcha = function() {
         } else {
             _captchaAttempts++;
             
-            let totalAttempts = parseInt(sessionStorage.getItem('_captchaTotalAttempts') || '0');
+            let totalAttempts = parseInt(localStorage.getItem('_captchaTotalAttempts') || '0');
             totalAttempts++;
-            sessionStorage.setItem('_captchaTotalAttempts', totalAttempts.toString());
+            localStorage.setItem('_captchaTotalAttempts', totalAttempts.toString());
             
             for (let i = 0; i < 6; i++) {
                 if (inputs[i].value !== _captchaCode[i]) {
