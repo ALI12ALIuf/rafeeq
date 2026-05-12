@@ -28,8 +28,7 @@ function showApp() {
     _pendingGoogleUser = null;
     if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
     if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
-    localStorage.removeItem('_captchaTotalAttempts');
-    localStorage.removeItem('_captchaBlockedUntil');
+    sessionStorage.removeItem('_captchaTotalAttempts');
     sessionStorage.setItem('_captchaVerified', 'true');
     
     const splash = document.getElementById('splash'), app = document.getElementById('app');
@@ -131,8 +130,6 @@ async function logout() {
     } catch (e) {}
     
     sessionStorage.removeItem('_captchaVerified');
-    localStorage.removeItem('_captchaBlockedUntil');
-    localStorage.removeItem('_captchaTotalAttempts');
     PresenceSystem.stopAll();
     
     try { await window.auth.signOut(); } catch (e) {}
@@ -163,9 +160,6 @@ if (typeof window.auth !== 'undefined') {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            // ===== سطر واحد يمنع الدخول تماماً إذا كان في حظر =====
-            if (localStorage.getItem('_captchaBlockedUntil')) return;
-            
             if (_captchaActive) return;
             
             const isVerified = sessionStorage.getItem('_captchaVerified') === 'true';
