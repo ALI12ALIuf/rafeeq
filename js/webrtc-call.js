@@ -5,6 +5,7 @@ const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
+    currentCallType: 'video',
     servers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' },{ urls: 'stun:stun1.l.google.com:19302' },{ urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
     
     async ensureDataChannel(calleeId) {
@@ -83,11 +84,27 @@ const CallSystem = {
         this.reconnectTimer = setTimeout(async () => { try { if (ChatSystem.currentChat && ChatSystem.friendOnline) await this.ensureDataChannel(ChatSystem.currentChat); } catch (error) {} this.reconnectTimer = null; }, delay);
     },
     
+    // ========== بدء المكالمة مع إرسال إشارة "اتصال وارد" ==========
     async startCall(calleeId, callType = 'video') {
-        if (!window.auth?.currentUser || this.isInCall) return;
+        if (!window.auth?.currentUser || this.isInCall) {
+            if (this.isInCall) alert('لديك مكالمة جارية بالفعل');
+            return;
+        }
         this.isInCall = true;
+        this.currentCallType = callType;
+        
         try {
-            const constraints = { audio: true, video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
+            // إرسال إشارة "اتصال وارد" للطرف الآخر
+            await this.sendSignal(calleeId, { 
+                type: 'incoming-call',
+                callType: callType,
+                callerName: document.getElementById('profileName')?.textContent || 'مستخدم'
+            });
+            
+            const constraints = { 
+                audio: true, 
+                video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false 
+            };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(callType);
             this.pc = new RTCPeerConnection(this.servers);
@@ -95,10 +112,21 @@ const CallSystem = {
             this.dc = this.pc.createDataChannel('chat'); this.setupDataChannel(this.dc);
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
             this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv && e.streams[0]) rv.srcObject = e.streams[0]; };
-            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
+            this.pc.onconnectionstatechange = () => { 
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                    this.endCall();
+                }
+                if (this.pc && this.pc.connectionState === 'connected') {
+                    // إلغاء إشارة الاتصال الوارد بعد الاتصال
+                    this.sendSignal(calleeId, { type: 'call-connected' }).catch(() => {});
+                }
+            };
             const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-        } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
+            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, callType: callType });
+        } catch (e) { 
+            this.endCall(); 
+            if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون');
+        }
     },
     
     async sendFileDirect(file, type) {
@@ -124,26 +152,80 @@ const CallSystem = {
                 await new Promise(r => setTimeout(r, 50));
             }
             ChatSystem.hideProgressBar();
-            console.log('✅ تم الإرسال بنجاح');
             return true;
         } catch (e) { ChatSystem.hideProgressBar(); return false; }
     },
     
+    // ========== إظهار نافذة اتصال وارد ==========
     showIncomingCall(callerId, callData) {
-        const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        const overlay = document.createElement('div'); overlay.id = 'incomingCall';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
-        overlay.innerHTML = `<div style="font-size:1.5rem;">📞 ${contactName} يتصل بك...</div><div style="display:flex;gap:30px;"><button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button><button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button></div>`;
+        // إزالة أي نافذة قديمة
+        const oldInc = document.getElementById('incomingCall');
+        if (oldInc) oldInc.remove();
+        
+        const callerName = callData.callerName || 'مستخدم';
+        const callType = callData.callType || 'video';
+        const callLabel = callType === 'video' ? '📹 فيديو' : '📞 صوت';
+        
+        const overlay = document.createElement('div'); 
+        overlay.id = 'incomingCall';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:20px;';
+        overlay.innerHTML = `
+            <div style="font-size:4rem;">${callType === 'video' ? '📹' : '📞'}</div>
+            <div style="font-size:1.5rem;font-weight:bold;">${callerName}</div>
+            <div style="font-size:1rem;color:#ccc;">${callLabel} - اتصال وارد...</div>
+            <div style="display:flex;gap:30px;margin-top:10px;">
+                <button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button>
+                <button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button>
+            </div>`;
         document.body.appendChild(overlay);
-        document.getElementById('btnAccept').onclick = () => { overlay.remove(); this.receiveCall(callerId, callData); };
-        document.getElementById('btnReject').onclick = () => { overlay.remove(); };
+        
+        // إصدار صوت رنين (اختياري)
+        this._playRingtone();
+        
+        document.getElementById('btnAccept').onclick = () => { 
+            this._stopRingtone();
+            overlay.remove(); 
+            this.receiveCall(callerId, callData); 
+        };
+        
+        document.getElementById('btnReject').onclick = () => { 
+            this._stopRingtone();
+            overlay.remove();
+            this.sendSignal(callerId, { type: 'call-rejected' });
+        };
+        
+        // المهلة: 30 ثانية وإذا ما رد، ينتهي
+        this._ringTimeout = setTimeout(() => {
+            this._stopRingtone();
+            overlay.remove();
+            this.sendSignal(callerId, { type: 'call-timeout' });
+        }, 30000);
     },
     
-    async receiveCall(callerId, callData) {
-        if (this.isInCall) return;
-        this.isInCall = true;
+    _playRingtone() {
         try {
-            const hasVideo = callData.sdp?.sdp?.includes('video') !== false;
+            this._ringAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/f4B/f3+Af39/gH9/fHb29vbw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8');
+            this._ringAudio.loop = true;
+            this._ringAudio.play().catch(() => {});
+        } catch(e) {}
+    },
+    
+    _stopRingtone() {
+        if (this._ringTimeout) { clearTimeout(this._ringTimeout); this._ringTimeout = null; }
+        if (this._ringAudio) { this._ringAudio.pause(); this._ringAudio = null; }
+    },
+    
+    // ========== استقبال المكالمة ==========
+    async receiveCall(callerId, callData) {
+        if (this.isInCall) {
+            this.sendSignal(callerId, { type: 'call-busy' });
+            return;
+        }
+        this.isInCall = true;
+        this.currentCallType = callData.callType || 'audio';
+        
+        try {
+            const hasVideo = callData.sdp?.sdp?.includes('video') !== false || callData.callType === 'video';
             const constraints = { audio: true, video: hasVideo ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(hasVideo ? 'video' : 'audio');
@@ -152,16 +234,73 @@ const CallSystem = {
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
             this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv && e.streams[0]) rv.srcObject = e.streams[0]; };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
-            if (callData.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); await this.sendSignal(callerId, { sdp: this.pc.localDescription }); }
-        } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
+            this.pc.onconnectionstatechange = () => { 
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                    this.endCall();
+                }
+            };
+            if (callData.sdp) { 
+                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); 
+                const answer = await this.pc.createAnswer(); 
+                await this.pc.setLocalDescription(answer); 
+                await this.sendSignal(callerId, { sdp: this.pc.localDescription }); 
+            }
+        } catch (e) { 
+            this.endCall(); 
+            if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون');
+        }
     },
     
+    // ========== معالجة الإشارات (معدلة لدعم المكالمات الواردة) ==========
     async handleSignaling(data) {
         try {
-            if (!this.pc) { this.pc = new RTCPeerConnection(this.servers); this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); }; }
-            if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); if (data.sdp.type === 'offer') { const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); } }
-            else if (data.candidate) await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            // إشارة اتصال وارد
+            if (data.type === 'incoming-call') {
+                const callerId = ChatSystem.currentChat;
+                if (callerId) {
+                    this.showIncomingCall(callerId, data);
+                }
+                return;
+            }
+            
+            // إشارة رفض المكالمة
+            if (data.type === 'call-rejected') {
+                this._stopRingtone();
+                alert('تم رفض المكالمة');
+                this.endCall();
+                return;
+            }
+            
+            // إشارة انتهاء المهلة
+            if (data.type === 'call-timeout') {
+                this._stopRingtone();
+                alert('لم يتم الرد على المكالمة');
+                this.endCall();
+                return;
+            }
+            
+            // إشارة مشغول
+            if (data.type === 'call-busy') {
+                alert('المستخدم مشغول بمكالمة أخرى');
+                this.endCall();
+                return;
+            }
+            
+            if (!this.pc) { 
+                this.pc = new RTCPeerConnection(this.servers); 
+                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; 
+                this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); }; 
+            }
+            if (data.sdp) { 
+                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); 
+                if (data.sdp.type === 'offer') { 
+                    const answer = await this.pc.createAnswer(); 
+                    await this.pc.setLocalDescription(answer); 
+                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); 
+                } 
+            } else if (data.candidate) {
+                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
         } catch (e) {}
     },
     
@@ -176,11 +315,37 @@ const CallSystem = {
         } catch (error) {}
     },
     
-    showCallUI(callType) { document.body.classList.add('in-call'); const ui = document.createElement('div'); ui.id = 'callUI'; ui.innerHTML = `<video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video><video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video><div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;"><button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button><button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button><button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">📹</button></div>`; document.body.appendChild(ui); const lv = document.getElementById('localVideo'); if (lv && this.localStream) lv.srcObject = this.localStream; },
+    showCallUI(callType) { 
+        document.body.classList.add('in-call'); 
+        const ui = document.createElement('div'); ui.id = 'callUI'; 
+        ui.innerHTML = `<video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video><video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video><div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;"><button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button><button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button><button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">📹</button></div>`; 
+        document.body.appendChild(ui); 
+        const lv = document.getElementById('localVideo'); if (lv && this.localStream) lv.srcObject = this.localStream; 
+    },
+    
     toggleAudio() { if (this.localStream) { const at = this.localStream.getAudioTracks()[0]; if (at) at.enabled = !at.enabled; } },
     toggleVideo() { if (this.localStream) { const vt = this.localStream.getVideoTracks()[0]; if (vt) vt.enabled = !vt.enabled; } },
-    endCall() { this.isInCall = false; document.body.classList.remove('in-call'); if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } this.cleanupConnections(); const ui = document.getElementById('callUI'); if (ui) ui.remove(); const inc = document.getElementById('incomingCall'); if (inc) inc.remove(); },
-    cleanupConnections() { if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; } if (this.dc) { this.dc.close(); this.dc = null; } if (this.pc) { this.pc.close(); this.pc = null; } this.incomingChunks = {}; this.incomingFileInfo = {}; }
+    
+    endCall() { 
+        this.isInCall = false; 
+        this._stopRingtone();
+        document.body.classList.remove('in-call'); 
+        if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } 
+        // إرسال إشارة إنهاء المكالمة للطرف الآخر
+        if (ChatSystem.currentChat) {
+            this.sendSignal(ChatSystem.currentChat, { type: 'call-ended' }).catch(() => {});
+        }
+        this.cleanupConnections(); 
+        const ui = document.getElementById('callUI'); if (ui) ui.remove(); 
+        const inc = document.getElementById('incomingCall'); if (inc) inc.remove(); 
+    },
+    
+    cleanupConnections() { 
+        if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; } 
+        if (this.dc) { this.dc.close(); this.dc = null; } 
+        if (this.pc) { this.pc.close(); this.pc = null; } 
+        this.incomingChunks = {}; this.incomingFileInfo = {}; 
+    }
 };
 
 window.startVideoCall = async () => { if (!ChatSystem.currentChat) return; await CallSystem.startCall(ChatSystem.currentChat, 'video'); };
