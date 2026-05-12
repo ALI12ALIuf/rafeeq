@@ -47,10 +47,10 @@ let _captchaRemainingSeconds = 0;
 })();
 
 function getBlockTime(totalAttempts) {
-    if (totalAttempts <= 3) return 60;      // دقيقة
-    if (totalAttempts <= 6) return 300;     // 5 دقائق
-    if (totalAttempts <= 9) return 1800;    // 30 دقيقة
-    return 86400;                            // 24 ساعة
+    if (totalAttempts <= 3) return 60;
+    if (totalAttempts <= 6) return 300;
+    if (totalAttempts <= 9) return 1800;
+    return 86400;
 }
 
 // ========== توليد الكابتشا ==========
