@@ -190,7 +190,61 @@ const CallSystem = {
         } catch (error) {}
     },
     
-    showCallUI(callType) { document.body.classList.add('in-call'); const ui = document.createElement('div'); ui.id = 'callUI'; ui.innerHTML = `<video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video><video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video><div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;"><button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button><button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button><button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">📹</button></div>`; document.body.appendChild(ui); const lv = document.getElementById('localVideo'); if (lv && this.localStream) lv.srcObject = this.localStream; },
+    // ========== تبديل الكاميرا ==========
+    async switchCamera() {
+        if (!this.localStream) return;
+        
+        const videoTrack = this.localStream.getVideoTracks()[0];
+        if (!videoTrack) return;
+        
+        const currentFacing = videoTrack.getSettings().facingMode;
+        const newFacing = currentFacing === 'user' ? 'environment' : 'user';
+        
+        videoTrack.stop();
+        
+        try {
+            const newStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
+            });
+            
+            const newVideoTrack = newStream.getVideoTracks()[0];
+            
+            // استبدال المسار في PeerConnection
+            if (this.pc) {
+                const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) await sender.replaceTrack(newVideoTrack);
+            }
+            
+            // تحديث localStream
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
+            
+            // تحديث الفيديو المحلي
+            const lv = document.getElementById('localVideo');
+            if (lv) lv.srcObject = this.localStream;
+            
+        } catch (e) {
+            console.error('❌ فشل تبديل الكاميرا:', e);
+        }
+    },
+    
+    showCallUI(callType) { 
+        document.body.classList.add('in-call'); 
+        const ui = document.createElement('div'); ui.id = 'callUI'; 
+        ui.innerHTML = `
+            <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video>
+            <video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video>
+            <div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;">
+                <button onclick="CallSystem.switchCamera()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🔄</button>
+                <button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">🎤</button>
+                <button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">📞</button>
+                <button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;">📹</button>
+            </div>`; 
+        document.body.appendChild(ui); 
+        const lv = document.getElementById('localVideo'); 
+        if (lv && this.localStream) lv.srcObject = this.localStream; 
+    },
+    
     toggleAudio() { if (this.localStream) { const at = this.localStream.getAudioTracks()[0]; if (at) at.enabled = !at.enabled; } },
     toggleVideo() { if (this.localStream) { const vt = this.localStream.getVideoTracks()[0]; if (vt) vt.enabled = !vt.enabled; } },
     endCall() { this.isInCall = false; document.body.classList.remove('in-call'); if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; } this.cleanupConnections(); const ui = document.getElementById('callUI'); if (ui) ui.remove(); const inc = document.getElementById('incomingCall'); if (inc) inc.remove(); },
