@@ -87,7 +87,14 @@ const CallSystem = {
         if (!window.auth?.currentUser || this.isInCall) return;
         this.isInCall = true;
         try {
-            const constraints = { audio: true, video: callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
+            const constraints = { 
+                audio: true, 
+                video: callType === 'video' ? { 
+                    width: { ideal: 640 }, 
+                    height: { ideal: 480 },
+                    facingMode: 'user'
+                } : false 
+            };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(callType);
             this.pc = new RTCPeerConnection(this.servers);
@@ -144,7 +151,14 @@ const CallSystem = {
         this.isInCall = true;
         try {
             const hasVideo = callData.sdp?.sdp?.includes('video') !== false;
-            const constraints = { audio: true, video: hasVideo ? { width: { ideal: 640 }, height: { ideal: 480 } } : false };
+            const constraints = { 
+                audio: true, 
+                video: hasVideo ? { 
+                    width: { ideal: 640 }, 
+                    height: { ideal: 480 },
+                    facingMode: 'user'
+                } : false 
+            };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(hasVideo ? 'video' : 'audio');
             this.pc = new RTCPeerConnection(this.servers);
