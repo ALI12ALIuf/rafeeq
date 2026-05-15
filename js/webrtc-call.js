@@ -5,6 +5,7 @@ const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
+    callTimerInterval: null,
     servers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' },{ urls: 'stun:stun1.l.google.com:19302' },{ urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
     
     async ensureDataChannel(calleeId) {
@@ -87,25 +88,27 @@ const CallSystem = {
         if (!window.auth?.currentUser || this.isInCall) return;
         this.isInCall = true;
         
-        // حفظ نوع المكالمة للاستخدام في oniceconnectionstatechange وغيره
-        this.currentCallType = callType;
-        
         try {
-            // طلب الصوت فقط في حالة المكالمة الصوتية، أو الصوت+الفيديو في حالة الفيديو
+            // تحديد المتطلبات حسب نوع المكالمة
             const constraints = { 
-                audio: true, 
-                video: callType === 'video' ? { 
+                audio: true,
+                video: false  // افتراضياً بدون فيديو
+            };
+            
+            // إذا كانت مكالمة فيديو، أضف الفيديو
+            if (callType === 'video') {
+                constraints.video = { 
                     width: { ideal: 640 }, 
                     height: { ideal: 480 },
                     facingMode: 'user'
-                } : false 
-            };
+                };
+            }
             
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(callType);
             this.pc = new RTCPeerConnection(this.servers);
             
-            // إضافة المسارات حسب نوع المكالمة
+            // إضافة المسارات
             this.localStream.getTracks().forEach(track => {
                 this.pc.addTrack(track, this.localStream);
             });
@@ -116,14 +119,11 @@ const CallSystem = {
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
             
             this.pc.ontrack = e => { 
-                // في المكالمة الصوتية، لا نحتاج لعرض فيديو، لكن الصوت سيشتغل تلقائياً
                 if (callType === 'video') {
                     const rv = document.getElementById('remoteVideo'); 
                     if (rv && e.streams[0]) rv.srcObject = e.streams[0]; 
-                } else {
-                    // للمكالمات الصوتية، فقط نطمئن أن الصوت يصل لكن لا نعرض فيديو
-                    console.log('Stream received for audio call');
                 }
+                // الصوت سيصل تلقائياً في كلتا الحالتين
             };
             
             this.pc.onconnectionstatechange = () => { 
@@ -131,8 +131,7 @@ const CallSystem = {
                     this.endCall(); 
             };
             
-            // إنشاء العرض (offer) حسب نوع المكالمة
-            // للمكالمة الصوتية: offerToReceiveVideo = false لتقليل استهلاك الإشارات
+            // إنشاء العرض - للمكالمة الصوتية لا نطلب فيديو
             const offerOptions = callType === 'video' 
                 ? { offerToReceiveAudio: true, offerToReceiveVideo: true }
                 : { offerToReceiveAudio: true, offerToReceiveVideo: false };
@@ -140,12 +139,14 @@ const CallSystem = {
             const offer = await this.pc.createOffer(offerOptions); 
             await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
+            
         } catch (e) { 
             this.endCall(); 
             if (e.name === 'NotAllowedError') {
                 alert(callType === 'video' ? 'يرجى السماح بالوصول إلى الكاميرا والميكروفون' : 'يرجى السماح بالوصول إلى الميكروفون');
             } else {
                 console.error('startCall error:', e);
+                alert('حدث خطأ في بدء المكالمة: ' + e.message);
             }
         }
     },
@@ -180,17 +181,18 @@ const CallSystem = {
     
     showIncomingCall(callerId, callData) {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        // تحديد نوع المكالمة من SDP (إذا كان يحتوي على video track)
-        const hasVideo = callData.sdp?.sdp?.includes('m=video') || false;
+        // التحقق من نوع المكالمة من SDP
+        const sdp = callData.sdp?.sdp || '';
+        const hasVideo = sdp.includes('m=video') && (sdp.includes('sendrecv') || sdp.includes('recvonly'));
         const callType = hasVideo ? 'video' : 'audio';
         
         const overlay = document.createElement('div'); overlay.id = 'incomingCall';
         overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
         overlay.innerHTML = `
-            <div style="font-size:1.5rem;text-align:center;">
-                <i class="fas fa-phone-alt" style="font-size:2rem;display:block;margin-bottom:10px;"></i>
-                📞 ${contactName} يتصل بك...
-                <div style="font-size:0.9rem;margin-top:8px;color:#ccc;">${callType === 'video' ? 'مكالمة فيديو' : 'مكالمة صوتية'}</div>
+            <div style="text-align:center;">
+                <div style="font-size:3rem;margin-bottom:10px;">${callType === 'video' ? '📹' : '🎧'}</div>
+                <div style="font-size:1.5rem;">📞 ${contactName}</div>
+                <div style="font-size:1rem;margin-top:8px;color:#ccc;">${callType === 'video' ? 'مكالمة فيديو' : 'مكالمة صوتية'}</div>
             </div>
             <div style="display:flex;gap:30px;">
                 <button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">
@@ -202,8 +204,7 @@ const CallSystem = {
             </div>`;
         document.body.appendChild(overlay);
         
-        // حفظ نوع المكالمة للمتغير
-        overlay._callType = callType;
+        overlay._callData = { callerId, callData, callType };
         
         document.getElementById('btnAccept').onclick = () => { 
             overlay.remove(); 
@@ -216,20 +217,25 @@ const CallSystem = {
         if (this.isInCall) return;
         this.isInCall = true;
         
-        // تحديد نوع المكالمة من البيانات
-        const hasVideo = callData.sdp?.sdp?.includes('m=video') || false;
+        // تحديد نوع المكالمة من SDP
+        const sdp = callData.sdp?.sdp || '';
+        const hasVideo = sdp.includes('m=video') && (sdp.includes('sendrecv') || sdp.includes('recvonly'));
         const callType = hasVideo ? 'video' : 'audio';
-        this.currentCallType = callType;
         
         try {
             const constraints = { 
-                audio: true, 
-                video: hasVideo ? { 
+                audio: true,
+                video: false
+            };
+            
+            if (hasVideo) {
+                constraints.video = { 
                     width: { ideal: 640 }, 
                     height: { ideal: 480 },
                     facingMode: 'user'
-                } : false 
-            };
+                };
+            }
+            
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(callType);
             this.pc = new RTCPeerConnection(this.servers);
@@ -252,7 +258,6 @@ const CallSystem = {
             
             if (callData.sdp) { 
                 await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); 
-                // إنشاء الإجابة حسب نوع المكالمة
                 const answerOptions = hasVideo 
                     ? { offerToReceiveAudio: true, offerToReceiveVideo: true }
                     : { offerToReceiveAudio: true, offerToReceiveVideo: false };
@@ -264,6 +269,9 @@ const CallSystem = {
             this.endCall(); 
             if (e.name === 'NotAllowedError') {
                 alert(hasVideo ? 'يرجى السماح بالوصول إلى الكاميرا والميكروفون' : 'يرجى السماح بالوصول إلى الميكروفون');
+            } else {
+                console.error('receiveCall error:', e);
+                alert('حدث خطأ في استقبال المكالمة: ' + e.message);
             }
         }
     },
@@ -278,7 +286,6 @@ const CallSystem = {
             if (data.sdp) { 
                 await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); 
                 if (data.sdp.type === 'offer') { 
-                    // تحديد إذا كانت المكالمة تحتوي فيديو أم لا
                     const hasVideo = data.sdp.sdp?.includes('m=video') || false;
                     const answerOptions = hasVideo 
                         ? { offerToReceiveAudio: true, offerToReceiveVideo: true }
@@ -347,7 +354,6 @@ const CallSystem = {
         const ui = document.createElement('div'); ui.id = 'callUI'; 
         
         if (callType === 'audio') {
-            // واجهة المكالمات الصوتية فقط
             ui.innerHTML = `
                 <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
                 <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
@@ -367,7 +373,6 @@ const CallSystem = {
                 </div>
             `;
         } else {
-            // واجهة مكالمات الفيديو الكاملة
             ui.innerHTML = `
                 <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9997;background:#000;"></video>
                 <video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;box-shadow:0 2px 10px rgba(0,0,0,0.3);"></video>
@@ -386,8 +391,6 @@ const CallSystem = {
                     </button>
                 </div>
             `;
-            // إضافة مؤقت المكالمة للمكالمات الصوتية أو المرئية
-            this.startCallTimer();
         }
         
         document.body.appendChild(ui);
@@ -421,7 +424,6 @@ const CallSystem = {
             const at = this.localStream.getAudioTracks()[0]; 
             if (at) {
                 at.enabled = !at.enabled;
-                // تحديث شكل الزر حسب الحالة
                 const btns = document.querySelectorAll('#callUI button[onclick*="toggleAudio"] i');
                 btns.forEach(btn => {
                     if (at.enabled) {
