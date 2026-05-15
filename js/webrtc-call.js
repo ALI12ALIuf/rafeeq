@@ -5,7 +5,7 @@ const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
-    callTimerInterval: null, // متغير للمؤقت
+    callTimerInterval: null, // مؤقت عداد المكالمة
     servers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' },{ urls: 'stun:stun1.l.google.com:19302' },{ urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
     
     async ensureDataChannel(calleeId) {
@@ -102,12 +102,7 @@ const CallSystem = {
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             this.dc = this.pc.createDataChannel('chat'); this.setupDataChannel(this.dc);
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => { 
-                if (callType === 'video') {
-                    const rv = document.getElementById('remoteVideo'); 
-                    if (rv && e.streams[0]) rv.srcObject = e.streams[0]; 
-                }
-            };
+            this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv && e.streams[0]) rv.srcObject = e.streams[0]; };
             this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
             const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
@@ -146,7 +141,7 @@ const CallSystem = {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const overlay = document.createElement('div'); overlay.id = 'incomingCall';
         overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
-        overlay.innerHTML = `<div style="font-size:1.5rem;">📞 ${contactName} يتصل بك...</div><div style="display:flex;gap:30px;"><button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button><button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button></div>`;
+        overlay.innerHTML = `<div style="font-size:1.5rem;">📞 ${this.escapeHtml(contactName)} يتصل بك...</div><div style="display:flex;gap:30px;"><button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button><button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button></div>`;
         document.body.appendChild(overlay);
         document.getElementById('btnAccept').onclick = () => { overlay.remove(); this.receiveCall(callerId, callData); };
         document.getElementById('btnReject').onclick = () => { overlay.remove(); };
@@ -170,12 +165,7 @@ const CallSystem = {
             this.pc = new RTCPeerConnection(this.servers);
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => { 
-                if (hasVideo) {
-                    const rv = document.getElementById('remoteVideo'); 
-                    if (rv && e.streams[0]) rv.srcObject = e.streams[0]; 
-                }
-            };
+            this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv && e.streams[0]) rv.srcObject = e.streams[0]; };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
             this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
             if (callData.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); await this.sendSignal(callerId, { sdp: this.pc.localDescription }); }
@@ -238,12 +228,12 @@ const CallSystem = {
             console.error('❌ فشل تبديل الكاميرا:', e);
         }
     },
-
-    // ========== واجهة المكالمات (صوت وفيديو) ==========
+    
+    // ========== واجهة المستخدم للمكالمات (محدثة) ==========
     showCallUI(callType) { 
         document.body.classList.add('in-call'); 
         
-        // إزالة أي واجهة قديمة
+        // إزالة أي واجهة مكالمة قديمة لتجنب التكرار
         const existingUI = document.getElementById('callUI');
         if (existingUI) existingUI.remove();
 
@@ -254,12 +244,12 @@ const CallSystem = {
         const contactName = document.getElementById('conversationName')?.textContent || 'جاري الاتصال...';
         
         if (callType === 'audio') {
-            // ========== واجهة المكالمة الصوتية فقط ==========
+            // --- واجهة المكالمة الصوتية فقط ---
             ui.innerHTML = `
                 <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;">
-                    <div style="font-size:5rem;margin-bottom:1rem;">🎙️</div>
-                    <div style="font-size:1.5rem;font-weight:bold;margin-bottom:0.5rem;">${this.escapeHtml(contactName)}</div>
-                    <div id="callTimer" style="font-size:1rem;color:#ccc;margin-bottom:2rem;">00:00</div>
+                    <div class="call-avatar" style="font-size:5rem;margin-bottom:1rem;">🎙️</div>
+                    <div class="call-name" style="font-size:1.5rem;font-weight:bold;margin-bottom:0.5rem;">${this.escapeHtml(contactName)}</div>
+                    <div class="call-timer" id="callTimer" style="font-size:1rem;color:#ccc;margin-bottom:2rem;">00:00</div>
                     <div style="display:flex;gap:30px;">
                         <button onclick="CallSystem.toggleAudio()" style="width:60px;height:60px;border-radius:50%;background:#333;color:white;border:none;font-size:1.5rem;cursor:pointer;" title="كتم الصوت">🎤</button>
                         <button onclick="CallSystem.endCall()" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;" title="إنهاء المكالمة">📞</button>
@@ -267,7 +257,7 @@ const CallSystem = {
                     </div>
                 </div>`;
             
-            // بدء عداد المكالمة
+            // بدء العداد من 0
             let callDuration = 0;
             this.callTimerInterval = setInterval(() => {
                 callDuration++;
@@ -277,8 +267,7 @@ const CallSystem = {
                 if (timerElement) timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }, 1000);
         } 
-        else {
-            // ========== واجهة المكالمة المرئية (فيديو) ==========
+        else { // video call
             ui.innerHTML = `
                 <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video>
                 <video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;"></video>
@@ -288,8 +277,8 @@ const CallSystem = {
                     <button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;" title="إنهاء المكالمة">📞</button>
                     <button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:#333;color:white;border:none;font-size:1.2rem;cursor:pointer;" title="إيقاف/تشغيل الكاميرا">📹</button>
                 </div>`;
-            
-            // ربط عناصر الفيديو
+                
+            // ربط عناصر الفيديو بعد إضافتها للصفحة
             setTimeout(() => {
                 const lv = document.getElementById('localVideo'); 
                 if (lv && this.localStream) lv.srcObject = this.localStream; 
@@ -299,17 +288,18 @@ const CallSystem = {
         document.body.appendChild(ui); 
     },
     
-    // دالة لتنظيف النص من أكواد HTML
+    // إضافة دالة مساعدة لتنظيف النص من أكواد HTML
     escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     },
-    
-    // دالة لمكبر الصوت (مؤقتاً رسالة)
+
+    // إضافة دالة للتحكم بمكبر الصوت
     toggleSpeaker() {
-        alert('ميزة تبديل مكبر الصوت قيد التطوير');
+        // تنبيه بسيط للمستخدم أن الميزة قيد التطوير
+        alert('ميزة مكبر الصوت قيد التطوير في هذا الإصدار');
     },
     
     toggleAudio() { if (this.localStream) { const at = this.localStream.getAudioTracks()[0]; if (at) at.enabled = !at.enabled; } },
@@ -328,7 +318,7 @@ const CallSystem = {
         const inc = document.getElementById('incomingCall'); 
         if (inc) inc.remove(); 
         
-        // إيقاف المؤقت إذا كان موجود
+        // تنظيف المؤقت
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
