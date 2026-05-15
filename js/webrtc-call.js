@@ -6,6 +6,7 @@ const CallSystem = {
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
     // تم إضافة خوادم STUN متعددة لتحسين نسبة نجاح الاتصال المباشر (الحل 1)
+    // تم استبدال بيانات TURN العامة ببيانات الحساب الخاص لتتبع الاستهلاك
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -14,8 +15,9 @@ const CallSystem = {
             { urls: 'stun:stun3.l.google.com:19302' },
             { urls: 'stun:stun4.l.google.com:19302' },
             { urls: 'stun:stun.stunprotocol.org:3478' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+            // بيانات TURN الخاصة بالحساب - تم استبدالها
+            { urls: 'turn:global.relay.metered.ca:80', username: '460cc44c5eb30bcd14ce1f80', credential: '+gA3syWmwiMbEXQA' },
+            { urls: 'turn:global.relay.metered.ca:443', username: '460cc44c5eb30bcd14ce1f80', credential: '+gA3syWmwiMbEXQA' }
         ] 
     },
     
