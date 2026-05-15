@@ -1,5 +1,5 @@
-// ========== webrtc-call.js ==========
-// نظام اتصال WebRTC مباشر + المكالمات + إرسال الملفات (الإصدار النهائي المستقر)
+// ========== webrtc-call.js (الإصدار النهائي المستقر والمنفصل) ==========
+// نظام اتصال WebRTC مباشر + مكالمات صوتية/مرئية منفصلة + إرسال الملفات
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
@@ -84,7 +84,7 @@ const CallSystem = {
         this.reconnectTimer = setTimeout(async () => { try { if (ChatSystem.currentChat && ChatSystem.friendOnline) await this.ensureDataChannel(ChatSystem.currentChat); } catch (error) {} this.reconnectTimer = null; }, delay);
     },
     
-    // ========== بدء المكالمة (إصدار منفصل ومستقر) ==========
+    // ========== بدء المكالمة (منفصل تمامًا) ==========
     async startCall(calleeId, callType = 'video') {
         if (!window.auth?.currentUser || this.isInCall) return;
         this.isInCall = true;
@@ -99,22 +99,24 @@ const CallSystem = {
             // 2. الحصول على التيار المحلي
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
-            // 3. عرض واجهة المستخدم المناسبة (صوت أو فيديو)
+            // 3. عرض واجهة المستخدم المناسبة
             this.showCallUI(callType);
             
             // 4. إنشاء اتصال PeerConnection جديد
             this.pc = new RTCPeerConnection(this.servers);
             
-            // 5. إضافة المسارات (audio فقط للصوت، audio+video للفيديو)
-            this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-            });
+            // 5. إضافة المسارات (معالجة دقيقة)
+            if (this.localStream) {
+                this.localStream.getTracks().forEach(track => {
+                    this.pc.addTrack(track, this.localStream);
+                });
+            }
             
             // 6. إنشاء قناة البيانات (للملفات والإشارات)
             this.dc = this.pc.createDataChannel('chat');
             this.setupDataChannel(this.dc);
             
-            // 7. معالج المرشحين (ICE candidates)
+            // 7. معالج المرشحين
             this.pc.onicecandidate = (event) => {
                 if (event.candidate) {
                     this.sendSignal(calleeId, { candidate: event.candidate });
@@ -138,7 +140,7 @@ const CallSystem = {
                 }
             };
             
-            // 10. إنشاء العرض (Offer) مع تحديد نوع الوسائط المطلوب استقبالها
+            // 10. إنشاء العرض (Offer) مع تحديد نوع الوسائط المطلوب استقبالها (الحل النهائي)
             const offerOptions = {
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: (callType === 'video')
@@ -146,7 +148,7 @@ const CallSystem = {
             const offer = await this.pc.createOffer(offerOptions);
             await this.pc.setLocalDescription(offer);
             
-            // 11. إرسال الإشارة مع تحديد نوع المكالمة
+            // 11. إرسال الإشارة مع تحديد نوع المكالمة (مهم جدًا)
             await this.sendSignal(calleeId, { 
                 sdp: this.pc.localDescription, 
                 callType: callType 
@@ -221,11 +223,12 @@ const CallSystem = {
         };
     },
     
-    // ========== استقبال المكالمة (إصدار منفصل ومستقر) ==========
+    // ========== استقبال المكالمة (منفصل تمامًا ومعالجة صحيحة لنوع المكالمة) ==========
     async receiveCall(callerId, callData) {
         if (this.isInCall) return;
         this.isInCall = true;
         
+        // تحديد نوع المكالمة من البيانات المرسلة
         const isVideoCall = (callData.callType === 'video');
         
         try {
@@ -245,9 +248,11 @@ const CallSystem = {
             this.pc = new RTCPeerConnection(this.servers);
             
             // 5. إضافة المسارات المحلية
-            this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-            });
+            if (this.localStream) {
+                this.localStream.getTracks().forEach(track => {
+                    this.pc.addTrack(track, this.localStream);
+                });
+            }
             
             // 6. معالج المرشحين
             this.pc.onicecandidate = (event) => {
@@ -282,7 +287,13 @@ const CallSystem = {
             // 10. تعيين الوصف البعيد وإنشاء الإجابة
             if (callData.sdp) {
                 await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
-                const answer = await this.pc.createAnswer();
+                
+                // إنشاء الإجابة (Answer) بناءً على نوع المكالمة (مهم جدًا)
+                const answerOptions = {
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: isVideoCall
+                };
+                const answer = await this.pc.createAnswer(answerOptions);
                 await this.pc.setLocalDescription(answer);
                 await this.sendSignal(callerId, { sdp: this.pc.localDescription });
             }
@@ -363,7 +374,7 @@ const CallSystem = {
         }
     },
     
-    // ========== واجهة المستخدم المتطورة ==========
+    // ========== واجهة المستخدم المتطورة (صوت وفيديو منفصلين) ==========
     showCallUI(callType) { 
         document.body.classList.add('in-call'); 
         
@@ -376,7 +387,7 @@ const CallSystem = {
         const contactName = document.getElementById('conversationName')?.textContent || 'رفيق';
         
         if (callType === 'audio') {
-            // واجهة المكالمة الصوتية
+            // واجهة المكالمة الصوتية (مصممة خصيصًا)
             ui.innerHTML = `
                 <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:sans-serif;">
                     <div style="text-align:center;">
@@ -394,6 +405,7 @@ const CallSystem = {
                     <div style="position:absolute;bottom:20px;font-size:0.7rem;color:#666;">مكالمة صوتية مشفرة</div>
                 </div>`;
             
+            // بدء العداد
             let callDuration = 0;
             if (this.callTimerInterval) clearInterval(this.callTimerInterval);
             this.callTimerInterval = setInterval(() => {
@@ -433,12 +445,7 @@ const CallSystem = {
     },
 
     toggleSpeaker() {
-        // محاولة تجريبية لتفعيل مكبر الصوت
-        if (this.pc) {
-            // ملاحظة: التحكم بمكبر الصوت يعتمد على المتصفح
-            // هذه محاولة أولية
-            alert('🔊 سيتم إضافة ميزة مكبر الصوت بشكل كامل في التحديث القادم');
-        }
+        alert('🔊 ميزة مكبر الصوت ستتوفر في التحديث القادم');
     },
     
     toggleAudio() { 
@@ -449,7 +456,6 @@ const CallSystem = {
                 const micBtn = document.getElementById('micToggleBtn') || document.getElementById('videoMicToggleBtn');
                 if (micBtn) {
                     micBtn.style.background = audioTrack.enabled ? '#2c2c3e' : '#e94560';
-                    micBtn.style.opacity = audioTrack.enabled ? '1' : '0.8';
                 }
             }
         } 
