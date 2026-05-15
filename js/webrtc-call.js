@@ -1,5 +1,5 @@
 // ========== webrtc-call.js ==========
-// نظام اتصال WebRTC مباشر + المكالمات + إرسال الملفات
+// نظام اتصال WebRTC مباشر + المكالمات + إرسال الملفات (الإصدار النهائي المستقر)
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
@@ -8,7 +8,7 @@ const CallSystem = {
     callTimerInterval: null,
     servers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' },{ urls: 'stun:stun1.l.google.com:19302' },{ urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
     
-    async ensureDataChannel(calleeId) { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    async ensureDataChannel(calleeId) {
         if (!calleeId) return;
         if (this.dc && this.dc.readyState === 'open') return;
         if (this.dc && this.dc.readyState === 'connecting') {
@@ -23,7 +23,8 @@ const CallSystem = {
         }
         return this.createNewDataChannel(calleeId);
     },
-    async createNewDataChannel(calleeId) { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    
+    async createNewDataChannel(calleeId) {
         this.reconnectAttempts = 0; this.cleanupConnections();
         try {
             this.pc = new RTCPeerConnection(this.servers);
@@ -33,12 +34,13 @@ const CallSystem = {
             this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
             this.pc.onconnectionstatechange = () => { switch(this.pc?.connectionState) { case 'connected': this.reconnectAttempts = 0; break; case 'failed': case 'disconnected': this.scheduleReconnect(); break; } };
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
             await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
         } catch (error) { throw error; }
     },
-    setupDataChannel(channel) { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    
+    setupDataChannel(channel) {
         if (!channel) return;
         channel.onmessage = e => {
             try {
@@ -52,7 +54,8 @@ const CallSystem = {
         channel.onclose = () => this.scheduleReconnect();
         channel.onerror = () => this.scheduleReconnect();
     },
-    handleChunkMessage(msg) { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    
+    handleChunkMessage(msg) {
         if (!this.incomingChunks[msg.id]) { 
             this.incomingChunks[msg.id] = []; 
             this.incomingFileInfo[msg.id] = { type: msg.type, fileName: msg.fileName, total: msg.total, received: 0 };
@@ -71,7 +74,8 @@ const CallSystem = {
             delete this.incomingChunks[msg.id]; delete this.incomingFileInfo[msg.id];
         }
     },
-    scheduleReconnect() { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    
+    scheduleReconnect() {
         if (!ChatSystem.currentChat || !ChatSystem.friendOnline) return;
         if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -80,57 +84,86 @@ const CallSystem = {
         this.reconnectTimer = setTimeout(async () => { try { if (ChatSystem.currentChat && ChatSystem.friendOnline) await this.ensureDataChannel(ChatSystem.currentChat); } catch (error) {} this.reconnectTimer = null; }, delay);
     },
     
-    // ========== بدء المكالمة (تم إصلاح الخلل) ==========
+    // ========== بدء المكالمة (إصدار منفصل ومستقر) ==========
     async startCall(calleeId, callType = 'video') {
         if (!window.auth?.currentUser || this.isInCall) return;
         this.isInCall = true;
+        
         try {
-            // تحديد المسموح به بناءً على نوع المكالمة
-            const constraints = { 
-                audio: true, 
-                video: callType === 'video' ? { 
-                    width: { ideal: 640 }, 
-                    height: { ideal: 480 },
-                    facingMode: 'user'
-                } : false 
-            };
+            // 1. تحديد القيود بناءً على نوع المكالمة
+            let constraints = { audio: true };
+            if (callType === 'video') {
+                constraints.video = { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' };
+            }
+            
+            // 2. الحصول على التيار المحلي
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
-            // إظهار الواجهة الصحيحة فورًا
+            // 3. عرض واجهة المستخدم المناسبة (صوت أو فيديو)
             this.showCallUI(callType);
             
+            // 4. إنشاء اتصال PeerConnection جديد
             this.pc = new RTCPeerConnection(this.servers);
-            // إضافة المسارات إلى جلسة الـ PeerConnection
-            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             
-            this.dc = this.pc.createDataChannel('chat'); 
+            // 5. إضافة المسارات (audio فقط للصوت، audio+video للفيديو)
+            this.localStream.getTracks().forEach(track => {
+                this.pc.addTrack(track, this.localStream);
+            });
+            
+            // 6. إنشاء قناة البيانات (للملفات والإشارات)
+            this.dc = this.pc.createDataChannel('chat');
             this.setupDataChannel(this.dc);
             
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => { 
-                // للمكالمات الصوتية، لا يوجد فيديو بعيد
-                if (callType === 'video') {
-                    const rv = document.getElementById('remoteVideo'); 
-                    if (rv && e.streams[0]) rv.srcObject = e.streams[0];
+            // 7. معالج المرشحين (ICE candidates)
+            this.pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    this.sendSignal(calleeId, { candidate: event.candidate });
                 }
             };
-            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
             
-            // إنشاء العرض (Offer) مع تحديد نوع الوسائط
-            const offer = await this.pc.createOffer({
+            // 8. معالج استقبال المسار البعيد (فقط للفيديو)
+            this.pc.ontrack = (event) => {
+                if (callType === 'video') {
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    if (remoteVideo && event.streams[0]) {
+                        remoteVideo.srcObject = event.streams[0];
+                    }
+                }
+            };
+            
+            // 9. مراقبة حالة الاتصال
+            this.pc.onconnectionstatechange = () => {
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                    this.endCall();
+                }
+            };
+            
+            // 10. إنشاء العرض (Offer) مع تحديد نوع الوسائط المطلوب استقبالها
+            const offerOptions = {
                 offerToReceiveAudio: true,
-                offerToReceiveVideo: callType === 'video'
-            });
+                offerToReceiveVideo: (callType === 'video')
+            };
+            const offer = await this.pc.createOffer(offerOptions);
             await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: callType });
-        } catch (e) { 
-            this.endCall(); 
-            if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون');
-            else console.error(e);
+            
+            // 11. إرسال الإشارة مع تحديد نوع المكالمة
+            await this.sendSignal(calleeId, { 
+                sdp: this.pc.localDescription, 
+                callType: callType 
+            });
+            
+        } catch (error) {
+            console.error('خطأ في بدء المكالمة:', error);
+            this.endCall();
+            if (error.name === 'NotAllowedError') {
+                alert('يرجى السماح بالوصول إلى الميكروفون والكاميرا');
+            } else {
+                alert('حدث خطأ أثناء بدء المكالمة');
+            }
         }
     },
     
-    async sendFileDirect(file, type) { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') return false;
         try {
             let blobToSend = file;
@@ -158,69 +191,133 @@ const CallSystem = {
         } catch (e) { ChatSystem.hideProgressBar(); return false; }
     },
     
-    showIncomingCall(callerId, callData) { /* ... (نفس الكود الأصلي، تم تحديث اسم المتصل بشكل آمن) ... */ 
+    showIncomingCall(callerId, callData) {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const overlay = document.createElement('div'); overlay.id = 'incomingCall';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
-        overlay.innerHTML = `<div style="font-size:1.5rem;">📞 ${this.escapeHtml(contactName)} يتصل بك...</div><div style="display:flex;gap:30px;"><button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">✅</button><button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button></div>`;
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;backdrop-filter:blur(5px);';
+        
+        const isVideo = callData.callType === 'video';
+        const callTypeText = isVideo ? 'مكالمة فيديو' : 'مكالمة صوتية';
+        
+        overlay.innerHTML = `
+            <div style="text-align:center;">
+                <div style="font-size:3rem;margin-bottom:1rem;">${isVideo ? '📹' : '🎙️'}</div>
+                <div style="font-size:1.5rem;margin-bottom:0.5rem;">${this.escapeHtml(contactName)}</div>
+                <div style="font-size:1rem;color:#ccc;">${callTypeText}</div>
+            </div>
+            <div style="display:flex;gap:30px;">
+                <button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;transition:0.2s;">✅</button>
+                <button id="btnReject" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;transition:0.2s;">❌</button>
+            </div>
+        `;
         document.body.appendChild(overlay);
-        document.getElementById('btnAccept').onclick = () => { overlay.remove(); this.receiveCall(callerId, callData); };
-        document.getElementById('btnReject').onclick = () => { overlay.remove(); };
+        
+        document.getElementById('btnAccept').onclick = () => { 
+            overlay.remove(); 
+            this.receiveCall(callerId, callData); 
+        };
+        document.getElementById('btnReject').onclick = () => { 
+            overlay.remove(); 
+        };
     },
     
-    // ========== استقبال المكالمة (تم إصلاح الخلل) ==========
+    // ========== استقبال المكالمة (إصدار منفصل ومستقر) ==========
     async receiveCall(callerId, callData) {
         if (this.isInCall) return;
         this.isInCall = true;
-        // تحديد نوع المكالمة من البيانات المرسلة
-        const isVideoCall = callData.type === 'video';
+        
+        const isVideoCall = (callData.callType === 'video');
         
         try {
-            const constraints = { 
-                audio: true, 
-                video: isVideoCall ? { 
-                    width: { ideal: 640 }, 
-                    height: { ideal: 480 },
-                    facingMode: 'user'
-                } : false 
-            };
+            // 1. تحديد القيود بناءً على نوع المكالمة
+            let constraints = { audio: true };
+            if (isVideoCall) {
+                constraints.video = { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' };
+            }
+            
+            // 2. الحصول على التيار المحلي
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            // 3. عرض واجهة المستخدم المناسبة
             this.showCallUI(isVideoCall ? 'video' : 'audio');
             
+            // 4. إنشاء اتصال PeerConnection جديد
             this.pc = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => { 
-                if (isVideoCall) {
-                    const rv = document.getElementById('remoteVideo'); 
-                    if (rv && e.streams[0]) rv.srcObject = e.streams[0];
+            // 5. إضافة المسارات المحلية
+            this.localStream.getTracks().forEach(track => {
+                this.pc.addTrack(track, this.localStream);
+            });
+            
+            // 6. معالج المرشحين
+            this.pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    this.sendSignal(callerId, { candidate: event.candidate });
                 }
             };
-            this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-            this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
             
-            if (callData.sdp) { 
-                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); 
-                const answer = await this.pc.createAnswer(); 
-                await this.pc.setLocalDescription(answer); 
-                await this.sendSignal(callerId, { sdp: this.pc.localDescription }); 
+            // 7. معالج استقبال المسار البعيد (فقط للفيديو)
+            this.pc.ontrack = (event) => {
+                if (isVideoCall) {
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    if (remoteVideo && event.streams[0]) {
+                        remoteVideo.srcObject = event.streams[0];
+                    }
+                }
+            };
+            
+            // 8. معالج قناة البيانات
+            this.pc.ondatachannel = (event) => {
+                this.dc = event.channel;
+                this.setupDataChannel(this.dc);
+            };
+            
+            // 9. مراقبة حالة الاتصال
+            this.pc.onconnectionstatechange = () => {
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                    this.endCall();
+                }
+            };
+            
+            // 10. تعيين الوصف البعيد وإنشاء الإجابة
+            if (callData.sdp) {
+                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+                const answer = await this.pc.createAnswer();
+                await this.pc.setLocalDescription(answer);
+                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
             }
-        } catch (e) { 
-            this.endCall(); 
-            if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); 
+            
+        } catch (error) {
+            console.error('خطأ في استقبال المكالمة:', error);
+            this.endCall();
+            if (error.name === 'NotAllowedError') {
+                alert('يرجى السماح بالوصول إلى الميكروفون والكاميرا');
+            }
         }
     },
     
-    async handleSignaling(data) { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    async handleSignaling(data) {
         try {
-            if (!this.pc) { this.pc = new RTCPeerConnection(this.servers); this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); }; }
-            if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); if (data.sdp.type === 'offer') { const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); } }
-            else if (data.candidate) await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {}
+            if (!this.pc) { 
+                this.pc = new RTCPeerConnection(this.servers); 
+                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; 
+                this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
+            }
+            if (data.sdp) { 
+                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); 
+                if (data.sdp.type === 'offer') { 
+                    const answer = await this.pc.createAnswer(); 
+                    await this.pc.setLocalDescription(answer); 
+                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); 
+                } 
+            }
+            else if (data.candidate) {
+                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        } catch (e) { console.error('Signaling error:', e); }
     },
     
-    async sendSignal(calleeId, data) { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    async sendSignal(calleeId, data) {
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
@@ -228,11 +325,11 @@ const CallSystem = {
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
             await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        } catch (error) {}
+        } catch (error) { console.error('Send signal error:', error); }
     },
     
     // ========== تبديل الكاميرا ==========
-    async switchCamera() { /* ... (نفس الكود الأصلي، لم يتغير) ... */ 
+    async switchCamera() {
         if (!this.localStream) return;
         
         const videoTrack = this.localStream.getVideoTracks()[0];
@@ -250,17 +347,14 @@ const CallSystem = {
             
             const newVideoTrack = newStream.getVideoTracks()[0];
             
-            // استبدال المسار في PeerConnection
             if (this.pc) {
                 const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
                 if (sender) await sender.replaceTrack(newVideoTrack);
             }
             
-            // تحديث localStream
             const audioTrack = this.localStream.getAudioTracks()[0];
             this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
             
-            // تحديث الفيديو المحلي
             const lv = document.getElementById('localVideo');
             if (lv) lv.srcObject = this.localStream;
             
@@ -269,40 +363,37 @@ const CallSystem = {
         }
     },
     
-    // ========== واجهة المستخدم المتطورة للمكالمات ==========
+    // ========== واجهة المستخدم المتطورة ==========
     showCallUI(callType) { 
         document.body.classList.add('in-call'); 
         
-        // إزالة أي واجهة مكالمة قديمة لتجنب التكرار
         const existingUI = document.getElementById('callUI');
         if (existingUI) existingUI.remove();
 
         const ui = document.createElement('div'); 
         ui.id = 'callUI'; 
         
-        // الحصول على اسم جهة الاتصال
         const contactName = document.getElementById('conversationName')?.textContent || 'رفيق';
         
         if (callType === 'audio') {
-            // --- واجهة المكالمة الصوتية المتطورة ---
+            // واجهة المكالمة الصوتية
             ui.innerHTML = `
                 <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:sans-serif;">
                     <div style="text-align:center;">
                         <div style="width:120px;height:120px;background:linear-gradient(135deg, #0f3460, #e94560);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5rem;box-shadow:0 10px 25px rgba(0,0,0,0.3);">
                             <span style="font-size:4rem;">🎙️</span>
                         </div>
-                        <div class="call-name" style="font-size:1.8rem;font-weight:bold;margin-bottom:0.5rem;text-shadow:0 2px 5px rgba(0,0,0,0.3);">${this.escapeHtml(contactName)}</div>
+                        <div class="call-name" style="font-size:1.8rem;font-weight:bold;margin-bottom:0.5rem;">${this.escapeHtml(contactName)}</div>
                         <div class="call-timer" id="callTimer" style="font-size:1.2rem;color:#a0a0c0;margin-bottom:3rem;background:rgba(0,0,0,0.3);padding:4px 12px;border-radius:30px;display:inline-block;">00:00</div>
                     </div>
                     <div style="display:flex;gap:30px;justify-content:center;">
-                        <button onclick="CallSystem.toggleAudio()" style="width:70px;height:70px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.8rem;cursor:pointer;transition:0.2s;box-shadow:0 5px 15px rgba(0,0,0,0.2);" title="كتم الصوت" id="micToggleBtn">🎤</button>
-                        <button onclick="CallSystem.endCall()" style="width:80px;height:80px;border-radius:50%;background:#e94560;color:white;border:none;font-size:2rem;cursor:pointer;transition:0.2s;box-shadow:0 5px 15px rgba(233,69,96,0.4);" title="إنهاء المكالمة">📞</button>
-                        <button onclick="CallSystem.toggleSpeaker()" style="width:70px;height:70px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.8rem;cursor:pointer;transition:0.2s;box-shadow:0 5px 15px rgba(0,0,0,0.2);" title="مكبر الصوت" id="speakerToggleBtn">🔊</button>
+                        <button onclick="CallSystem.toggleAudio()" id="micToggleBtn" style="width:70px;height:70px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.8rem;cursor:pointer;transition:0.2s;" title="كتم الصوت">🎤</button>
+                        <button onclick="CallSystem.endCall()" style="width:80px;height:80px;border-radius:50%;background:#e94560;color:white;border:none;font-size:2rem;cursor:pointer;" title="إنهاء المكالمة">📞</button>
+                        <button onclick="CallSystem.toggleSpeaker()" id="speakerToggleBtn" style="width:70px;height:70px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.8rem;cursor:pointer;" title="مكبر الصوت">🔊</button>
                     </div>
-                    <div style="position:absolute;bottom:20px;font-size:0.8rem;color:#666;">مكالمة صوتية مشفرة</div>
+                    <div style="position:absolute;bottom:20px;font-size:0.7rem;color:#666;">مكالمة صوتية مشفرة</div>
                 </div>`;
             
-            // بدء العداد من 0
             let callDuration = 0;
             if (this.callTimerInterval) clearInterval(this.callTimerInterval);
             this.callTimerInterval = setInterval(() => {
@@ -314,18 +405,17 @@ const CallSystem = {
             }, 1000);
         } 
         else { 
-            // --- واجهة المكالمة المرئية المتطورة ---
+            // واجهة المكالمة المرئية
             ui.innerHTML = `
                 <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video>
-                <video id="localVideo" autoplay playsinline muted style="width:120px;height:180px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:20px;border:2px solid rgba(255,255,255,0.5);background:#333;box-shadow:0 5px 20px rgba(0,0,0,0.3);"></video>
+                <video id="localVideo" autoplay playsinline muted style="width:120px;height:180px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:20px;border:2px solid rgba(255,255,255,0.5);background:#333;"></video>
                 <div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:25px;background:rgba(0,0,0,0.5);padding:12px 20px;border-radius:60px;backdrop-filter:blur(10px);">
-                    <button onclick="CallSystem.switchCamera()" style="width:55px;height:55px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.3rem;cursor:pointer;transition:0.2s;" title="تبديل الكاميرا">🔄</button>
-                    <button onclick="CallSystem.toggleAudio()" style="width:55px;height:55px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.3rem;cursor:pointer;transition:0.2s;" title="كتم الصوت" id="videoMicToggleBtn">🎤</button>
-                    <button onclick="CallSystem.endCall()" style="width:65px;height:65px;border-radius:50%;background:#e94560;color:white;border:none;font-size:1.5rem;cursor:pointer;transition:0.2s;box-shadow:0 0 15px rgba(233,69,96,0.5);" title="إنهاء المكالمة">📞</button>
-                    <button onclick="CallSystem.toggleVideo()" style="width:55px;height:55px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.3rem;cursor:pointer;transition:0.2s;" title="إيقاف/تشغيل الكاميرا" id="videoToggleBtn">📹</button>
+                    <button onclick="CallSystem.switchCamera()" style="width:55px;height:55px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.3rem;cursor:pointer;" title="تبديل الكاميرا">🔄</button>
+                    <button onclick="CallSystem.toggleAudio()" id="videoMicToggleBtn" style="width:55px;height:55px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.3rem;cursor:pointer;" title="كتم الصوت">🎤</button>
+                    <button onclick="CallSystem.endCall()" style="width:65px;height:65px;border-radius:50%;background:#e94560;color:white;border:none;font-size:1.5rem;cursor:pointer;" title="إنهاء المكالمة">📞</button>
+                    <button onclick="CallSystem.toggleVideo()" id="videoToggleBtn" style="width:55px;height:55px;border-radius:50%;background:#2c2c3e;color:white;border:none;font-size:1.3rem;cursor:pointer;" title="إيقاف/تشغيل الكاميرا">📹</button>
                 </div>`;
                 
-            // ربط عناصر الفيديو بعد إضافتها للصفحة
             setTimeout(() => {
                 const lv = document.getElementById('localVideo'); 
                 if (lv && this.localStream) lv.srcObject = this.localStream; 
@@ -335,7 +425,6 @@ const CallSystem = {
         document.body.appendChild(ui); 
     },
     
-    // إضافة دالة مساعدة لتنظيف النص
     escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
@@ -343,9 +432,13 @@ const CallSystem = {
         return div.innerHTML;
     },
 
-    // دالة مكبر الصوت (تطوير مستقبلي)
     toggleSpeaker() {
-        alert('🔊 ميزة مكبر الصوت ستتوفر في التحديث القادم!');
+        // محاولة تجريبية لتفعيل مكبر الصوت
+        if (this.pc) {
+            // ملاحظة: التحكم بمكبر الصوت يعتمد على المتصفح
+            // هذه محاولة أولية
+            alert('🔊 سيتم إضافة ميزة مكبر الصوت بشكل كامل في التحديث القادم');
+        }
     },
     
     toggleAudio() { 
@@ -353,16 +446,15 @@ const CallSystem = {
             const audioTrack = this.localStream.getAudioTracks()[0]; 
             if (audioTrack) {
                 audioTrack.enabled = !audioTrack.enabled;
-                // تحديث شكل الزر لإظهار حالة الكتم (تحسين بسيط)
                 const micBtn = document.getElementById('micToggleBtn') || document.getElementById('videoMicToggleBtn');
                 if (micBtn) {
                     micBtn.style.background = audioTrack.enabled ? '#2c2c3e' : '#e94560';
                     micBtn.style.opacity = audioTrack.enabled ? '1' : '0.8';
-                    micBtn.title = audioTrack.enabled ? 'كتم الصوت' : 'إلغاء الكتم';
                 }
             }
         } 
     },
+    
     toggleVideo() { 
         if (this.localStream) { 
             const videoTrack = this.localStream.getVideoTracks()[0]; 
@@ -371,7 +463,6 @@ const CallSystem = {
                 const videoBtn = document.getElementById('videoToggleBtn');
                 if (videoBtn) {
                     videoBtn.style.background = videoTrack.enabled ? '#2c2c3e' : '#e94560';
-                    videoBtn.title = videoTrack.enabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا';
                 }
             }
         } 
@@ -390,7 +481,6 @@ const CallSystem = {
         const inc = document.getElementById('incomingCall'); 
         if (inc) inc.remove(); 
         
-        // تنظيف المؤقت
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
