@@ -5,7 +5,19 @@ const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
-    servers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' },{ urls: 'stun:stun1.l.google.com:19302' },{ urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
+    // تم إضافة خوادم STUN متعددة لتحسين نسبة نجاح الاتصال المباشر (الحل 1)
+    servers: { 
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:stun.stunprotocol.org:3478' },
+            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+        ] 
+    },
     
     async ensureDataChannel(calleeId) {
         if (!calleeId) return;
@@ -29,10 +41,38 @@ const CallSystem = {
             this.pc = new RTCPeerConnection(this.servers);
             this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
             this.setupDataChannel(this.dc);
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
-            this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
+            
+            // (الحل 2) Trickle ICE - إرسال المرشحين فور ظهورهم
+            this.pc.onicecandidate = e => { 
+                if (e.candidate) {
+                    this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
+                } else {
+                    // إشارة انتهاء تجميع المرشحين
+                    this.sendSignal(calleeId, { iceComplete: true }).catch(() => {});
+                }
+            };
+            
+            // (الحل 2) إعادة محاولة تلقائية عند فشل ICE
+            this.pc.oniceconnectionstatechange = () => { 
+                if (this.pc?.iceConnectionState === 'failed') {
+                    console.log('ICE connection failed, attempting restart...');
+                    this.pc.restartIce();
+                }
+            };
+            
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-            this.pc.onconnectionstatechange = () => { switch(this.pc?.connectionState) { case 'connected': this.reconnectAttempts = 0; break; case 'failed': case 'disconnected': this.scheduleReconnect(); break; } };
+            this.pc.onconnectionstatechange = () => { 
+                switch(this.pc?.connectionState) { 
+                    case 'connected': 
+                        this.reconnectAttempts = 0; 
+                        break; 
+                    case 'failed': 
+                    case 'disconnected': 
+                        this.scheduleReconnect(); 
+                        break; 
+                } 
+            };
+            
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
             await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
@@ -100,9 +140,13 @@ const CallSystem = {
             this.pc = new RTCPeerConnection(this.servers);
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             this.dc = this.pc.createDataChannel('chat'); this.setupDataChannel(this.dc);
+            
+            // Trickle ICE للمكالمات أيضاً
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+            this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
             this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv && e.streams[0]) rv.srcObject = e.streams[0]; };
             this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
+            
             const offer = await this.pc.createOffer(); await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
         } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
@@ -163,17 +207,26 @@ const CallSystem = {
             this.showCallUI(hasVideo ? 'video' : 'audio');
             this.pc = new RTCPeerConnection(this.servers);
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+            
+            // Trickle ICE لاستقبال المكالمات
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
+            this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
             this.pc.ontrack = e => { const rv = document.getElementById('remoteVideo'); if (rv && e.streams[0]) rv.srcObject = e.streams[0]; };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
             this.pc.onconnectionstatechange = () => { if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall(); };
+            
             if (callData.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); await this.sendSignal(callerId, { sdp: this.pc.localDescription }); }
         } catch (e) { this.endCall(); if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون'); }
     },
     
     async handleSignaling(data) {
         try {
-            if (!this.pc) { this.pc = new RTCPeerConnection(this.servers); this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); }; }
+            if (!this.pc) { 
+                this.pc = new RTCPeerConnection(this.servers); 
+                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; 
+                this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
+                this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
+            }
             if (data.sdp) { await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); if (data.sdp.type === 'offer') { const answer = await this.pc.createAnswer(); await this.pc.setLocalDescription(answer); await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); } }
             else if (data.candidate) await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
         } catch (e) {}
