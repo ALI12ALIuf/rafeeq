@@ -1,5 +1,5 @@
 // ========== webrtc-call.js ==========
-// نظام اتصال WebRTC - مكالمات صوتية فقط + إرسال الملفات والصور والبصمات + نظام تشخيص
+// نظام اتصال WebRTC - مكالمات صوتية فقط + إرسال الملفات والصور والبصمات + نظام تشخيص + Keep-Alive
 
 // ========== نظام التشخيص ==========
 const CallDiagnostics = {
@@ -10,7 +10,6 @@ const CallDiagnostics = {
         this.logs.push(log);
         console.log(`[${time}] ${message}`);
         
-        // عرض على الشاشة
         let panel = document.getElementById('callDiagnosticsPanel');
         if (!panel) {
             panel = document.createElement('div');
@@ -55,7 +54,7 @@ const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
-    callTimerInterval: null,
+    callTimerInterval: null, keepAliveInterval: null,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -116,6 +115,8 @@ const CallSystem = {
         channel.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
+                // تجاهل رسائل keep-alive (ping)
+                if (msg.type === 'ping') return;
                 if (msg.chunk !== undefined) { this.handleChunkMessage(msg); return; }
                 const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
                 if (ChatSystem.currentChat) { ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg); ChatSystem.displayMessage(displayMsg); }
@@ -124,10 +125,28 @@ const CallSystem = {
         channel.onopen = () => { 
             CallDiagnostics.addLog('✅ DataChannel مفتوح', 'success');
             if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; } 
-            this.reconnectAttempts = 0; 
+            this.reconnectAttempts = 0;
+            
+            // إرسال Keep-Alive كل 2 ثانية للحفاظ على القناة مفتوحة
+            if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = setInterval(() => {
+                if (this.dc && this.dc.readyState === 'open') {
+                    this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                }
+            }, 2000);
         };
-        channel.onclose = () => { CallDiagnostics.addLog('❌ DataChannel مغلق', 'error'); this.scheduleReconnect(); };
-        channel.onerror = () => { CallDiagnostics.addLog('❌ خطأ في DataChannel', 'error'); this.scheduleReconnect(); };
+        channel.onclose = () => { 
+            CallDiagnostics.addLog('❌ DataChannel مغلق', 'error');
+            if (this.keepAliveInterval) {
+                clearInterval(this.keepAliveInterval);
+                this.keepAliveInterval = null;
+            }
+            this.scheduleReconnect(); 
+        };
+        channel.onerror = () => { 
+            CallDiagnostics.addLog('❌ خطأ في DataChannel', 'error');
+            this.scheduleReconnect(); 
+        };
     },
     
     handleChunkMessage(msg) {
@@ -236,6 +255,11 @@ const CallSystem = {
             
             this.pc.ontrack = e => {
                 CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind} من الطرف البعيد`, 'success');
+                // محاولة تشغيل الصوت المستلم
+                if (e.track.kind === 'audio') {
+                    e.track.enabled = true;
+                    CallDiagnostics.addLog(`🎵 تم تفعيل المسار الصوتي المستلم`, 'success');
+                }
             };
             
             this.pc.onconnectionstatechange = () => {
@@ -360,6 +384,10 @@ const CallSystem = {
             };
             this.pc.ontrack = e => {
                 CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind} من الطرف البعيد`, 'success');
+                if (e.track.kind === 'audio') {
+                    e.track.enabled = true;
+                    CallDiagnostics.addLog(`🎵 تم تفعيل المسار الصوتي المستلم`, 'success');
+                }
             };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
             this.pc.onconnectionstatechange = () => {
@@ -492,6 +520,10 @@ const CallSystem = {
     endCall() { 
         CallDiagnostics.addLog(`📞 إنهاء المكالمة`, 'info');
         this.isInCall = false; 
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
@@ -511,6 +543,7 @@ const CallSystem = {
     
     cleanupConnections() { 
         if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; } 
+        if (this.keepAliveInterval) { clearInterval(this.keepAliveInterval); this.keepAliveInterval = null; }
         if (this.dc) { this.dc.close(); this.dc = null; } 
         if (this.pc) { this.pc.close(); this.pc = null; } 
         this.incomingChunks = {}; 
