@@ -1,5 +1,5 @@
 // ========== webrtc-call.js ==========
-// نظام اتصال WebRTC - مكالمات صوتية فقط + إرسال الملفات والصور والبصمات + نظام تشخيص + Keep-Alive
+// نظام اتصال WebRTC - مكالمات صوتية فقط + إرسال الملفات والصور والبصمات + نظام تشخيص + Keep-Alive + تشغيل صوت قسري
 
 // ========== نظام التشخيص ==========
 const CallDiagnostics = {
@@ -16,27 +16,30 @@ const CallDiagnostics = {
             panel.id = 'callDiagnosticsPanel';
             panel.style.cssText = `
                 position: fixed;
-                bottom: 10px;
-                left: 10px;
-                right: 10px;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
                 background: rgba(0,0,0,0.95);
                 color: #0f0;
-                font-size: 11px;
-                padding: 8px;
-                border-radius: 8px;
+                font-size: 14px;
+                padding: 15px;
+                border-radius: 12px;
                 z-index: 10001;
                 font-family: monospace;
-                max-height: 200px;
+                max-width: 90%;
+                max-height: 70%;
                 overflow-y: auto;
                 direction: ltr;
                 text-align: left;
                 pointer-events: none;
+                box-shadow: 0 0 20px rgba(0,0,0,0.5);
+                border: 1px solid #333;
             `;
             document.body.appendChild(panel);
         }
         
         const color = type === 'error' ? '#ff4444' : (type === 'success' ? '#44ff44' : '#ffaa44');
-        panel.innerHTML += `<div style="color:${color};border-bottom:1px solid #333;padding:2px 0;">[${time}] ${message}</div>`;
+        panel.innerHTML += `<div style="color:${color};border-bottom:1px solid #333;padding:4px 0;">[${time}] ${message}</div>`;
         panel.scrollTop = panel.scrollHeight;
         
         while (panel.children.length > 50) {
@@ -115,7 +118,6 @@ const CallSystem = {
         channel.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
-                // تجاهل رسائل keep-alive (ping)
                 if (msg.type === 'ping') return;
                 if (msg.chunk !== undefined) { this.handleChunkMessage(msg); return; }
                 const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
@@ -127,7 +129,6 @@ const CallSystem = {
             if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; } 
             this.reconnectAttempts = 0;
             
-            // إرسال Keep-Alive كل 2 ثانية للحفاظ على القناة مفتوحة
             if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = setInterval(() => {
                 if (this.dc && this.dc.readyState === 'open') {
@@ -194,7 +195,11 @@ const CallSystem = {
         this.isInCall = true;
         
         try {
-            // فحص إذن الميكروفون
+            // كسر سياسة Autoplay في المتصفح
+            const silentAudio = new Audio();
+            silentAudio.volume = 0;
+            silentAudio.play().catch(() => {});
+            
             if (navigator.permissions) {
                 const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
                 CallDiagnostics.addLog(`🎤 حالة إذن الميكروفون: ${permissionStatus.state}`, permissionStatus.state === 'denied' ? 'error' : 'info');
@@ -206,7 +211,6 @@ const CallSystem = {
                 }
             }
             
-            // طلب الصوت فقط (بدون كاميرا)
             const constraints = { audio: true, video: false };
             CallDiagnostics.addLog(`🎤 طلب الميكروفون...`, 'info');
             
@@ -221,7 +225,6 @@ const CallSystem = {
                 return;
             }
             
-            // تفعيل المسار الصوتي
             audioTracks[0].enabled = true;
             
             this.showCallUI();
@@ -255,10 +258,18 @@ const CallSystem = {
             
             this.pc.ontrack = e => {
                 CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind} من الطرف البعيد`, 'success');
-                // محاولة تشغيل الصوت المستلم
                 if (e.track.kind === 'audio') {
                     e.track.enabled = true;
-                    CallDiagnostics.addLog(`🎵 تم تفعيل المسار الصوتي المستلم`, 'success');
+                    
+                    // تشغيل الصوت قسراً باستخدام عنصر Audio
+                    const audioElement = new Audio();
+                    audioElement.srcObject = e.streams[0];
+                    audioElement.autoplay = true;
+                    audioElement.play().then(() => {
+                        CallDiagnostics.addLog(`🎵 تم تشغيل الصوت بنجاح عبر Audio element`, 'success');
+                    }).catch(err => {
+                        CallDiagnostics.addLog(`⚠️ فشل تشغيل الصوت تلقائياً: ${err.message}`, 'error');
+                    });
                 }
             };
             
@@ -268,7 +279,6 @@ const CallSystem = {
                     this.endCall();
             };
             
-            // طلب صوت فقط (بدون فيديو) - يقلل استهلاك TURN بشكل كبير
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false }); 
             CallDiagnostics.addLog(`📝 تم إنشاء العرض (صوت فقط)`, 'success');
             
@@ -353,7 +363,11 @@ const CallSystem = {
         this.isInCall = true;
         
         try {
-            // مكالمة صوتية فقط (بدون كاميرا)
+            // كسر سياسة Autoplay
+            const silentAudio = new Audio();
+            silentAudio.volume = 0;
+            silentAudio.play().catch(() => {});
+            
             const constraints = { audio: true, video: false };
             CallDiagnostics.addLog(`🎤 طلب الميكروفون...`, 'info');
             
@@ -386,7 +400,15 @@ const CallSystem = {
                 CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind} من الطرف البعيد`, 'success');
                 if (e.track.kind === 'audio') {
                     e.track.enabled = true;
-                    CallDiagnostics.addLog(`🎵 تم تفعيل المسار الصوتي المستلم`, 'success');
+                    
+                    const audioElement = new Audio();
+                    audioElement.srcObject = e.streams[0];
+                    audioElement.autoplay = true;
+                    audioElement.play().then(() => {
+                        CallDiagnostics.addLog(`🎵 تم تشغيل الصوت بنجاح عبر Audio element`, 'success');
+                    }).catch(err => {
+                        CallDiagnostics.addLog(`⚠️ فشل تشغيل الصوت تلقائياً: ${err.message}`, 'error');
+                    });
                 }
             };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
@@ -551,5 +573,4 @@ const CallSystem = {
     }
 };
 
-// دالة المكالمات الصوتية فقط (تم إزالة مكالمات الفيديو نهائياً)
 window.startAudioCall = async () => { if (!ChatSystem.currentChat) return; await CallSystem.startCall(ChatSystem.currentChat); };
