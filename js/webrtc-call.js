@@ -10,7 +10,6 @@ const CallDiagnostics = {
         this.logs.push(log);
         console.log(`[${time}] ${message}`);
         
-        // عرض على الشاشة
         let panel = document.getElementById('callDiagnosticsPanel');
         if (!panel) {
             panel = document.createElement('div');
@@ -40,7 +39,6 @@ const CallDiagnostics = {
         panel.innerHTML += `<div style="color:${color};border-bottom:1px solid #333;padding:2px 0;">[${time}] ${message}</div>`;
         panel.scrollTop = panel.scrollHeight;
         
-        // حذف بعد 50 سطر
         while (panel.children.length > 50) {
             panel.removeChild(panel.children[0]);
         }
@@ -52,13 +50,11 @@ const CallDiagnostics = {
     }
 };
 
-// اعتراض الأخطاء العامة
 window.onerror = function(msg, url, line, col, error) {
     CallDiagnostics.addLog(`خطأ عام: ${msg} (سطر ${line})`, 'error');
     return false;
 };
 
-// مراقبة WebRTC
 const originalRTCPeerConnection = window.RTCPeerConnection;
 window.RTCPeerConnection = function(config) {
     CallDiagnostics.addLog('📞 إنشاء اتصال WebRTC جديد', 'info');
@@ -95,13 +91,11 @@ window.RTCPeerConnection = function(config) {
     return pc;
 };
 
-// ========== نظام الاتصال الأساسي ==========
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
-    callTimerInterval: null,
-    // ✅ تعديل الـ servers: إضافة TURN إضافي و TCP fallback
+    callTimerInterval: null, keepAliveInterval: null,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -117,8 +111,6 @@ const CallSystem = {
                 credential: 'openrelayproject'
             }
         ]
-        // ✅ ملاحظة: تم إزالة iceTransportPolicy: 'relay' مؤقتاً
-        // جرب أولاً بدونه، إذا ما اشتغل الصوت أضفه
     },
     
     async ensureDataChannel(calleeId) {
@@ -140,7 +132,12 @@ const CallSystem = {
     async createNewDataChannel(calleeId) {
         this.reconnectAttempts = 0; this.cleanupConnections();
         try {
-            this.pc = new RTCPeerConnection(this.servers);
+            this.pc = new RTCPeerConnection({
+                iceServers: this.servers.iceServers,
+                iceTransportPolicy: 'relay',
+                rtcpMuxPolicy: 'require',
+                bundlePolicy: 'max-bundle'
+            });
             this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
             this.setupDataChannel(this.dc);
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
@@ -212,6 +209,18 @@ const CallSystem = {
         this.isInCall = true;
         
         try {
+            // فحص إذن الميكروفون
+            if (navigator.permissions) {
+                const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+                CallDiagnostics.addLog(`🎤 حالة إذن الميكروفون: ${permissionStatus.state}`, 'info');
+                if (permissionStatus.state === 'denied') {
+                    CallDiagnostics.addLog('❌ إذن الميكروفون مرفوض!', 'error');
+                    alert('⚠️ لا يمكن الوصول إلى الميكروفون. الرجاء السماح يدوياً من إعدادات المتصفح.');
+                    this.endCall();
+                    return;
+                }
+            }
+            
             const constraints = { 
                 audio: true,
                 video: (callType === 'video')
@@ -230,7 +239,14 @@ const CallSystem = {
             }
             
             this.showCallUI(callType);
-            this.pc = new RTCPeerConnection(this.servers);
+            
+            // إنشاء اتصال مع إعدادات محسنة
+            this.pc = new RTCPeerConnection({
+                iceServers: this.servers.iceServers,
+                iceTransportPolicy: 'relay',
+                rtcpMuxPolicy: 'require',
+                bundlePolicy: 'max-bundle'
+            });
             
             this.localStream.getTracks().forEach(track => {
                 this.pc.addTrack(track, this.localStream);
@@ -247,6 +263,15 @@ const CallSystem = {
                 }
             };
             
+            this.pc.oniceconnectionstatechange = () => {
+                const state = this.pc?.iceConnectionState;
+                CallDiagnostics.addLog(`❄️ ICE state: ${state}`, state === 'failed' ? 'error' : 'info');
+                if (state === 'failed') {
+                    CallDiagnostics.addLog('🔄 ICE فشل، إعادة المحاولة...', 'info');
+                    this.pc.restartIce();
+                }
+            };
+            
             this.pc.ontrack = e => {
                 CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind} من الطرف البعيد`, 'success');
                 if (callType === 'video' && e.track.kind === 'video') {
@@ -260,6 +285,17 @@ const CallSystem = {
                 if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected'))
                     this.endCall();
             };
+            
+            this.pc.getSenders().forEach(sender => {
+                CallDiagnostics.addLog(`📤 جهاز الإرسال: ${sender.track?.kind}`, 'info');
+            });
+            
+            // Keep-alive كل 10 ثوانٍ
+            this.keepAliveInterval = setInterval(() => {
+                if (this.dc && this.dc.readyState === 'open') {
+                    this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                }
+            }, 10000);
             
             const offerOptions = (callType === 'video') 
                 ? { offerToReceiveAudio: true, offerToReceiveVideo: true }
@@ -379,10 +415,27 @@ const CallSystem = {
             }
             
             this.showCallUI(callType);
-            this.pc = new RTCPeerConnection(this.servers);
+            
+            this.pc = new RTCPeerConnection({
+                iceServers: this.servers.iceServers,
+                iceTransportPolicy: 'relay',
+                rtcpMuxPolicy: 'require',
+                bundlePolicy: 'max-bundle'
+            });
+            
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
+            
+            this.pc.oniceconnectionstatechange = () => {
+                const state = this.pc?.iceConnectionState;
+                CallDiagnostics.addLog(`❄️ ICE state: ${state}`, state === 'failed' ? 'error' : 'info');
+                if (state === 'failed') {
+                    CallDiagnostics.addLog('🔄 ICE فشل، إعادة المحاولة...', 'info');
+                    this.pc.restartIce();
+                }
+            };
+            
             this.pc.ontrack = e => {
                 CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind}`, 'success');
                 if (hasVideo && e.track.kind === 'video') {
@@ -397,6 +450,13 @@ const CallSystem = {
                 if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected'))
                     this.endCall();
             };
+            
+            // Keep-alive
+            this.keepAliveInterval = setInterval(() => {
+                if (this.dc && this.dc.readyState === 'open') {
+                    this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                }
+            }, 10000);
             
             if (callData.sdp) {
                 CallDiagnostics.addLog(`📝 تعيين RemoteDescription`, 'info');
@@ -424,7 +484,12 @@ const CallSystem = {
     async handleSignaling(data) {
         try {
             if (!this.pc) { 
-                this.pc = new RTCPeerConnection(this.servers); 
+                this.pc = new RTCPeerConnection({
+                    iceServers: this.servers.iceServers,
+                    iceTransportPolicy: 'relay',
+                    rtcpMuxPolicy: 'require',
+                    bundlePolicy: 'max-bundle'
+                }); 
                 this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; 
                 this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
                 this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
@@ -461,7 +526,6 @@ const CallSystem = {
         } catch (error) {}
     },
     
-    // ========== تبديل الكاميرا ==========
     async switchCamera() {
         if (!this.localStream) return;
         const videoTrack = this.localStream.getVideoTracks()[0];
@@ -585,6 +649,10 @@ const CallSystem = {
     
     endCall() { 
         this.isInCall = false; 
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
         if (this.callTimerInterval) clearInterval(this.callTimerInterval);
         document.body.classList.remove('in-call'); 
         if (this.localStream) { 
