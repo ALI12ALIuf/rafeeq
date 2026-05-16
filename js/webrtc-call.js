@@ -209,7 +209,6 @@ const CallSystem = {
         this.isInCall = true;
         
         try {
-            // فحص إذن الميكروفون
             if (navigator.permissions) {
                 const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
                 CallDiagnostics.addLog(`🎤 حالة إذن الميكروفون: ${permissionStatus.state}`, 'info');
@@ -238,22 +237,14 @@ const CallSystem = {
                 return;
             }
             
-            // ✅ تأكيد تشغيل الصوت محلياً (للمكالمات الصوتية)
-            if (callType === 'audio') {
-                const audioTrack = audioTracks[0];
-                if (audioTrack) {
-                    audioTrack.enabled = true;
-                    // محاولة تشغيل الصوت محلياً للتأكد من أنه يعمل
-                    const audio = new Audio();
-                    audio.srcObject = this.localStream;
-                    audio.play().catch(e => CallDiagnostics.addLog(`⚠️ تشغيل الصوت محلياً فشل: ${e}`, 'error'));
-                    CallDiagnostics.addLog(`🎤 مسار الصوت مفعل (enabled: ${audioTrack.enabled})`, 'success');
-                }
+            // تفعيل مسار الصوت محلياً
+            if (audioTracks[0]) {
+                audioTracks[0].enabled = true;
+                CallDiagnostics.addLog(`🎤 مسار الصوت المحلي مفعل`, 'success');
             }
             
             this.showCallUI(callType);
             
-            // إنشاء اتصال مع إعدادات محسنة
             this.pc = new RTCPeerConnection({
                 iceServers: this.servers.iceServers,
                 iceTransportPolicy: 'relay',
@@ -285,11 +276,29 @@ const CallSystem = {
                 }
             };
             
+            // ✅ إصلاح مشكلة الصوت في مكالمة الفيديو
             this.pc.ontrack = e => {
                 CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind} من الطرف البعيد`, 'success');
+                
+                if (e.track.kind === 'audio') {
+                    // تأكيد تشغيل الصوت حتى في مكالمة الفيديو
+                    e.track.enabled = true;
+                    CallDiagnostics.addLog(`🎤 تم تفعيل مسار الصوت البعيد`, 'success');
+                    
+                    // محاولة تشغيل الصوت عبر عنصر منفصل للتأكد
+                    if (e.streams[0]) {
+                        const audioEl = new Audio();
+                        audioEl.srcObject = e.streams[0];
+                        audioEl.play().catch(err => CallDiagnostics.addLog(`⚠️ خطأ في تشغيل الصوت: ${err}`, 'error'));
+                    }
+                }
+                
                 if (callType === 'video' && e.track.kind === 'video') {
                     const rv = document.getElementById('remoteVideo');
-                    if (rv && e.streams[0]) rv.srcObject = e.streams[0];
+                    if (rv && e.streams[0]) {
+                        rv.srcObject = e.streams[0];
+                        CallDiagnostics.addLog(`📹 تم عرض الفيديو البعيد`, 'success');
+                    }
                 }
             };
             
@@ -303,7 +312,6 @@ const CallSystem = {
                 CallDiagnostics.addLog(`📤 جهاز الإرسال: ${sender.track?.kind}`, 'info');
             });
             
-            // Keep-alive كل 10 ثوانٍ
             this.keepAliveInterval = setInterval(() => {
                 if (this.dc && this.dc.readyState === 'open') {
                     this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
@@ -427,6 +435,12 @@ const CallSystem = {
                 return;
             }
             
+            // تفعيل مسار الصوت محلياً
+            if (audioTracks[0]) {
+                audioTracks[0].enabled = true;
+                CallDiagnostics.addLog(`🎤 مسار الصوت المحلي مفعل`, 'success');
+            }
+            
             this.showCallUI(callType);
             
             this.pc = new RTCPeerConnection({
@@ -449,11 +463,26 @@ const CallSystem = {
                 }
             };
             
+            // ✅ إصلاح مشكلة الصوت في مكالمة الفيديو
             this.pc.ontrack = e => {
                 CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind}`, 'success');
+                
+                if (e.track.kind === 'audio') {
+                    e.track.enabled = true;
+                    CallDiagnostics.addLog(`🎤 تم تفعيل مسار الصوت البعيد`, 'success');
+                    if (e.streams[0]) {
+                        const audioEl = new Audio();
+                        audioEl.srcObject = e.streams[0];
+                        audioEl.play().catch(err => CallDiagnostics.addLog(`⚠️ خطأ في تشغيل الصوت: ${err}`, 'error'));
+                    }
+                }
+                
                 if (hasVideo && e.track.kind === 'video') {
                     const rv = document.getElementById('remoteVideo');
-                    if (rv && e.streams[0]) rv.srcObject = e.streams[0];
+                    if (rv && e.streams[0]) {
+                        rv.srcObject = e.streams[0];
+                        CallDiagnostics.addLog(`📹 تم عرض الفيديو البعيد`, 'success');
+                    }
                 }
             };
             
@@ -464,7 +493,6 @@ const CallSystem = {
                     this.endCall();
             };
             
-            // Keep-alive
             this.keepAliveInterval = setInterval(() => {
                 if (this.dc && this.dc.readyState === 'open') {
                     this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
@@ -615,7 +643,6 @@ const CallSystem = {
         document.body.appendChild(ui);
         this.startCallTimer();
         
-        // تأكيد تشغيل الصوت للمكالمات الصوتية
         if (callType === 'audio' && this.localStream) {
             const audioTrack = this.localStream.getAudioTracks()[0];
             if (audioTrack) {
