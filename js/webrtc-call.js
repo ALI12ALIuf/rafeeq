@@ -1,5 +1,5 @@
 // ========== webrtc-call.js ==========
-// نظام اتصال WebRTC مباشر + المكالمات + إرسال الملفات + نظام تشخيص متكامل
+// نظام اتصال WebRTC مباشر + المكالمات + إرسال الملفات + نظام تشخيص متكامل + إجبار TURN
 
 // ========== نظام التشخيص ==========
 const CallDiagnostics = {
@@ -101,7 +101,25 @@ const CallSystem = {
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
     callTimerInterval: null,
-    servers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' },{ urls: 'stun:stun1.l.google.com:19302' },{ urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
+    // ✅ تعديل الـ servers: إضافة TURN إضافي و TCP fallback
+    servers: { 
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { 
+                urls: 'turn:openrelay.metered.ca:80', 
+                username: 'openrelayproject', 
+                credential: 'openrelayproject'
+            },
+            { 
+                urls: 'turn:openrelay.metered.ca:443?transport=tcp', 
+                username: 'openrelayproject', 
+                credential: 'openrelayproject'
+            }
+        ]
+        // ✅ ملاحظة: تم إزالة iceTransportPolicy: 'relay' مؤقتاً
+        // جرب أولاً بدونه، إذا ما اشتغل الصوت أضفه
+    },
     
     async ensureDataChannel(calleeId) {
         if (!calleeId) return;
