@@ -1,5 +1,5 @@
 // ========== webrtc-call.js ==========
-// نظام اتصال WebRTC - مكالمات صوتية فقط + إرسال الملفات والصور والبصمات
+// نظام اتصال WebRTC - مكالمات صوتية فقط + إشعارات + رنين
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
@@ -8,6 +8,8 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    ringingAudio: null,  // صوت الرنين
+    currentCallId: null, // معرف المكالمة الحالية
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -15,6 +17,54 @@ const CallSystem = {
             { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
             { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
         ] 
+    },
+    
+    // تشغيل صوت الرنين
+    playRingingSound() {
+        if (this.ringingAudio) {
+            this.ringingAudio.pause();
+            this.ringingAudio = null;
+        }
+        // إنشاء صوت رنين بسيط باستخدام Web Audio API (يعمل بدون ملفات)
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.value = 440; // نغمة A4
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            // إيقاف الصوت بعد ثانية ونصف
+            setTimeout(() => {
+                oscillator.stop();
+                audioContext.close();
+            }, 1500);
+            // تكرار كل 3 ثوانٍ
+            this.ringingInterval = setInterval(() => {
+                if (!this.isInCall) {
+                    const newCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const newOsc = newCtx.createOscillator();
+                    const newGain = newCtx.createGain();
+                    newOsc.connect(newGain);
+                    newGain.connect(newCtx.destination);
+                    newOsc.frequency.value = 440;
+                    newGain.gain.value = 0.3;
+                    newOsc.start();
+                    setTimeout(() => {
+                        newOsc.stop();
+                        newCtx.close();
+                    }, 1500);
+                }
+            }, 3000);
+        } catch(e) { console.log('تعذر تشغيل صوت الرنين'); }
+    },
+    
+    stopRingingSound() {
+        if (this.ringingInterval) {
+            clearInterval(this.ringingInterval);
+            this.ringingInterval = null;
+        }
     },
     
     async ensureDataChannel(calleeId) {
@@ -72,6 +122,10 @@ const CallSystem = {
                     this.handleCallStatus(msg);
                     return;
                 }
+                if (msg.type === 'end_call') {
+                    this.handleEndCall();
+                    return;
+                }
                 if (msg.chunk !== undefined) { this.handleChunkMessage(msg); return; }
                 const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
                 if (ChatSystem.currentChat) { ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg); ChatSystem.displayMessage(displayMsg); }
@@ -108,6 +162,19 @@ const CallSystem = {
                 alert('الطرف الآخر أنهى المكالمة');
                 this.endCall();
             }
+        }
+    },
+    
+    handleEndCall() {
+        if (this.isInCall) {
+            console.log('📞 الطرف الآخر أنهى المكالمة');
+            this.endCall();
+        }
+    },
+    
+    sendEndCall() {
+        if (this.dc && this.dc.readyState === 'open') {
+            this.dc.send(JSON.stringify({ type: 'end_call', timestamp: Date.now() }));
         }
     },
     
@@ -149,6 +216,7 @@ const CallSystem = {
     async startCall(calleeId) {
         if (!window.auth?.currentUser || this.isInCall) return;
         this.isInCall = true;
+        this.currentCallId = calleeId;
         
         try {
             const silentAudio = new Audio();
@@ -212,28 +280,24 @@ const CallSystem = {
         this.remoteAudioElement = new Audio();
         this.remoteAudioElement.srcObject = stream;
         this.remoteAudioElement.autoplay = true;
-        
-        // تطبيق إعداد السماعة فوراً
         this.applySpeakerSettings();
-        
         this.remoteAudioElement.play().catch(e => console.log('تشغيل الصوت فشل:', e));
+        
+        // إيقاف صوت الرنين عند بدء المكالمة
+        this.stopRingingSound();
     },
     
     applySpeakerSettings() {
         if (!this.remoteAudioElement) return;
         
-        // استخدام setSinkId للتحكم في مخرج الصوت
         if (this.remoteAudioElement.setSinkId) {
             if (this.isSpeakerEnabled) {
-                // استخدام السماعة الخارجية (السفلية)
                 this.remoteAudioElement.setSinkId('speaker').then(() => {
                     console.log('✅ تم التبديل إلى السماعة الخارجية');
                 }).catch(e => {
                     console.log('❌ فشل التبديل إلى السماعة الخارجية:', e);
-                    this.fallbackSpeakerMode();
                 });
             } else {
-                // استخدام السماعة الداخلية (العلوية - وضع المكالمة العادي)
                 this.remoteAudioElement.setSinkId('default').then(() => {
                     console.log('✅ تم التبديل إلى السماعة الداخلية');
                 }).catch(e => {
@@ -241,27 +305,7 @@ const CallSystem = {
                 });
             }
         } else {
-            // المتصفح لا يدعم setSinkId
             console.log('⚠️ المتصفح لا يدعم تغيير مخرج الصوت');
-            this.fallbackSpeakerMode();
-        }
-    },
-    
-    fallbackSpeakerMode() {
-        // حل بديل: تغيير المسار عبر إنشاء عنصر Audio جديد
-        if (this.isSpeakerEnabled && this.remoteAudioElement) {
-            // محاولة إجبار الصوت على السماعة الخارجية عبر إنشاء عنصر جديد بدون قيود
-            const stream = this.remoteAudioElement.srcObject;
-            if (stream) {
-                const newAudio = new Audio();
-                newAudio.srcObject = stream;
-                newAudio.autoplay = true;
-                newAudio.volume = 1;
-                // إيقاف القديم وتشغيل الجديد
-                this.remoteAudioElement.pause();
-                this.remoteAudioElement = newAudio;
-                newAudio.play().catch(e => console.log('فشل التشغيل البديل:', e));
-            }
         }
     },
     
@@ -294,6 +338,9 @@ const CallSystem = {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
         
+        // تشغيل صوت الرنين
+        this.playRingingSound();
+        
         const overlay = document.createElement('div'); overlay.id = 'incomingCall';
         overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
         overlay.innerHTML = `
@@ -312,13 +359,32 @@ const CallSystem = {
             </div>`;
         document.body.appendChild(overlay);
         
-        document.getElementById('btnAccept').onclick = () => { overlay.remove(); this.receiveCall(callerId, callData); };
-        document.getElementById('btnReject').onclick = () => { overlay.remove(); };
+        overlay._callerId = callerId;
+        overlay._callData = callData;
+        
+        document.getElementById('btnAccept').onclick = () => { 
+            this.stopRingingSound();
+            overlay.remove(); 
+            this.receiveCall(callerId, callData); 
+        };
+        document.getElementById('btnReject').onclick = () => { 
+            this.stopRingingSound();
+            overlay.remove(); 
+        };
+        
+        // إغلاق الرنين بعد 30 ثانية إذا لم يرد
+        setTimeout(() => {
+            if (document.getElementById('incomingCall')) {
+                this.stopRingingSound();
+                overlay.remove();
+            }
+        }, 30000);
     },
     
     async receiveCall(callerId, callData) {
         if (this.isInCall) return;
         this.isInCall = true;
+        this.currentCallId = callerId;
         
         try {
             const silentAudio = new Audio();
@@ -462,6 +528,7 @@ const CallSystem = {
             <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
                 <div style="font-size:5rem;margin-bottom:10px;">${contactAvatar}</div>
                 <div style="font-size:1.5rem;color:white;font-weight:bold;">${contactName}</div>
+                <div style="margin-top:5px;color:#4CAF50;font-size:0.8rem;" id="callStatus">متصل</div>
                 <div style="margin-top:5px;color:#aaa;font-size:0.8rem;" id="callTimer">00:00</div>
             </div>
             <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;">
@@ -502,8 +569,15 @@ const CallSystem = {
     },
     
     endCall() { 
+        if (!this.isInCall) return;
+        
+        // إرسال إشارة إنهاء المكالمة للطرف الآخر
+        this.sendEndCall();
+        
         this.isInCall = false; 
         this.sendCallStatus('disconnected');
+        this.stopRingingSound();
+        
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
@@ -527,6 +601,8 @@ const CallSystem = {
         if (ui) ui.remove(); 
         const inc = document.getElementById('incomingCall'); 
         if (inc) inc.remove(); 
+        
+        this.currentCallId = null;
     },
     
     cleanupConnections() { 
