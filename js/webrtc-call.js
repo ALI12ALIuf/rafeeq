@@ -238,6 +238,19 @@ const CallSystem = {
                 return;
             }
             
+            // ✅ تأكيد تشغيل الصوت محلياً (للمكالمات الصوتية)
+            if (callType === 'audio') {
+                const audioTrack = audioTracks[0];
+                if (audioTrack) {
+                    audioTrack.enabled = true;
+                    // محاولة تشغيل الصوت محلياً للتأكد من أنه يعمل
+                    const audio = new Audio();
+                    audio.srcObject = this.localStream;
+                    audio.play().catch(e => CallDiagnostics.addLog(`⚠️ تشغيل الصوت محلياً فشل: ${e}`, 'error'));
+                    CallDiagnostics.addLog(`🎤 مسار الصوت مفعل (enabled: ${audioTrack.enabled})`, 'success');
+                }
+            }
+            
             this.showCallUI(callType);
             
             // إنشاء اتصال مع إعدادات محسنة
@@ -601,6 +614,15 @@ const CallSystem = {
         }
         document.body.appendChild(ui);
         this.startCallTimer();
+        
+        // تأكيد تشغيل الصوت للمكالمات الصوتية
+        if (callType === 'audio' && this.localStream) {
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = true;
+                CallDiagnostics.addLog(`🎤 مسار الصوت مفعل (enabled: ${audioTrack.enabled})`, 'success');
+            }
+        }
     },
     
     startCallTimer() {
@@ -629,6 +651,7 @@ const CallSystem = {
                     if (at.enabled) btn.className = 'fas fa-microphone';
                     else btn.className = 'fas fa-microphone-slash';
                 });
+                CallDiagnostics.addLog(`🎤 كتم الصوت: ${!at.enabled ? 'مكتوم' : 'مفعل'}`, 'info');
             }
         } 
     },
