@@ -8,7 +8,10 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
-    pendingCall: null, // لتخزين بيانات المكالمة الواردة
+    pendingCall: null,
+    currentCallPeer: null,
+    callTimeout: null,
+    currentRingtone: null,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -73,22 +76,6 @@ const CallSystem = {
                     this.handleCallStatus(msg);
                     return;
                 }
-                if (msg.type === 'call_offer') {
-                    this.handleCallOffer(msg);
-                    return;
-                }
-                if (msg.type === 'call_accept') {
-                    this.handleCallAccept(msg);
-                    return;
-                }
-                if (msg.type === 'call_reject') {
-                    this.handleCallReject(msg);
-                    return;
-                }
-                if (msg.type === 'call_end') {
-                    this.handleCallEnd(msg);
-                    return;
-                }
                 if (msg.chunk !== undefined) { this.handleChunkMessage(msg); return; }
                 const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
                 if (ChatSystem.currentChat) { ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg); ChatSystem.displayMessage(displayMsg); }
@@ -127,9 +114,49 @@ const CallSystem = {
         }
     },
     
+    sendCallStatus(status) {
+        if (this.dc && this.dc.readyState === 'open') {
+            this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
+        }
+    },
+    
+    // ========== إشارات المكالمات عبر Firestore ==========
+    async sendCallOffer(calleeId, callerName, callerAvatar) {
+        await this.sendSignal(calleeId, {
+            type: 'call_offer',
+            from: window.auth.currentUser.uid,
+            callerName: callerName,
+            callerAvatar: callerAvatar,
+            timestamp: Date.now()
+        });
+    },
+    
+    async sendCallAccept(calleeId) {
+        await this.sendSignal(calleeId, {
+            type: 'call_accept',
+            from: window.auth.currentUser.uid,
+            timestamp: Date.now()
+        });
+    },
+    
+    async sendCallReject(calleeId) {
+        await this.sendSignal(calleeId, {
+            type: 'call_reject',
+            from: window.auth.currentUser.uid,
+            timestamp: Date.now()
+        });
+    },
+    
+    async sendCallEnd(calleeId) {
+        await this.sendSignal(calleeId, {
+            type: 'call_end',
+            from: window.auth.currentUser.uid,
+            timestamp: Date.now()
+        });
+    },
+    
     handleCallOffer(msg) {
         if (this.isInCall) {
-            // مشغول، أرسل رفض
             this.sendCallReject(msg.from);
             return;
         }
@@ -156,7 +183,6 @@ const CallSystem = {
             alert('الطرف الآخر رفض المكالمة');
         } else if (this.isInCall && this.currentCallPeer === msg.from) {
             this.endCall();
-            alert('الطرف الآخر أنهى المكالمة');
         }
     },
     
@@ -164,45 +190,6 @@ const CallSystem = {
         if (this.isInCall && this.currentCallPeer === msg.from) {
             alert('الطرف الآخر أنهى المكالمة');
             this.endCall();
-        }
-    },
-    
-    sendCallOffer(calleeId, callerName, callerAvatar) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ 
-                type: 'call_offer', 
-                from: window.auth.currentUser.uid,
-                callerName: callerName,
-                callerAvatar: callerAvatar,
-                timestamp: Date.now() 
-            }));
-        } else {
-            // إذا القناة غير جاهزة، نخزن الطلب وننتظر
-            setTimeout(() => this.sendCallOffer(calleeId, callerName, callerAvatar), 500);
-        }
-    },
-    
-    sendCallAccept(calleeId) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ type: 'call_accept', from: window.auth.currentUser.uid, timestamp: Date.now() }));
-        }
-    },
-    
-    sendCallReject(calleeId) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ type: 'call_reject', from: window.auth.currentUser.uid, timestamp: Date.now() }));
-        }
-    },
-    
-    sendCallEnd(calleeId) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ type: 'call_end', from: window.auth.currentUser.uid, timestamp: Date.now() }));
-        }
-    },
-    
-    sendCallStatus(status) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
         }
     },
     
@@ -234,7 +221,6 @@ const CallSystem = {
             this.rejectCall(callerId);
         };
         
-        // رنة (اختياري)
         this.playRingtone();
     },
     
@@ -256,13 +242,12 @@ const CallSystem = {
     },
     
     async acceptCall(callerId) {
-        this.sendCallAccept(callerId);
-        // بدء المكالمة الفعلية بعد القبول
+        await this.sendCallAccept(callerId);
         this.startCallAccepted(callerId);
     },
     
-    rejectCall(callerId) {
-        this.sendCallReject(callerId);
+    async rejectCall(callerId) {
+        await this.sendCallReject(callerId);
         this.pendingCall = null;
     },
     
@@ -301,14 +286,12 @@ const CallSystem = {
         const callerName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const callerAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
         
-        // إرسال عرض المكالمة
-        this.sendCallOffer(calleeId, callerName, callerAvatar);
-        
-        // حفظ بيانات المكالمة الحالية
         this.currentCallPeer = calleeId;
         
-        // بدء المكالمة الفعلية (سيتم الانتظار حتى القبول)
-        // نستخدم timeout لانتظار القبول لمدة 30 ثانية
+        // إرسال عرض المكالمة عبر Firestore
+        await this.sendCallOffer(calleeId, callerName, callerAvatar);
+        
+        // مهلة 30 ثانية
         this.callTimeout = setTimeout(() => {
             if (!this.isInCall) {
                 alert('لم يجب الطرف الآخر');
@@ -435,13 +418,27 @@ const CallSystem = {
         } catch (e) { ChatSystem.hideProgressBar(); return false; }
     },
     
-    async receiveCall(callerId, callData) {
-        // تم استبدال هذه الدالة بـ acceptCall و startCallAccepted
-        // نتركها فارغة لتجنب الأخطاء
-    },
-    
     async handleSignaling(data) {
         try {
+            // معالجة إشارات المكالمات
+            if (data.type === 'call_offer') {
+                this.handleCallOffer(data);
+                return;
+            }
+            if (data.type === 'call_accept') {
+                this.handleCallAccept(data);
+                return;
+            }
+            if (data.type === 'call_reject') {
+                this.handleCallReject(data);
+                return;
+            }
+            if (data.type === 'call_end') {
+                this.handleCallEnd(data);
+                return;
+            }
+            
+            // معالجة إشارات WebRTC العادية
             if (!this.pc) { 
                 this.pc = new RTCPeerConnection({
                     iceServers: this.servers.iceServers,
