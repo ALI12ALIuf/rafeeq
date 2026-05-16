@@ -6,7 +6,8 @@ const CallSystem = {
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
     callTimerInterval: null, keepAliveInterval: null,
-    isMuted: false, isSpeakerEnabled: true,
+    isMuted: false, isSpeakerEnabled: false,
+    remoteAudioElement: null,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -150,7 +151,6 @@ const CallSystem = {
         this.isInCall = true;
         
         try {
-            // كسر سياسة Autoplay
             const silentAudio = new Audio();
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
@@ -182,13 +182,7 @@ const CallSystem = {
             this.pc.ontrack = e => {
                 if (e.track.kind === 'audio') {
                     e.track.enabled = true;
-                    // تطبيق إعدادات السماعة
-                    if (this.isSpeakerEnabled) {
-                        const audioElement = new Audio();
-                        audioElement.srcObject = e.streams[0];
-                        audioElement.autoplay = true;
-                        audioElement.play().catch(() => {});
-                    }
+                    this.setupRemoteAudio(e.streams[0]);
                 }
             };
             
@@ -207,6 +201,29 @@ const CallSystem = {
                 alert('يرجى السماح بالوصول إلى الميكروفون');
             }
         }
+    },
+    
+    setupRemoteAudio(stream) {
+        if (this.remoteAudioElement) {
+            this.remoteAudioElement.pause();
+            this.remoteAudioElement.srcObject = null;
+        }
+        this.remoteAudioElement = new Audio();
+        this.remoteAudioElement.srcObject = stream;
+        this.remoteAudioElement.autoplay = true;
+        
+        // التحكم في مخرج الصوت (سماعة الأذن أو السماعة الخارجية)
+        if (this.remoteAudioElement.setSinkId) {
+            if (this.isSpeakerEnabled) {
+                // استخدام السماعة الخارجية (صوت عالٍ)
+                this.remoteAudioElement.setSinkId('speaker').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
+            } else {
+                // استخدام سماعة الأذن العادية
+                this.remoteAudioElement.setSinkId('earpiece').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
+            }
+        }
+        
+        this.remoteAudioElement.play().catch(e => console.log('تشغيل الصوت فشل:', e));
     },
     
     async sendFileDirect(file, type) {
@@ -291,12 +308,7 @@ const CallSystem = {
             this.pc.ontrack = e => {
                 if (e.track.kind === 'audio') {
                     e.track.enabled = true;
-                    if (this.isSpeakerEnabled) {
-                        const audioElement = new Audio();
-                        audioElement.srcObject = e.streams[0];
-                        audioElement.autoplay = true;
-                        audioElement.play().catch(() => {});
-                    }
+                    this.setupRemoteAudio(e.streams[0]);
                 }
             };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
@@ -381,6 +393,16 @@ const CallSystem = {
     
     toggleSpeaker() {
         this.isSpeakerEnabled = !this.isSpeakerEnabled;
+        if (this.remoteAudioElement && this.remoteAudioElement.setSinkId) {
+            if (this.isSpeakerEnabled) {
+                // استخدام السماعة الخارجية (صوت عالٍ)
+                this.remoteAudioElement.setSinkId('speaker').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
+            } else {
+                // استخدام سماعة الأذن العادية
+                this.remoteAudioElement.setSinkId('earpiece').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
+            }
+        }
+        
         const speakerBtn = document.getElementById('speakerBtn');
         if (speakerBtn) {
             if (this.isSpeakerEnabled) {
@@ -409,7 +431,6 @@ const CallSystem = {
             <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
                 <div style="font-size:5rem;margin-bottom:10px;">${contactAvatar}</div>
                 <div style="font-size:1.5rem;color:white;font-weight:bold;">${contactName}</div>
-                <div style="margin-top:5px;color:#4CAF50;font-size:0.9rem;" id="callStatusText">جاري الاتصال...</div>
                 <div style="margin-top:5px;color:#aaa;font-size:0.8rem;" id="callTimer">00:00</div>
             </div>
             <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;">
@@ -427,19 +448,10 @@ const CallSystem = {
         document.body.appendChild(ui);
         this.startCallTimer();
         
-        // تحديث حالة الاتصال بعد 2 ثانية
-        setTimeout(() => {
-            const statusEl = document.getElementById('callStatusText');
-            if (statusEl && this.isInCall) {
-                statusEl.innerHTML = 'متصل';
-                statusEl.style.color = '#4CAF50';
-            }
-        }, 2000);
-        
         // إعداد ألوان الأزرار الافتراضية
         const speakerBtn = document.getElementById('speakerBtn');
         if (speakerBtn) {
-            speakerBtn.style.background = '#2196F3';
+            speakerBtn.style.background = 'rgba(0,0,0,0.6)';
         }
     },
     
@@ -469,6 +481,11 @@ const CallSystem = {
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
+        }
+        if (this.remoteAudioElement) {
+            this.remoteAudioElement.pause();
+            this.remoteAudioElement.srcObject = null;
+            this.remoteAudioElement = null;
         }
         document.body.classList.remove('in-call'); 
         if (this.localStream) { 
