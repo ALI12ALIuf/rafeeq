@@ -8,6 +8,9 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    audioContext: null,
+    mediaStreamSource: null,
+    gainNode: null,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -151,6 +154,7 @@ const CallSystem = {
         this.isInCall = true;
         
         try {
+            // كسر سياسة Autoplay
             const silentAudio = new Audio();
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
@@ -204,25 +208,47 @@ const CallSystem = {
     },
     
     setupRemoteAudio(stream) {
+        // إغلاق أي عناصر سابقة
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
         }
-        this.remoteAudioElement = new Audio();
-        this.remoteAudioElement.srcObject = stream;
-        this.remoteAudioElement.autoplay = true;
+        if (this.mediaStreamSource) {
+            this.mediaStreamSource.disconnect();
+        }
+        if (this.audioContext) {
+            this.audioContext.close();
+        }
         
-        // التحكم في مخرج الصوت (سماعة الأذن أو السماعة الخارجية)
-        if (this.remoteAudioElement.setSinkId) {
+        // إنشاء AudioContext للتحكم في مخرج الصوت
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.mediaStreamSource = this.audioContext.createMediaStreamSource(stream);
+        this.gainNode = this.audioContext.createGain();
+        this.gainNode.gain.value = 1;
+        
+        // توصيل العقد
+        this.mediaStreamSource.connect(this.gainNode);
+        
+        // تحديد مخرج الصوت (سماعة الأذن افتراضياً)
+        if (this.audioContext.setSinkId) {
             if (this.isSpeakerEnabled) {
-                // استخدام السماعة الخارجية (صوت عالٍ)
-                this.remoteAudioElement.setSinkId('speaker').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
+                this.audioContext.setSinkId('speaker').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
             } else {
-                // استخدام سماعة الأذن العادية
-                this.remoteAudioElement.setSinkId('earpiece').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
+                this.audioContext.setSinkId('earpiece').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
             }
         }
         
+        this.gainNode.connect(this.audioContext.destination);
+        
+        // تشغيل AudioContext (يجب أن يكون بعد تفاعل المستخدم)
+        this.audioContext.resume().then(() => {
+            console.log('🎵 تم تشغيل الصوت بنجاح');
+        }).catch(e => console.log('فشل تشغيل الصوت:', e));
+        
+        // حفظ مرجع للتيار
+        this.remoteAudioElement = new Audio();
+        this.remoteAudioElement.srcObject = stream;
+        this.remoteAudioElement.volume = 1;
         this.remoteAudioElement.play().catch(e => console.log('تشغيل الصوت فشل:', e));
     },
     
@@ -282,6 +308,7 @@ const CallSystem = {
         this.isInCall = true;
         
         try {
+            // كسر سياسة Autoplay
             const silentAudio = new Audio();
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
@@ -393,13 +420,13 @@ const CallSystem = {
     
     toggleSpeaker() {
         this.isSpeakerEnabled = !this.isSpeakerEnabled;
-        if (this.remoteAudioElement && this.remoteAudioElement.setSinkId) {
+        
+        // تغيير مخرج الصوت في AudioContext
+        if (this.audioContext && this.audioContext.setSinkId) {
             if (this.isSpeakerEnabled) {
-                // استخدام السماعة الخارجية (صوت عالٍ)
-                this.remoteAudioElement.setSinkId('speaker').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
+                this.audioContext.setSinkId('speaker').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
             } else {
-                // استخدام سماعة الأذن العادية
-                this.remoteAudioElement.setSinkId('earpiece').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
+                this.audioContext.setSinkId('earpiece').catch(e => console.log('لا يمكن تغيير مخرج الصوت'));
             }
         }
         
@@ -481,6 +508,11 @@ const CallSystem = {
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
+        }
+        // إغلاق AudioContext
+        if (this.audioContext) {
+            this.audioContext.close();
+            this.audioContext = null;
         }
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
