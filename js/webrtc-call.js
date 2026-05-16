@@ -1,116 +1,19 @@
 // ========== webrtc-call.js ==========
-// نظام اتصال WebRTC مباشر + المكالمات + إرسال الملفات + نظام تشخيص متكامل + إجبار TURN
-
-// ========== نظام التشخيص ==========
-const CallDiagnostics = {
-    logs: [],
-    addLog(message, type = 'info') {
-        const time = new Date().toLocaleTimeString();
-        const log = { time, message, type };
-        this.logs.push(log);
-        console.log(`[${time}] ${message}`);
-        
-        let panel = document.getElementById('callDiagnosticsPanel');
-        if (!panel) {
-            panel = document.createElement('div');
-            panel.id = 'callDiagnosticsPanel';
-            panel.style.cssText = `
-                position: fixed;
-                bottom: 10px;
-                left: 10px;
-                right: 10px;
-                background: rgba(0,0,0,0.95);
-                color: #0f0;
-                font-size: 11px;
-                padding: 8px;
-                border-radius: 8px;
-                z-index: 10001;
-                font-family: monospace;
-                max-height: 200px;
-                overflow-y: auto;
-                direction: ltr;
-                text-align: left;
-                pointer-events: none;
-            `;
-            document.body.appendChild(panel);
-        }
-        
-        const color = type === 'error' ? '#ff4444' : (type === 'success' ? '#44ff44' : '#ffaa44');
-        panel.innerHTML += `<div style="color:${color};border-bottom:1px solid #333;padding:2px 0;">[${time}] ${message}</div>`;
-        panel.scrollTop = panel.scrollHeight;
-        
-        while (panel.children.length > 50) {
-            panel.removeChild(panel.children[0]);
-        }
-    },
-    clear() {
-        const panel = document.getElementById('callDiagnosticsPanel');
-        if (panel) panel.innerHTML = '';
-        this.logs = [];
-    }
-};
-
-window.onerror = function(msg, url, line, col, error) {
-    CallDiagnostics.addLog(`خطأ عام: ${msg} (سطر ${line})`, 'error');
-    return false;
-};
-
-const originalRTCPeerConnection = window.RTCPeerConnection;
-window.RTCPeerConnection = function(config) {
-    CallDiagnostics.addLog('📞 إنشاء اتصال WebRTC جديد', 'info');
-    const pc = new originalRTCPeerConnection(config);
-    
-    const originalSetRemoteDescription = pc.setRemoteDescription;
-    pc.setRemoteDescription = function(desc) {
-        CallDiagnostics.addLog(`📡 setRemoteDescription: ${desc.type}`, 'info');
-        return originalSetRemoteDescription.call(this, desc);
-    };
-    
-    const originalSetLocalDescription = pc.setLocalDescription;
-    pc.setLocalDescription = function(desc) {
-        CallDiagnostics.addLog(`📡 setLocalDescription: ${desc.type}`, 'info');
-        return originalSetLocalDescription.call(this, desc);
-    };
-    
-    pc.oniceconnectionstatechange = function() {
-        CallDiagnostics.addLog(`❄️ ICE state: ${pc.iceConnectionState}`, pc.iceConnectionState === 'failed' ? 'error' : 'info');
-    };
-    
-    pc.onconnectionstatechange = function() {
-        CallDiagnostics.addLog(`🔗 Connection state: ${pc.connectionState}`, pc.connectionState === 'failed' ? 'error' : 'info');
-    };
-    
-    pc.onsignalingstatechange = function() {
-        CallDiagnostics.addLog(`📶 Signaling state: ${pc.signalingState}`, 'info');
-    };
-    
-    pc.ontrack = function(e) {
-        CallDiagnostics.addLog(`🎵 تم استقبال مسار: ${e.track.kind} (enabled: ${e.track.enabled})`, 'success');
-    };
-    
-    return pc;
-};
+// نظام اتصال WebRTC - مكالمات صوتية فقط + إرسال الملفات والصور والبصمات
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false,
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
-    callTimerInterval: null, keepAliveInterval: null,
+    callTimerInterval: null,
+    // خوادم STUN و TURN (TURN للاحتياط فقط في الشبكات الصعبة)
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-            { 
-                urls: 'turn:openrelay.metered.ca:80', 
-                username: 'openrelayproject', 
-                credential: 'openrelayproject'
-            },
-            { 
-                urls: 'turn:openrelay.metered.ca:443?transport=tcp', 
-                username: 'openrelayproject', 
-                credential: 'openrelayproject'
-            }
-        ]
+            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+        ] 
     },
     
     async ensureDataChannel(calleeId) {
@@ -134,9 +37,7 @@ const CallSystem = {
         try {
             this.pc = new RTCPeerConnection({
                 iceServers: this.servers.iceServers,
-                iceTransportPolicy: 'relay',
-                rtcpMuxPolicy: 'require',
-                bundlePolicy: 'max-bundle'
+                iceTransportPolicy: 'all'  // يفضل الاتصال المباشر (P2P) أولاً
             });
             this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
             this.setupDataChannel(this.dc);
@@ -144,7 +45,8 @@ const CallSystem = {
             this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
             this.pc.onconnectionstatechange = () => { switch(this.pc?.connectionState) { case 'connected': this.reconnectAttempts = 0; break; case 'failed': case 'disconnected': this.scheduleReconnect(); break; } };
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+            // طلب صوت فقط (بدون فيديو) لتقليل استهلاك TURN
+            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
             await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
         } catch (error) { throw error; }
@@ -194,150 +96,53 @@ const CallSystem = {
         this.reconnectTimer = setTimeout(async () => { try { if (ChatSystem.currentChat && ChatSystem.friendOnline) await this.ensureDataChannel(ChatSystem.currentChat); } catch (error) {} this.reconnectTimer = null; }, delay);
     },
     
-    async startCall(calleeId, callType = 'video') {
-        CallDiagnostics.addLog(`🚀 بدء مكالمة ${callType} إلى ${calleeId}`, 'info');
-        
-        if (!window.auth?.currentUser) {
-            CallDiagnostics.addLog('❌ لا يوجد مستخدم مسجل', 'error');
-            return;
-        }
-        if (this.isInCall) {
-            CallDiagnostics.addLog('❌ مكالمة قيد التشغيل بالفعل', 'error');
-            return;
-        }
-        
+    // ========== مكالمة صوتية فقط ==========
+    async startCall(calleeId) {
+        if (!window.auth?.currentUser || this.isInCall) return;
         this.isInCall = true;
         
         try {
-            if (navigator.permissions) {
-                const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-                CallDiagnostics.addLog(`🎤 حالة إذن الميكروفون: ${permissionStatus.state}`, 'info');
-                if (permissionStatus.state === 'denied') {
-                    CallDiagnostics.addLog('❌ إذن الميكروفون مرفوض!', 'error');
-                    alert('⚠️ لا يمكن الوصول إلى الميكروفون. الرجاء السماح يدوياً من إعدادات المتصفح.');
-                    this.endCall();
-                    return;
-                }
-            }
-            
-            const constraints = { 
-                audio: true,
-                video: (callType === 'video')
-            };
-            CallDiagnostics.addLog(`🎤 طلب الوسائط: audio=${constraints.audio}, video=${constraints.video}`, 'info');
-            
+            // طلب الصوت فقط (بدون كاميرا)
+            const constraints = { audio: true, video: false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            const audioTracks = this.localStream.getAudioTracks();
-            const videoTracks = this.localStream.getVideoTracks();
-            CallDiagnostics.addLog(`✅ تم الحصول على الوسائط: ${audioTracks.length} مسار صوت, ${videoTracks.length} مسار فيديو`, audioTracks.length > 0 ? 'success' : 'error');
             
+            const audioTracks = this.localStream.getAudioTracks();
             if (audioTracks.length === 0) {
-                CallDiagnostics.addLog('❌ لا يوجد مسار صوتي! تأكد من إذن الميكروفون', 'error');
+                console.error('❌ لا يوجد مسار صوتي');
                 this.endCall();
+                alert('لا يمكن الوصول إلى الميكروفون');
                 return;
             }
             
-            // تفعيل مسار الصوت محلياً
-            if (audioTracks[0]) {
-                audioTracks[0].enabled = true;
-                CallDiagnostics.addLog(`🎤 مسار الصوت المحلي مفعل`, 'success');
-            }
-            
-            this.showCallUI(callType);
-            
+            this.showCallUI();
             this.pc = new RTCPeerConnection({
                 iceServers: this.servers.iceServers,
-                iceTransportPolicy: 'relay',
-                rtcpMuxPolicy: 'require',
-                bundlePolicy: 'max-bundle'
+                iceTransportPolicy: 'all'
             });
             
-            this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                CallDiagnostics.addLog(`➕ إضافة ${track.kind} track إلى الاتصال`, 'info');
-            });
-            
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             this.dc = this.pc.createDataChannel('chat'); 
             this.setupDataChannel(this.dc);
             
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) {
-                    CallDiagnostics.addLog(`🧊 ICE candidate: ${e.candidate.candidate.substring(0, 50)}...`, 'info');
-                    this.sendSignal(calleeId, { candidate: e.candidate });
-                }
+            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+            this.pc.ontrack = e => { console.log('📡 استقبال مسار صوتي'); };
+            this.pc.onconnectionstatechange = () => { 
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) 
+                    this.endCall(); 
             };
             
-            this.pc.oniceconnectionstatechange = () => {
-                const state = this.pc?.iceConnectionState;
-                CallDiagnostics.addLog(`❄️ ICE state: ${state}`, state === 'failed' ? 'error' : 'info');
-                if (state === 'failed') {
-                    CallDiagnostics.addLog('🔄 ICE فشل، إعادة المحاولة...', 'info');
-                    this.pc.restartIce();
-                }
-            };
-            
-            // ✅ إصلاح مشكلة الصوت في مكالمة الفيديو
-            this.pc.ontrack = e => {
-                CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind} من الطرف البعيد`, 'success');
-                
-                if (e.track.kind === 'audio') {
-                    // تأكيد تشغيل الصوت حتى في مكالمة الفيديو
-                    e.track.enabled = true;
-                    CallDiagnostics.addLog(`🎤 تم تفعيل مسار الصوت البعيد`, 'success');
-                    
-                    // محاولة تشغيل الصوت عبر عنصر منفصل للتأكد
-                    if (e.streams[0]) {
-                        const audioEl = new Audio();
-                        audioEl.srcObject = e.streams[0];
-                        audioEl.play().catch(err => CallDiagnostics.addLog(`⚠️ خطأ في تشغيل الصوت: ${err}`, 'error'));
-                    }
-                }
-                
-                if (callType === 'video' && e.track.kind === 'video') {
-                    const rv = document.getElementById('remoteVideo');
-                    if (rv && e.streams[0]) {
-                        rv.srcObject = e.streams[0];
-                        CallDiagnostics.addLog(`📹 تم عرض الفيديو البعيد`, 'success');
-                    }
-                }
-            };
-            
-            this.pc.onconnectionstatechange = () => {
-                CallDiagnostics.addLog(`🔌 حالة الاتصال: ${this.pc?.connectionState}`, 'info');
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected'))
-                    this.endCall();
-            };
-            
-            this.pc.getSenders().forEach(sender => {
-                CallDiagnostics.addLog(`📤 جهاز الإرسال: ${sender.track?.kind}`, 'info');
-            });
-            
-            this.keepAliveInterval = setInterval(() => {
-                if (this.dc && this.dc.readyState === 'open') {
-                    this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-                }
-            }, 10000);
-            
-            const offerOptions = (callType === 'video') 
-                ? { offerToReceiveAudio: true, offerToReceiveVideo: true }
-                : { offerToReceiveAudio: true, offerToReceiveVideo: false };
-            
-            CallDiagnostics.addLog(`📝 إنشاء عرض (Offer) مع: offerToReceiveVideo=${offerOptions.offerToReceiveVideo}`, 'info');
-            
-            const offer = await this.pc.createOffer(offerOptions);
-            CallDiagnostics.addLog(`✅ تم إنشاء العرض بنجاح`, 'success');
-            
+            // طلب صوت فقط (بدون فيديو) - يقلل استهلاك TURN بشكل كبير
+            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false }); 
             await this.pc.setLocalDescription(offer);
-            CallDiagnostics.addLog(`✅ تم تعيين LocalDescription`, 'success');
-            
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-            CallDiagnostics.addLog(`📤 تم إرسال الإشارة إلى ${calleeId}`, 'success');
             
-        } catch (e) {
-            CallDiagnostics.addLog(`❌ خطأ في startCall: ${e.name} - ${e.message}`, 'error');
-            this.endCall();
+        } catch (e) { 
+            this.endCall(); 
             if (e.name === 'NotAllowedError') {
-                alert('يرجى السماح بالوصول إلى الميكروفون' + (callType === 'video' ? ' والكاميرا' : ''));
+                alert('يرجى السماح بالوصول إلى الميكروفون');
+            } else {
+                console.error('خطأ في بدء المكالمة:', e);
+                alert('حدث خطأ في بدء المكالمة');
             }
         }
     },
@@ -372,21 +177,13 @@ const CallSystem = {
     
     showIncomingCall(callerId, callData) {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        const sdp = callData.sdp?.sdp || '';
-        const hasVideo = sdp.includes('m=video') && !sdp.includes('m=video 0');
-        const callType = hasVideo ? 'video' : 'audio';
-        const typeText = callType === 'video' ? 'مكالمة فيديو' : 'مكالمة صوتية';
-        const typeIcon = callType === 'video' ? '📹' : '🎧';
-        
-        CallDiagnostics.addLog(`📞 مكالمة واردة من ${callerId} (${typeText})`, 'info');
-        
         const overlay = document.createElement('div'); overlay.id = 'incomingCall';
         overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
         overlay.innerHTML = `
             <div style="text-align:center;">
-                <div style="font-size:3rem;margin-bottom:10px;">${typeIcon}</div>
+                <div style="font-size:3rem;margin-bottom:10px;">🎧</div>
                 <div style="font-size:1.5rem;">📞 ${contactName}</div>
-                <div style="font-size:1rem;margin-top:8px;color:#ccc;">${typeText}</div>
+                <div style="font-size:1rem;margin-top:8px;color:#ccc;">مكالمة صوتية</div>
             </div>
             <div style="display:flex;gap:30px;">
                 <button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">
@@ -403,121 +200,51 @@ const CallSystem = {
     },
     
     async receiveCall(callerId, callData) {
-        CallDiagnostics.addLog(`📞 استقبال مكالمة من ${callerId}`, 'info');
-        
-        if (this.isInCall) {
-            CallDiagnostics.addLog('❌ مكالمة قيد التشغيل بالفعل', 'error');
-            return;
-        }
+        if (this.isInCall) return;
         this.isInCall = true;
         
         try {
-            const sdp = callData.sdp?.sdp || '';
-            const hasVideo = sdp.includes('m=video') && !sdp.includes('m=video 0');
-            const callType = hasVideo ? 'video' : 'audio';
-            
-            CallDiagnostics.addLog(`📋 تحليل SDP: نوع المكالمة = ${callType}`, 'info');
-            
-            const constraints = { 
-                audio: true,
-                video: hasVideo
-            };
-            
-            CallDiagnostics.addLog(`🎤 طلب الوسائط: audio=${constraints.audio}, video=${constraints.video}`, 'info');
-            
+            // مكالمة صوتية فقط (بدون كاميرا)
+            const constraints = { audio: true, video: false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            const audioTracks = this.localStream.getAudioTracks();
-            CallDiagnostics.addLog(`✅ تم الحصول على ${audioTracks.length} مسار صوتي`, audioTracks.length > 0 ? 'success' : 'error');
             
+            const audioTracks = this.localStream.getAudioTracks();
             if (audioTracks.length === 0) {
-                CallDiagnostics.addLog('❌ لا يوجد مسار صوتي!', 'error');
+                console.error('❌ لا يوجد مسار صوتي');
                 this.endCall();
+                alert('لا يمكن الوصول إلى الميكروفون');
                 return;
             }
             
-            // تفعيل مسار الصوت محلياً
-            if (audioTracks[0]) {
-                audioTracks[0].enabled = true;
-                CallDiagnostics.addLog(`🎤 مسار الصوت المحلي مفعل`, 'success');
-            }
-            
-            this.showCallUI(callType);
-            
+            this.showCallUI();
             this.pc = new RTCPeerConnection({
                 iceServers: this.servers.iceServers,
-                iceTransportPolicy: 'relay',
-                rtcpMuxPolicy: 'require',
-                bundlePolicy: 'max-bundle'
+                iceTransportPolicy: 'all'
             });
             
             this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
-            
-            this.pc.oniceconnectionstatechange = () => {
-                const state = this.pc?.iceConnectionState;
-                CallDiagnostics.addLog(`❄️ ICE state: ${state}`, state === 'failed' ? 'error' : 'info');
-                if (state === 'failed') {
-                    CallDiagnostics.addLog('🔄 ICE فشل، إعادة المحاولة...', 'info');
-                    this.pc.restartIce();
-                }
-            };
-            
-            // ✅ إصلاح مشكلة الصوت في مكالمة الفيديو
-            this.pc.ontrack = e => {
-                CallDiagnostics.addLog(`📡 استقبال مسار ${e.track.kind}`, 'success');
-                
-                if (e.track.kind === 'audio') {
-                    e.track.enabled = true;
-                    CallDiagnostics.addLog(`🎤 تم تفعيل مسار الصوت البعيد`, 'success');
-                    if (e.streams[0]) {
-                        const audioEl = new Audio();
-                        audioEl.srcObject = e.streams[0];
-                        audioEl.play().catch(err => CallDiagnostics.addLog(`⚠️ خطأ في تشغيل الصوت: ${err}`, 'error'));
-                    }
-                }
-                
-                if (hasVideo && e.track.kind === 'video') {
-                    const rv = document.getElementById('remoteVideo');
-                    if (rv && e.streams[0]) {
-                        rv.srcObject = e.streams[0];
-                        CallDiagnostics.addLog(`📹 تم عرض الفيديو البعيد`, 'success');
-                    }
-                }
-            };
-            
+            this.pc.ontrack = e => { console.log('📡 استقبال مسار صوتي'); };
             this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-            this.pc.onconnectionstatechange = () => {
-                CallDiagnostics.addLog(`🔌 حالة الاتصال: ${this.pc?.connectionState}`, 'info');
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected'))
-                    this.endCall();
+            this.pc.onconnectionstatechange = () => { 
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) 
+                    this.endCall(); 
             };
             
-            this.keepAliveInterval = setInterval(() => {
-                if (this.dc && this.dc.readyState === 'open') {
-                    this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-                }
-            }, 10000);
-            
-            if (callData.sdp) {
-                CallDiagnostics.addLog(`📝 تعيين RemoteDescription`, 'info');
-                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
-                
-                const answerOptions = hasVideo
-                    ? { offerToReceiveAudio: true, offerToReceiveVideo: true }
-                    : { offerToReceiveAudio: true, offerToReceiveVideo: false };
-                
-                CallDiagnostics.addLog(`📝 إنشاء إجابة (Answer)`, 'info');
-                const answer = await this.pc.createAnswer(answerOptions);
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
-                CallDiagnostics.addLog(`✅ تم إرسال الإجابة`, 'success');
+            if (callData.sdp) { 
+                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); 
+                const answer = await this.pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: false }); 
+                await this.pc.setLocalDescription(answer); 
+                await this.sendSignal(callerId, { sdp: this.pc.localDescription }); 
             }
-        } catch (e) {
-            CallDiagnostics.addLog(`❌ خطأ في receiveCall: ${e.name} - ${e.message}`, 'error');
-            this.endCall();
+        } catch (e) { 
+            this.endCall(); 
             if (e.name === 'NotAllowedError') {
-                alert('يرجى السماح بالوصول إلى الميكروفون' + (hasVideo ? ' والكاميرا' : ''));
+                alert('يرجى السماح بالوصول إلى الميكروفون');
+            } else {
+                console.error('خطأ في استقبال المكالمة:', e);
+                alert('حدث خطأ في استقبال المكالمة');
             }
         }
     },
@@ -527,9 +254,7 @@ const CallSystem = {
             if (!this.pc) { 
                 this.pc = new RTCPeerConnection({
                     iceServers: this.servers.iceServers,
-                    iceTransportPolicy: 'relay',
-                    rtcpMuxPolicy: 'require',
-                    bundlePolicy: 'max-bundle'
+                    iceTransportPolicy: 'all'
                 }); 
                 this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; 
                 this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
@@ -538,12 +263,7 @@ const CallSystem = {
             if (data.sdp) { 
                 await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); 
                 if (data.sdp.type === 'offer') { 
-                    const sdp = data.sdp.sdp || '';
-                    const hasVideo = sdp.includes('m=video') && !sdp.includes('m=video 0');
-                    const answerOptions = hasVideo
-                        ? { offerToReceiveAudio: true, offerToReceiveVideo: true }
-                        : { offerToReceiveAudio: true, offerToReceiveVideo: false };
-                    const answer = await this.pc.createAnswer(answerOptions); 
+                    const answer = await this.pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: false }); 
                     await this.pc.setLocalDescription(answer); 
                     await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); 
                 } 
@@ -567,89 +287,33 @@ const CallSystem = {
         } catch (error) {}
     },
     
-    async switchCamera() {
-        if (!this.localStream) return;
-        const videoTrack = this.localStream.getVideoTracks()[0];
-        if (!videoTrack) return;
-        const currentFacing = videoTrack.getSettings().facingMode;
-        const newFacing = currentFacing === 'user' ? 'environment' : 'user';
-        videoTrack.stop();
-        try {
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
-            });
-            const newVideoTrack = newStream.getVideoTracks()[0];
-            if (this.pc) {
-                const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) await sender.replaceTrack(newVideoTrack);
-            }
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
-            const lv = document.getElementById('localVideo');
-            if (lv) lv.srcObject = this.localStream;
-        } catch (e) { console.error('❌ فشل تبديل الكاميرا:', e); }
-    },
-    
-    showCallUI(callType) { 
+    // ========== واجهة المستخدم ==========
+    showCallUI() { 
         document.body.classList.add('in-call'); 
         const existingUi = document.getElementById('callUI');
         if (existingUi) existingUi.remove();
         
         const ui = document.createElement('div'); ui.id = 'callUI'; 
-        
-        if (callType === 'audio') {
-            ui.innerHTML = `
-                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
-                <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
-                    <div style="background:var(--primary);border-radius:50%;width:120px;height:120px;display:flex;align-items:center;justify-content:center;margin:0 auto;box-shadow:0 4px 15px rgba(0,0,0,0.3);">
-                        <i class="fas fa-phone" style="font-size:3rem;color:white;"></i>
-                    </div>
-                    <div style="margin-top:20px;color:white;font-size:1.2rem;">مكالمة صوتية</div>
-                    <div style="margin-top:5px;color:#aaa;font-size:0.8rem;" id="callTimer">00:00</div>
+        ui.innerHTML = `
+            <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
+            <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
+                <div style="background:var(--primary);border-radius:50%;width:120px;height:120px;display:flex;align-items:center;justify-content:center;margin:0 auto;box-shadow:0 4px 15px rgba(0,0,0,0.3);">
+                    <i class="fas fa-phone" style="font-size:3rem;color:white;"></i>
                 </div>
-                <div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;">
-                    <button onclick="CallSystem.toggleAudio()" style="width:60px;height:60px;border-radius:50%;background:#333;color:white;border:none;font-size:1.5rem;cursor:pointer;">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button onclick="CallSystem.endCall()" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.8rem;cursor:pointer;">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                </div>
-            `;
-        } else {
-            ui.innerHTML = `
-                <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9997;background:#000;"></video>
-                <video id="localVideo" autoplay playsinline muted style="width:100px;height:150px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:12px;border:2px solid white;background:#333;box-shadow:0 2px 10px rgba(0,0,0,0.3);"></video>
-                <div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;">
-                    <button onclick="CallSystem.switchCamera()" style="width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.6);color:white;border:none;font-size:1.2rem;cursor:pointer;">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button onclick="CallSystem.toggleAudio()" style="width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.6);color:white;border:none;font-size:1.2rem;cursor:pointer;">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button onclick="CallSystem.endCall()" style="width:60px;height:60px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.5rem;cursor:pointer;">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button onclick="CallSystem.toggleVideo()" style="width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.6);color:white;border:none;font-size:1.2rem;cursor:pointer;">
-                        <i class="fas fa-video"></i>
-                    </button>
-                </div>
-            `;
-            setTimeout(() => {
-                const lv = document.getElementById('localVideo'); 
-                if (lv && this.localStream) lv.srcObject = this.localStream;
-            }, 100);
-        }
+                <div style="margin-top:20px;color:white;font-size:1.2rem;">مكالمة صوتية</div>
+                <div style="margin-top:5px;color:#aaa;font-size:0.8rem;" id="callTimer">00:00</div>
+            </div>
+            <div style="position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;gap:30px;">
+                <button onclick="CallSystem.toggleAudio()" style="width:60px;height:60px;border-radius:50%;background:#333;color:white;border:none;font-size:1.5rem;cursor:pointer;" title="كتم الصوت">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button onclick="CallSystem.endCall()" style="width:70px;height:70px;border-radius:50%;background:#f44336;color:white;border:none;font-size:1.8rem;cursor:pointer;" title="إنهاء المكالمة">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        `;
         document.body.appendChild(ui);
         this.startCallTimer();
-        
-        if (callType === 'audio' && this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = true;
-                CallDiagnostics.addLog(`🎤 مسار الصوت مفعل (enabled: ${audioTrack.enabled})`, 'success');
-            }
-        }
     },
     
     startCallTimer() {
@@ -673,37 +337,24 @@ const CallSystem = {
             const at = this.localStream.getAudioTracks()[0]; 
             if (at) {
                 at.enabled = !at.enabled;
-                const btns = document.querySelectorAll('#callUI button[onclick*="toggleAudio"] i');
-                btns.forEach(btn => {
-                    if (at.enabled) btn.className = 'fas fa-microphone';
-                    else btn.className = 'fas fa-microphone-slash';
-                });
-                CallDiagnostics.addLog(`🎤 كتم الصوت: ${!at.enabled ? 'مكتوم' : 'مفعل'}`, 'info');
-            }
-        } 
-    },
-    
-    toggleVideo() { 
-        if (this.localStream) { 
-            const vt = this.localStream.getVideoTracks()[0]; 
-            if (vt) {
-                vt.enabled = !vt.enabled;
-                const btns = document.querySelectorAll('#callUI button[onclick*="toggleVideo"] i');
-                btns.forEach(btn => {
-                    if (vt.enabled) btn.className = 'fas fa-video';
-                    else btn.className = 'fas fa-video-slash';
-                });
+                const btn = document.querySelector('#callUI button[onclick*="toggleAudio"] i');
+                if (btn) {
+                    if (at.enabled) {
+                        btn.className = 'fas fa-microphone';
+                    } else {
+                        btn.className = 'fas fa-microphone-slash';
+                    }
+                }
             }
         } 
     },
     
     endCall() { 
         this.isInCall = false; 
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
+        if (this.callTimerInterval) {
+            clearInterval(this.callTimerInterval);
+            this.callTimerInterval = null;
         }
-        if (this.callTimerInterval) clearInterval(this.callTimerInterval);
         document.body.classList.remove('in-call'); 
         if (this.localStream) { 
             this.localStream.getTracks().forEach(t => t.stop()); 
@@ -725,5 +376,5 @@ const CallSystem = {
     }
 };
 
-window.startVideoCall = async () => { if (!ChatSystem.currentChat) return; await CallSystem.startCall(ChatSystem.currentChat, 'video'); };
-window.startAudioCall = async () => { if (!ChatSystem.currentChat) return; await CallSystem.startCall(ChatSystem.currentChat, 'audio'); };
+// دالة المكالمات الصوتية فقط (تم إزالة مكالمات الفيديو نهائياً)
+window.startAudioCall = async () => { if (!ChatSystem.currentChat) return; await CallSystem.startCall(ChatSystem.currentChat); };
