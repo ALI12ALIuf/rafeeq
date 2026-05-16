@@ -6,7 +6,6 @@ const CallSystem = {
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
     callTimerInterval: null,
-    currentCallType: null, // لتخزين نوع المكالمة الحالية (audio/video)
     servers: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' },{ urls: 'stun:stun1.l.google.com:19302' },{ urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }] },
     
     async ensureDataChannel(calleeId) {
@@ -87,92 +86,64 @@ const CallSystem = {
     
     async startCall(calleeId, callType = 'video') {
         if (!window.auth?.currentUser || this.isInCall) return;
-        
-        // حفظ نوع المكالمة
-        this.currentCallType = callType;
         this.isInCall = true;
         
         try {
-            // تحديد المتطلبات حسب نوع المكالمة
+            // الحل: دائماً نطلب audio + video في constraints، لكن إذا كانت مكالمة صوتية نوقف الفيديو فوراً
+            // هذا يضمن أن SDP يكون متوافقاً مع المكالمات الصوتية والمرئية
             const constraints = { 
                 audio: true,
-                video: (callType === 'video') 
+                video: true  // دائماً نطلب الفيديو لكن سنوقفه إذا كان callType = 'audio'
             };
             
-            // إذا كانت مكالمة فيديو، أضف إعدادات الفيديو
-            if (callType === 'video') {
-                constraints.video = { 
-                    width: { ideal: 640 }, 
-                    height: { ideal: 480 },
-                    facingMode: 'user'
-                };
+            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            // إذا كانت مكالمة صوتية، أوقف مسار الفيديو فوراً
+            if (callType === 'audio') {
+                const videoTracks = this.localStream.getVideoTracks();
+                videoTracks.forEach(track => {
+                    track.stop();
+                    this.localStream.removeTrack(track);
+                });
             }
             
-            console.log(`بدء مكالمة ${callType === 'video' ? 'فيديو' : 'صوتية'} مع ${calleeId}`);
-            
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.showCallUI(callType);
             this.pc = new RTCPeerConnection(this.servers);
             
-            // إضافة المسارات المحلية
+            // إضافة المسارات
             this.localStream.getTracks().forEach(track => {
-                console.log(`إضافة مسار ${track.kind} إلى PC`);
                 this.pc.addTrack(track, this.localStream);
             });
             
             this.dc = this.pc.createDataChannel('chat'); 
             this.setupDataChannel(this.dc);
             
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) {
-                    this.sendSignal(calleeId, { 
-                        candidate: e.candidate,
-                        callType: this.currentCallType // إرسال نوع المكالمة مع المرشح
-                    }); 
-                }
-            };
+            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
             
             this.pc.ontrack = e => { 
-                console.log(`تم استلام مسار ${e.track.kind} من الطرف البعيد`);
-                // عرض الفيديو إذا كان موجوداً
-                if (e.track.kind === 'video') {
+                if (callType === 'video') {
                     const rv = document.getElementById('remoteVideo'); 
-                    if (rv && e.streams[0]) {
-                        rv.srcObject = e.streams[0];
-                        console.log('تم توصيل الفيديو البعيد');
-                    }
+                    if (rv && e.streams[0]) rv.srcObject = e.streams[0]; 
                 }
-                // الصوت سيصل تلقائياً
             };
             
             this.pc.onconnectionstatechange = () => { 
-                console.log(`حالة الاتصال: ${this.pc?.connectionState}`);
                 if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) 
                     this.endCall(); 
             };
             
-            // إنشاء العرض (Offer) مع تحديد نوع المكالمة بوضوح
-            const offerOptions = {
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: (callType === 'video')
-            };
-            
-            const offer = await this.pc.createOffer(offerOptions); 
+            // دائماً نطلب audio و video في الـ SDP لتوحيد الإشارات
+            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true }); 
             await this.pc.setLocalDescription(offer);
-            
-            // إرسال العرض مع نوع المكالمة
-            await this.sendSignal(calleeId, { 
-                sdp: this.pc.localDescription,
-                callType: this.currentCallType
-            });
+            await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
             
         } catch (e) { 
-            console.error('خطأ في startCall:', e);
             this.endCall(); 
             if (e.name === 'NotAllowedError') {
-                alert(callType === 'video' ? 'يرجى السماح بالوصول إلى الكاميرا والميكروفون' : 'يرجى السماح بالوصول إلى الميكروفون');
+                alert('يرجى السماح بالوصول إلى الميكروفون' + (callType === 'video' ? ' والكاميرا' : ''));
             } else {
-                alert('حدث خطأ في بدء المكالمة: ' + e.message);
+                console.error('startCall error:', e);
+                alert('حدث خطأ في بدء المكالمة');
             }
         }
     },
@@ -207,16 +178,14 @@ const CallSystem = {
     
     showIncomingCall(callerId, callData) {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        // استخراج نوع المكالمة من البيانات المرسلة
-        const callType = callData.callType || 'audio'; // افتراضي صوت إذا لم يحدد
         
         const overlay = document.createElement('div'); overlay.id = 'incomingCall';
         overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
         overlay.innerHTML = `
             <div style="text-align:center;">
-                <div style="font-size:3rem;margin-bottom:10px;">${callType === 'video' ? '📹' : '🎧'}</div>
-                <div style="font-size:1.5rem;">📞 ${contactName}</div>
-                <div style="font-size:1rem;margin-top:8px;color:#ccc;">${callType === 'video' ? 'مكالمة فيديو' : 'مكالمة صوتية'}</div>
+                <div style="font-size:3rem;margin-bottom:10px;">📞</div>
+                <div style="font-size:1.5rem;">${contactName}</div>
+                <div style="font-size:1rem;margin-top:8px;color:#ccc;">مكالمة واردة</div>
             </div>
             <div style="display:flex;gap:30px;">
                 <button id="btnAccept" style="width:70px;height:70px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">
@@ -228,8 +197,6 @@ const CallSystem = {
             </div>`;
         document.body.appendChild(overlay);
         
-        overlay._callData = { callerId, callData, callType };
-        
         document.getElementById('btnAccept').onclick = () => { 
             overlay.remove(); 
             this.receiveCall(callerId, callData); 
@@ -239,163 +206,88 @@ const CallSystem = {
     
     async receiveCall(callerId, callData) {
         if (this.isInCall) return;
-        
-        // استخراج نوع المكالمة من البيانات الواردة
-        const callType = callData.callType || 'audio';
-        this.currentCallType = callType;
         this.isInCall = true;
         
-        console.log(`استقبال مكالمة ${callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
-        
         try {
-            // إعداد القيود بناءً على نوع المكالمة
+            // دائماً نطلب audio + video (مثل المتصل)
             const constraints = { 
                 audio: true,
-                video: (callType === 'video')
+                video: true
             };
-            
-            if (callType === 'video') {
-                constraints.video = { 
-                    width: { ideal: 640 }, 
-                    height: { ideal: 480 },
-                    facingMode: 'user'
-                };
-            }
             
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            // تحديد إذا كان المتصل يريد فيديو أم لا بالتحقق من SDP
+            const sdp = callData.sdp?.sdp || '';
+            const hasVideo = sdp.includes('m=video') && !sdp.includes('m=video 0');
+            const callType = hasVideo ? 'video' : 'audio';
+            
+            // إذا كانت مكالمة صوتية فقط، أوقف مسار الفيديو
+            if (callType === 'audio') {
+                const videoTracks = this.localStream.getVideoTracks();
+                videoTracks.forEach(track => {
+                    track.stop();
+                    this.localStream.removeTrack(track);
+                });
+            }
+            
             this.showCallUI(callType);
             this.pc = new RTCPeerConnection(this.servers);
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             
-            // إضافة المسارات المحلية
-            this.localStream.getTracks().forEach(track => {
-                console.log(`إضافة مسار ${track.kind} إلى PC`);
-                this.pc.addTrack(track, this.localStream);
-            });
-            
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) {
-                    this.sendSignal(callerId, { 
-                        candidate: e.candidate,
-                        callType: this.currentCallType
-                    }); 
-                }
-            };
+            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate }); };
             
             this.pc.ontrack = e => { 
-                console.log(`تم استلام مسار ${e.track.kind} من الطرف البعيد`);
-                if (e.track.kind === 'video') {
+                if (callType === 'video') {
                     const rv = document.getElementById('remoteVideo'); 
-                    if (rv && e.streams[0]) {
-                        rv.srcObject = e.streams[0];
-                        console.log('تم توصيل الفيديو البعيد');
-                    }
+                    if (rv && e.streams[0]) rv.srcObject = e.streams[0]; 
                 }
             };
             
-            this.pc.ondatachannel = e => { 
-                console.log('تم استلام قناة بيانات');
-                this.setupDataChannel(e.channel); 
-                this.dc = e.channel; 
-            };
-            
+            this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
             this.pc.onconnectionstatechange = () => { 
-                console.log(`حالة الاتصال: ${this.pc?.connectionState}`);
                 if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) 
                     this.endCall(); 
             };
             
             if (callData.sdp) { 
                 await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); 
-                
-                // إنشاء الإجابة (Answer) مع تحديد ما نريد استقباله
-                const answerOptions = {
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: (callType === 'video')
-                };
-                
-                const answer = await this.pc.createAnswer(answerOptions); 
+                const answer = await this.pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: true }); 
                 await this.pc.setLocalDescription(answer); 
-                
-                // إرسال الإجابة مع نوع المكالمة
-                await this.sendSignal(callerId, { 
-                    sdp: this.pc.localDescription,
-                    callType: this.currentCallType
-                }); 
+                await this.sendSignal(callerId, { sdp: this.pc.localDescription }); 
             }
         } catch (e) { 
-            console.error('خطأ في receiveCall:', e);
             this.endCall(); 
             if (e.name === 'NotAllowedError') {
-                alert(callType === 'video' ? 'يرجى السماح بالوصول إلى الكاميرا والميكروفون' : 'يرجى السماح بالوصول إلى الميكروفون');
+                alert('يرجى السماح بالوصول إلى الميكروفون');
             } else {
-                alert('حدث خطأ في استقبال المكالمة: ' + e.message);
+                console.error('receiveCall error:', e);
+                alert('حدث خطأ في استقبال المكالمة');
             }
         }
     },
     
     async handleSignaling(data) {
         try {
-            // إذا لم يكن هناك PC، قم بإنشائه
             if (!this.pc) { 
                 this.pc = new RTCPeerConnection(this.servers); 
-                this.pc.ondatachannel = e => { 
-                    this.dc = e.channel; 
-                    this.setupDataChannel(this.dc); 
-                }; 
-                this.pc.onicecandidate = e => { 
-                    if (e.candidate) {
-                        this.sendSignal(ChatSystem.currentChat, { 
-                            candidate: e.candidate,
-                            callType: this.currentCallType
-                        }).catch(() => {}); 
-                    }
-                };
-                this.pc.ontrack = e => {
-                    console.log(`handleSignaling - استلام مسار ${e.track.kind}`);
-                    if (e.track.kind === 'video') {
-                        const rv = document.getElementById('remoteVideo');
-                        if (rv && e.streams[0]) rv.srcObject = e.streams[0];
-                    }
-                };
+                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; 
+                this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
             }
-            
             if (data.sdp) { 
                 await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); 
-                
                 if (data.sdp.type === 'offer') { 
-                    // استخراج نوع المكالمة من data أو تخمينه من SDP
-                    let callType = data.callType || 'audio';
-                    if (data.sdp.sdp && !callType) {
-                        callType = data.sdp.sdp.includes('m=video') ? 'video' : 'audio';
-                    }
-                    this.currentCallType = callType;
-                    
-                    const answerOptions = {
-                        offerToReceiveAudio: true,
-                        offerToReceiveVideo: (callType === 'video')
-                    };
-                    
-                    const answer = await this.pc.createAnswer(answerOptions); 
+                    const answer = await this.pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: true }); 
                     await this.pc.setLocalDescription(answer); 
-                    await this.sendSignal(ChatSystem.currentChat, { 
-                        sdp: this.pc.localDescription,
-                        callType: this.currentCallType
-                    }); 
+                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); 
                 } 
             }
             else if (data.candidate) {
-                if (this.pc && data.candidate.candidate) {
-                    try {
-                        await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                        console.log('تم إضافة مرشح ICE بنجاح');
-                    } catch (e) {
-                        console.warn('خطأ في إضافة مرشح ICE:', e);
-                    }
+                if (this.pc && data.candidate) {
+                    await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
                 }
             }
-        } catch (e) { 
-            console.warn('خطأ في معالجة الإشارات:', e); 
-        }
+        } catch (e) { console.warn('Signaling error:', e); }
     },
     
     async sendSignal(calleeId, data) {
@@ -406,9 +298,7 @@ const CallSystem = {
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
             await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        } catch (error) {
-            console.error('خطأ في إرسال الإشارة:', error);
-        }
+        } catch (error) {}
     },
     
     // ========== تبديل الكاميرا ==========
@@ -487,7 +377,6 @@ const CallSystem = {
                         <i class="fas fa-video"></i>
                     </button>
                 </div>
-                <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.6);padding:8px 16px;border-radius:20px;color:white;font-size:0.9rem;" id="callTimer">00:00</div>
             `;
         }
         
@@ -552,9 +441,7 @@ const CallSystem = {
     },
     
     endCall() { 
-        console.log('إنهاء المكالمة');
         this.isInCall = false; 
-        this.currentCallType = null;
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
@@ -589,19 +476,5 @@ const CallSystem = {
     }
 };
 
-// تحديث دوال البدء العالمية
-window.startVideoCall = async () => { 
-    if (!ChatSystem.currentChat) {
-        console.warn('لا توجد محادثة حالية');
-        return;
-    }
-    await CallSystem.startCall(ChatSystem.currentChat, 'video'); 
-};
-
-window.startAudioCall = async () => { 
-    if (!ChatSystem.currentChat) {
-        console.warn('لا توجد محادثة حالية');
-        return;
-    }
-    await CallSystem.startCall(ChatSystem.currentChat, 'audio'); 
-};
+window.startVideoCall = async () => { if (!ChatSystem.currentChat) return; await CallSystem.startCall(ChatSystem.currentChat, 'video'); };
+window.startAudioCall = async () => { if (!ChatSystem.currentChat) return; await CallSystem.startCall(ChatSystem.currentChat, 'audio'); };
