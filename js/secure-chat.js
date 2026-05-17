@@ -234,16 +234,65 @@ const SecureChatSystem = {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
+            // ✅ معالجة الرسائل النصية
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } else if (msg.package.type === 'webrtc') { 
-                const signalData = await this.decryptData(msg.package.data, sharedKey); 
-                CallSystem.handleSignaling(JSON.parse(signalData)); 
+            } 
+            // ✅ معالجة إشارات WebRTC (المكالمات)
+            else if (msg.package.type === 'webrtc') { 
+                try {
+                    const decryptedSignal = await this.decryptData(msg.package.data, sharedKey);
+                    const signalData = JSON.parse(decryptedSignal);
+                    console.log('📞 استلام إشارة WebRTC من:', msg.from, 'نوع الإشارة:', signalData.sdp?.type || (signalData.candidate ? 'candidate' : 'unknown'));
+                    // ✅ تمرير معرف المرسل مع الإشارة
+                    await CallSystem.handleSignaling(signalData, msg.from);
+                } catch(e) {
+                    console.error('❌ فك تشفير إشارة WebRTC فشل:', e);
+                }
             }
+            // ✅ معالجة رفض المكالمة
+            else if (msg.package.type === 'webrtc_reject') {
+                try {
+                    console.log('📞 استلام رفض مكالمة من:', msg.from);
+                    await CallSystem.handleReject();
+                } catch(e) {
+                    console.error('❌ معالجة رفض المكالمة فشلت:', e);
+                }
+            }
+            // ✅ معالجة الصور
+            else if (msg.package.type === 'image') {
+                const imageData = msg.package.data;
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: imageData, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                ChatSystem.updateLastMessage(msg.from, '📷 صورة');
+            }
+            // ✅ معالجة الملفات
+            else if (msg.package.type === 'file') {
+                const fileData = msg.package.data;
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'file', data: fileData, fileName: msg.package.fileName, fileSize: msg.package.fileSize, sender: 'friend', time: new Date().toISOString() });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                ChatSystem.updateLastMessage(msg.from, `📎 ${msg.package.fileName || 'ملف'}`);
+            }
+            // ✅ معالجة الفيديو
+            else if (msg.package.type === 'video') {
+                const videoData = msg.package.data;
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'video', data: videoData, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                ChatSystem.updateLastMessage(msg.from, '🎥 فيديو');
+            }
+            // ✅ معالجة الموقع
+            else if (msg.package.type === 'location') {
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'location', data: msg.package.data, sender: 'friend', time: new Date().toISOString() });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                ChatSystem.updateLastMessage(msg.from, '📍 موقع');
+            }
+            
             if (typeof loadChats === 'function') loadChats();
-        } catch (error) {}
+        } catch (error) {
+            console.error('❌ خطأ في معالجة الرسالة:', error);
+        }
     }
 };
