@@ -247,18 +247,25 @@ const SecureChatSystem = {
                 
                 console.log('📡 استلام إشارة WebRTC:', parsed);
                 
-                // ✅ إذا كانت إشارة مكالمة جديدة (offer) ولسنا في مكالمة حالياً
+                // ✅ التحقق من أن الإشارة جديدة (آخر 30 ثانية)
+                const msgTimestamp = msg.timestamp?.toMillis?.() || msg.package?.timestamp || 0;
+                const signalTimestamp = parsed.timestamp || 0;
+                const now = Date.now();
+                const isRecent = (now - msgTimestamp) < 30000 || (now - signalTimestamp) < 30000;
+                
+                // ✅ إذا كانت إشارة مكالمة جديدة (offer) ولسنا في مكالمة
                 if (parsed.sdp && parsed.sdp.type === 'offer' && !CallSystem.isInCall) {
-                    console.log('📞 استلام طلب مكالمة من', msg.from);
-                    // عرض شاشة قبول/رفض المكالمة
-                    if (typeof CallSystem.showIncomingCall === 'function') {
-                        CallSystem.showIncomingCall(msg.from, parsed);
-                    } else {
-                        console.warn('⚠️ CallSystem.showIncomingCall غير موجود');
-                        // معالجة افتراضية: قبول المكالمة تلقائياً (للتجربة)
-                        CallSystem.receiveCall(msg.from, parsed);
+                    
+                    if (!isRecent) {
+                        console.log('⚠️ تجاهل إشارة offer قديمة (أكثر من 30 ثانية)');
+                        return;
                     }
-                } else {
+                    
+                    console.log('📞 استلام طلب مكالمة جديد من', msg.from);
+                    // عرض شاشة قبول/رفض المكالمة
+                    CallSystem.showIncomingCall(msg.from, parsed);
+                } 
+                else {
                     // معالجة الإشارات الأخرى (candidates, answer, etc.)
                     CallSystem.handleSignaling(parsed);
                 }
