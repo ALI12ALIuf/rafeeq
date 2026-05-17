@@ -37,7 +37,6 @@ const CallDiagnostics = {
         panel.innerHTML += `<div style="color:${color};border-bottom:1px solid #333;padding:3px 0;">[${time}] ${message}</div>`;
         panel.scrollTop = panel.scrollHeight;
         
-        // حذف الأسطر القديمة
         while (panel.children.length > 20) {
             panel.removeChild(panel.children[0]);
         }
@@ -224,11 +223,11 @@ const CallSystem = {
         }
         
         if (!ChatSystem.friendOnline) {
-            CallDiagnostics.addLog('❌ الطرف الآخر غير متصل بالإنترنت (friendOnline = false)', 'error');
+            CallDiagnostics.addLog('❌ الطرف الآخر غير متصل بالإنترنت', 'error');
             alert('الطرف الآخر غير متصل حالياً');
             return;
         }
-        CallDiagnostics.addLog('✅ الطرف الآخر متصل (friendOnline = true)', 'success');
+        CallDiagnostics.addLog('✅ الطرف الآخر متصل', 'success');
         
         if (this.isInCall) {
             CallDiagnostics.addLog('❌ مكالمة قيد التشغيل بالفعل', 'error');
@@ -239,7 +238,6 @@ const CallSystem = {
         this.isRinging = true;
         
         try {
-            // كسر سياسة Autoplay
             const silentAudio = new Audio();
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
@@ -273,7 +271,6 @@ const CallSystem = {
             
             this.pc.onicecandidate = e => { 
                 if (e.candidate) {
-                    CallDiagnostics.addLog(`🧊 ICE candidate`, 'info');
                     this.sendSignal(calleeId, { candidate: e.candidate });
                 }
             };
@@ -299,9 +296,8 @@ const CallSystem = {
             CallDiagnostics.addLog('✅ تم تعيين LocalDescription', 'success');
             
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-            CallDiagnostics.addLog(`📤 تم إرسال الإشارة إلى ${calleeId.substring(0, 8)}...`, 'success');
+            CallDiagnostics.addLog(`📤 تم إرسال الإشارة`, 'success');
             
-            // مهلة 30 ثانية لانتظار الرد
             this.callTimeout = setTimeout(() => {
                 if (this.isRinging) {
                     CallDiagnostics.addLog('⏰ لم يتم الرد خلال 30 ثانية', 'error');
@@ -320,7 +316,6 @@ const CallSystem = {
     },
     
     setupRemoteAudio(stream) {
-        CallDiagnostics.addLog('🔊 إعداد الصوت المستقبل...', 'info');
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
@@ -347,13 +342,13 @@ const CallSystem = {
                 this.remoteAudioElement.setSinkId('speaker').then(() => {
                     CallDiagnostics.addLog('✅ تم التبديل إلى السماعة الخارجية', 'success');
                 }).catch(e => {
-                    CallDiagnostics.addLog(`❌ فشل التبديل إلى السماعة الخارجية: ${e.message}`, 'error');
+                    CallDiagnostics.addLog(`❌ فشل التبديل إلى السماعة الخارجية`, 'error');
                 });
             } else {
                 this.remoteAudioElement.setSinkId('default').then(() => {
                     CallDiagnostics.addLog('✅ تم التبديل إلى السماعة الداخلية', 'success');
                 }).catch(e => {
-                    CallDiagnostics.addLog(`❌ فشل التبديل إلى السماعة الداخلية: ${e.message}`, 'error');
+                    CallDiagnostics.addLog(`❌ فشل التبديل إلى السماعة الداخلية`, 'error');
                 });
             }
         } else {
@@ -390,7 +385,11 @@ const CallSystem = {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
         
-        CallDiagnostics.addLog(`📞 مكالمة واردة من ${callerId.substring(0, 8)}...`, 'info');
+        CallDiagnostics.addLog(`📞 مكالمة واردة من ${callerId.substring(0, 8)}... - عرض شاشة القبول`, 'info');
+        
+        // إزالة أي شاشة قبول سابقة
+        const existingOverlay = document.getElementById('incomingCall');
+        if (existingOverlay) existingOverlay.remove();
         
         const overlay = document.createElement('div'); overlay.id = 'incomingCall';
         overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
@@ -500,7 +499,7 @@ const CallSystem = {
     
     async handleSignaling(data) {
         try {
-            CallDiagnostics.addLog('📡 معالجة إشارة واردة', 'info');
+            CallDiagnostics.addLog(`📡 معالجة إشارة واردة: ${data.sdp ? 'SDP ' + data.sdp.type : (data.candidate ? 'ICE candidate' : 'unknown')}`, 'info');
             if (!this.pc) { 
                 CallDiagnostics.addLog('📞 إنشاء اتصال جديد للمعالجة', 'info');
                 this.pc = new RTCPeerConnection({
@@ -512,7 +511,6 @@ const CallSystem = {
                 this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
             }
             if (data.sdp) { 
-                CallDiagnostics.addLog(`📝 معالجة SDP (${data.sdp.type})`, 'info');
                 await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); 
                 if (data.sdp.type === 'offer') { 
                     const answer = await this.pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: false }); 
@@ -522,7 +520,6 @@ const CallSystem = {
                 } 
             }
             else if (data.candidate) {
-                CallDiagnostics.addLog('🧊 معالجة ICE candidate', 'info');
                 if (this.pc && data.candidate) {
                     await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
                 }
@@ -532,7 +529,6 @@ const CallSystem = {
     
     async sendSignal(calleeId, data) {
         try {
-            CallDiagnostics.addLog('📤 إرسال إشارة WebRTC', 'info');
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
             if (!myPrivateKey || !receiverPublicKey) {
@@ -542,7 +538,7 @@ const CallSystem = {
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
             await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-            CallDiagnostics.addLog('✅ تم إرسال الإشارة بنجاح', 'success');
+            CallDiagnostics.addLog('✅ تم إرسال الإشارة', 'success');
         } catch (error) {
             CallDiagnostics.addLog(`❌ فشل إرسال الإشارة: ${error.message}`, 'error');
         }
@@ -554,7 +550,6 @@ const CallSystem = {
             const audioTrack = this.localStream.getAudioTracks()[0];
             if (audioTrack) {
                 audioTrack.enabled = !this.isMuted;
-                CallDiagnostics.addLog(`🎤 كتم الصوت: ${this.isMuted ? 'مكتوم' : 'مفعل'}`, 'info');
             }
         }
         const muteBtn = document.getElementById('muteBtn');
@@ -679,6 +674,7 @@ const CallSystem = {
         const inc = document.getElementById('incomingCall'); 
         if (inc) inc.remove(); 
         CallDiagnostics.addLog('✅ تم إنهاء المكالمة', 'success');
+        setTimeout(() => CallDiagnostics.clear(), 3000);
     },
     
     cleanupConnections() { 
