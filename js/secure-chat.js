@@ -1,5 +1,5 @@
 // ========== secure-chat.js ==========
-// نظام التشفير E2EE + ضغط الصور + فحص الفيديو + حذف 24 ساعة
+// نظام التشفير E2EE - نسخة مستقرة
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -200,37 +200,19 @@ const SecureChatSystem = {
     
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
-        
-        // ✅ للمكالمات: نستخدم إشعار مؤقت فقط (ينتهي بعد 10 ثوانٍ)
-        if (encryptedPackage.type === 'webrtc') {
-            const tempRef = await window.db.collection('temp_calls').add({ 
-                to: receiverId, 
-                from: window.auth.currentUser.uid, 
-                package: encryptedPackage, 
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 10000)) // 10 ثوانٍ فقط
+        try {
+            await window.db.collection('secure_messages').add({ 
+                to: receiverId, from: window.auth.currentUser.uid, package: encryptedPackage, 
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
+                expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000))
             });
-            // حذف تلقائي بعد 10 ثوانٍ
-            setTimeout(async () => {
-                try { await tempRef.delete(); } catch(e) {}
-            }, 10000);
-            return;
-        }
-        
-        // ✅ للرسائل العادية: تحفظ لمدة 24 ساعة
-        await window.db.collection('secure_messages').add({ 
-            to: receiverId, from: window.auth.currentUser.uid, package: encryptedPackage, 
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
-            expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000))
-        });
+        } catch (error) { throw error; }
     },
     
     startReceiving() { 
         if (!window.auth?.currentUser) return null;
         const uid = window.auth.currentUser.uid;
-        
-        // الاستماع للرسائل العادية
-        const unsubscribe = window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
+        return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
             for (const change of snapshot.docChanges()) { 
                 if (change.type === 'added') { 
                     const msg = { id: change.doc.id, ...change.doc.data() }; 
@@ -238,66 +220,7 @@ const SecureChatSystem = {
                     try { await change.doc.ref.delete(); } catch(e) {}
                 } 
             } 
-        }, error => { setTimeout(() => this.startReceiving(), 5000); });
-        
-        // ✅ الاستماع للإشارات المؤقتة للمكالمات
-        window.db.collection('temp_calls').where('to', '==', uid).onSnapshot(async snapshot => {
-            for (const change of snapshot.docChanges()) {
-                if (change.type === 'added') {
-                    const call = { id: change.doc.id, ...change.doc.data() };
-                    await this.processReceivedCall(call);
-                    try { await change.doc.ref.delete(); } catch(e) {}
-                }
-            }
-        });
-        
-        return unsubscribe;
-    },
-    
-    async processReceivedCall(call) {
-        try {
-            const myPrivateKey = await this.getMyPrivateKey(); 
-            const senderPublicKey = await this.getReceiverPublicKey(call.from);
-            if (!myPrivateKey || !senderPublicKey) return;
-            const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
-            
-            const signalData = await this.decryptData(call.package.data, sharedKey); 
-            const parsed = JSON.parse(signalData);
-            
-            console.log('📡 استلام إشارة مكالمة:', parsed);
-            
-            // ✅ التحقق من أن المكالمة جديدة (أقل من 10 ثوانٍ)
-            const callTimestamp = call.timestamp?.toMillis?.() || 0;
-            const now = Date.now();
-            if (now - callTimestamp > 10000) {
-                console.log('⚠️ تجاهل مكالمة قديمة (أكثر من 10 ثوانٍ)');
-                return;
-            }
-            
-            // ✅ التحقق من أن المحادثة مفتوحة
-            const conversationPage = document.getElementById('conversationPage');
-            const isConversationVisible = conversationPage && conversationPage.style.display !== 'none';
-            if (!isConversationVisible) {
-                console.log('⚠️ تجاهل مكالمة لأن المحادثة غير مفتوحة');
-                return;
-            }
-            
-            // ✅ التحقق من عدم وجود مكالمة نشطة
-            if (CallSystem.isInCall) {
-                console.log('⚠️ تجاهل مكالمة لأن هناك مكالمة نشطة');
-                return;
-            }
-            
-            // ✅ عرض نافذة قبول/رفض المكالمة
-            if (parsed.sdp && parsed.sdp.type === 'offer') {
-                CallSystem.showIncomingCall(call.from, parsed);
-            } else {
-                CallSystem.handleSignaling(parsed);
-            }
-            
-        } catch (error) {
-            console.error('❌ خطأ في معالجة المكالمة:', error);
-        }
+        }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
     async processReceivedMessage(msg) {
@@ -312,35 +235,33 @@ const SecureChatSystem = {
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
+            } 
+            else if (msg.package.type === 'webrtc') { 
+                const signalData = await this.decryptData(msg.package.data, sharedKey); 
+                const parsed = JSON.parse(signalData);
+                
+                console.log('📡 استلام إشارة WebRTC:', parsed);
+                
+                // ✅ فقط التحقق من أن المحادثة مفتوحة وعدم وجود مكالمة نشطة
+                const conversationPage = document.getElementById('conversationPage');
+                const isConversationVisible = conversationPage && conversationPage.style.display !== 'none';
+                
+                if (parsed.sdp && parsed.sdp.type === 'offer') {
+                    // ✅ فقط إذا كانت المحادثة مفتوحة ولا توجد مكالمة
+                    if (isConversationVisible && !CallSystem.isInCall) {
+                        console.log('📞 عرض طلب مكالمة من', msg.from);
+                        CallSystem.showIncomingCall(msg.from, parsed);
+                    } else {
+                        console.log('⚠️ تجاهل مكالمة: المحادثة غير مفتوحة أو مكالمة نشطة');
+                    }
+                } else {
+                    // للإشارات الأخرى (candidates, answer) - نمررها دائماً
+                    CallSystem.handleSignaling(parsed);
+                }
             }
-            else if (msg.package.type === 'webrtc') {
-                // ❌ تجاهل أي إشارة WebRTC في الرسائل العادية (هذا يمنع المكالمات القديمة)
-                console.log('⚠️ تم تجاهل إشارة WebRTC قديمة من secure_messages');
-                return;
-            }
-            
             if (typeof loadChats === 'function') loadChats();
         } catch (error) {
             console.error('❌ خطأ في معالجة الرسالة:', error);
         }
     }
 };
-
-// تنظيف قاعدة البيانات من الرسائل القديمة عند التحميل
-window.addEventListener('load', async () => {
-    if (window.auth?.currentUser) {
-        setTimeout(async () => {
-            try {
-                const uid = window.auth.currentUser.uid;
-                // حذف جميع رسائل webrtc القديمة
-                const snapshot = await window.db.collection('secure_messages').where('to', '==', uid).get();
-                for (const doc of snapshot.docs) {
-                    if (doc.data().package?.type === 'webrtc') {
-                        await doc.ref.delete();
-                        console.log('🗑️ تم حذف رسالة WebRTC قديمة');
-                    }
-                }
-            } catch(e) {}
-        }, 3000);
-    }
-});
