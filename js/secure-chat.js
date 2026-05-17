@@ -227,7 +227,6 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== هذه هي الدالة المعدلة فقط ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -240,27 +239,11 @@ const SecureChatSystem = {
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } 
-            else if (msg.package.type === 'webrtc') { 
-                const signalData = await this.decryptData(msg.package.data, sharedKey);
-                const parsedData = JSON.parse(signalData);
-                
-                // ✅ مكالمة واردة جديدة (offer) - إظهار شاشة القبول
-                if (parsedData.sdp && parsedData.sdp.type === 'offer') {
-                    if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
-                        CallSystem.showIncomingCall(msg.from, parsedData);
-                    } else {
-                        CallSystem.handleSignaling(parsedData);
-                    }
-                } 
-                // ✅ رد على مكالمة أو ICE candidate
-                else {
-                    CallSystem.handleSignaling(parsedData);
-                }
+            } else if (msg.package.type === 'webrtc') { 
+                const signalData = await this.decryptData(msg.package.data, sharedKey); 
+                CallSystem.handleSignaling(JSON.parse(signalData)); 
             }
             if (typeof loadChats === 'function') loadChats();
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الرسالة:', error);
-        }
+        } catch (error) {}
     }
 };
