@@ -8,7 +8,7 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null, ringtoneInterval: null,
     isMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null, pendingCallData: null,
-    lastSignalTime: 0, // ✅ منع الإشارات القديمة
+    currentCallSessionId: null,  // ✅ معرف جلسة المكالمة الحالية
     
     servers: { 
         iceServers: [
@@ -19,25 +19,28 @@ const CallSystem = {
         ] 
     },
     
+    // ✅ إنشاء معرف جلسة فريد
+    generateSessionId() {
+        return Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
+    },
+    
     // ✅ عرض شاشة المكالمة الواردة
-    showIncomingCall(callerId, callData) {
-        console.log('📞 عرض شاشة المكالمة الواردة من:', callerId);
+    showIncomingCall(callerId, callData, sessionId) {
+        console.log('📞 عرض شاشة المكالمة الواردة من:', callerId, 'الجلسة:', sessionId);
         
-        // ✅ منع إذا كان في مكالمة أو إذا كانت المحادثة الحالية مختلفة عن المرسل
         if (this.isInCall || this.isCalling) {
             console.log('❌ مكالمة نشطة، رفض');
-            this.sendReject(callerId);
+            this.sendReject(callerId, sessionId);
             return;
         }
         
-        // ✅ التأكد أن المرسل هو نفس المحادثة المفتوحة حالياً
         if (ChatSystem.currentChat !== callerId) {
             console.log('❌ المكالمة من محادثة مختلفة، تجاهل');
-            this.sendReject(callerId);
+            this.sendReject(callerId, sessionId);
             return;
         }
         
-        this.pendingCallData = { callerId, callData };
+        this.pendingCallData = { callerId, callData, sessionId };
         
         let contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         let contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
@@ -67,7 +70,11 @@ const CallSystem = {
             this.stopRingTone();
             overlay.remove();
             if (this.pendingCallData) {
-                await this.receiveCall(this.pendingCallData.callerId, this.pendingCallData.callData);
+                await this.receiveCall(
+                    this.pendingCallData.callerId, 
+                    this.pendingCallData.callData,
+                    this.pendingCallData.sessionId
+                );
                 this.pendingCallData = null;
             }
         };
@@ -76,7 +83,7 @@ const CallSystem = {
             this.stopRingTone();
             overlay.remove();
             if (this.pendingCallData) {
-                await this.sendReject(this.pendingCallData.callerId);
+                await this.sendReject(this.pendingCallData.callerId, this.pendingCallData.sessionId);
                 this.pendingCallData = null;
             }
         };
@@ -111,22 +118,28 @@ const CallSystem = {
         }
     },
     
-    async sendReject(calleeId) {
+    async sendReject(calleeId, sessionId) {
         console.log('📞 إرسال رفض إلى:', calleeId);
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
             if (!myPrivateKey || !receiverPublicKey) return;
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ type: 'call_reject' }), sharedKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ type: 'call_reject', sessionId: sessionId }), sharedKey);
             await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc_reject', data: encrypted, timestamp: Date.now() });
         } catch (error) {}
     },
     
-    async handleReject() {
-        console.log('📞 تم رفض المكالمة');
+    async handleReject(sessionId) {
+        console.log('📞 تم رفض المكالمة, الجلسة:', sessionId);
+        // ✅ فقط إذا كانت الجلسة تطابق الجلسة الحالية
+        if (sessionId && this.currentCallSessionId && sessionId !== this.currentCallSessionId) {
+            console.log('❌ تجاهل رفض لجلسة مختلفة');
+            return;
+        }
         if (!this.isCalling) return;
         this.isCalling = false;
+        this.currentCallSessionId = null;
         if (this.isInCall) {
             this.endCall();
         } else {
@@ -145,6 +158,8 @@ const CallSystem = {
             return;
         }
         
+        // ✅ إنشاء معرف جلسة جديد
+        this.currentCallSessionId = this.generateSessionId();
         this.isCalling = true;
         
         try {
@@ -167,7 +182,10 @@ const CallSystem = {
             
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
             await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
+            await this.sendSignal(calleeId, { 
+                sdp: this.pc.localDescription, 
+                sessionId: this.currentCallSessionId 
+            });
             
             this.showCallUI();
             this.isInCall = true;
@@ -175,19 +193,22 @@ const CallSystem = {
         } catch (e) {
             console.error(e);
             this.isCalling = false;
+            this.currentCallSessionId = null;
             this.endCall();
             alert(e.name === 'NotAllowedError' ? 'السماح بالميكروفون مطلوب' : 'فشل بدء المكالمة');
         }
     },
     
-    async receiveCall(callerId, callData) {
-        console.log('📞 قبول مكالمة من:', callerId);
+    async receiveCall(callerId, callData, sessionId) {
+        console.log('📞 قبول مكالمة من:', callerId, 'الجلسة:', sessionId);
         
         if (this.isInCall || this.isCalling) {
-            await this.sendReject(callerId);
+            await this.sendReject(callerId, sessionId);
             return;
         }
         
+        // ✅ حفظ معرف الجلسة
+        this.currentCallSessionId = sessionId;
         this.isInCall = true;
         
         try {
@@ -222,38 +243,37 @@ const CallSystem = {
         }
     },
     
-    // ✅ القلب المعدل - يمنع الإشارات الوهمية
+    // ✅ القلب المعدل - يمنع أي إشارة قديمة أو غير مرغوب فيها
     async handleSignaling(data, fromUserId) {
-        console.log('📞 إشارة من:', fromUserId, 'نوع:', data.sdp?.type || (data.candidate ? 'candidate' : 'مجهول'));
+        console.log('📞 إشارة من:', fromUserId, 'بيانات:', Object.keys(data));
         
-        // ✅ شرط 1: تجاهل أي إشارة إذا لم تكن المحادثة الحالية هي نفس المرسل
+        // ✅ الشرط الأهم: تجاهل أي إشارة إذا لم تكن المحادثة الحالية هي نفس المرسل
         if (ChatSystem.currentChat !== fromUserId) {
-            console.log('❌ تجاهل: المرسل ليس المحادثة الحالية');
+            console.log('❌ تجاهل تام: المرسل ليس المحادثة الحالية');
             return;
         }
         
-        // ✅ شرط 2: منع الإشارات القديمة (أقدم من 10 ثواني)
-        const now = Date.now();
-        if (data.timestamp && (now - data.timestamp) > 10000) {
-            console.log('❌ تجاهل: إشارة قديمة');
+        // ✅ تجاهل الإشارات التي لا تحتوي على sessionId (قديمة)
+        if (!data.sessionId && data.sdp && data.sdp.type === 'offer') {
+            console.log('❌ تجاهل عرض مكالمة بدون sessionId (قديم)');
             return;
         }
         
-        // ✅ شرط 3: إذا كانت إشارة عرض (offer) جديدة
-        if (data.sdp && data.sdp.type === 'offer' && !this.isInCall && !this.isCalling) {
-            console.log('📞 عرض مكالمة جديد، عرض الشاشة');
-            this.showIncomingCall(fromUserId, data);
+        // ✅ معالجة عرض مكالمة جديد مع sessionId صالح
+        if (data.sdp && data.sdp.type === 'offer' && data.sessionId && !this.isInCall && !this.isCalling) {
+            console.log('📞 عرض مكالمة جديد صالح، الجلسة:', data.sessionId);
+            this.showIncomingCall(fromUserId, data, data.sessionId);
             return;
         }
         
-        // ✅ شرط 4: رفض عرض جديد إذا كنا في مكالمة
+        // ✅ رفض عرض جديد إذا كنا في مكالمة
         if (data.sdp && data.sdp.type === 'offer' && (this.isInCall || this.isCalling)) {
             console.log('❌ رفض عرض جديد - مكالمة نشطة');
-            this.sendReject(fromUserId);
+            if (data.sessionId) this.sendReject(fromUserId, data.sessionId);
             return;
         }
         
-        // ✅ شرط 5: تجاهل أي إشارة أخرى إذا لم تكن هناك مكالمة نشطة
+        // ✅ تجاهل أي إشارة أخرى إذا لم تكن هناك مكالمة نشطة
         if (!this.isInCall && !this.isCalling) {
             console.log('❌ تجاهل: لا توجد مكالمة نشطة');
             return;
@@ -463,9 +483,13 @@ const CallSystem = {
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
             if (!myPrivateKey || !receiverPublicKey) return;
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            // ✅ إضافة timestamp للإشارة
-            const signalWithTime = { ...data, timestamp: Date.now() };
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify(signalWithTime), sharedKey);
+            // ✅ إضافة sessionId و timestamp للإشارة
+            const signalWithMeta = { 
+                ...data, 
+                timestamp: Date.now(),
+                sessionId: data.sessionId || this.currentCallSessionId || null
+            };
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify(signalWithMeta), sharedKey);
             await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
         } catch(error) {}
     },
@@ -544,6 +568,7 @@ const CallSystem = {
         
         this.isInCall = false;
         this.isCalling = false;
+        this.currentCallSessionId = null;  // ✅ مسح معرف الجلسة
         this.stopRingTone();
         this.sendCallStatus('disconnected');
         
