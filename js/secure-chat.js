@@ -227,6 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
+    // ========== الدالة المعدلة (هذا هو التعديل الوحيد) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -239,11 +240,48 @@ const SecureChatSystem = {
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } else if (msg.package.type === 'webrtc') { 
-                const signalData = await this.decryptData(msg.package.data, sharedKey); 
-                CallSystem.handleSignaling(JSON.parse(signalData)); 
+            } 
+            else if (msg.package.type === 'webrtc') { 
+                const signalData = await this.decryptData(msg.package.data, sharedKey);
+                const parsedData = JSON.parse(signalData);
+                
+                console.log('📞 استلام إشارة WebRTC من:', msg.from);
+                console.log('📞 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
+                
+                // التحقق: هل هذه مكالمة واردة جديدة (offer)؟
+                if (parsedData.sdp && parsedData.sdp.type === 'offer') {
+                    // مكالمة واردة جديدة - إظهار شاشة القبول/الرفض
+                    console.log('📞 مكالمة واردة جديدة من:', msg.from, 'نوع:', parsedData.type || 'audio');
+                    if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
+                        CallSystem.showIncomingCall(msg.from, parsedData);
+                    } else {
+                        console.error('❌ CallSystem.showIncomingCall غير موجود');
+                    }
+                } 
+                else {
+                    // رد على مكالمة قائمة أو ICE candidate
+                    if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
+                        CallSystem.handleSignaling(parsedData);
+                    }
+                }
             }
+            // الحفاظ على وظيفة الموقع والملفات
+            else if (msg.package.type === 'location') {
+                const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
+                const locationData = JSON.parse(decryptedLocation);
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'location', data: locationData, sender: 'friend', time: new Date().toISOString() });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+            }
+            else if (msg.package.type === 'file' || msg.package.type === 'image' || msg.package.type === 'video') {
+                // معالجة الملفات (إذا كانت ترسل عبر النظام)
+                const decryptedFile = await this.decryptData(msg.package.data, sharedKey);
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: msg.package.type, data: decryptedFile, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+            }
+            
             if (typeof loadChats === 'function') loadChats();
-        } catch (error) {}
+        } catch (error) {
+            console.error('❌ خطأ في معالجة الرسالة:', error);
+        }
     }
 };
