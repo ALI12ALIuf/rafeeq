@@ -1,5 +1,5 @@
 // ========== secure-chat.js ==========
-// نظام التشفير E2EE - نسخة مستقرة
+// نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -176,7 +176,11 @@ const SecureChatSystem = {
             if (duration > this.VIDEO_MAX_DURATION) {
                 const warnMins = Math.floor(this.VIDEO_WARNING_DURATION / 60);
                 const warnSecs = this.VIDEO_WARNING_DURATION % 60;
-                throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${warnMins}:${warnSecs.toString().padStart(2, '0')} دقائق`);
+                throw new Error(
+                    `❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\n` +
+                    `الحد الأقصى: ${warnMins}:${warnSecs.toString().padStart(2, '0')} دقائق\n` +
+                    `💡 قم بقص الفيديو قبل الإرسال`
+                );
             }
             
             if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
@@ -184,7 +188,7 @@ const SecureChatSystem = {
                 throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
             }
             
-            console.log(`⚡ فيديو جاهز للإرسال: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            console.log(`⚡ فيديو جاهز للإرسال المباشر: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
             return file;
         });
     },
@@ -217,7 +221,7 @@ const SecureChatSystem = {
                 if (change.type === 'added') { 
                     const msg = { id: change.doc.id, ...change.doc.data() }; 
                     await this.processReceivedMessage(msg); 
-                    try { await change.doc.ref.delete(); } catch(e) {}
+                    try { await change.doc.ref.delete(); } catch (deleteError) {}
                 } 
             } 
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
@@ -235,33 +239,11 @@ const SecureChatSystem = {
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } 
-            else if (msg.package.type === 'webrtc') { 
+            } else if (msg.package.type === 'webrtc') { 
                 const signalData = await this.decryptData(msg.package.data, sharedKey); 
-                const parsed = JSON.parse(signalData);
-                
-                console.log('📡 استلام إشارة WebRTC:', parsed);
-                
-                // ✅ فقط التحقق من أن المحادثة مفتوحة وعدم وجود مكالمة نشطة
-                const conversationPage = document.getElementById('conversationPage');
-                const isConversationVisible = conversationPage && conversationPage.style.display !== 'none';
-                
-                if (parsed.sdp && parsed.sdp.type === 'offer') {
-                    // ✅ فقط إذا كانت المحادثة مفتوحة ولا توجد مكالمة
-                    if (isConversationVisible && !CallSystem.isInCall) {
-                        console.log('📞 عرض طلب مكالمة من', msg.from);
-                        CallSystem.showIncomingCall(msg.from, parsed);
-                    } else {
-                        console.log('⚠️ تجاهل مكالمة: المحادثة غير مفتوحة أو مكالمة نشطة');
-                    }
-                } else {
-                    // للإشارات الأخرى (candidates, answer) - نمررها دائماً
-                    CallSystem.handleSignaling(parsed);
-                }
+                CallSystem.handleSignaling(JSON.parse(signalData)); 
             }
             if (typeof loadChats === 'function') loadChats();
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الرسالة:', error);
-        }
+        } catch (error) {}
     }
 };
