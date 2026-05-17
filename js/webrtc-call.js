@@ -1,5 +1,5 @@
 // ========== webrtc-call.js - النسخة النهائية المتكاملة ==========
-// جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات
+// جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, callType: null,
@@ -17,17 +17,99 @@ const CallSystem = {
         ] 
     },
     
-    // ==================== المكالمة الصوتية (من ملف 22) ====================
+    // ==================== التنظيف التلقائي (جديد) ====================
+    
+    async autoCleanupOnLoad() {
+        console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
+        
+        // تنظيف الحالة المحلية
+        this.isInCall = false;
+        this.callType = null;
+        this.isAudioMuted = false;
+        this.isVideoMuted = false;
+        this.isSpeakerEnabled = false;
+        
+        // تنظيف المؤقتات
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
+        if (this.callTimerInterval) {
+            clearInterval(this.callTimerInterval);
+            this.callTimerInterval = null;
+        }
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        
+        // تنظيف الصوت عن بعد
+        if (this.remoteAudioElement) {
+            this.remoteAudioElement.pause();
+            this.remoteAudioElement.srcObject = null;
+            this.remoteAudioElement = null;
+        }
+        
+        // تنظيف المسارات المحلية
+        if (this.localStream) {
+            try {
+                this.localStream.getTracks().forEach(t => t.stop());
+            } catch(e) {}
+            this.localStream = null;
+        }
+        
+        // تنظيف الاتصالات
+        this.cleanupConnections();
+        
+        // إخفاء أي واجهات مكالمات عالقة
+        const ui = document.getElementById('callUI');
+        if (ui) ui.remove();
+        const inc = document.getElementById('incomingCall');
+        if (inc) inc.remove();
+        document.body.classList.remove('in-call');
+        
+        // تنظيف حالة المستخدم في قاعدة البيانات
+        if (typeof PresenceSystem !== 'undefined' && window.auth?.currentUser) {
+            try {
+                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    online: true,
+                    inCall: false,
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('✅ تم تنظيف حالة المستخدم في قاعدة البيانات');
+            } catch(e) {
+                console.warn('⚠️ فشل تنظيف قاعدة البيانات:', e.message);
+            }
+        }
+        
+        console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
+    },
+    
+    // ==================== المكالمة الصوتية ====================
     
     async startAudioCall(calleeId) {
-        if (!window.auth?.currentUser || this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مستخدم غير موجود أو مكالمة نشطة');
+        if (!window.auth?.currentUser) {
+            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
             return;
         }
+        if (this.isInCall) {
+            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+            alert('أنت في مكالمة حالياً. أنهي المكالمة الحالية أولاً.');
+            return;
+        }
+        
         this.isInCall = true;
         this.callType = 'audio';
         
         try {
+            // تحديث حالة المستخدم في قاعدة البيانات
+            if (window.auth?.currentUser) {
+                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    inCall: true,
+                    callType: 'audio'
+                }).catch(() => {});
+            }
+            
             // تشغيل صوت صامت لتجاوز قيود المتصفح
             const silentAudio = new Audio();
             silentAudio.volume = 0;
@@ -49,17 +131,14 @@ const CallSystem = {
             
             this.pc = new RTCPeerConnection(this.servers);
             
-            // إضافة المسارات المحلية
             this.localStream.getTracks().forEach(track => {
                 this.pc.addTrack(track, this.localStream);
                 console.log(`➕ تم إضافة مسار ${track.kind}`);
             });
             
-            // إنشاء Data Channel
             this.dc = this.pc.createDataChannel('chat');
             this.setupDataChannel(this.dc);
             
-            // إعداد مستمعي الأحداث
             this.pc.onicecandidate = e => { 
                 if (e.candidate) {
                     console.log('📡 إرسال ICE candidate');
@@ -81,7 +160,6 @@ const CallSystem = {
                 }
             };
             
-            // إنشاء العرض
             console.log('📞 إنشاء عرض مكالمة صوتية...');
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
             await this.pc.setLocalDescription(offer);
@@ -102,11 +180,28 @@ const CallSystem = {
     // ==================== المكالمة المرئية ====================
     
     async startVideoCall(calleeId) {
-        if (!window.auth?.currentUser || this.isInCall) return;
+        if (!window.auth?.currentUser) {
+            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
+            return;
+        }
+        if (this.isInCall) {
+            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+            alert('أنت في مكالمة حالياً. أنهي المكالمة الحالية أولاً.');
+            return;
+        }
+        
         this.isInCall = true;
         this.callType = 'video';
         
         try {
+            // تحديث حالة المستخدم في قاعدة البيانات
+            if (window.auth?.currentUser) {
+                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    inCall: true,
+                    callType: 'video'
+                }).catch(() => {});
+            }
+            
             const constraints = { 
                 audio: true, 
                 video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
@@ -144,7 +239,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== إعداد الصوت عن بعد (من ملف 22) ====================
+    // ==================== إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
         console.log('🔊 إعداد الصوت عن بعد...');
@@ -157,7 +252,6 @@ const CallSystem = {
         this.remoteAudioElement.srcObject = stream;
         this.remoteAudioElement.autoplay = true;
         
-        // تطبيق إعدادات السماعة
         this.applySpeakerSettings();
         
         this.remoteAudioElement.play().then(() => {
@@ -196,12 +290,18 @@ const CallSystem = {
         console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
         
         try {
-            // تشغيل صوت صامت
+            // تحديث حالة المستخدم في قاعدة البيانات
+            if (window.auth?.currentUser) {
+                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    inCall: true,
+                    callType: this.callType
+                }).catch(() => {});
+            }
+            
             const silentAudio = new Audio();
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
             
-            // طلب الصلاحيات حسب نوع المكالمة
             const constraints = { 
                 audio: true, 
                 video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } : false
@@ -263,9 +363,14 @@ const CallSystem = {
     },
     
     showIncomingCall(callerId, callData) {
+        console.log('🔔 عرض شاشة المكالمة الواردة...');
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
         const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
+        
+        // إزالة أي شاشة مكالمة سابقة
+        const existingOverlay = document.getElementById('incomingCall');
+        if (existingOverlay) existingOverlay.remove();
         
         const overlay = document.createElement('div'); 
         overlay.id = 'incomingCall';
@@ -293,9 +398,18 @@ const CallSystem = {
         document.getElementById('btnReject').onclick = () => { 
             overlay.remove(); 
         };
+        
+        // إخفاء الشاشة تلقائياً بعد 30 ثانية إذا لم يتم الرد
+        setTimeout(() => {
+            const stillThere = document.getElementById('incomingCall');
+            if (stillThere) {
+                stillThere.remove();
+                console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً (انتهت المهلة)');
+            }
+        }, 30000);
     },
     
-    // ==================== Data Channel وإدارة الاتصال (من ملف 22) ====================
+    // ==================== Data Channel وإدارة الاتصال ====================
     
     setupDataChannel(channel) {
         if (!channel) return;
@@ -521,7 +635,6 @@ const CallSystem = {
         ui.innerHTML = uiHTML;
         document.body.appendChild(ui);
         
-        // ربط الأحداث
         document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
         
         if (type === 'video') {
@@ -783,13 +896,15 @@ const CallSystem = {
         });
     },
     
-    // ==================== إنهاء المكالمة ====================
+    // ==================== إنهاء المكالمة (معدل بالكامل) ====================
     
     endCall() {
-        console.log('📞 إنهاء المكالمة');
-        this.isInCall = false;
+        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+        
+        // إرسال حالة الانقطاع
         this.sendCallStatus('disconnected');
         
+        // تنظيف المؤقتات
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
@@ -798,25 +913,54 @@ const CallSystem = {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
         }
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        
+        // تنظيف الصوت عن بعد
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
             this.remoteAudioElement = null;
         }
         
-        document.body.classList.remove('in-call');
-        
+        // تنظيف المسارات المحلية
         if (this.localStream) {
-            this.localStream.getTracks().forEach(t => t.stop());
+            try {
+                this.localStream.getTracks().forEach(t => t.stop());
+            } catch(e) {}
             this.localStream = null;
         }
         
+        // تنظيف الاتصالات
         this.cleanupConnections();
         
+        // إخفاء الواجهات
         const ui = document.getElementById('callUI');
         if (ui) ui.remove();
         const inc = document.getElementById('incomingCall');
         if (inc) inc.remove();
+        document.body.classList.remove('in-call');
+        
+        // إعادة تعيين المتغيرات الرئيسية
+        this.isInCall = false;
+        this.callType = null;
+        this.isAudioMuted = false;
+        this.isVideoMuted = false;
+        this.isSpeakerEnabled = false;
+        this.reconnectAttempts = 0;
+        
+        // تحديث حالة المستخدم في قاعدة البيانات
+        if (window.auth?.currentUser) {
+            window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: false,
+                callType: null,
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(() => {});
+        }
+        
+        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
     },
     
     cleanupConnections() {
@@ -829,17 +973,37 @@ const CallSystem = {
             this.keepAliveInterval = null;
         }
         if (this.dc) {
-            this.dc.close();
+            try { this.dc.close(); } catch(e) {}
             this.dc = null;
         }
         if (this.pc) {
-            this.pc.close();
+            try { this.pc.close(); } catch(e) {}
             this.pc = null;
         }
         this.incomingChunks = {};
         this.incomingFileInfo = {};
     }
 };
+
+// ==================== التنظيف التلقائي عند تحميل الصفحة ====================
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            if (typeof CallSystem !== 'undefined') {
+                CallSystem.autoCleanupOnLoad();
+            }
+        }, 1500);
+    });
+}
+
+// ==================== التنظيف قبل إغلاق الصفحة ====================
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+        if (CallSystem.isInCall) {
+            CallSystem.endCall();
+        }
+    });
+}
 
 // ==================== الدوال العامة ====================
 window.startAudioCall = async () => {
@@ -858,4 +1022,10 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-console.log('✅ WebRTC Call System جاهز - يدعم الصوت والفيديو مع فصل كامل');
+// دالة يدوية لتنظيف الحالة (يمكن استدعاؤها من Console إذا لزم الأمر)
+window.cleanupCallState = async () => {
+    await CallSystem.autoCleanupOnLoad();
+    console.log('✅ تم تنظيف حالة المكالمات يدوياً');
+};
+
+console.log('✅ WebRTC Call System جاهز - مع نظام التنظيف التلقائي');
