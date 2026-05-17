@@ -234,35 +234,16 @@ const SecureChatSystem = {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
-            console.log('📨 رسالة مستلمة، النوع:', msg.package?.type);
-            
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } 
-            else if (msg.package.type === 'webrtc') { 
-                console.log('📞 إشارة WebRTC واردة، سيتم تمريرها إلى CallSystem');
-                const signalData = await this.decryptData(msg.package.data, sharedKey);
-                const signal = JSON.parse(signalData);
-                
-                // ✅ إذا كانت الإشارة تحتوي على عرض (offer) من نوع offer، أظهر شاشة المكالمة الواردة
-                if (signal.sdp && signal.sdp.type === 'offer') {
-                    console.log('📞 مكالمة واردة (offer)، عرض الشاشة');
-                    if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
-                        CallSystem.showIncomingCall(msg.from, signal);
-                    }
-                } else {
-                    // إشارات أخرى (ICE candidates أو answer)
-                    if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
-                        CallSystem.handleSignaling(signal);
-                    }
-                }
+            } else if (msg.package.type === 'webrtc') { 
+                const signalData = await this.decryptData(msg.package.data, sharedKey); 
+                CallSystem.handleSignaling(JSON.parse(signalData)); 
             }
             if (typeof loadChats === 'function') loadChats();
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الرسالة:', error);
-        }
+        } catch (error) {}
     }
 };
