@@ -1,7 +1,6 @@
 // ========== webrtc-call.js ==========
 // نظام اتصال WebRTC - مكالمات صوتية فقط + نظام تشخيص مرئي
 
-// نظام التشخيص المرئي (يظهر على الشاشة)
 const CallDiagnostics = {
     addLog(message, type = 'info') {
         const time = new Date().toLocaleTimeString();
@@ -54,6 +53,7 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    pendingCandidates: [],
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -387,7 +387,6 @@ const CallSystem = {
         
         CallDiagnostics.addLog(`📞 مكالمة واردة من ${callerId.substring(0, 8)}... - عرض شاشة القبول`, 'info');
         
-        // إزالة أي شاشة قبول سابقة
         const existingOverlay = document.getElementById('incomingCall');
         if (existingOverlay) existingOverlay.remove();
         
@@ -479,14 +478,17 @@ const CallSystem = {
                     this.endCall();
             };
             
-            if (callData.sdp) { 
-                CallDiagnostics.addLog('📝 تعيين RemoteDescription', 'info');
-                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp)); 
-                const answer = await this.pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: false }); 
+            if (callData.sdp && callData.sdp.type === 'offer') {
+                CallDiagnostics.addLog('📝 تعيين RemoteDescription (offer)', 'info');
+                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+                const answer = await this.pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
                 CallDiagnostics.addLog('📝 تم إنشاء الإجابة (Answer)', 'success');
-                await this.pc.setLocalDescription(answer); 
-                await this.sendSignal(callerId, { sdp: this.pc.localDescription }); 
+                await this.pc.setLocalDescription(answer);
+                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
                 CallDiagnostics.addLog('✅ تم إرسال الإجابة', 'success');
+            } else if (callData.sdp && callData.sdp.type === 'answer') {
+                CallDiagnostics.addLog('📝 تعيين RemoteDescription (answer)', 'info');
+                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
             }
         } catch (e) { 
             CallDiagnostics.addLog(`❌ خطأ: ${e.name} - ${e.message}`, 'error');
@@ -499,32 +501,38 @@ const CallSystem = {
     
     async handleSignaling(data) {
         try {
-            CallDiagnostics.addLog(`📡 معالجة إشارة واردة: ${data.sdp ? 'SDP ' + data.sdp.type : (data.candidate ? 'ICE candidate' : 'unknown')}`, 'info');
-            if (!this.pc) { 
+            CallDiagnostics.addLog(`📡 معالجة إشارة واردة`, 'info');
+            
+            if (!this.pc) {
                 CallDiagnostics.addLog('📞 إنشاء اتصال جديد للمعالجة', 'info');
                 this.pc = new RTCPeerConnection({
                     iceServers: this.servers.iceServers,
                     iceTransportPolicy: 'all'
-                }); 
-                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); }; 
+                });
+                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
                 this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
                 this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
             }
-            if (data.sdp) { 
-                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); 
-                if (data.sdp.type === 'offer') { 
-                    const answer = await this.pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: false }); 
-                    await this.pc.setLocalDescription(answer); 
-                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription }); 
-                    CallDiagnostics.addLog('✅ تم إرسال الرد على العرض', 'success');
-                } 
-            }
-            else if (data.candidate) {
-                if (this.pc && data.candidate) {
+            
+            if (data.sdp) {
+                if (data.sdp.type === 'offer') {
+                    CallDiagnostics.addLog('📝 استقبال عرض (offer)، عرض شاشة المكالمة', 'info');
+                    this.showIncomingCall(ChatSystem.currentChat, data);
+                } else if (data.sdp.type === 'answer') {
+                    CallDiagnostics.addLog('📝 استقبال إجابة (answer)', 'info');
+                    await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                }
+            } else if (data.candidate) {
+                CallDiagnostics.addLog('🧊 استقبال ICE candidate', 'info');
+                if (this.pc && this.pc.remoteDescription && this.pc.remoteDescription.type) {
                     await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                } else {
+                    this.pendingCandidates.push(data.candidate);
                 }
             }
-        } catch (e) { CallDiagnostics.addLog(`❌ خطأ في معالجة الإشارة: ${e.message}`, 'error'); }
+        } catch (e) {
+            CallDiagnostics.addLog(`❌ خطأ في معالجة الإشارة: ${e.message}`, 'error');
+        }
     },
     
     async sendSignal(calleeId, data) {
@@ -684,6 +692,7 @@ const CallSystem = {
         if (this.pc) { this.pc.close(); this.pc = null; } 
         this.incomingChunks = {}; 
         this.incomingFileInfo = {}; 
+        this.pendingCandidates = [];
     }
 };
 
