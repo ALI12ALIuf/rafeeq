@@ -1,5 +1,5 @@
 // ========== webrtc-call.js ==========
-// نظام اتصال WebRTC - مكالمات صوتية فقط + إرسال الملفات والصور والبصمات
+// نظام اتصال WebRTC - مكالمات صوتية فقط
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, isCalling: false,
@@ -8,6 +8,7 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null, ringtoneInterval: null,
     isMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null, pendingCallData: null,
+    lastSignalTime: 0, // ✅ منع الإشارات القديمة
     
     servers: { 
         iceServers: [
@@ -22,8 +23,16 @@ const CallSystem = {
     showIncomingCall(callerId, callData) {
         console.log('📞 عرض شاشة المكالمة الواردة من:', callerId);
         
+        // ✅ منع إذا كان في مكالمة أو إذا كانت المحادثة الحالية مختلفة عن المرسل
         if (this.isInCall || this.isCalling) {
-            console.log('❌ مكالمة نشطة، رفض المكالمة الواردة');
+            console.log('❌ مكالمة نشطة، رفض');
+            this.sendReject(callerId);
+            return;
+        }
+        
+        // ✅ التأكد أن المرسل هو نفس المحادثة المفتوحة حالياً
+        if (ChatSystem.currentChat !== callerId) {
+            console.log('❌ المكالمة من محادثة مختلفة، تجاهل');
             this.sendReject(callerId);
             return;
         }
@@ -46,21 +55,10 @@ const CallSystem = {
                 <div style="font-size:1rem;margin-top:8px;color:#4CAF50;">🔔 يتصل بك...</div>
             </div>
             <div style="display:flex;gap:40px;">
-                <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 15px rgba(76,175,80,0.4);transition:transform 0.2s;">
-                    <i class="fas fa-phone"></i>
-                </button>
-                <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 15px rgba(244,67,54,0.4);transition:transform 0.2s;">
-                    <i class="fas fa-phone-slash"></i>
-                </button>
+                <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;"><i class="fas fa-phone"></i></button>
+                <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;"><i class="fas fa-phone-slash"></i></button>
             </div>
         `;
-        
-        const style = document.createElement('style');
-        style.textContent = `
-            #btnAccept:hover, #btnReject:hover { transform: scale(1.05); }
-            @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.02); opacity: 0.9; } 100% { transform: scale(1); opacity: 1; } }
-        `;
-        overlay.appendChild(style);
         document.body.appendChild(overlay);
         
         this.playRingTone();
@@ -103,7 +101,7 @@ const CallSystem = {
                 setTimeout(() => oscillator.stop(), 500);
             }, 2000);
             if (audioContext.state === 'suspended') audioContext.resume();
-        } catch(e) { console.log('تشغيل الرنين فشل:', e); }
+        } catch(e) {}
     },
     
     stopRingTone() {
@@ -122,7 +120,7 @@ const CallSystem = {
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ type: 'call_reject' }), sharedKey);
             await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc_reject', data: encrypted, timestamp: Date.now() });
-        } catch (error) { console.error('فشل إرسال الرفض:', error); }
+        } catch (error) {}
     },
     
     async handleReject() {
@@ -143,7 +141,7 @@ const CallSystem = {
         
         if (!window.auth?.currentUser) return;
         if (this.isInCall || this.isCalling) {
-            alert('يوجد مكالمة نشطة حالياً');
+            alert('يوجد مكالمة نشطة');
             return;
         }
         
@@ -153,7 +151,7 @@ const CallSystem = {
             const constraints = { audio: true, video: false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
-            if (this.localStream.getAudioTracks().length === 0) throw new Error('لا يمكن الوصول إلى الميكروفون');
+            if (this.localStream.getAudioTracks().length === 0) throw new Error('لا يوجد ميكروفون');
             
             this.pc = new RTCPeerConnection({ iceServers: this.servers.iceServers, iceTransportPolicy: 'all' });
             
@@ -164,8 +162,7 @@ const CallSystem = {
             this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
             this.pc.ontrack = e => { if (e.track.kind === 'audio') this.setupRemoteAudio(e.streams[0]); };
             this.pc.onconnectionstatechange = () => {
-                if (this.pc?.connectionState === 'connected') console.log('📞 تم الاتصال');
-                else if (this.pc?.connectionState === 'failed' || this.pc?.connectionState === 'disconnected') this.endCall();
+                if (this.pc?.connectionState === 'failed' || this.pc?.connectionState === 'disconnected') this.endCall();
             };
             
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
@@ -176,10 +173,10 @@ const CallSystem = {
             this.isInCall = true;
             
         } catch (e) {
-            console.error('خطأ:', e);
+            console.error(e);
             this.isCalling = false;
             this.endCall();
-            alert(e.name === 'NotAllowedError' ? 'يرجى السماح بالوصول إلى الميكروفون' : 'فشل بدء المكالمة');
+            alert(e.name === 'NotAllowedError' ? 'السماح بالميكروفون مطلوب' : 'فشل بدء المكالمة');
         }
     },
     
@@ -197,7 +194,7 @@ const CallSystem = {
             const constraints = { audio: true, video: false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
-            if (this.localStream.getAudioTracks().length === 0) throw new Error('لا يمكن الوصول إلى الميكروفون');
+            if (this.localStream.getAudioTracks().length === 0) throw new Error('لا يوجد ميكروفون');
             
             this.pc = new RTCPeerConnection({ iceServers: this.servers.iceServers, iceTransportPolicy: 'all' });
             
@@ -219,38 +216,52 @@ const CallSystem = {
             this.showCallUI();
             
         } catch (e) {
-            console.error('خطأ:', e);
+            console.error(e);
             this.endCall();
-            alert(e.name === 'NotAllowedError' ? 'يرجى السماح بالوصول إلى الميكروفون' : 'فشل قبول المكالمة');
+            alert(e.name === 'NotAllowedError' ? 'السماح بالميكروفون مطلوب' : 'فشل قبول المكالمة');
         }
     },
     
+    // ✅ القلب المعدل - يمنع الإشارات الوهمية
     async handleSignaling(data, fromUserId) {
         console.log('📞 إشارة من:', fromUserId, 'نوع:', data.sdp?.type || (data.candidate ? 'candidate' : 'مجهول'));
         
-        // عرض مكالمة جديدة
+        // ✅ شرط 1: تجاهل أي إشارة إذا لم تكن المحادثة الحالية هي نفس المرسل
+        if (ChatSystem.currentChat !== fromUserId) {
+            console.log('❌ تجاهل: المرسل ليس المحادثة الحالية');
+            return;
+        }
+        
+        // ✅ شرط 2: منع الإشارات القديمة (أقدم من 10 ثواني)
+        const now = Date.now();
+        if (data.timestamp && (now - data.timestamp) > 10000) {
+            console.log('❌ تجاهل: إشارة قديمة');
+            return;
+        }
+        
+        // ✅ شرط 3: إذا كانت إشارة عرض (offer) جديدة
         if (data.sdp && data.sdp.type === 'offer' && !this.isInCall && !this.isCalling) {
+            console.log('📞 عرض مكالمة جديد، عرض الشاشة');
             this.showIncomingCall(fromUserId, data);
             return;
         }
         
-        // رفض مكالمة جديدة أثناء مكالمة نشطة
+        // ✅ شرط 4: رفض عرض جديد إذا كنا في مكالمة
         if (data.sdp && data.sdp.type === 'offer' && (this.isInCall || this.isCalling)) {
-            console.log('📞 رفض مكالمة جديدة - مكالمة نشطة');
+            console.log('❌ رفض عرض جديد - مكالمة نشطة');
             this.sendReject(fromUserId);
             return;
         }
         
-        // تجاهل أي إشارة إذا لم تكن هناك مكالمة نشطة
+        // ✅ شرط 5: تجاهل أي إشارة أخرى إذا لم تكن هناك مكالمة نشطة
         if (!this.isInCall && !this.isCalling) {
-            console.log('📞 تجاهل إشارة - لا توجد مكالمة نشطة');
+            console.log('❌ تجاهل: لا توجد مكالمة نشطة');
             return;
         }
         
-        // معالجة الإشارات للمكالمة النشطة
+        // ✅ معالجة الإشارات للمكالمة النشطة فقط
         try {
             if (!this.pc) {
-                console.log('📞 إنشاء PeerConnection');
                 this.pc = new RTCPeerConnection({ iceServers: this.servers.iceServers, iceTransportPolicy: 'all' });
                 this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
                 this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(fromUserId, { candidate: e.candidate }); };
@@ -272,8 +283,6 @@ const CallSystem = {
     
     setupDataChannel(channel) {
         if (!channel) return;
-        console.log('📞 Data Channel جاهز');
-        
         channel.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
@@ -288,7 +297,6 @@ const CallSystem = {
                 }
             } catch(error) {}
         };
-        
         channel.onopen = () => {
             if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
             this.reconnectAttempts = 0;
@@ -298,13 +306,11 @@ const CallSystem = {
                 if (this.dc?.readyState === 'open') this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
             }, 2000);
         };
-        
         channel.onclose = () => {
             this.sendCallStatus('disconnected');
             if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
             this.scheduleReconnect();
         };
-        
         channel.onerror = () => this.scheduleReconnect();
     },
     
@@ -406,7 +412,7 @@ const CallSystem = {
         this.remoteAudioElement.srcObject = stream;
         this.remoteAudioElement.autoplay = true;
         this.applySpeakerSettings();
-        this.remoteAudioElement.play().catch(e => console.log('تشغيل الصوت فشل:', e));
+        this.remoteAudioElement.play().catch(() => {});
     },
     
     applySpeakerSettings() {
@@ -457,7 +463,9 @@ const CallSystem = {
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
             if (!myPrivateKey || !receiverPublicKey) return;
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
+            // ✅ إضافة timestamp للإشارة
+            const signalWithTime = { ...data, timestamp: Date.now() };
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify(signalWithTime), sharedKey);
             await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
         } catch(error) {}
     },
@@ -571,14 +579,13 @@ const CallSystem = {
     }
 };
 
-// دالة بدء المكالمة
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
         return;
     }
     if (CallSystem.isInCall || CallSystem.isCalling) {
-        alert('يوجد مكالمة نشطة حالياً');
+        alert('يوجد مكالمة نشطة');
         return;
     }
     await CallSystem.startCall(CallSystem.currentChat);
