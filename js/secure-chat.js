@@ -234,27 +234,16 @@ const SecureChatSystem = {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
-            console.log('📨 رسالة مستلمة، النوع:', msg.package?.type);
-            
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } 
-            else if (msg.package.type === 'webrtc') { 
-                console.log('📞 إشارة WebRTC واردة');
-                const signalData = await this.decryptData(msg.package.data, sharedKey);
-                const signal = JSON.parse(signalData);
-                
-                // تمرير جميع الإشارات إلى CallSystem.handleSignaling
-                if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
-                    CallSystem.handleSignaling(signal);
-                }
+            } else if (msg.package.type === 'webrtc') { 
+                const signalData = await this.decryptData(msg.package.data, sharedKey); 
+                CallSystem.handleSignaling(JSON.parse(signalData)); 
             }
             if (typeof loadChats === 'function') loadChats();
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الرسالة:', error);
-        }
+        } catch (error) {}
     }
 };
