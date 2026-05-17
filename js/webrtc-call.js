@@ -17,18 +17,17 @@ const CallSystem = {
         ] 
     },
     
-    // ==================== المكالمة الصوتية (من ملف 22) ====================
+    // ==================== المكالمة الصوتية ====================
     
     async startAudioCall(calleeId) {
         if (!window.auth?.currentUser || this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مستخدم غير موجود أو مكالمة نشطة');
+            console.log('❌ لا يمكن بدء المكالمة');
             return;
         }
         this.isInCall = true;
         this.callType = 'audio';
         
         try {
-            // تشغيل صوت صامت لتجاوز قيود المتصفح
             const silentAudio = new Audio();
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
@@ -48,23 +47,12 @@ const CallSystem = {
             this.showCallUI('audio');
             
             this.pc = new RTCPeerConnection(this.servers);
-            
-            // إضافة المسارات المحلية
-            this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
-            });
-            
-            // إنشاء Data Channel
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
             this.dc = this.pc.createDataChannel('chat');
             this.setupDataChannel(this.dc);
             
-            // إعداد مستمعي الأحداث
             this.pc.onicecandidate = e => { 
-                if (e.candidate) {
-                    console.log('📡 إرسال ICE candidate');
-                    this.sendSignal(calleeId, { candidate: e.candidate });
-                }
+                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate });
             };
             
             this.pc.ontrack = e => {
@@ -81,20 +69,16 @@ const CallSystem = {
                 }
             };
             
-            // إنشاء العرض
-            console.log('📞 إنشاء عرض مكالمة صوتية...');
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
             await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
-            console.log('✅ تم إرسال العرض');
+            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio', timestamp: Date.now() });
+            console.log('✅ تم إرسال العرض الصوتي');
             
         } catch (e) { 
-            console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
+            console.error('❌ خطأ:', e);
             this.endCall(); 
             if (e.name === 'NotAllowedError') {
                 alert('يرجى السماح بالوصول إلى الميكروفون');
-            } else {
-                alert('حدث خطأ في بدء المكالمة');
             }
         }
     },
@@ -136,7 +120,7 @@ const CallSystem = {
             
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
             await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
+            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video', timestamp: Date.now() });
             
         } catch (e) { 
             this.endCall(); 
@@ -144,7 +128,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== إعداد الصوت عن بعد (من ملف 22) ====================
+    // ==================== إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
         console.log('🔊 إعداد الصوت عن بعد...');
@@ -157,7 +141,6 @@ const CallSystem = {
         this.remoteAudioElement.srcObject = stream;
         this.remoteAudioElement.autoplay = true;
         
-        // تطبيق إعدادات السماعة
         this.applySpeakerSettings();
         
         this.remoteAudioElement.play().then(() => {
@@ -169,16 +152,11 @@ const CallSystem = {
     
     applySpeakerSettings() {
         if (!this.remoteAudioElement) return;
-        
         if (this.remoteAudioElement.setSinkId) {
             if (this.isSpeakerEnabled) {
-                this.remoteAudioElement.setSinkId('speaker').then(() => {
-                    console.log('✅ تم التبديل إلى السماعة الخارجية');
-                }).catch(e => console.log('❌ فشل التبديل إلى السماعة:', e));
+                this.remoteAudioElement.setSinkId('speaker').catch(e => console.log('فشل التبديل:', e));
             } else {
-                this.remoteAudioElement.setSinkId('default').then(() => {
-                    console.log('✅ تم التبديل إلى السماعة الداخلية');
-                }).catch(e => console.log('❌ فشل التبديل:', e));
+                this.remoteAudioElement.setSinkId('default').catch(e => console.log('فشل التبديل:', e));
             }
         }
     },
@@ -196,12 +174,10 @@ const CallSystem = {
         console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
         
         try {
-            // تشغيل صوت صامت
             const silentAudio = new Audio();
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
             
-            // طلب الصلاحيات حسب نوع المكالمة
             const constraints = { 
                 audio: true, 
                 video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } : false
@@ -254,7 +230,7 @@ const CallSystem = {
                 console.log('✅ تم إرسال الرد');
             }
         } catch (e) { 
-            console.error('❌ خطأ في استقبال المكالمة:', e);
+            console.error('❌ خطأ:', e);
             this.endCall(); 
             if (e.name === 'NotAllowedError') {
                 alert('يرجى السماح بالوصول إلى الميكروفون');
@@ -277,12 +253,8 @@ const CallSystem = {
                 <div style="font-size:1.2rem;margin-top:8px;color:#4CAF50;">${callTypeText}</div>
             </div>
             <div style="display:flex;gap:40px;">
-                <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">
-                    <i class="fas fa-phone"></i>
-                </button>
-                <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">
-                    <i class="fas fa-phone-slash"></i>
-                </button>
+                <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">📞</button>
+                <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">❌</button>
             </div>`;
         document.body.appendChild(overlay);
         
@@ -295,7 +267,7 @@ const CallSystem = {
         };
     },
     
-    // ==================== Data Channel وإدارة الاتصال (من ملف 22) ====================
+    // ==================== Data Channel وإدارة الاتصال ====================
     
     setupDataChannel(channel) {
         if (!channel) return;
@@ -521,7 +493,6 @@ const CallSystem = {
         ui.innerHTML = uiHTML;
         document.body.appendChild(ui);
         
-        // ربط الأحداث
         document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
         
         if (type === 'video') {
@@ -564,14 +535,13 @@ const CallSystem = {
         const muteBtn = document.getElementById('muteBtn');
         if (muteBtn) {
             if (this.isAudioMuted) {
-                muteBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+                muteBtn.innerHTML = '🔇';
                 muteBtn.style.background = '#f44336';
             } else {
-                muteBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                muteBtn.innerHTML = '🎤';
                 muteBtn.style.background = 'rgba(0,0,0,0.6)';
             }
         }
-        console.log(`🎤 كتم الصوت: ${this.isAudioMuted ? 'مفعل' : 'ملغي'}`);
     },
     
     toggleAudio() {
@@ -589,7 +559,6 @@ const CallSystem = {
                         btn.style.background = '#f44336';
                     }
                 }
-                console.log(`🎤 كتم الصوت: ${!audioTrack.enabled ? 'مفعل' : 'ملغي'}`);
             }
         }
     },
@@ -609,7 +578,6 @@ const CallSystem = {
                         btn.style.background = '#f44336';
                     }
                 }
-                console.log(`📹 كتم الفيديو: ${!videoTrack.enabled ? 'مفعل' : 'ملغي'}`);
             }
         }
     },
@@ -627,7 +595,6 @@ const CallSystem = {
                 speakerBtn.style.background = 'rgba(0,0,0,0.6)';
             }
         }
-        console.log(`🔊 وضع السماعة: ${this.isSpeakerEnabled ? 'خارجية' : 'داخلية'}`);
     },
     
     async switchCamera() {
@@ -652,7 +619,6 @@ const CallSystem = {
             this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
             const lv = document.getElementById('localVideo');
             if (lv) lv.srcObject = this.localStream;
-            console.log(`🔄 تبديل الكاميرا إلى ${newFacing === 'user' ? 'أمامية' : 'خلفية'}`);
         } catch (e) {
             console.error('❌ فشل تبديل الكاميرا:', e);
         }
@@ -669,10 +635,10 @@ const CallSystem = {
         try {
             let blobToSend = file;
             if (type === 'image') {
-                blobToSend = await this.compressImage(file);
+                blobToSend = await SecureChatSystem.compressImage(file);
             }
             
-            const b64 = await this.fileToBase64(blobToSend);
+            const b64 = await SecureChatSystem.fileToBase64(blobToSend);
             const chunkSize = 16000;
             const totalChunks = Math.ceil(b64.length / chunkSize);
             const fileId = Date.now().toString();
@@ -747,40 +713,11 @@ const CallSystem = {
     },
     
     compressImage(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const maxSize = 800;
-                    if (width > height && width > maxSize) {
-                        height = (height * maxSize) / width;
-                        width = maxSize;
-                    } else if (height > maxSize) {
-                        width = (width * maxSize) / height;
-                        height = maxSize;
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
+        return SecureChatSystem.compressImage(file);
     },
     
     fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1] || reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
+        return SecureChatSystem.fileToBase64(file);
     },
     
     // ==================== إنهاء المكالمة ====================
