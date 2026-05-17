@@ -239,11 +239,33 @@ const SecureChatSystem = {
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } else if (msg.package.type === 'webrtc') { 
+            } 
+            // ✅ معالجة إشارات WebRTC (مكالمات صوت وفيديو)
+            else if (msg.package.type === 'webrtc') { 
                 const signalData = await this.decryptData(msg.package.data, sharedKey); 
-                CallSystem.handleSignaling(JSON.parse(signalData)); 
+                const parsed = JSON.parse(signalData);
+                
+                console.log('📡 استلام إشارة WebRTC:', parsed);
+                
+                // ✅ إذا كانت إشارة مكالمة جديدة (offer) ولسنا في مكالمة حالياً
+                if (parsed.sdp && parsed.sdp.type === 'offer' && !CallSystem.isInCall) {
+                    console.log('📞 استلام طلب مكالمة من', msg.from);
+                    // عرض شاشة قبول/رفض المكالمة
+                    if (typeof CallSystem.showIncomingCall === 'function') {
+                        CallSystem.showIncomingCall(msg.from, parsed);
+                    } else {
+                        console.warn('⚠️ CallSystem.showIncomingCall غير موجود');
+                        // معالجة افتراضية: قبول المكالمة تلقائياً (للتجربة)
+                        CallSystem.receiveCall(msg.from, parsed);
+                    }
+                } else {
+                    // معالجة الإشارات الأخرى (candidates, answer, etc.)
+                    CallSystem.handleSignaling(parsed);
+                }
             }
             if (typeof loadChats === 'function') loadChats();
-        } catch (error) {}
+        } catch (error) {
+            console.error('❌ خطأ في معالجة الرسالة:', error);
+        }
     }
 };
