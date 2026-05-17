@@ -75,6 +75,7 @@ const ChatSystem = {
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
+    // ========== الدالة المعدلة - إزالة الاتصال التلقائي ==========
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId; document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
@@ -84,12 +85,15 @@ const ChatSystem = {
         document.getElementById('conversationPage').style.display = 'flex';
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
-        setTimeout(() => { if (this.friendOnline) CallSystem.ensureDataChannel(friendId).catch(() => {}); }, 500);
+        
+        // ✅ تم إزالة السطر الذي كان يبدأ الاتصال التلقائي
+        // setTimeout(() => { if (this.friendOnline) CallSystem.ensureDataChannel(friendId).catch(() => {}); }, 500);
+        
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ========== الدالة المعدلة (الفصل بين الحالتين) ==========
+    // ========== دالة تحديث حالة المستخدم (معدلة - فصل الحالتين) ==========
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
@@ -105,10 +109,6 @@ const ChatSystem = {
         const statusEl = document.getElementById('conversationStatus');
         if (!statusEl) return;
         
-        // ✅ الفصل بين الحالتين:
-        // 1. الدائرة الخضراء تعتمد فقط على ONLINE (الاتصال بالإنترنت)
-        // 2. حالة المكالمة تعرض كنص منفصل
-        
         let statusHtml = '';
         
         // حالة التواجد (الدائرة الخضراء/الحمراء)
@@ -123,7 +123,7 @@ const ChatSystem = {
             else statusHtml = `🔴 غير متصل منذ ${Math.floor(diffMinutes / 60)} ساعة`;
         }
         
-        // ✅ حالة المكالمة (نص إضافي، لا تؤثر على الدائرة الخضراء)
+        // حالة المكالمة (نص إضافي، لا تؤثر على الدائرة الخضراء)
         if (userData?.inCall && isOnline) {
             const callTypeText = userData.callType === 'video' ? 'فيديو' : 'صوتية';
             statusHtml += ` <span style="color: #2196F3;">📞 في مكالمة ${callTypeText}</span>`;
@@ -132,9 +132,8 @@ const ChatSystem = {
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
         
-        // تحديث أزرار الإرفاق
+        // تحديث أزرار الإرفاق (بدون بدء مكالمة تلقائية)
         if (isOnline) {
-            CallSystem.ensureDataChannel(friendId).catch(() => {});
             this.updateAttachmentButtons(true);
         } else {
             this.updateAttachmentButtons(false);
@@ -190,23 +189,19 @@ const ChatSystem = {
         this.hideProgressBar(); return false;
     },
     
-    // ========== التأكد من جاهزية Data Channel ==========
     async _ensureChannelReady() {
         if (!this.friendOnline) {
             alert('المستخدم غير متصل حالياً');
             return false;
         }
         
-        // إذا القناة موجودة ومفتوحة = جاهز
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             return true;
         }
         
-        // نحاول نفتح قناة جديدة وننتظر
         try {
             await CallSystem.ensureDataChannel(this.currentChat);
             
-            // انتظر 5 ثواني لتتأكد القناة فتحت
             const result = await new Promise((resolve) => {
                 let attempts = 0;
                 const check = setInterval(() => {
@@ -215,7 +210,7 @@ const ChatSystem = {
                         clearInterval(check);
                         resolve(true);
                     }
-                    if (attempts > 10) { // 5 ثواني
+                    if (attempts > 10) {
                         clearInterval(check);
                         resolve(false);
                     }
