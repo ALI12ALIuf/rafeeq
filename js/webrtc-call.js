@@ -17,19 +17,17 @@ const CallSystem = {
         ] 
     },
     
-    // ==================== التنظيف التلقائي (جديد) ====================
+    // ==================== التنظيف التلقائي ====================
     
     async autoCleanupOnLoad() {
         console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
         
-        // تنظيف الحالة المحلية
         this.isInCall = false;
         this.callType = null;
         this.isAudioMuted = false;
         this.isVideoMuted = false;
         this.isSpeakerEnabled = false;
         
-        // تنظيف المؤقتات
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
@@ -43,14 +41,12 @@ const CallSystem = {
             this.reconnectTimer = null;
         }
         
-        // تنظيف الصوت عن بعد
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
             this.remoteAudioElement = null;
         }
         
-        // تنظيف المسارات المحلية
         if (this.localStream) {
             try {
                 this.localStream.getTracks().forEach(t => t.stop());
@@ -58,17 +54,14 @@ const CallSystem = {
             this.localStream = null;
         }
         
-        // تنظيف الاتصالات
         this.cleanupConnections();
         
-        // إخفاء أي واجهات مكالمات عالقة
         const ui = document.getElementById('callUI');
         if (ui) ui.remove();
         const inc = document.getElementById('incomingCall');
         if (inc) inc.remove();
         document.body.classList.remove('in-call');
         
-        // تنظيف حالة المستخدم في قاعدة البيانات
         if (typeof PresenceSystem !== 'undefined' && window.auth?.currentUser) {
             try {
                 await window.db.collection('users').doc(window.auth.currentUser.uid).update({
@@ -83,6 +76,71 @@ const CallSystem = {
         }
         
         console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
+    },
+    
+    // ==================== Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
+    
+    async ensureDataChannelOnly(calleeId) {
+        if (!calleeId) return false;
+        
+        // إذا القناة مفتوحة بالفعل
+        if (this.dc && this.dc.readyState === 'open') {
+            console.log('✅ Data Channel موجود ومفتوح');
+            return true;
+        }
+        
+        // إذا القناة في حالة اتصال
+        if (this.dc && this.dc.readyState === 'connecting') {
+            console.log('⏳ Data Channel في طور الاتصال...');
+            return new Promise((resolve) => {
+                const timeout = setTimeout(() => resolve(false), 10000);
+                const check = setInterval(() => {
+                    if (this.dc && this.dc.readyState === 'open') {
+                        clearInterval(check);
+                        clearTimeout(timeout);
+                        resolve(true);
+                    } else if (this.dc && (this.dc.readyState === 'failed' || this.dc.readyState === 'closed')) {
+                        clearInterval(check);
+                        clearTimeout(timeout);
+                        this.createDataChannelOnly(calleeId).then(resolve);
+                    }
+                }, 500);
+            });
+        }
+        
+        // إنشاء Data Channel جديد
+        return this.createDataChannelOnly(calleeId);
+    },
+    
+    async createDataChannelOnly(calleeId) {
+        this.cleanupConnections();
+        try {
+            console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
+            
+            this.pc = new RTCPeerConnection(this.servers);
+            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
+            this.setupDataChannel(this.dc);
+            
+            this.pc.onicecandidate = e => { 
+                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
+            };
+            
+            this.pc.ondatachannel = e => { 
+                this.setupDataChannel(e.channel); 
+                this.dc = e.channel; 
+            };
+            
+            // إنشاء offer بدون صوت وفيديو
+            const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+            await this.pc.setLocalDescription(offer);
+            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
+            
+            console.log('✅ تم إرسال طلب فتح Data Channel');
+            return true;
+        } catch (error) {
+            console.error('❌ فشل إنشاء Data Channel:', error);
+            return false;
+        }
     },
     
     // ==================== المكالمة الصوتية ====================
@@ -102,7 +160,6 @@ const CallSystem = {
         this.callType = 'audio';
         
         try {
-            // تحديث حالة المستخدم في قاعدة البيانات
             if (window.auth?.currentUser) {
                 await window.db.collection('users').doc(window.auth.currentUser.uid).update({
                     inCall: true,
@@ -110,7 +167,6 @@ const CallSystem = {
                 }).catch(() => {});
             }
             
-            // تشغيل صوت صامت لتجاوز قيود المتصفح
             const silentAudio = new Audio();
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
@@ -194,7 +250,6 @@ const CallSystem = {
         this.callType = 'video';
         
         try {
-            // تحديث حالة المستخدم في قاعدة البيانات
             if (window.auth?.currentUser) {
                 await window.db.collection('users').doc(window.auth.currentUser.uid).update({
                     inCall: true,
@@ -290,7 +345,6 @@ const CallSystem = {
         console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
         
         try {
-            // تحديث حالة المستخدم في قاعدة البيانات
             if (window.auth?.currentUser) {
                 await window.db.collection('users').doc(window.auth.currentUser.uid).update({
                     inCall: true,
@@ -363,12 +417,18 @@ const CallSystem = {
     },
     
     showIncomingCall(callerId, callData) {
+        // إذا كانت إشارة Data Channel فقط، لا تظهر شاشة المكالمة
+        if (callData.type === 'datachannel') {
+            console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
+            this.handleSignaling(callData);
+            return;
+        }
+        
         console.log('🔔 عرض شاشة المكالمة الواردة...');
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
         const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
         
-        // إزالة أي شاشة مكالمة سابقة
         const existingOverlay = document.getElementById('incomingCall');
         if (existingOverlay) existingOverlay.remove();
         
@@ -399,7 +459,6 @@ const CallSystem = {
             overlay.remove(); 
         };
         
-        // إخفاء الشاشة تلقائياً بعد 30 ثانية إذا لم يتم الرد
         setTimeout(() => {
             const stillThere = document.getElementById('incomingCall');
             if (stillThere) {
@@ -497,7 +556,7 @@ const CallSystem = {
         this.reconnectTimer = setTimeout(async () => {
             try {
                 if (ChatSystem.currentChat && ChatSystem.friendOnline) {
-                    await this.ensureDataChannel(ChatSystem.currentChat);
+                    await this.ensureDataChannelOnly(ChatSystem.currentChat);
                 }
             } catch (error) {}
             this.reconnectTimer = null;
@@ -896,15 +955,13 @@ const CallSystem = {
         });
     },
     
-    // ==================== إنهاء المكالمة (معدل بالكامل) ====================
+    // ==================== إنهاء المكالمة ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
         
-        // إرسال حالة الانقطاع
         this.sendCallStatus('disconnected');
         
-        // تنظيف المؤقتات
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
@@ -918,14 +975,12 @@ const CallSystem = {
             this.reconnectTimer = null;
         }
         
-        // تنظيف الصوت عن بعد
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
             this.remoteAudioElement = null;
         }
         
-        // تنظيف المسارات المحلية
         if (this.localStream) {
             try {
                 this.localStream.getTracks().forEach(t => t.stop());
@@ -933,17 +988,14 @@ const CallSystem = {
             this.localStream = null;
         }
         
-        // تنظيف الاتصالات
         this.cleanupConnections();
         
-        // إخفاء الواجهات
         const ui = document.getElementById('callUI');
         if (ui) ui.remove();
         const inc = document.getElementById('incomingCall');
         if (inc) inc.remove();
         document.body.classList.remove('in-call');
         
-        // إعادة تعيين المتغيرات الرئيسية
         this.isInCall = false;
         this.callType = null;
         this.isAudioMuted = false;
@@ -951,7 +1003,6 @@ const CallSystem = {
         this.isSpeakerEnabled = false;
         this.reconnectAttempts = 0;
         
-        // تحديث حالة المستخدم في قاعدة البيانات
         if (window.auth?.currentUser) {
             window.db.collection('users').doc(window.auth.currentUser.uid).update({
                 inCall: false,
@@ -1022,10 +1073,9 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-// دالة يدوية لتنظيف الحالة (يمكن استدعاؤها من Console إذا لزم الأمر)
 window.cleanupCallState = async () => {
     await CallSystem.autoCleanupOnLoad();
     console.log('✅ تم تنظيف حالة المكالمات يدوياً');
 };
 
-console.log('✅ WebRTC Call System جاهز - مع نظام التنظيف التلقائي');
+console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
