@@ -7,7 +7,7 @@ const PresenceSystem = {
     async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
     startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
     stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
-    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
+    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data()); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
     stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
 };
 
@@ -89,17 +89,56 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    updateFriendStatus(friendId, isOnline) {
+    // ========== الدالة المعدلة (الفصل بين الحالتين) ==========
+    updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
+        
+        // جلب بيانات المستخدم إذا لم تكن موجودة
+        if (!userData && window.auth?.currentUser) {
+            window.db.collection('users').doc(friendId).get().then(doc => {
+                if (doc.exists) this.updateFriendStatus(friendId, isOnline, doc.data());
+            }).catch(() => {});
+            return;
+        }
+        
+        const statusEl = document.getElementById('conversationStatus');
+        if (!statusEl) return;
+        
+        // ✅ الفصل بين الحالتين:
+        // 1. الدائرة الخضراء تعتمد فقط على ONLINE (الاتصال بالإنترنت)
+        // 2. حالة المكالمة تعرض كنص منفصل
+        
+        let statusHtml = '';
+        
+        // حالة التواجد (الدائرة الخضراء/الحمراء)
+        if (isOnline) {
+            statusHtml = '🟢 متصل';
+        } else {
+            const lastSeen = userData?.lastSeen?.toDate?.() || new Date();
+            const now = new Date();
+            const diffMinutes = Math.floor((now - lastSeen) / 1000 / 60);
+            if (diffMinutes < 1) statusHtml = '🔴 غير متصل (الآن)';
+            else if (diffMinutes < 60) statusHtml = `🔴 غير متصل منذ ${diffMinutes} دقيقة`;
+            else statusHtml = `🔴 غير متصل منذ ${Math.floor(diffMinutes / 60)} ساعة`;
+        }
+        
+        // ✅ حالة المكالمة (نص إضافي، لا تؤثر على الدائرة الخضراء)
+        if (userData?.inCall && isOnline) {
+            const callTypeText = userData.callType === 'video' ? 'فيديو' : 'صوتية';
+            statusHtml += ` <span style="color: #2196F3;">📞 في مكالمة ${callTypeText}</span>`;
+        }
+        
+        statusEl.innerHTML = statusHtml;
+        statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
+        
+        // تحديث أزرار الإرفاق
         if (isOnline) {
             CallSystem.ensureDataChannel(friendId).catch(() => {});
             this.updateAttachmentButtons(true);
         } else {
             this.updateAttachmentButtons(false);
         }
-        const statusEl = document.getElementById('conversationStatus');
-        if (statusEl) { statusEl.textContent = isOnline ? '🟢 متصل' : '🔴 غير متصل'; statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`; }
     },
     
     updateAttachmentButtons(isOnline) {
