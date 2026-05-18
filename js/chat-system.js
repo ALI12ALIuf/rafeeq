@@ -75,7 +75,6 @@ const ChatSystem = {
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
-    // ========== الدالة المعدلة - إزالة الاتصال التلقائي ==========
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId; document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
@@ -86,19 +85,21 @@ const ChatSystem = {
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
         
-        // ✅ تم إزالة السطر الذي كان يبدأ الاتصال التلقائي
-        // setTimeout(() => { if (this.friendOnline) CallSystem.ensureDataChannel(friendId).catch(() => {}); }, 500);
+        // ✅ فتح Data Channel فقط (بدون مكالمة) - يسمح بإرسال الملفات
+        setTimeout(() => { 
+            if (this.friendOnline) {
+                CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
+            }
+        }, 500);
         
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ========== دالة تحديث حالة المستخدم (معدلة - فصل الحالتين) ==========
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
         
-        // جلب بيانات المستخدم إذا لم تكن موجودة
         if (!userData && window.auth?.currentUser) {
             window.db.collection('users').doc(friendId).get().then(doc => {
                 if (doc.exists) this.updateFriendStatus(friendId, isOnline, doc.data());
@@ -111,7 +112,6 @@ const ChatSystem = {
         
         let statusHtml = '';
         
-        // حالة التواجد (الدائرة الخضراء/الحمراء)
         if (isOnline) {
             statusHtml = '🟢 متصل';
         } else {
@@ -123,7 +123,6 @@ const ChatSystem = {
             else statusHtml = `🔴 غير متصل منذ ${Math.floor(diffMinutes / 60)} ساعة`;
         }
         
-        // حالة المكالمة (نص إضافي، لا تؤثر على الدائرة الخضراء)
         if (userData?.inCall && isOnline) {
             const callTypeText = userData.callType === 'video' ? 'فيديو' : 'صوتية';
             statusHtml += ` <span style="color: #2196F3;">📞 في مكالمة ${callTypeText}</span>`;
@@ -132,7 +131,6 @@ const ChatSystem = {
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
         
-        // تحديث أزرار الإرفاق (بدون بدء مكالمة تلقائية)
         if (isOnline) {
             this.updateAttachmentButtons(true);
         } else {
@@ -200,26 +198,15 @@ const ChatSystem = {
         }
         
         try {
-            await CallSystem.ensureDataChannel(this.currentChat);
+            // ✅ استخدام ensureDataChannelOnly بدلاً من ensureDataChannel
+            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
             
-            const result = await new Promise((resolve) => {
-                let attempts = 0;
-                const check = setInterval(() => {
-                    attempts++;
-                    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-                        clearInterval(check);
-                        resolve(true);
-                    }
-                    if (attempts > 10) {
-                        clearInterval(check);
-                        resolve(false);
-                    }
-                }, 500);
-            });
+            if (success) {
+                await new Promise(r => setTimeout(r, 1000));
+                return true;
+            }
             
-            if (result) return true;
-            
-            alert('تعذر الاتصال. اطلب من المستخدم الآخر إعادة فتح المحادثة.');
+            alert('تعذر فتح قناة الاتصال لإرسال الملفات');
             return false;
         } catch (e) {
             alert('فشل الاتصال. حاول مرة أخرى.');
