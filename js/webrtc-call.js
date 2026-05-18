@@ -83,13 +83,11 @@ const CallSystem = {
     async ensureDataChannelOnly(calleeId) {
         if (!calleeId) return false;
         
-        // إذا القناة مفتوحة بالفعل
         if (this.dc && this.dc.readyState === 'open') {
             console.log('✅ Data Channel موجود ومفتوح');
             return true;
         }
         
-        // إذا القناة في حالة اتصال
         if (this.dc && this.dc.readyState === 'connecting') {
             console.log('⏳ Data Channel في طور الاتصال...');
             return new Promise((resolve) => {
@@ -108,7 +106,6 @@ const CallSystem = {
             });
         }
         
-        // إنشاء Data Channel جديد
         return this.createDataChannelOnly(calleeId);
     },
     
@@ -130,7 +127,6 @@ const CallSystem = {
                 this.dc = e.channel; 
             };
             
-            // إنشاء offer بدون صوت وفيديو
             const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
             await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
@@ -417,7 +413,6 @@ const CallSystem = {
     },
     
     showIncomingCall(callerId, callData) {
-        // إذا كانت إشارة Data Channel فقط، لا تظهر شاشة المكالمة
         if (callData.type === 'datachannel') {
             console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
             this.handleSignaling(callData);
@@ -880,6 +875,7 @@ const CallSystem = {
         }
     },
     
+    // ========== دالة معالجة استلام الملفات (المعدلة) ==========
     handleChunkMessage(msg) {
         if (!this.incomingChunks[msg.id]) {
             this.incomingChunks[msg.id] = [];
@@ -900,14 +896,28 @@ const CallSystem = {
         
         if (this.incomingFileInfo[msg.id].received === msg.total) {
             const fullData = this.incomingChunks[msg.id].join('');
+            
+            // ✅ معالجة الفيديو والصورة بشكل صحيح
+            let finalData = fullData;
+            
+            // إذا كانت البيانات لا تبدأ بالمقدمة المناسبة، أضفها
+            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
+                finalData = 'data:image/jpeg;base64,' + fullData;
+            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
+                finalData = 'data:video/mp4;base64,' + fullData;
+            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
+                finalData = 'data:audio/webm;base64,' + fullData;
+            }
+            
             const displayMsg = {
                 id: msg.id,
                 type: msg.type === 'location' ? 'text' : msg.type,
-                data: fullData,
-                fileName: msg.fileName,
+                data: finalData,
+                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
                 sender: 'friend',
                 time: new Date().toISOString()
             };
+            
             if (ChatSystem.currentChat) {
                 ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
                 ChatSystem.displayMessage(displayMsg);
