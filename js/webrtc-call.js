@@ -404,6 +404,7 @@ const CallSystem = {
         }
     },
     
+    // ========== دالة عرض المكالمة الواردة (المعدلة - أيقونة فقط بدون نص) ==========
     showIncomingCall(callerId, callData) {
         if (callData.type === 'datachannel') {
             console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
@@ -443,28 +444,64 @@ const CallSystem = {
         };
         
         Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
-            const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
+            const isVideo = callData.type === 'video';
+            const callIcon = isVideo ? '📹' : '📞';
             
             const existingOverlay = document.getElementById('incomingCall');
             if (existingOverlay) existingOverlay.remove();
             
+            // إضافة أنيميشن
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes ring {
+                    0% { transform: rotate(0deg); }
+                    25% { transform: rotate(15deg); }
+                    50% { transform: rotate(0deg); }
+                    75% { transform: rotate(-15deg); }
+                    100% { transform: rotate(0deg); }
+                }
+                .incoming-overlay {
+                    animation: fadeIn 0.3s ease;
+                }
+                .call-icon {
+                    animation: ring 1.5s ease-in-out infinite;
+                    display: inline-block;
+                }
+                .incoming-btn {
+                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                }
+                .incoming-btn:active {
+                    transform: scale(0.92);
+                }
+            `;
+            document.head.appendChild(style);
+            
             const overlay = document.createElement('div'); 
             overlay.id = 'incomingCall';
+            overlay.className = 'incoming-overlay';
             overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+            
             overlay.innerHTML = `
                 <div style="text-align:center;">
-                    <div style="font-size:5rem;margin-bottom:10px;">${contactAvatar}</div>
-                    <div style="font-size:1.8rem;font-weight:bold;">${contactName}</div>
-                    <div style="font-size:1.2rem;margin-top:8px;color:#4CAF50;">${callTypeText}</div>
+                    <div style="font-size:5.5rem;margin-bottom:15px;filter:drop-shadow(0 10px 25px rgba(0,0,0,0.4));background:linear-gradient(135deg,#fff,#ddd);border-radius:50%;width:120px;height:120px;display:flex;align-items:center;justify-content:center;margin:0 auto 15px auto;">
+                        ${contactAvatar}
+                    </div>
+                    <div style="font-size:1.8rem;font-weight:bold;margin-bottom:10px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
+                    <div style="font-size:3.5rem;" class="call-icon">${callIcon}</div>
                 </div>
-                <div style="display:flex;gap:40px;">
-                    <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:transform 0.2s;">
+                <div style="display:flex;gap:60px;">
+                    <button id="btnAccept" class="incoming-btn" style="width:85px;height:85px;border-radius:50%;background:linear-gradient(135deg,#4CAF50,#2E7D32);color:white;border:none;font-size:2.3rem;cursor:pointer;box-shadow:0 6px 25px rgba(0,0,0,0.3);">
                         <i class="fas fa-phone"></i>
                     </button>
-                    <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:transform 0.2s;">
+                    <button id="btnReject" class="incoming-btn" style="width:85px;height:85px;border-radius:50%;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;font-size:2.3rem;cursor:pointer;box-shadow:0 6px 25px rgba(0,0,0,0.3);">
                         <i class="fas fa-phone-slash"></i>
                     </button>
-                </div>`;
+                </div>
+            `;
             document.body.appendChild(overlay);
             
             document.getElementById('btnAccept').onclick = () => { 
@@ -688,7 +725,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== واجهة المستخدم (المعدلة بتصميم جديد وأيقونات ملونة) ====================
+    // ==================== واجهة المستخدم (المعدلة) ====================
     
     showCallUI(type) {
         document.body.classList.add('in-call');
