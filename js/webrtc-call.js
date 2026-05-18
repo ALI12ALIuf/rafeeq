@@ -2,7 +2,7 @@
 // جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
 
 const CallSystem = {
-    pc: null, dc: null, localStream: null, isInCall: false, callType: null,
+    pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
     callTimerInterval: null, keepAliveInterval: null,
@@ -24,6 +24,7 @@ const CallSystem = {
         
         this.isInCall = false;
         this.callType = null;
+        this.currentCallId = null;
         this.isAudioMuted = false;
         this.isVideoMuted = false;
         this.isSpeakerEnabled = false;
@@ -153,6 +154,7 @@ const CallSystem = {
         
         this.isInCall = true;
         this.callType = 'audio';
+        this.currentCallId = calleeId;
         
         try {
             if (window.auth?.currentUser) {
@@ -236,6 +238,7 @@ const CallSystem = {
         
         this.isInCall = true;
         this.callType = 'video';
+        this.currentCallId = calleeId;
         
         try {
             if (window.auth?.currentUser) {
@@ -329,6 +332,7 @@ const CallSystem = {
         
         this.isInCall = true;
         this.callType = callData.type || 'audio';
+        this.currentCallId = callerId;
         console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
         
         try {
@@ -408,51 +412,81 @@ const CallSystem = {
         }
         
         console.log('🔔 عرض شاشة المكالمة الواردة...');
-        const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
-        const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
+        this.currentCallId = callerId;
         
-        const existingOverlay = document.getElementById('incomingCall');
-        if (existingOverlay) existingOverlay.remove();
-        
-        const overlay = document.createElement('div'); 
-        overlay.id = 'incomingCall';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
-        overlay.innerHTML = `
-            <div style="text-align:center;">
-                <div style="font-size:5rem;margin-bottom:10px;">${contactAvatar}</div>
-                <div style="font-size:1.8rem;font-weight:bold;">${contactName}</div>
-                <div style="font-size:1.2rem;margin-top:8px;color:#4CAF50;">${callTypeText}</div>
-            </div>
-            <div style="display:flex;gap:40px;">
-                <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">
-                    <i class="fas fa-phone"></i>
-                </button>
-                <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">
-                    <i class="fas fa-phone-slash"></i>
-                </button>
-            </div>`;
-        document.body.appendChild(overlay);
-        
-        document.getElementById('btnAccept').onclick = () => { 
-            overlay.remove(); 
-            this.receiveCall(callerId, callData); 
-        };
-        
-        // ✅ زر الرفض - يغلق الشاشة ويرسل إشارة رفض
-        document.getElementById('btnReject').onclick = () => { 
-            overlay.remove();
-            this.sendSignal(callerId, { type: 'reject' });
-        };
-        
-        setTimeout(() => {
-            const stillThere = document.getElementById('incomingCall');
-            if (stillThere) {
-                stillThere.remove();
-                console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً (انتهت المهلة)');
-                this.sendSignal(callerId, { type: 'reject' });
+        // جلب اسم المستخدم من قاعدة البيانات
+        const fetchUserName = async () => {
+            try {
+                const userDoc = await window.db.collection('users').doc(callerId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    return userData.name || 'مستخدم';
+                }
+            } catch (e) {
+                console.error('خطأ في جلب اسم المستخدم:', e);
             }
-        }, 30000);
+            return 'مستخدم';
+        };
+        
+        const fetchUserAvatar = async () => {
+            try {
+                const userDoc = await window.db.collection('users').doc(callerId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    if (typeof window.getEmojiForUser === 'function') {
+                        return window.getEmojiForUser(userData);
+                    }
+                    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
+                    return emojiMap[userData.avatarType] || '👤';
+                }
+            } catch (e) {}
+            return '👤';
+        };
+        
+        Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
+            const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
+            
+            const existingOverlay = document.getElementById('incomingCall');
+            if (existingOverlay) existingOverlay.remove();
+            
+            const overlay = document.createElement('div'); 
+            overlay.id = 'incomingCall';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+            overlay.innerHTML = `
+                <div style="text-align:center;">
+                    <div style="font-size:5rem;margin-bottom:10px;">${contactAvatar}</div>
+                    <div style="font-size:1.8rem;font-weight:bold;">${contactName}</div>
+                    <div style="font-size:1.2rem;margin-top:8px;color:#4CAF50;">${callTypeText}</div>
+                </div>
+                <div style="display:flex;gap:40px;">
+                    <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                    <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>`;
+            document.body.appendChild(overlay);
+            
+            document.getElementById('btnAccept').onclick = () => { 
+                overlay.remove(); 
+                this.receiveCall(callerId, callData); 
+            };
+            
+            document.getElementById('btnReject').onclick = () => { 
+                overlay.remove();
+                this.sendSignal(callerId, { type: 'reject' });
+            };
+            
+            setTimeout(() => {
+                const stillThere = document.getElementById('incomingCall');
+                if (stillThere) {
+                    stillThere.remove();
+                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً (انتهت المهلة)');
+                    this.sendSignal(callerId, { type: 'reject' });
+                }
+            }, 30000);
+        });
     },
     
     // ==================== Data Channel وإدارة الاتصال ====================
@@ -516,7 +550,6 @@ const CallSystem = {
         };
     },
     
-    // ✅ دالة معالجة حالة المكالمة (بدون alert)
     handleCallStatus(msg) {
         if (msg.status === 'connected') {
             console.log('📞 الطرف الآخر متصل');
@@ -603,12 +636,22 @@ const CallSystem = {
         }
     },
     
-    // ✅ دالة معالجة الإشارات (مضافة معالجة الرفض)
     async handleSignaling(data) {
         try {
             // معالجة الرفض
             if (data.type === 'reject') {
                 console.log('📞 الطرف الآخر رفض المكالمة');
+                const inc = document.getElementById('incomingCall');
+                if (inc) inc.remove();
+                this.endCall();
+                return;
+            }
+            
+            // معالجة إنهاء المكالمة قبل الرد
+            if (data.type === 'call_ended') {
+                console.log('📞 المتصل أنهى المكالمة قبل الرد');
+                const inc = document.getElementById('incomingCall');
+                if (inc) inc.remove();
                 this.endCall();
                 return;
             }
@@ -966,6 +1009,12 @@ const CallSystem = {
     
     endCall() {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+        
+        // إرسال إشارة إنهاء المكالمة إلى الطرف الآخر
+        if (this.currentCallId && ChatSystem.currentChat) {
+            this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
+        }
+        this.currentCallId = null;
         
         this.sendCallStatus('disconnected');
         
