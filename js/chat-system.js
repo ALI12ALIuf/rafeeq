@@ -95,6 +95,7 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
+    // ========== الدالة المعدلة - إزالة "منذ X ساعة" و "في مكالمة" ==========
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
@@ -111,21 +112,14 @@ const ChatSystem = {
         
         let statusHtml = '';
         
+        // ✅ فقط نص "متصل" أو "غير متصل" بدون "منذ X ساعة"
         if (isOnline) {
             statusHtml = '🟢 متصل';
         } else {
-            const lastSeen = userData?.lastSeen?.toDate?.() || new Date();
-            const now = new Date();
-            const diffMinutes = Math.floor((now - lastSeen) / 1000 / 60);
-            if (diffMinutes < 1) statusHtml = '🔴 غير متصل (الآن)';
-            else if (diffMinutes < 60) statusHtml = `🔴 غير متصل منذ ${diffMinutes} دقيقة`;
-            else statusHtml = `🔴 غير متصل منذ ${Math.floor(diffMinutes / 60)} ساعة`;
+            statusHtml = '🔴 غير متصل';
         }
         
-        if (userData?.inCall && isOnline) {
-            const callTypeText = userData.callType === 'video' ? 'فيديو' : 'صوتية';
-            statusHtml += ` <span style="color: #2196F3;">📞 في مكالمة ${callTypeText}</span>`;
-        }
+        // ✅ تم إزالة نص "📞 في مكالمة" نهائياً
         
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
@@ -144,7 +138,6 @@ const ChatSystem = {
     
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
     
-    // ========== دالة عرض الرسالة المعدلة (لإصلاح الصور والفيديو) ==========
     displayMessage(msg) {
         const c = document.getElementById('messagesContainer'); 
         if (!c) return;
