@@ -148,7 +148,6 @@ const CallSystem = {
         }
         if (this.isInCall) {
             console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            alert('أنت في مكالمة حالياً. أنهي المكالمة الحالية أولاً.');
             return;
         }
         
@@ -174,7 +173,6 @@ const CallSystem = {
             const audioTracks = this.localStream.getAudioTracks();
             if (audioTracks.length === 0) {
                 this.endCall();
-                alert('لا يمكن الوصول إلى الميكروفون');
                 return;
             }
             console.log('✅ تم الحصول على الميكروفون');
@@ -221,11 +219,6 @@ const CallSystem = {
         } catch (e) { 
             console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
             this.endCall(); 
-            if (e.name === 'NotAllowedError') {
-                alert('يرجى السماح بالوصول إلى الميكروفون');
-            } else {
-                alert('حدث خطأ في بدء المكالمة');
-            }
         }
     },
     
@@ -238,7 +231,6 @@ const CallSystem = {
         }
         if (this.isInCall) {
             console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            alert('أنت في مكالمة حالياً. أنهي المكالمة الحالية أولاً.');
             return;
         }
         
@@ -261,7 +253,6 @@ const CallSystem = {
             
             if (this.localStream.getAudioTracks().length === 0) {
                 this.endCall();
-                alert('لا يمكن الوصول إلى الميكروفون');
                 return;
             }
             
@@ -286,7 +277,6 @@ const CallSystem = {
             
         } catch (e) { 
             this.endCall(); 
-            if (e.name === 'NotAllowedError') alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون');
         }
     },
     
@@ -333,6 +323,7 @@ const CallSystem = {
     async receiveCall(callerId, callData) {
         if (this.isInCall) {
             console.log('❌ مكالمة نشطة بالفعل');
+            this.sendSignal(callerId, { type: 'reject' });
             return;
         }
         
@@ -361,7 +352,6 @@ const CallSystem = {
             
             if (this.localStream.getAudioTracks().length === 0) {
                 this.endCall();
-                alert('لا يمكن الوصول إلى الميكروفون');
                 return;
             }
             
@@ -405,10 +395,8 @@ const CallSystem = {
             }
         } catch (e) { 
             console.error('❌ خطأ في استقبال المكالمة:', e);
+            this.sendSignal(callerId, { type: 'reject' });
             this.endCall(); 
-            if (e.name === 'NotAllowedError') {
-                alert('يرجى السماح بالوصول إلى الميكروفون');
-            }
         }
     },
     
@@ -450,8 +438,11 @@ const CallSystem = {
             overlay.remove(); 
             this.receiveCall(callerId, callData); 
         };
+        
+        // ✅ زر الرفض - يغلق الشاشة ويرسل إشارة رفض
         document.getElementById('btnReject').onclick = () => { 
-            overlay.remove(); 
+            overlay.remove();
+            this.sendSignal(callerId, { type: 'reject' });
         };
         
         setTimeout(() => {
@@ -459,6 +450,7 @@ const CallSystem = {
             if (stillThere) {
                 stillThere.remove();
                 console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً (انتهت المهلة)');
+                this.sendSignal(callerId, { type: 'reject' });
             }
         }, 30000);
     },
@@ -524,13 +516,13 @@ const CallSystem = {
         };
     },
     
+    // ✅ دالة معالجة حالة المكالمة (بدون alert)
     handleCallStatus(msg) {
         if (msg.status === 'connected') {
             console.log('📞 الطرف الآخر متصل');
         } else if (msg.status === 'disconnected') {
             console.log('📞 الطرف الآخر قطع الاتصال');
             if (this.isInCall) {
-                alert('الطرف الآخر أنهى المكالمة');
                 this.endCall();
             }
         }
@@ -611,8 +603,16 @@ const CallSystem = {
         }
     },
     
+    // ✅ دالة معالجة الإشارات (مضافة معالجة الرفض)
     async handleSignaling(data) {
         try {
+            // معالجة الرفض
+            if (data.type === 'reject') {
+                console.log('📞 الطرف الآخر رفض المكالمة');
+                this.endCall();
+                return;
+            }
+            
             if (!this.pc) {
                 this.pc = new RTCPeerConnection(this.servers);
                 this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
@@ -875,7 +875,6 @@ const CallSystem = {
         }
     },
     
-    // ========== دالة معالجة استلام الملفات (المعدلة) ==========
     handleChunkMessage(msg) {
         if (!this.incomingChunks[msg.id]) {
             this.incomingChunks[msg.id] = [];
@@ -897,10 +896,8 @@ const CallSystem = {
         if (this.incomingFileInfo[msg.id].received === msg.total) {
             const fullData = this.incomingChunks[msg.id].join('');
             
-            // ✅ معالجة الفيديو والصورة بشكل صحيح
             let finalData = fullData;
             
-            // إذا كانت البيانات لا تبدأ بالمقدمة المناسبة، أضفها
             if (msg.type === 'image' && !fullData.startsWith('data:image')) {
                 finalData = 'data:image/jpeg;base64,' + fullData;
             } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
