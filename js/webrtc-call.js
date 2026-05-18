@@ -688,7 +688,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== واجهة المستخدم (المعدلة بتصميم جديد) ====================
+    // ==================== واجهة المستخدم (المعدلة بتصميم جديد وأيقونات ملونة) ====================
     
     showCallUI(type) {
         document.body.classList.add('in-call');
@@ -697,6 +697,7 @@ const CallSystem = {
         
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
+        const appColor = '#2196F3';
         
         let uiHTML = '';
         if (type === 'video') {
@@ -734,16 +735,16 @@ const CallSystem = {
                 <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video>
                 <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
                 <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);" title="تبديل الكاميرا">
+                    <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
                         <i class="fas fa-sync-alt"></i>
                     </button>
-                    <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);" title="كتم الميكروفون">
+                    <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
                         <i class="fas fa-microphone"></i>
                     </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);" title="إنهاء المكالمة">
+                    <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
                         <i class="fas fa-phone-slash"></i>
                     </button>
-                    <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);" title="إيقاف الكاميرا">
+                    <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا">
                         <i class="fas fa-video"></i>
                     </button>
                 </div>`;
@@ -791,13 +792,13 @@ const CallSystem = {
                     </div>
                 </div>
                 <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);" title="تبديل السماعة">
+                    <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة">
                         <i class="fas fa-volume-up"></i>
                     </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);" title="إنهاء المكالمة">
+                    <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
                         <i class="fas fa-phone-slash"></i>
                     </button>
-                    <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);" title="كتم الميكروفون">
+                    <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
                         <i class="fas fa-microphone"></i>
                     </button>
                 </div>`;
@@ -822,10 +823,10 @@ const CallSystem = {
                 if (icon) {
                     if (this.isAudioMuted) {
                         icon.className = 'fas fa-microphone-slash';
-                        muteAudioBtn.style.background = '#f44336';
+                        muteAudioBtn.style.color = '#f44336';
                     } else {
                         icon.className = 'fas fa-microphone';
-                        muteAudioBtn.style.background = 'rgba(30,30,40,0.85)';
+                        muteAudioBtn.style.color = appColor;
                     }
                 }
             });
@@ -837,10 +838,10 @@ const CallSystem = {
                 if (icon) {
                     if (this.isVideoMuted) {
                         icon.className = 'fas fa-video-slash';
-                        muteVideoBtn.style.background = '#f44336';
+                        muteVideoBtn.style.color = '#f44336';
                     } else {
                         icon.className = 'fas fa-video';
-                        muteVideoBtn.style.background = 'rgba(30,30,40,0.85)';
+                        muteVideoBtn.style.color = appColor;
                     }
                 }
             });
@@ -852,10 +853,8 @@ const CallSystem = {
                 if (icon) {
                     if (this.isSpeakerEnabled) {
                         icon.className = 'fas fa-volume-up';
-                        speakerBtn.style.background = '#2196F3';
                     } else {
                         icon.className = 'fas fa-volume-mute';
-                        speakerBtn.style.background = 'rgba(30,30,40,0.85)';
                     }
                 }
             });
@@ -867,10 +866,10 @@ const CallSystem = {
                 if (icon) {
                     if (this.isAudioMuted) {
                         icon.className = 'fas fa-microphone-slash';
-                        muteBtn.style.background = '#f44336';
+                        muteBtn.style.color = '#f44336';
                     } else {
                         icon.className = 'fas fa-microphone';
-                        muteBtn.style.background = 'rgba(30,30,40,0.85)';
+                        muteBtn.style.color = appColor;
                     }
                 }
             });
