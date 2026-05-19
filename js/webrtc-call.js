@@ -407,7 +407,8 @@ const CallSystem = {
     // ========== شاشة المكالمة الواردة بأزرار السحب ==========
     
     
-    showIncomingCall(callerId, callData) {
+    
+     showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
         console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
         this.handleSignaling(callData);
@@ -478,13 +479,17 @@ const CallSystem = {
                     75% { transform: rotate(-6deg); }
                     100% { transform: rotate(0deg); }
                 }
-                @keyframes arrowPulseLeft {
-                    0%, 100% { transform: translateX(0px); opacity: 0.7; }
-                    50% { transform: translateX(8px); opacity: 1; }
+                @keyframes arrowBounceLeft {
+                    0%, 100% { transform: translateX(0px); }
+                    50% { transform: translateX(10px); }
                 }
-                @keyframes arrowPulseRight {
-                    0%, 100% { transform: translateX(0px); opacity: 0.7; }
-                    50% { transform: translateX(-8px); opacity: 1; }
+                @keyframes arrowBounceRight {
+                    0%, 100% { transform: translateX(0px); }
+                    50% { transform: translateX(-10px); }
+                }
+                @keyframes glowPulse {
+                    0% { box-shadow: 0 0 5px rgba(76,175,80,0.3); }
+                    100% { box-shadow: 0 0 20px rgba(76,175,80,0.6); }
                 }
                 .avatar-float {
                     animation: float 2.5s ease-in-out infinite;
@@ -494,30 +499,31 @@ const CallSystem = {
                     transform-origin: center;
                 }
                 .swipe-container {
-                    width: 360px;
+                    width: 380px;
                     margin: 30px auto;
                     position: relative;
                 }
                 .swipe-button {
                     width: 100%;
-                    height: 75px;
+                    height: 80px;
                     border-radius: 50px;
                     position: relative;
-                    overflow: hidden;
+                    overflow: visible;
                     cursor: grab;
                     user-select: none;
                     touch-action: none;
                     background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
-                    border: 1px solid rgba(255,255,255,0.15);
-                    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+                    border: 2px solid rgba(255,255,255,0.2);
+                    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+                    border-radius: 50px;
                 }
                 .swipe-button:active {
                     cursor: grabbing;
                 }
                 .divider-line {
                     position: absolute;
-                    top: 8px;
-                    bottom: 8px;
+                    top: 10px;
+                    bottom: 10px;
                     left: 50%;
                     width: 2px;
                     background: rgba(255,255,255,0.4);
@@ -526,83 +532,101 @@ const CallSystem = {
                     z-index: 5;
                     border-radius: 2px;
                 }
-                .arrow-left {
+                /* الأسهم الخارجية - أمام الزر */
+                .arrow-left-outer {
                     position: absolute;
-                    left: 20px;
+                    left: -45px;
                     top: 50%;
                     transform: translateY(-50%);
-                    font-size: 1.8rem;
-                    color: rgba(76,175,80,0.9);
-                    pointer-events: none;
-                    z-index: 5;
-                    animation: arrowPulseLeft 1.2s ease-in-out infinite;
-                    text-shadow: 0 0 10px rgba(76,175,80,0.5);
-                }
-                .arrow-right {
-                    position: absolute;
-                    right: 20px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 1.8rem;
-                    color: rgba(244,67,54,0.9);
-                    pointer-events: none;
-                    z-index: 5;
-                    animation: arrowPulseRight 1.2s ease-in-out infinite;
-                    text-shadow: 0 0 10px rgba(244,67,54,0.5);
-                }
-                .swipe-thumb {
-                    position: absolute;
-                    top: 6px;
-                    width: 63px;
-                    height: 63px;
+                    width: 40px;
+                    height: 40px;
+                    background: linear-gradient(135deg, #4CAF50, #2e7d32);
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 1.7rem;
-                    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+                    font-size: 1.8rem;
+                    color: white;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                    animation: arrowBounceLeft 1s ease-in-out infinite;
+                    z-index: 30;
+                    border: 2px solid rgba(255,255,255,0.3);
+                }
+                .arrow-right-outer {
+                    position: absolute;
+                    right: -45px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    width: 40px;
+                    height: 40px;
+                    background: linear-gradient(135deg, #f44336, #c62828);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.8rem;
+                    color: white;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                    animation: arrowBounceRight 1s ease-in-out infinite;
+                    z-index: 30;
+                    border: 2px solid rgba(255,255,255,0.3);
+                }
+                .arrow-left-outer i, .arrow-right-outer i {
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+                }
+                .swipe-thumb {
+                    position: absolute;
+                    top: 8px;
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.8rem;
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
                     transition: left 0.1s linear, right 0.1s linear;
                     cursor: grab;
                     z-index: 20;
-                    backdrop-filter: blur(4px);
+                    backdrop-filter: blur(5px);
+                    border: 2px solid rgba(255,255,255,0.4);
                 }
                 .swipe-thumb:active {
                     cursor: grabbing;
                     transform: scale(0.96);
                 }
                 .thumb-left {
-                    left: 6px;
+                    left: 8px;
                     background: linear-gradient(145deg, #4CAF50, #1b5e2a);
                     color: white;
-                    border: 2px solid rgba(255,255,255,0.3);
                 }
                 .thumb-right {
-                    right: 6px;
+                    right: 8px;
                     left: auto;
                     background: linear-gradient(145deg, #f44336, #8b0000);
                     color: white;
-                    border: 2px solid rgba(255,255,255,0.3);
                 }
                 .call-type-badge {
                     background: rgba(255,255,255,0.1);
                     border-radius: 30px;
-                    padding: 8px 22px;
-                    font-size: 0.9rem;
+                    padding: 8px 25px;
+                    font-size: 0.95rem;
                     margin-top: 15px;
                     backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255,255,255,0.1);
+                    border: 1px solid rgba(255,255,255,0.15);
                 }
-                .center-glow {
+                .center-dot {
                     position: absolute;
                     top: 50%;
                     left: 50%;
                     transform: translate(-50%, -50%);
-                    width: 40px;
-                    height: 40px;
+                    width: 12px;
+                    height: 12px;
+                    background: rgba(255,255,255,0.6);
                     border-radius: 50%;
-                    background: radial-gradient(circle, rgba(255,255,255,0.15), transparent);
                     pointer-events: none;
-                    z-index: 3;
+                    z-index: 25;
+                    box-shadow: 0 0 15px rgba(255,255,255,0.5);
                 }
             </style>
             
@@ -613,11 +637,18 @@ const CallSystem = {
             </div>
             
             <div class="swipe-container">
+                <!-- السهم الأيسر (أخضر) - خارج الزر -->
+                <div class="arrow-left-outer">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+                <!-- السهم الأيمن (أحمر) - خارج الزر -->
+                <div class="arrow-right-outer">
+                    <i class="fas fa-arrow-left"></i>
+                </div>
+                
                 <div id="swipeButton" class="swipe-button">
                     <div class="divider-line"></div>
-                    <div class="center-glow"></div>
-                    <div class="arrow-left"><i class="fas fa-arrow-right"></i></div>
-                    <div class="arrow-right"><i class="fas fa-arrow-left"></i></div>
+                    <div class="center-dot"></div>
                     <div id="leftThumb" class="swipe-thumb thumb-left">
                         <i class="fas fa-phone"></i>
                     </div>
@@ -638,12 +669,12 @@ const CallSystem = {
         let isDraggingRight = false;
         let leftStartX = 0;
         let rightStartX = 0;
-        let leftCurrentPos = 6;
-        let rightCurrentPos = 6;
+        let leftCurrentPos = 8;
+        let rightCurrentPos = 8;
         const buttonWidth = button.clientWidth;
         const centerPos = buttonWidth / 2;
-        const maxLeftMove = centerPos - 35;
-        const maxRightMove = centerPos - 35;
+        const maxLeftMove = centerPos - 40;
+        const maxRightMove = centerPos - 40;
         
         // ========== السحب من اليسار (قبول) ==========
         const onLeftStart = (e) => {
@@ -662,7 +693,7 @@ const CallSystem = {
             e.stopPropagation();
             const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
-            newLeft = Math.max(6, Math.min(newLeft, maxLeftMove));
+            newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
             leftCurrentPos = newLeft;
             leftThumb.style.left = newLeft + 'px';
         };
@@ -679,7 +710,7 @@ const CallSystem = {
                     this.receiveCall(callerId, callData);
                 }, 200);
             } else {
-                leftThumb.style.left = '6px';
+                leftThumb.style.left = '8px';
             }
         };
         
@@ -701,7 +732,7 @@ const CallSystem = {
             const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             const containerRect = button.getBoundingClientRect();
             let newRight = (containerRect.right - clientX) - rightStartX;
-            newRight = Math.max(6, Math.min(newRight, maxRightMove));
+            newRight = Math.max(8, Math.min(newRight, maxRightMove));
             rightCurrentPos = newRight;
             rightThumb.style.right = newRight + 'px';
         };
@@ -718,7 +749,7 @@ const CallSystem = {
                     this.sendSignal(callerId, { type: 'reject' });
                 }, 200);
             } else {
-                rightThumb.style.right = '6px';
+                rightThumb.style.right = '8px';
             }
         };
         
@@ -764,6 +795,7 @@ const CallSystem = {
         }, 30000);
     });
 },
+    
         
     
     // ==================== Data Channel وإدارة الاتصال ====================
