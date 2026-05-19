@@ -1133,72 +1133,83 @@ const CallSystem = {
         }, 1000);
     },
     
-    // ==================== 11. التحكم بالمكالمة ====================
-    
-    toggleMute() {
-        this.isAudioMuted = !this.isAudioMuted;
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) audioTrack.enabled = !this.isAudioMuted;
+// ==================== 11. التحكم بالمكالمة ====================
+
+toggleMute() {
+    this.isAudioMuted = !this.isAudioMuted;
+    if (this.localStream) {
+        const audioTrack = this.localStream.getAudioTracks()[0];
+        if (audioTrack) audioTrack.enabled = !this.isAudioMuted;
+    }
+    console.log(`🎤 كتم الصوت: ${this.isAudioMuted ? 'مفعل' : 'ملغي'}`);
+},
+
+toggleAudio() {
+    if (this.localStream) {
+        const audioTrack = this.localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            console.log(`🎤 كتم الصوت: ${!audioTrack.enabled ? 'مفعل' : 'ملغي'}`);
         }
-        console.log(`🎤 كتم الصوت: ${this.isAudioMuted ? 'مفعل' : 'ملغي'}`);
-    },
-    
-    toggleAudio() {
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                console.log(`🎤 كتم الصوت: ${!audioTrack.enabled ? 'مفعل' : 'ملغي'}`);
-            }
-        }
-        this.isAudioMuted = this.localStream?.getAudioTracks()[0]?.enabled === false;
-    },
-    
-    toggleVideo() {
-        if (this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                console.log(`📹 كتم الفيديو: ${!videoTrack.enabled ? 'مفعل' : 'ملغي'}`);
-            }
-        }
-        this.isVideoMuted = this.localStream?.getVideoTracks()[0]?.enabled === false;
-    },
-    
-    toggleSpeaker() {
-        this.isSpeakerEnabled = !this.isSpeakerEnabled;
-        this.applySpeakerSettings();
-        console.log(`🔊 وضع السماعة: ${this.isSpeakerEnabled ? 'خارجية' : 'داخلية'}`);
-    },
-    
-    async switchCamera() {
-        if (!this.localStream) return;
+    }
+    this.isAudioMuted = this.localStream?.getAudioTracks()[0]?.enabled === false;
+},
+
+// ✅ الدالة المعدلة (لإصلاح الخلفية السوداء)
+toggleVideo() {
+    if (this.localStream) {
         const videoTrack = this.localStream.getVideoTracks()[0];
-        if (!videoTrack) return;
-        
-        const currentFacing = videoTrack.getSettings().facingMode;
-        const newFacing = currentFacing === 'user' ? 'environment' : 'user';
-        videoTrack.stop();
-        
-        try {
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
-            });
-            const newVideoTrack = newStream.getVideoTracks()[0];
-            if (this.pc) {
-                const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) await sender.replaceTrack(newVideoTrack);
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            console.log(`📹 كتم الفيديو: ${!videoTrack.enabled ? 'مفعل' : 'ملغي'}`);
+            
+            // ✅ إصلاح الخلفية السوداء - تغيير لون عنصر الفيديو عند إيقاف الكاميرا
+            const remoteVideo = document.getElementById('remoteVideo');
+            if (remoteVideo) {
+                if (!videoTrack.enabled) {
+                    remoteVideo.style.backgroundColor = '#0a0e27';
+                } else {
+                    remoteVideo.style.backgroundColor = 'transparent';
+                }
             }
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
-            const lv = document.getElementById('localVideo');
-            if (lv) lv.srcObject = this.localStream;
-            console.log(`🔄 تبديل الكاميرا إلى ${newFacing === 'user' ? 'أمامية' : 'خلفية'}`);
-        } catch (e) {
-            console.error('❌ فشل تبديل الكاميرا:', e);
         }
-    },
+    }
+    this.isVideoMuted = this.localStream?.getVideoTracks()[0]?.enabled === false;
+},
+
+toggleSpeaker() {
+    this.isSpeakerEnabled = !this.isSpeakerEnabled;
+    this.applySpeakerSettings();
+    console.log(`🔊 وضع السماعة: ${this.isSpeakerEnabled ? 'خارجية' : 'داخلية'}`);
+},
+
+async switchCamera() {
+    if (!this.localStream) return;
+    const videoTrack = this.localStream.getVideoTracks()[0];
+    if (!videoTrack) return;
+    
+    const currentFacing = videoTrack.getSettings().facingMode;
+    const newFacing = currentFacing === 'user' ? 'environment' : 'user';
+    videoTrack.stop();
+    
+    try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
+        });
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        if (this.pc) {
+            const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
+            if (sender) await sender.replaceTrack(newVideoTrack);
+        }
+        const audioTrack = this.localStream.getAudioTracks()[0];
+        this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
+        const lv = document.getElementById('localVideo');
+        if (lv) lv.srcObject = this.localStream;
+        console.log(`🔄 تبديل الكاميرا إلى ${newFacing === 'user' ? 'أمامية' : 'خلفية'}`);
+    } catch (e) {
+        console.error('❌ فشل تبديل الكاميرا:', e);
+    }
+},
     
     // ==================== 12. إرسال الملفات ====================
     
