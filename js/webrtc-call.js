@@ -406,8 +406,6 @@ const CallSystem = {
     
     // ========== شاشة المكالمة الواردة بأزرار السحب ==========
     
-    
-
     showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
         console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
@@ -480,12 +478,12 @@ const CallSystem = {
                     100% { transform: rotate(0deg); }
                 }
                 @keyframes arrowMoveLeft {
-                    0%, 100% { transform: translateX(0px); opacity: 0.8; }
-                    50% { transform: translateX(12px); opacity: 1; }
+                    0%, 100% { transform: translateX(0px); opacity: 0.9; text-shadow: 0 0 5px rgba(76,175,80,0.5); }
+                    50% { transform: translateX(10px); opacity: 1; text-shadow: 0 0 15px rgba(76,175,80,0.8); }
                 }
                 @keyframes arrowMoveRight {
-                    0%, 100% { transform: translateX(0px); opacity: 0.8; }
-                    50% { transform: translateX(-12px); opacity: 1; }
+                    0%, 100% { transform: translateX(0px); opacity: 0.9; text-shadow: 0 0 5px rgba(244,67,54,0.5); }
+                    50% { transform: translateX(-10px); opacity: 1; text-shadow: 0 0 15px rgba(244,67,54,0.8); }
                 }
                 .avatar-float {
                     animation: float 2.5s ease-in-out infinite;
@@ -527,49 +525,30 @@ const CallSystem = {
                     z-index: 5;
                     border-radius: 2px;
                 }
-                /* الأسهم داخل الزر وفي المقدمة */
-                .arrow-left-inner {
+                /* الأسهم الشفافة بدون خلفية */
+                .arrow-left {
                     position: absolute;
-                    left: 20px;
+                    left: 15px;
                     top: 50%;
                     transform: translateY(-50%);
-                    width: 44px;
-                    height: 44px;
-                    background: linear-gradient(135deg, #4CAF50, #2e7d32);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.8rem;
-                    color: white;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                    animation: arrowMoveLeft 1s ease-in-out infinite;
+                    font-size: 2.2rem;
+                    color: #4CAF50;
+                    animation: arrowMoveLeft 1.2s ease-in-out infinite;
                     z-index: 25;
-                    border: 2px solid rgba(255,255,255,0.4);
                     pointer-events: none;
+                    filter: drop-shadow(0 0 5px rgba(76,175,80,0.5));
                 }
-                .arrow-right-inner {
+                .arrow-right {
                     position: absolute;
-                    right: 20px;
+                    right: 15px;
                     top: 50%;
                     transform: translateY(-50%);
-                    width: 44px;
-                    height: 44px;
-                    background: linear-gradient(135deg, #f44336, #c62828);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.8rem;
-                    color: white;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                    animation: arrowMoveRight 1s ease-in-out infinite;
+                    font-size: 2.2rem;
+                    color: #f44336;
+                    animation: arrowMoveRight 1.2s ease-in-out infinite;
                     z-index: 25;
-                    border: 2px solid rgba(255,255,255,0.4);
                     pointer-events: none;
-                }
-                .arrow-left-inner i, .arrow-right-inner i {
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+                    filter: drop-shadow(0 0 5px rgba(244,67,54,0.5));
                 }
                 .swipe-thumb {
                     position: absolute;
@@ -612,18 +591,18 @@ const CallSystem = {
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255,255,255,0.15);
                 }
-                .center-glow {
+                .center-dot {
                     position: absolute;
                     top: 50%;
                     left: 50%;
                     transform: translate(-50%, -50%);
-                    width: 16px;
-                    height: 16px;
+                    width: 12px;
+                    height: 12px;
                     background: rgba(255,255,255,0.5);
                     border-radius: 50%;
                     pointer-events: none;
                     z-index: 20;
-                    box-shadow: 0 0 15px rgba(255,255,255,0.6);
+                    box-shadow: 0 0 10px rgba(255,255,255,0.5);
                 }
             </style>
             
@@ -635,16 +614,16 @@ const CallSystem = {
             
             <div class="swipe-container">
                 <div id="swipeButton" class="swipe-button">
-                    <!-- الأسهم داخل الزر وفي المقدمة -->
-                    <div class="arrow-left-inner">
+                    <!-- الأسهم الشفافة بدون خلفية -->
+                    <div class="arrow-left">
                         <i class="fas fa-arrow-right"></i>
                     </div>
-                    <div class="arrow-right-inner">
+                    <div class="arrow-right">
                         <i class="fas fa-arrow-left"></i>
                     </div>
                     
                     <div class="divider-line"></div>
-                    <div class="center-glow"></div>
+                    <div class="center-dot"></div>
                     
                     <div id="leftThumb" class="swipe-thumb thumb-left">
                         <i class="fas fa-phone"></i>
@@ -791,9 +770,7 @@ const CallSystem = {
             }
         }, 30000);
     });
-}, 
-    
-        
+},
     
     // ==================== Data Channel وإدارة الاتصال ====================
     
