@@ -406,8 +406,7 @@ const CallSystem = {
     
     // ========== شاشة المكالمة الواردة بأزرار السحب ==========
 
-    
-     showIncomingCall(callerId, callData) {
+    showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
         console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
         this.handleSignaling(callData);
@@ -479,13 +478,9 @@ const CallSystem = {
                     75% { transform: rotate(-6deg); }
                     100% { transform: rotate(0deg); }
                 }
-                @keyframes arrowMoveLeft {
-                    0%, 100% { transform: translateX(0px); opacity: 0.9; text-shadow: 0 0 5px rgba(76,175,80,0.5); }
-                    50% { transform: translateX(10px); opacity: 1; text-shadow: 0 0 15px rgba(76,175,80,0.8); }
-                }
-                @keyframes arrowMoveRight {
-                    0%, 100% { transform: translateX(0px); opacity: 0.9; text-shadow: 0 0 5px rgba(244,67,54,0.5); }
-                    50% { transform: translateX(-10px); opacity: 1; text-shadow: 0 0 15px rgba(244,67,54,0.8); }
+                @keyframes thumbPulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
                 }
                 .avatar-float {
                     animation: float 2.5s ease-in-out infinite;
@@ -527,31 +522,6 @@ const CallSystem = {
                     z-index: 5;
                     border-radius: 2px;
                     box-shadow: 0 0 8px ${appColor};
-                }
-                /* الأسهم الشفافة بدون خلفية */
-                .arrow-left {
-                    position: absolute;
-                    left: 15px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 2.2rem;
-                    color: #4CAF50;
-                    animation: arrowMoveLeft 1.2s ease-in-out infinite;
-                    z-index: 25;
-                    pointer-events: none;
-                    filter: drop-shadow(0 0 5px rgba(76,175,80,0.5));
-                }
-                .arrow-right {
-                    position: absolute;
-                    right: 15px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 2.2rem;
-                    color: #f44336;
-                    animation: arrowMoveRight 1.2s ease-in-out infinite;
-                    z-index: 25;
-                    pointer-events: none;
-                    filter: drop-shadow(0 0 5px rgba(244,67,54,0.5));
                 }
                 .swipe-thumb {
                     position: absolute;
@@ -617,14 +587,6 @@ const CallSystem = {
             
             <div class="swipe-container">
                 <div id="swipeButton" class="swipe-button">
-                    <!-- الأسهم المتحركة -->
-                    <div class="arrow-left">
-                        <i class="fas fa-arrow-right"></i>
-                    </div>
-                    <div class="arrow-right">
-                        <i class="fas fa-arrow-left"></i>
-                    </div>
-                    
                     <div class="divider-line"></div>
                     <div class="center-dot"></div>
                     
@@ -773,8 +735,7 @@ const CallSystem = {
             }
         }, 30000);
     });
-},       
-
+},
     
     // ==================== Data Channel وإدارة الاتصال ====================
     
