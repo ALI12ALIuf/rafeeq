@@ -406,7 +406,8 @@ const CallSystem = {
     
     // ========== شاشة المكالمة الواردة (بتصميم مطور) ==========255,255,255,0.6);">
      
-    showIncomingCall(callerId, callData) {
+// ========== شاشة المكالمة الواردة (بتصميم السحب) ==========
+showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
         console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
         this.handleSignaling(callData);
@@ -415,8 +416,6 @@ const CallSystem = {
     
     console.log('🔔 عرض شاشة المكالمة الواردة...');
     this.currentCallId = callerId;
-    
-    const isVideo = callData.type === 'video';
     
     const fetchUserName = async () => {
         try {
@@ -447,15 +446,15 @@ const CallSystem = {
     };
     
     Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
-        const callTypeText = isVideo ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
-        const acceptIcon = isVideo ? '📹' : '📞';
+        const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
+        const appColor = '#2196F3';
         
         const existingOverlay = document.getElementById('incomingCall');
         if (existingOverlay) existingOverlay.remove();
         
         const overlay = document.createElement('div'); 
         overlay.id = 'incomingCall';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;';
         
         overlay.innerHTML = `
             <style>
@@ -471,6 +470,10 @@ const CallSystem = {
                     75% { transform: rotate(-5deg); }
                     100% { transform: rotate(0deg); }
                 }
+                @keyframes slideIn {
+                    0% { opacity: 0; transform: translateY(50px); }
+                    100% { opacity: 1; transform: translateY(0); }
+                }
                 .incoming-avatar {
                     animation: float 2s ease-in-out infinite;
                     font-size: 6rem;
@@ -480,129 +483,117 @@ const CallSystem = {
                     animation: ring 1s ease-in-out infinite;
                 }
                 .swipe-container {
-                    display: flex;
-                    gap: 30px;
-                    margin-top: 30px;
-                    justify-content: center;
-                    align-items: center;
-                }
-                .swipe-btn {
-                    position: relative;
-                    width: 200px;
-                    height: 65px;
-                    border-radius: 40px;
-                    overflow: hidden;
-                    cursor: pointer;
+                    width: 300px;
+                    height: 70px;
                     background: rgba(255,255,255,0.1);
-                    backdrop-filter: blur(5px);
+                    border-radius: 60px;
+                    position: relative;
+                    cursor: pointer;
+                    backdrop-filter: blur(10px);
                     border: 1px solid rgba(255,255,255,0.2);
-                    transition: all 0.3s ease;
-                }
-                .swipe-btn.disabled {
-                    opacity: 0.5;
-                    pointer-events: none;
+                    margin-top: 30px;
+                    animation: slideIn 0.5s ease-out;
                 }
                 .swipe-thumb {
+                    width: 60px;
+                    height: 60px;
+                    background: linear-gradient(135deg, ${appColor}, #1976D2);
+                    border-radius: 50%;
                     position: absolute;
                     top: 5px;
-                    width: 55px;
-                    height: 55px;
-                    border-radius: 50%;
+                    left: 5px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     font-size: 1.8rem;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                    transition: left 0.1s ease;
+                    color: white;
+                    transition: left 0.1s linear;
                     cursor: grab;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
                     z-index: 3;
                 }
                 .swipe-thumb:active {
                     cursor: grabbing;
                 }
-                .swipe-label {
-                    position: absolute;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 0.9rem;
-                    color: rgba(255,255,255,0.8);
-                    white-space: nowrap;
-                    pointer-events: none;
-                    z-index: 1;
-                }
-                .swipe-success {
+                .swipe-track-left {
                     position: absolute;
                     top: 0;
                     left: 0;
-                    right: 0;
-                    bottom: 0;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.2rem;
-                    font-weight: bold;
-                    color: white;
-                    z-index: 2;
-                    opacity: 0;
-                    transition: opacity 0.3s;
-                    pointer-events: none;
-                }
-                .accept-btn {
-                    background: linear-gradient(135deg, rgba(76,175,80,0.3), rgba(46,125,50,0.3));
-                    border: 1px solid rgba(76,175,80,0.5);
-                }
-                .accept-btn .swipe-thumb {
+                    height: 100%;
+                    width: 0%;
                     background: linear-gradient(135deg, #4CAF50, #2E7D32);
-                    left: 5px;
+                    border-radius: 60px;
+                    transition: width 0.1s linear;
+                    z-index: 1;
                 }
-                .accept-btn .swipe-label {
-                    left: 70px;
-                }
-                .reject-btn {
-                    background: linear-gradient(135deg, rgba(244,67,54,0.3), rgba(211,47,47,0.3));
-                    border: 1px solid rgba(244,67,54,0.5);
-                }
-                .reject-btn .swipe-thumb {
+                .swipe-track-right {
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    height: 100%;
+                    width: 0%;
                     background: linear-gradient(135deg, #f44336, #d32f2f);
-                    right: 5px;
+                    border-radius: 60px;
+                    transition: width 0.1s linear;
+                    z-index: 1;
                 }
-                .reject-btn .swipe-label {
-                    right: 70px;
-                }
-                .swipe-btn.completed {
+                .swipe-icon-left {
+                    position: absolute;
+                    left: 20px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 1.2rem;
+                    color: rgba(255,255,255,0.7);
+                    z-index: 2;
                     pointer-events: none;
                 }
-                .swipe-btn.completed .swipe-thumb {
-                    opacity: 0;
+                .swipe-icon-right {
+                    position: absolute;
+                    right: 20px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 1.2rem;
+                    color: rgba(255,255,255,0.7);
+                    z-index: 2;
+                    pointer-events: none;
                 }
-                .swipe-btn.completed .swipe-label {
-                    opacity: 0;
+                .swipe-label {
+                    position: absolute;
+                    left: 50%;
+                    top: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 0.8rem;
+                    color: rgba(255,255,255,0.6);
+                    z-index: 2;
+                    pointer-events: none;
+                    white-space: nowrap;
                 }
-                .swipe-btn.completed .swipe-success {
-                    opacity: 1;
+                .call-type-badge {
+                    margin-top: 12px;
+                    color: #4CAF50;
+                    font-size: 1rem;
+                    background: rgba(76,175,80,0.2);
+                    padding: 6px 18px;
+                    border-radius: 25px;
+                    display: inline-block;
                 }
             </style>
             <div style="text-align:center;">
                 <div class="incoming-avatar">${contactAvatar}</div>
                 <div style="font-size:1.8rem;font-weight:bold;margin-top:10px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
-                <div style="margin-top:12px;color:#4CAF50;font-size:1rem;background:rgba(76,175,80,0.2);padding:6px 18px;border-radius:25px;display:inline-block;">
+                <div class="call-type-badge">
                     <i class="fas fa-phone-alt" style="margin-left:5px;"></i> ${callTypeText}
                 </div>
             </div>
             
-            <div class="swipe-container">
-                <!-- زر القبول (سحب لليمين) -->
-                <div id="acceptSwipeBtn" class="swipe-btn accept-btn" style="direction:ltr;">
-                    <div id="acceptThumb" class="swipe-thumb">${acceptIcon}</div>
-                    <div class="swipe-label">اسحب لليمين للقبول →</div>
-                    <div class="swipe-success">✓ تم القبول</div>
-                </div>
-                
-                <!-- زر الرفض (سحب لليسار) -->
-                <div id="rejectSwipeBtn" class="swipe-btn reject-btn" style="direction:rtl;">
-                    <div id="rejectThumb" class="swipe-thumb">✕</div>
-                    <div class="swipe-label">← اسحب لليسار للرفض</div>
-                    <div class="swipe-success">✗ تم الرفض</div>
+            <div class="swipe-container" id="swipeContainer">
+                <div class="swipe-track-left" id="swipeTrackLeft"></div>
+                <div class="swipe-track-right" id="swipeTrackRight"></div>
+                <div class="swipe-icon-left">📞</div>
+                <div class="swipe-icon-right">📞</div>
+                <div class="swipe-label" id="swipeLabel">اسحب لليسار للقبول | لليمين للرفض</div>
+                <div class="swipe-thumb" id="swipeThumb">
+                    <i class="fas fa-arrows-alt-h"></i>
                 </div>
             </div>
             
@@ -614,132 +605,127 @@ const CallSystem = {
         
         document.body.appendChild(overlay);
         
-        // ========== تهيئة أزرار السحب ==========
-        let acceptCompleted = false;
-        let rejectCompleted = false;
+        // ========== منطق السحب ==========
+        const container = document.getElementById('swipeContainer');
+        const thumb = document.getElementById('swipeThumb');
+        const trackLeft = document.getElementById('swipeTrackLeft');
+        const trackRight = document.getElementById('swipeTrackRight');
+        const swipeLabel = document.getElementById('swipeLabel');
         
-        // زر القبول (سحب لليمين)
-        const acceptBtn = document.getElementById('acceptSwipeBtn');
-        const acceptThumb = document.getElementById('acceptThumb');
-        let acceptStartX = 0;
-        let acceptThumbStartLeft = 0;
-        let acceptDragging = false;
-        const acceptMaxMove = acceptBtn.offsetWidth - 60;
+        let isDragging = false;
+        let startX = 0;
+        let currentLeft = 5;
+        const containerWidth = 300;
+        const thumbWidth = 60;
+        const maxLeft = containerWidth - thumbWidth - 5;
+        let acceptTriggered = false;
+        let rejectTriggered = false;
         
-        const acceptOnStart = (e) => {
-            if (acceptCompleted) return;
-            acceptDragging = true;
+        const resetSwipe = () => {
+            currentLeft = 5;
+            thumb.style.left = '5px';
+            trackLeft.style.width = '0%';
+            trackRight.style.width = '0%';
+            swipeLabel.style.opacity = '1';
+            swipeLabel.textContent = 'اسحب لليسار للقبول | لليمين للرفض';
+            thumb.innerHTML = '<i class="fas fa-arrows-alt-h"></i>';
+            thumb.style.background = `linear-gradient(135deg, ${appColor}, #1976D2)`;
+            acceptTriggered = false;
+            rejectTriggered = false;
+        };
+        
+        const onStart = (e) => {
+            if (acceptTriggered || rejectTriggered) return;
+            isDragging = true;
             const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            acceptStartX = clientX - parseInt(acceptThumb.style.left || 5);
-            acceptThumb.style.transition = 'none';
+            startX = clientX - currentLeft;
+            thumb.style.transition = 'none';
             e.preventDefault();
         };
         
-        const acceptOnMove = (e) => {
-            if (!acceptDragging || acceptCompleted) return;
+        const onMove = (e) => {
+            if (!isDragging || acceptTriggered || rejectTriggered) return;
             e.preventDefault();
             const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            let newLeft = clientX - acceptStartX;
-            newLeft = Math.max(5, Math.min(newLeft, acceptMaxMove));
-            acceptThumb.style.left = newLeft + 'px';
-        };
-        
-        const acceptOnEnd = () => {
-            if (!acceptDragging || acceptCompleted) {
-                acceptDragging = false;
-                return;
-            }
-            acceptDragging = false;
-            acceptThumb.style.transition = 'left 0.3s ease';
-            const currentLeft = parseInt(acceptThumb.style.left || 5);
+            let newLeft = clientX - startX;
+            newLeft = Math.min(maxLeft, Math.max(5, newLeft));
+            currentLeft = newLeft;
+            thumb.style.left = currentLeft + 'px';
             
-            if (currentLeft >= acceptMaxMove - 20) {
-                // تم القبول بنجاح
-                acceptCompleted = true;
-                acceptThumb.style.left = acceptMaxMove + 'px';
-                acceptBtn.classList.add('completed');
-                
-                // تعطيل زر الرفض
-                const rejectBtnDiv = document.getElementById('rejectSwipeBtn');
-                if (rejectBtnDiv) rejectBtnDiv.classList.add('disabled');
-                
-                setTimeout(() => {
-                    overlay.remove();
-                    this.receiveCall(callerId, callData);
-                }, 300);
-            } else {
-                acceptThumb.style.left = '5px';
-            }
-        };
-        
-        acceptThumb.addEventListener('mousedown', acceptOnStart);
-        document.addEventListener('mousemove', acceptOnMove);
-        document.addEventListener('mouseup', acceptOnEnd);
-        acceptThumb.addEventListener('touchstart', acceptOnStart, { passive: false });
-        document.addEventListener('touchmove', acceptOnMove, { passive: false });
-        document.addEventListener('touchend', acceptOnEnd);
-        
-        // زر الرفض (سحب لليسار)
-        const rejectBtn = document.getElementById('rejectSwipeBtn');
-        const rejectThumb = document.getElementById('rejectThumb');
-        let rejectStartX = 0;
-        let rejectThumbStartRight = 0;
-        let rejectDragging = false;
-        const rejectMaxMove = rejectBtn.offsetWidth - 60;
-        
-        const rejectOnStart = (e) => {
-            if (rejectCompleted) return;
-            rejectDragging = true;
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            const currentRight = parseInt(rejectThumb.style.right || 5);
-            rejectStartX = clientX + currentRight;
-            rejectThumb.style.transition = 'none';
-            e.preventDefault();
-        };
-        
-        const rejectOnMove = (e) => {
-            if (!rejectDragging || rejectCompleted) return;
-            e.preventDefault();
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            let newRight = rejectStartX - clientX;
-            newRight = Math.max(5, Math.min(newRight, rejectMaxMove));
-            rejectThumb.style.right = newRight + 'px';
-        };
-        
-        const rejectOnEnd = () => {
-            if (!rejectDragging || rejectCompleted) {
-                rejectDragging = false;
-                return;
-            }
-            rejectDragging = false;
-            rejectThumb.style.transition = 'right 0.3s ease';
-            const currentRight = parseInt(rejectThumb.style.right || 5);
+            // تحديث المسارات حسب الاتجاه
+            const leftProgress = (currentLeft - 5) / (maxLeft - 5);
             
-            if (currentRight >= rejectMaxMove - 20) {
-                rejectCompleted = true;
-                rejectThumb.style.right = rejectMaxMove + 'px';
-                rejectBtn.classList.add('completed');
-                
-                // تعطيل زر القبول
-                const acceptBtnDiv = document.getElementById('acceptSwipeBtn');
-                if (acceptBtnDiv) acceptBtnDiv.classList.add('disabled');
-                
-                setTimeout(() => {
-                    overlay.remove();
-                    this.sendSignal(callerId, { type: 'reject' });
-                }, 300);
+            if (currentLeft < maxLeft / 2) {
+                // السحب لليسار (قبول)
+                const leftWidth = (currentLeft - 5) * 2;
+                trackLeft.style.width = Math.min(leftWidth, 100) + '%';
+                trackRight.style.width = '0%';
+                if (leftProgress > 0.6) {
+                    trackLeft.style.width = '100%';
+                    swipeLabel.textContent = '✓ إفلات للقبول';
+                    swipeLabel.style.color = '#4CAF50';
+                    thumb.innerHTML = '<i class="fas fa-check"></i>';
+                    thumb.style.background = 'linear-gradient(135deg, #4CAF50, #2E7D32)';
+                } else {
+                    trackLeft.style.width = leftProgress * 100 + '%';
+                    swipeLabel.textContent = 'اسحب لليسار للقبول';
+                    swipeLabel.style.color = 'rgba(255,255,255,0.6)';
+                    thumb.innerHTML = '<i class="fas fa-arrows-alt-h"></i>';
+                    thumb.style.background = `linear-gradient(135deg, ${appColor}, #1976D2)`;
+                }
             } else {
-                rejectThumb.style.right = '5px';
+                // السحب لليمين (رفض)
+                const rightProgress = (currentLeft - maxLeft / 2) / (maxLeft / 2);
+                const rightWidth = (maxLeft - currentLeft) * 2;
+                trackRight.style.width = Math.min(rightWidth, 100) + '%';
+                trackLeft.style.width = '0%';
+                if (rightProgress > 0.6) {
+                    trackRight.style.width = '100%';
+                    swipeLabel.textContent = '✗ إفلات للرفض';
+                    swipeLabel.style.color = '#f44336';
+                    thumb.innerHTML = '<i class="fas fa-times"></i>';
+                    thumb.style.background = 'linear-gradient(135deg, #f44336, #d32f2f)';
+                } else {
+                    trackRight.style.width = rightProgress * 100 + '%';
+                    swipeLabel.textContent = 'اسحب لليمين للرفض';
+                    swipeLabel.style.color = 'rgba(255,255,255,0.6)';
+                    thumb.innerHTML = '<i class="fas fa-arrows-alt-h"></i>';
+                    thumb.style.background = `linear-gradient(135deg, ${appColor}, #1976D2)`;
+                }
             }
         };
         
-        rejectThumb.addEventListener('mousedown', rejectOnStart);
-        document.addEventListener('mousemove', rejectOnMove);
-        document.addEventListener('mouseup', rejectOnEnd);
-        rejectThumb.addEventListener('touchstart', rejectOnStart, { passive: false });
-        document.addEventListener('touchmove', rejectOnMove, { passive: false });
-        document.addEventListener('touchend', rejectOnEnd);
+        const onEnd = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            thumb.style.transition = 'left 0.3s ease';
+            
+            const leftProgress = (currentLeft - 5) / (maxLeft - 5);
+            
+            if (leftProgress > 0.6 && !acceptTriggered && !rejectTriggered) {
+                // قبول المكالمة
+                acceptTriggered = true;
+                overlay.remove();
+                this.receiveCall(callerId, callData);
+            } else if ((1 - leftProgress) > 0.6 && !acceptTriggered && !rejectTriggered) {
+                // رفض المكالمة
+                rejectTriggered = true;
+                overlay.remove();
+                this.sendSignal(callerId, { type: 'reject' });
+            } else {
+                resetSwipe();
+            }
+        };
         
+        // إضافة مستمعي الأحداث
+        thumb.addEventListener('mousedown', onStart);
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onEnd);
+        thumb.addEventListener('touchstart', onStart, { passive: false });
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onEnd);
+        
+        // إخفاء الشاشة تلقائياً بعد 30 ثانية
         setTimeout(() => {
             const stillThere = document.getElementById('incomingCall');
             if (stillThere) {
@@ -750,8 +736,7 @@ const CallSystem = {
         }, 30000);
     });
 },
-    
-    
+
     // ==================== Data Channel وإدارة الاتصال ====================
     
     setupDataChannel(channel) {
