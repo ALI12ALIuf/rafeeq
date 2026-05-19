@@ -298,7 +298,7 @@ const CallSystem = {
         
         this.applySpeakerSettings();
         
-        this.remoteAudioElement.play().then(استقبال
+        this.remoteAudioElement.play().then(() => {
             console.log('✅ بدء تشغيل الصوت عن بعد');
         }).catch(e => {
             console.log('❌ فشل تشغيل الصوت:', e);
@@ -404,6 +404,7 @@ const CallSystem = {
         }
     },
     
+    // ========== شاشة المكالمة الواردة (بتصميم مطور) ==========
     showIncomingCall(callerId, callData) {
         if (callData.type === 'datachannel') {
             console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
@@ -450,21 +451,84 @@ const CallSystem = {
             
             const overlay = document.createElement('div'); 
             overlay.id = 'incomingCall';
-            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+            
             overlay.innerHTML = `
+                <style>
+                    @keyframes float {
+                        0% { transform: translateY(0px); }
+                        50% { transform: translateY(-10px); }
+                        100% { transform: translateY(0px); }
+                    }
+                    @keyframes ring {
+                        0% { transform: rotate(0deg); }
+                        25% { transform: rotate(5deg); }
+                        50% { transform: rotate(0deg); }
+                        75% { transform: rotate(-5deg); }
+                        100% { transform: rotate(0deg); }
+                    }
+                    .incoming-avatar {
+                        animation: float 2s ease-in-out infinite;
+                        font-size: 6rem;
+                        filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+                    }
+                    .incoming-ringer {
+                        animation: ring 1s ease-in-out infinite;
+                    }
+                    .incoming-accept-btn {
+                        width: 75px;
+                        height: 75px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #4CAF50, #2E7D32);
+                        border: none;
+                        font-size: 2rem;
+                        color: white;
+                        cursor: pointer;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    }
+                    .incoming-accept-btn:active {
+                        transform: scale(1.1);
+                        background: linear-gradient(135deg, #66BB6A, #388E3C);
+                    }
+                    .incoming-reject-btn {
+                        width: 75px;
+                        height: 75px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #f44336, #d32f2f);
+                        border: none;
+                        font-size: 2rem;
+                        color: white;
+                        cursor: pointer;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    }
+                    .incoming-reject-btn:active {
+                        transform: scale(1.1);
+                        background: linear-gradient(135deg, #ff6659, #e53935);
+                    }
+                </style>
                 <div style="text-align:center;">
-                    <div style="font-size:5rem;margin-bottom:10px;">${contactAvatar}</div>
-                    <div style="font-size:1.8rem;font-weight:bold;">${contactName}</div>
-                    <div style="font-size:1.2rem;margin-top:8px;color:#4CAF50;">${callTypeText}</div>
+                    <div class="incoming-avatar">${contactAvatar}</div>
+                    <div style="font-size:1.8rem;font-weight:bold;margin-top:10px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
+                    <div style="margin-top:12px;color:#4CAF50;font-size:1rem;background:rgba(76,175,80,0.2);padding:6px 18px;border-radius:25px;display:inline-block;">
+                        <i class="fas fa-phone-alt" style="margin-left:5px;"></i> ${callTypeText}
+                    </div>
                 </div>
-                <div style="display:flex;gap:40px;">
-                    <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:transform 0.2s;">
+                <div style="display:flex;gap:50px;margin-top:20px;">
+                    <button id="btnAccept" class="incoming-accept-btn" title="قبول المكالمة">
                         <i class="fas fa-phone"></i>
                     </button>
-                    <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:transform 0.2s;">
+                    <button id="btnReject" class="incoming-reject-btn" title="رفض المكالمة">
                         <i class="fas fa-phone-slash"></i>
                     </button>
+                </div>
+                <div style="position:absolute;bottom:30px;left:0;right:0;text-align:center;">
+                    <div class="incoming-ringer" style="font-size:0.8rem;color:rgba(255,255,255,0.6);">
+                        <i class="fas fa-volume-up"></i> جاري الاتصال...
+                    </div>
                 </div>`;
+            
             document.body.appendChild(overlay);
             
             document.getElementById('btnAccept').onclick = () => { 
@@ -688,7 +752,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== واجهة المستخدم (المعدلة بتصميم جديد وأيقونات ملونة) ====================
+    // ==================== واجهة المستخدم (بتصميم حديث) ====================
     
     showCallUI(type) {
         document.body.classList.add('in-call');
