@@ -1,4 +1,4 @@
-// ========== webrtc-call.js - النسخة النهائية المتكاملة ==========
+// ========== 1. webrtc-call.js - النسخة النهائية المتكاملة ==========
 // جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
 
 const CallSystem = {
@@ -17,7 +17,7 @@ const CallSystem = {
         ] 
     },
     
-    // ==================== التنظيف التلقائي ====================
+    // ==================== 2. التنظيف التلقائي ====================
     
     async autoCleanupOnLoad() {
         console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
@@ -79,7 +79,7 @@ const CallSystem = {
         console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
     },
     
-    // ==================== Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
+    // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
     
     async ensureDataChannelOnly(calleeId) {
         if (!calleeId) return false;
@@ -140,7 +140,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== المكالمة الصوتية ====================
+    // ==================== 4. المكالمة الصوتية ====================
     
     async startAudioCall(calleeId) {
         if (!window.auth?.currentUser) {
@@ -224,7 +224,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== المكالمة المرئية ====================
+    // ==================== 5. المكالمة المرئية ====================
     
     async startVideoCall(calleeId) {
         if (!window.auth?.currentUser) {
@@ -283,7 +283,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== إعداد الصوت عن بعد ====================
+    // ==================== 6. إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
         console.log('🔊 إعداد الصوت عن بعد...');
@@ -321,7 +321,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== استقبال المكالمات ====================
+    // ==================== 7. استقبال المكالمات ====================
     
     async receiveCall(callerId, callData) {
         if (this.isInCall) {
@@ -404,7 +404,7 @@ const CallSystem = {
         }
     },
     
-    // ========== شاشة المكالمة الواردة بأزرار السحب ==========
+    // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
 
     showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
@@ -724,7 +724,7 @@ const CallSystem = {
 },
 
     
-    // ==================== Data Channel وإدارة الاتصال ====================
+    // ==================== 9. Data Channel وإدارة الاتصال ====================
     
     setupDataChannel(channel) {
         if (!channel) return;
@@ -924,7 +924,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== واجهة المستخدم (أثناء المكالمة) ====================
+    // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
     
     showCallUI(type) {
         document.body.classList.add('in-call');
@@ -969,6 +969,8 @@ const CallSystem = {
                         box-shadow: 0 5px 20px rgba(0,0,0,0.3);
                     }
                 </style>
+                <!-- ✅ 10.1 طبقة خلفية لحل مشكلة الشاشة السوداء عند إيقاف الكاميرا -->
+                <div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:${bgColor};"></div>
                 <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
                 <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
                 <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
@@ -1131,7 +1133,7 @@ const CallSystem = {
         }, 1000);
     },
     
-    // ==================== التحكم بالمكالمة ====================
+    // ==================== 11. التحكم بالمكالمة ====================
     
     toggleMute() {
         this.isAudioMuted = !this.isAudioMuted;
@@ -1198,7 +1200,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== إرسال الملفات ====================
+    // ==================== 12. إرسال الملفات ====================
     
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') {
@@ -1335,7 +1337,7 @@ const CallSystem = {
         });
     },
     
-    // ==================== إنهاء المكالمة ====================
+    // ==================== 13. إنهاء المكالمة ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
@@ -1421,7 +1423,7 @@ const CallSystem = {
     }
 };
 
-// ==================== التنظيف التلقائي عند تحميل الصفحة ====================
+// ==================== 14. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
@@ -1432,7 +1434,7 @@ if (typeof document !== 'undefined') {
     });
 }
 
-// ==================== التنظيف قبل إغلاق الصفحة ====================
+// ==================== 15. التنظيف قبل إغلاق الصفحة ====================
 if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', () => {
         if (CallSystem.isInCall) {
@@ -1441,7 +1443,7 @@ if (typeof window !== 'undefined') {
     });
 }
 
-// ==================== الدوال العامة ====================
+// ==================== 16. الدوال العامة ====================
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
