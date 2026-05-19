@@ -407,7 +407,7 @@ const CallSystem = {
     // ========== شاشة المكالمة الواردة بأزرار السحب ==========
     
     
-        showIncomingCall(callerId, callData) {
+    showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
         console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
         this.handleSignaling(callData);
@@ -478,10 +478,13 @@ const CallSystem = {
                     75% { transform: rotate(-6deg); }
                     100% { transform: rotate(0deg); }
                 }
-                @keyframes pulseGlow {
-                    0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.3); }
-                    70% { box-shadow: 0 0 0 15px rgba(255,255,255,0); }
-                    100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+                @keyframes arrowPulseLeft {
+                    0%, 100% { transform: translateX(0px); opacity: 0.7; }
+                    50% { transform: translateX(8px); opacity: 1; }
+                }
+                @keyframes arrowPulseRight {
+                    0%, 100% { transform: translateX(0px); opacity: 0.7; }
+                    50% { transform: translateX(-8px); opacity: 1; }
                 }
                 .avatar-float {
                     animation: float 2.5s ease-in-out infinite;
@@ -491,79 +494,94 @@ const CallSystem = {
                     transform-origin: center;
                 }
                 .swipe-container {
-                    width: 340px;
-                    margin: 20px auto;
+                    width: 360px;
+                    margin: 30px auto;
                     position: relative;
                 }
                 .swipe-button {
                     width: 100%;
-                    height: 70px;
+                    height: 75px;
                     border-radius: 50px;
                     position: relative;
                     overflow: hidden;
                     cursor: grab;
                     user-select: none;
                     touch-action: none;
-                    background: linear-gradient(90deg, #2e7d32 0%, #2e7d32 50%, #c62828 50%, #c62828 100%);
-                    border: 1px solid rgba(255,255,255,0.2);
+                    background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
+                    border: 1px solid rgba(255,255,255,0.15);
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
                 }
                 .swipe-button:active {
                     cursor: grabbing;
                 }
-                .swipe-track {
+                .divider-line {
                     position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    pointer-events: none;
-                    z-index: 2;
-                }
-                .swipe-label-center {
-                    position: absolute;
-                    top: 50%;
+                    top: 8px;
+                    bottom: 8px;
                     left: 50%;
-                    transform: translate(-50%, -50%);
-                    font-size: 0.9rem;
-                    font-weight: 500;
-                    color: rgba(255,255,255,0.9);
+                    width: 2px;
+                    background: rgba(255,255,255,0.4);
+                    transform: translateX(-50%);
                     pointer-events: none;
-                    z-index: 3;
-                    white-space: nowrap;
-                    transition: all 0.2s ease;
-                    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                    z-index: 5;
+                    border-radius: 2px;
+                }
+                .arrow-left {
+                    position: absolute;
+                    left: 20px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 1.8rem;
+                    color: rgba(76,175,80,0.9);
+                    pointer-events: none;
+                    z-index: 5;
+                    animation: arrowPulseLeft 1.2s ease-in-out infinite;
+                    text-shadow: 0 0 10px rgba(76,175,80,0.5);
+                }
+                .arrow-right {
+                    position: absolute;
+                    right: 20px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 1.8rem;
+                    color: rgba(244,67,54,0.9);
+                    pointer-events: none;
+                    z-index: 5;
+                    animation: arrowPulseRight 1.2s ease-in-out infinite;
+                    text-shadow: 0 0 10px rgba(244,67,54,0.5);
                 }
                 .swipe-thumb {
                     position: absolute;
-                    top: 5px;
-                    width: 60px;
-                    height: 60px;
+                    top: 6px;
+                    width: 63px;
+                    height: 63px;
                     border-radius: 50%;
-                    background: white;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 1.6rem;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+                    font-size: 1.7rem;
+                    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
                     transition: left 0.1s linear, right 0.1s linear;
                     cursor: grab;
-                    z-index: 10;
+                    z-index: 20;
                     backdrop-filter: blur(4px);
                 }
                 .swipe-thumb:active {
                     cursor: grabbing;
-                    transform: scale(0.98);
+                    transform: scale(0.96);
                 }
                 .thumb-left {
-                    left: 5px;
-                    background: linear-gradient(135deg, #4CAF50, #2e7d32);
+                    left: 6px;
+                    background: linear-gradient(145deg, #4CAF50, #1b5e2a);
                     color: white;
+                    border: 2px solid rgba(255,255,255,0.3);
                 }
                 .thumb-right {
-                    right: 5px;
+                    right: 6px;
                     left: auto;
-                    background: linear-gradient(135deg, #f44336, #c62828);
+                    background: linear-gradient(145deg, #f44336, #8b0000);
                     color: white;
+                    border: 2px solid rgba(255,255,255,0.3);
                 }
                 .call-type-badge {
                     background: rgba(255,255,255,0.1);
@@ -572,17 +590,19 @@ const CallSystem = {
                     font-size: 0.9rem;
                     margin-top: 15px;
                     backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255,255,255,0.1);
                 }
-                .divider-line {
+                .center-glow {
                     position: absolute;
-                    top: 5px;
-                    bottom: 5px;
+                    top: 50%;
                     left: 50%;
-                    width: 2px;
-                    background: rgba(255,255,255,0.3);
-                    transform: translateX(-50%);
+                    transform: translate(-50%, -50%);
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background: radial-gradient(circle, rgba(255,255,255,0.15), transparent);
                     pointer-events: none;
-                    z-index: 5;
+                    z-index: 3;
                 }
             </style>
             
@@ -595,8 +615,9 @@ const CallSystem = {
             <div class="swipe-container">
                 <div id="swipeButton" class="swipe-button">
                     <div class="divider-line"></div>
-                    <div class="swipe-track"></div>
-                    <div class="swipe-label-center" id="swipeLabel">اسحب للرد أو الرفض</div>
+                    <div class="center-glow"></div>
+                    <div class="arrow-left"><i class="fas fa-arrow-right"></i></div>
+                    <div class="arrow-right"><i class="fas fa-arrow-left"></i></div>
                     <div id="leftThumb" class="swipe-thumb thumb-left">
                         <i class="fas fa-phone"></i>
                     </div>
@@ -612,17 +633,17 @@ const CallSystem = {
         const button = document.getElementById('swipeButton');
         const leftThumb = document.getElementById('leftThumb');
         const rightThumb = document.getElementById('rightThumb');
-        const swipeLabel = document.getElementById('swipeLabel');
         
         let isDraggingLeft = false;
         let isDraggingRight = false;
-        let startX = 0;
         let leftStartX = 0;
         let rightStartX = 0;
-        let leftCurrentPos = 5;
-        let rightCurrentPos = 5;
-        const maxMove = button.clientWidth - 70;
-        const centerThreshold = button.clientWidth / 2;
+        let leftCurrentPos = 6;
+        let rightCurrentPos = 6;
+        const buttonWidth = button.clientWidth;
+        const centerPos = buttonWidth / 2;
+        const maxLeftMove = centerPos - 35;
+        const maxRightMove = centerPos - 35;
         
         // ========== السحب من اليسار (قبول) ==========
         const onLeftStart = (e) => {
@@ -633,7 +654,6 @@ const CallSystem = {
             const rect = leftThumb.getBoundingClientRect();
             leftStartX = clientX - (rect.left - button.getBoundingClientRect().left);
             leftThumb.style.transition = 'none';
-            swipeLabel.style.opacity = '0.5';
         };
         
         const onLeftMove = (e) => {
@@ -642,39 +662,24 @@ const CallSystem = {
             e.stopPropagation();
             const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
-            newLeft = Math.max(5, Math.min(newLeft, centerThreshold - 15));
+            newLeft = Math.max(6, Math.min(newLeft, maxLeftMove));
             leftCurrentPos = newLeft;
             leftThumb.style.left = newLeft + 'px';
-            
-            const percent = (newLeft / centerThreshold) * 100;
-            if (percent > 60) {
-                swipeLabel.innerHTML = '✅ قبول المكالمة';
-                swipeLabel.style.color = '#4CAF50';
-            } else if (percent > 30) {
-                swipeLabel.innerHTML = 'اسحب للقبول';
-                swipeLabel.style.color = '#4CAF50';
-            } else {
-                swipeLabel.innerHTML = 'اسحب للرد أو الرفض';
-                swipeLabel.style.color = 'rgba(255,255,255,0.9)';
-            }
         };
         
         const onLeftEnd = () => {
             if (!isDraggingLeft) return;
             isDraggingLeft = false;
-            leftThumb.style.transition = 'left 0.3s ease';
+            leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
             
-            if (leftCurrentPos >= centerThreshold - 20) {
-                leftThumb.style.left = (centerThreshold - 15) + 'px';
-                swipeLabel.innerHTML = '✅ جاري الرد...';
+            if (leftCurrentPos >= maxLeftMove - 10) {
+                leftThumb.style.left = maxLeftMove + 'px';
                 setTimeout(() => {
                     overlay.remove();
                     this.receiveCall(callerId, callData);
                 }, 200);
             } else {
-                leftThumb.style.left = '5px';
-                swipeLabel.innerHTML = 'اسحب للرد أو الرفض';
-                swipeLabel.style.color = 'rgba(255,255,255,0.9)';
+                leftThumb.style.left = '6px';
             }
         };
         
@@ -687,7 +692,6 @@ const CallSystem = {
             const rect = rightThumb.getBoundingClientRect();
             rightStartX = (rect.right - clientX);
             rightThumb.style.transition = 'none';
-            swipeLabel.style.opacity = '0.5';
         };
         
         const onRightMove = (e) => {
@@ -697,39 +701,24 @@ const CallSystem = {
             const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             const containerRect = button.getBoundingClientRect();
             let newRight = (containerRect.right - clientX) - rightStartX;
-            newRight = Math.max(5, Math.min(newRight, (button.clientWidth - centerThreshold) - 15));
+            newRight = Math.max(6, Math.min(newRight, maxRightMove));
             rightCurrentPos = newRight;
             rightThumb.style.right = newRight + 'px';
-            
-            const percent = (newRight / (button.clientWidth - centerThreshold)) * 100;
-            if (percent > 60) {
-                swipeLabel.innerHTML = '❌ رفض المكالمة';
-                swipeLabel.style.color = '#f44336';
-            } else if (percent > 30) {
-                swipeLabel.innerHTML = 'اسحب للرفض';
-                swipeLabel.style.color = '#f44336';
-            } else {
-                swipeLabel.innerHTML = 'اسحب للرد أو الرفض';
-                swipeLabel.style.color = 'rgba(255,255,255,0.9)';
-            }
         };
         
         const onRightEnd = () => {
             if (!isDraggingRight) return;
             isDraggingRight = false;
-            rightThumb.style.transition = 'right 0.3s ease';
+            rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
             
-            if (rightCurrentPos >= (button.clientWidth - centerThreshold) - 20) {
-                rightThumb.style.right = (button.clientWidth - centerThreshold - 15) + 'px';
-                swipeLabel.innerHTML = '❌ جاري الرفض...';
+            if (rightCurrentPos >= maxRightMove - 10) {
+                rightThumb.style.right = maxRightMove + 'px';
                 setTimeout(() => {
                     overlay.remove();
                     this.sendSignal(callerId, { type: 'reject' });
                 }, 200);
             } else {
-                rightThumb.style.right = '5px';
-                swipeLabel.innerHTML = 'اسحب للرد أو الرفض';
-                swipeLabel.style.color = 'rgba(255,255,255,0.9)';
+                rightThumb.style.right = '6px';
             }
         };
         
