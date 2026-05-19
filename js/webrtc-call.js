@@ -406,6 +406,7 @@ const CallSystem = {
     
     // ========== شاشة المكالمة الواردة بأزرار السحب ==========
 
+
     showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
         console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
@@ -417,9 +418,7 @@ const CallSystem = {
     this.currentCallId = callerId;
     
     const callType = callData.type === 'video' ? 'video' : 'audio';
-    const callTypeText = callType === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
     const appColor = '#2196F3';
-    // ✅ تحديد الأيقونة حسب نوع المكالمة
     const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
     
     const fetchUserName = async () => {
@@ -553,15 +552,6 @@ const CallSystem = {
                     background: linear-gradient(145deg, #f44336, #8b0000);
                     color: white;
                 }
-                .call-type-badge {
-                    background: rgba(255,255,255,0.1);
-                    border-radius: 30px;
-                    padding: 8px 25px;
-                    font-size: 0.95rem;
-                    margin-top: 15px;
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255,255,255,0.15);
-                }
                 .center-dot {
                     position: absolute;
                     top: 50%;
@@ -580,7 +570,6 @@ const CallSystem = {
             <div style="text-align: center; margin-bottom: 50px;">
                 <div class="avatar-float ring-animation" style="font-size: 5.5rem; margin-bottom: 15px; filter: drop-shadow(0 10px 25px rgba(0,0,0,0.4));">${contactAvatar}</div>
                 <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 8px; letter-spacing: -0.5px;">${contactName}</div>
-                <div class="call-type-badge">${callTypeText}</div>
             </div>
             
             <div class="swipe-container">
