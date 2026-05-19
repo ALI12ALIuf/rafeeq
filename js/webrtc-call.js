@@ -404,153 +404,301 @@ const CallSystem = {
         }
     },
     
-    // ========== شاشة المكالمة الواردة (بتصميم مطور) ==========
-    showIncomingCall(callerId, callData) {
-        if (callData.type === 'datachannel') {
-            console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
-            this.handleSignaling(callData);
-            return;
-        }
-        
-        console.log('🔔 عرض شاشة المكالمة الواردة...');
-        this.currentCallId = callerId;
-        
-        const fetchUserName = async () => {
-            try {
-                const userDoc = await window.db.collection('users').doc(callerId).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    return userData.name || 'مستخدم';
-                }
-            } catch (e) {
-                console.error('خطأ في جلب اسم المستخدم:', e);
+    // ========== شاشة المكالمة الواردة (بتصميم مطور) ==========255,255,255,0.6);">
+     showIncomingCall(callerId, callData) {
+    if (callData.type === 'datachannel') {
+        console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
+        this.handleSignaling(callData);
+        return;
+    }
+    
+    console.log('🔔 عرض شاشة المكالمة الواردة...');
+    this.currentCallId = callerId;
+    
+    const fetchUserName = async () => {
+        try {
+            const userDoc = await window.db.collection('users').doc(callerId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                return userData.name || 'مستخدم';
             }
-            return 'مستخدم';
-        };
-        
-        const fetchUserAvatar = async () => {
-            try {
-                const userDoc = await window.db.collection('users').doc(callerId).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    if (typeof window.getEmojiForUser === 'function') {
-                        return window.getEmojiForUser(userData);
-                    }
-                    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
-                    return emojiMap[userData.avatarType] || '👤';
+        } catch (e) {
+            console.error('خطأ في جلب اسم المستخدم:', e);
+        }
+        return 'مستخدم';
+    };
+    
+    const fetchUserAvatar = async () => {
+        try {
+            const userDoc = await window.db.collection('users').doc(callerId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                if (typeof window.getEmojiForUser === 'function') {
+                    return window.getEmojiForUser(userData);
                 }
-            } catch (e) {}
-            return '👤';
+                const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
+                return emojiMap[userData.avatarType] || '👤';
+            }
+        } catch (e) {}
+        return '👤';
+    };
+    
+    Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
+        const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
+        const callIcon = callData.type === 'video' ? 'fas fa-video' : 'fas fa-phone-alt';
+        
+        const existingOverlay = document.getElementById('incomingCall');
+        if (existingOverlay) existingOverlay.remove();
+        
+        const overlay = document.createElement('div'); 
+        overlay.id = 'incomingCall';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+        
+        overlay.innerHTML = `
+            <style>
+                @keyframes float {
+                    0% { transform: translateY(0px); }
+                    50% { transform: translateY(-10px); }
+                    100% { transform: translateY(0px); }
+                }
+                @keyframes ring {
+                    0% { transform: rotate(0deg); }
+                    25% { transform: rotate(5deg); }
+                    50% { transform: rotate(0deg); }
+                    75% { transform: rotate(-5deg); }
+                    100% { transform: rotate(0deg); }
+                }
+                .incoming-avatar {
+                    animation: float 2s ease-in-out infinite;
+                    font-size: 6rem;
+                    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+                }
+                .incoming-ringer {
+                    animation: ring 1s ease-in-out infinite;
+                }
+                .slider-container {
+                    position: relative;
+                    width: 280px;
+                    height: 60px;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 35px;
+                    backdrop-filter: blur(10px);
+                    margin-top: 20px;
+                    overflow: hidden;
+                    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                }
+                .slider-track {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    width: 0%;
+                    background: linear-gradient(90deg, #4CAF50, #2E7D32);
+                    border-radius: 35px;
+                    transition: width 0.1s ease;
+                    z-index: 1;
+                }
+                .slider-track.reject {
+                    background: linear-gradient(90deg, #f44336, #d32f2f);
+                }
+                .slider-thumb {
+                    position: absolute;
+                    top: 3px;
+                    left: 3px;
+                    width: 54px;
+                    height: 54px;
+                    background: white;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.6rem;
+                    cursor: grab;
+                    transition: left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                    z-index: 3;
+                    color: #333;
+                }
+                .slider-thumb:active {
+                    cursor: grabbing;
+                }
+                .slider-label {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 0.85rem;
+                    color: rgba(255,255,255,0.7);
+                    white-space: nowrap;
+                    pointer-events: none;
+                    z-index: 2;
+                    font-weight: bold;
+                }
+                .slider-icons {
+                    position: absolute;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 1.2rem;
+                    z-index: 2;
+                    pointer-events: none;
+                }
+                .slider-icons.left {
+                    left: 15px;
+                    color: #f44336;
+                }
+                .slider-icons.right {
+                    right: 15px;
+                    color: #4CAF50;
+                }
+            </style>
+            <div style="text-align:center;">
+                <div class="incoming-avatar">${contactAvatar}</div>
+                <div style="font-size:1.8rem;font-weight:bold;margin-top:10px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
+                <div style="margin-top:12px;color:#4CAF50;font-size:1rem;background:rgba(76,175,80,0.2);padding:6px 18px;border-radius:25px;display:inline-block;">
+                    <i class="${callIcon}" style="margin-left:5px;"></i> ${callTypeText}
+                </div>
+            </div>
+            
+            <div class="slider-container" id="callSlider">
+                <div class="slider-track" id="sliderTrack"></div>
+                <div class="slider-icons left"><i class="fas fa-phone-slash"></i></div>
+                <div class="slider-icons right"><i class="fas fa-phone"></i></div>
+                <div class="slider-thumb" id="sliderThumb">
+                    <i class="fas fa-arrows-alt-h"></i>
+                </div>
+                <div class="slider-label" id="sliderLabel">اسحب للرد</div>
+            </div>
+            
+            <div style="position:absolute;bottom:30px;left:0;right:0;text-align:center;">
+                <div class="incoming-ringer" style="font-size:0.8rem;color:rgba(255,255,255,0.6);">
+                    <i class="fas fa-volume-up"></i> جاري الاتصال...
+                </div>
+            </div>`;
+        
+        document.body.appendChild(overlay);
+        
+        // ========== منطق السحب ==========
+        const slider = document.getElementById('callSlider');
+        const thumb = document.getElementById('sliderThumb');
+        const track = document.getElementById('sliderTrack');
+        const label = document.getElementById('sliderLabel');
+        
+        let isDragging = false;
+        let startX = 0;
+        let thumbLeft = 0;
+        let currentAction = null; // 'accept' or 'reject'
+        
+        const sliderWidth = 280;
+        const thumbWidth = 54;
+        const maxLeft = sliderWidth - thumbWidth - 6;
+        
+        const onStart = (e) => {
+            if (currentAction) return;
+            isDragging = true;
+            thumb.style.transition = 'none';
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const rect = thumb.getBoundingClientRect();
+            startX = clientX - rect.left;
+            thumbLeft = parseFloat(thumb.style.left) || 0;
         };
         
-        Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
-            const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
+        const onMove = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const newLeft = Math.max(0, Math.min(clientX - startX, maxLeft));
+            thumbLeft = newLeft;
+            thumb.style.left = newLeft + 'px';
             
-            const existingOverlay = document.getElementById('incomingCall');
-            if (existingOverlay) existingOverlay.remove();
+            // تحديث لون المسار حسب الاتجاه
+            if (newLeft > maxLeft * 0.7) {
+                track.style.background = 'linear-gradient(90deg, #4CAF50, #2E7D32)';
+                track.classList.remove('reject');
+                label.textContent = '✋ ارفع للإجابة';
+                label.style.color = '#4CAF50';
+                currentAction = 'accept';
+            } else if (newLeft < maxLeft * 0.3) {
+                track.style.background = 'linear-gradient(90deg, #f44336, #d32f2f)';
+                track.classList.add('reject');
+                label.textContent = '✋ ارفع للرفض';
+                label.style.color = '#f44336';
+                currentAction = 'reject';
+            } else {
+                track.style.background = 'linear-gradient(90deg, #4CAF50, #2E7D32)';
+                track.classList.remove('reject');
+                label.textContent = 'اسحب للرد';
+                label.style.color = 'rgba(255,255,255,0.7)';
+                currentAction = null;
+            }
+            track.style.width = (newLeft + 25) + 'px';
+        };
+        
+        const onEnd = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            thumb.style.transition = 'left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             
-            const overlay = document.createElement('div'); 
-            overlay.id = 'incomingCall';
-            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
-            
-            overlay.innerHTML = `
-                <style>
-                    @keyframes float {
-                        0% { transform: translateY(0px); }
-                        50% { transform: translateY(-10px); }
-                        100% { transform: translateY(0px); }
-                    }
-                    @keyframes ring {
-                        0% { transform: rotate(0deg); }
-                        25% { transform: rotate(5deg); }
-                        50% { transform: rotate(0deg); }
-                        75% { transform: rotate(-5deg); }
-                        100% { transform: rotate(0deg); }
-                    }
-                    .incoming-avatar {
-                        animation: float 2s ease-in-out infinite;
-                        font-size: 6rem;
-                        filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
-                    }
-                    .incoming-ringer {
-                        animation: ring 1s ease-in-out infinite;
-                    }
-                    .incoming-accept-btn {
-                        width: 75px;
-                        height: 75px;
-                        border-radius: 50%;
-                        background: linear-gradient(135deg, #4CAF50, #2E7D32);
-                        border: none;
-                        font-size: 2rem;
-                        color: white;
-                        cursor: pointer;
-                        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                    }
-                    .incoming-accept-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #66BB6A, #388E3C);
-                    }
-                    .incoming-reject-btn {
-                        width: 75px;
-                        height: 75px;
-                        border-radius: 50%;
-                        background: linear-gradient(135deg, #f44336, #d32f2f);
-                        border: none;
-                        font-size: 2rem;
-                        color: white;
-                        cursor: pointer;
-                        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                    }
-                    .incoming-reject-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935);
-                    }
-                </style>
-                <div style="text-align:center;">
-                    <div class="incoming-avatar">${contactAvatar}</div>
-                    <div style="font-size:1.8rem;font-weight:bold;margin-top:10px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
-                    <div style="margin-top:12px;color:#4CAF50;font-size:1rem;background:rgba(76,175,80,0.2);padding:6px 18px;border-radius:25px;display:inline-block;">
-                        <i class="fas fa-phone-alt" style="margin-left:5px;"></i> ${callTypeText}
-                    </div>
-                </div>
-                <div style="display:flex;gap:50px;margin-top:20px;">
-                    <button id="btnAccept" class="incoming-accept-btn" title="قبول المكالمة">
-                        <i class="fas fa-phone"></i>
-                    </button>
-                    <button id="btnReject" class="incoming-reject-btn" title="رفض المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                </div>
-                <div style="position:absolute;bottom:30px;left:0;right:0;text-align:center;">
-                    <div class="incoming-ringer" style="font-size:0.8rem;color:rgba(255,255,255,0.6);">
-                        <i class="fas fa-volume-up"></i> جاري الاتصال...
-                    </div>
-                </div>`;
-            
-            document.body.appendChild(overlay);
-            
-            document.getElementById('btnAccept').onclick = () => { 
-                overlay.remove(); 
-                this.receiveCall(callerId, callData); 
-            };
-            
-            document.getElementById('btnReject').onclick = () => { 
-                overlay.remove();
-                this.sendSignal(callerId, { type: 'reject' });
-            };
-            
-            setTimeout(() => {
-                const stillThere = document.getElementById('incomingCall');
-                if (stillThere) {
-                    stillThere.remove();
-                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً (انتهت المهلة)');
+            if (currentAction === 'accept' && thumbLeft > maxLeft * 0.7) {
+                // قبول المكالمة
+                thumb.style.left = maxLeft + 'px';
+                track.style.width = '100%';
+                label.textContent = '✓ جاري الاتصال...';
+                setTimeout(() => {
+                    overlay.remove();
+                    this.receiveCall(callerId, callData);
+                }, 300);
+            } else if (currentAction === 'reject' && thumbLeft < maxLeft * 0.3) {
+                // رفض المكالمة
+                thumb.style.left = '0px';
+                track.style.width = '0%';
+                label.textContent = '✗ تم الرفض';
+                setTimeout(() => {
+                    overlay.remove();
                     this.sendSignal(callerId, { type: 'reject' });
-                }
-            }, 30000);
-        });
-    },
+                }, 300);
+            } else {
+                // الرجوع للمنتصف
+                thumb.style.left = '3px';
+                track.style.width = '0%';
+                label.textContent = 'اسحب للرد';
+                label.style.color = 'rgba(255,255,255,0.7)';
+                track.style.background = 'linear-gradient(90deg, #4CAF50, #2E7D32)';
+                track.classList.remove('reject');
+                currentAction = null;
+            }
+        };
+        
+        thumb.addEventListener('mousedown', onStart);
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onEnd);
+        thumb.addEventListener('touchstart', onStart, { passive: false });
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onEnd);
+        
+        // تنظيف الأحداث عند إزالة الشاشة
+        const cleanupSlider = () => {
+            thumb.removeEventListener('mousedown', onStart);
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onEnd);
+            thumb.removeEventListener('touchstart', onStart);
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+        };
+        
+        // حفظ دالة التنظيف لإزالتها لاحقاً
+        overlay._cleanupSlider = cleanupSlider;
+        
+        setTimeout(() => {
+            const stillThere = document.getElementById('incomingCall');
+            if (stillThere) {
+                if (stillThere._cleanupSlider) stillThere._cleanupSlider();
+                stillThere.remove();
+                console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً (انتهت المهلة)');
+                this.sendSignal(callerId, { type: 'reject' });
+            }
+        }, 30000);
+    });
+},           
     
     // ==================== Data Channel وإدارة الاتصال ====================
     
