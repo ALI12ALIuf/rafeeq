@@ -406,7 +406,6 @@ const CallSystem = {
     
     // ========== شاشة المكالمة الواردة بأزرار السحب ==========
 
-
     showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
         console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
@@ -456,7 +455,7 @@ const CallSystem = {
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.92);
+            background: linear-gradient(145deg, #0f172a, #0a0e27);
             z-index: 9999;
             display: flex;
             flex-direction: column;
@@ -934,6 +933,8 @@ const CallSystem = {
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
         const appColor = '#2196F3';
+        const backgroundColor = '#0f172a';
+        const gradientColor = 'linear-gradient(145deg, #0f172a, #0a0e27)';
         
         let uiHTML = '';
         if (type === 'video') {
@@ -968,7 +969,7 @@ const CallSystem = {
                         box-shadow: 0 5px 20px rgba(0,0,0,0.3);
                     }
                 </style>
-                <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;"></video>
+                <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${backgroundColor};"></video>
                 <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
                 <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
                     <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
@@ -1019,7 +1020,7 @@ const CallSystem = {
                         100% { transform: translateY(0px); }
                     }
                 </style>
-                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
+                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:${gradientColor};z-index:9997;"></div>
                 <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
                     <div class="avatar-animation" style="font-size:6rem;margin-bottom:15px;filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">${contactAvatar}</div>
                     <div style="font-size:1.8rem;color:white;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
