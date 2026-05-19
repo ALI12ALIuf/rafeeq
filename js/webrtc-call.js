@@ -1133,7 +1133,8 @@ const CallSystem = {
         }, 1000);
     },
     
-// ==================== 11. التحكم بالمكالمة ====================
+
+// ==================== 11. التحكم بالمكالمة (بدون تعديلات الخلفية) ====================
 
 toggleMute() {
     this.isAudioMuted = !this.isAudioMuted;
@@ -1155,34 +1156,12 @@ toggleAudio() {
     this.isAudioMuted = this.localStream?.getAudioTracks()[0]?.enabled === false;
 },
 
-// ✅ الدالة المعدلة (لإصلاح الخلفية السوداء عند إيقاف الكاميرا)
 toggleVideo() {
     if (this.localStream) {
         const videoTrack = this.localStream.getVideoTracks()[0];
         if (videoTrack) {
             videoTrack.enabled = !videoTrack.enabled;
             console.log(`📹 كتم الفيديو: ${!videoTrack.enabled ? 'مفعل' : 'ملغي'}`);
-            
-            // ✅ تغيير لون عنصر الفيديو عند إيقاف الكاميرا
-            const remoteVideo = document.getElementById('remoteVideo');
-            const localVideo = document.getElementById('localVideo');
-            
-            if (remoteVideo) {
-                if (!videoTrack.enabled) {
-                    remoteVideo.style.backgroundColor = '#0a0e27';
-                } else {
-                    remoteVideo.style.backgroundColor = 'transparent';
-                }
-            }
-            
-            // ✅ للفيديو المحلي أيضاً
-            if (localVideo) {
-                if (!videoTrack.enabled) {
-                    localVideo.style.backgroundColor = '#0a0e27';
-                } else {
-                    localVideo.style.backgroundColor = 'transparent';
-                }
-            }
         }
     }
     this.isVideoMuted = this.localStream?.getVideoTracks()[0]?.enabled === false;
@@ -1194,7 +1173,6 @@ toggleSpeaker() {
     console.log(`🔊 وضع السماعة: ${this.isSpeakerEnabled ? 'خارجية' : 'داخلية'}`);
 },
 
-// ✅ الدالة المعدلة (إصلاح الخلفية عند تبديل الكاميرا)
 async switchCamera() {
     if (!this.localStream) return;
     const videoTrack = this.localStream.getVideoTracks()[0];
@@ -1217,31 +1195,12 @@ async switchCamera() {
         this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
         const lv = document.getElementById('localVideo');
         if (lv) lv.srcObject = this.localStream;
-        
-        // ✅ إعادة تعيين لون الخلفية بعد تبديل الكاميرا
-        const remoteVideo = document.getElementById('remoteVideo');
-        if (remoteVideo) {
-            if (this.isVideoMuted) {
-                remoteVideo.style.backgroundColor = '#0a0e27';
-            } else {
-                remoteVideo.style.backgroundColor = 'transparent';
-            }
-        }
-        
-        // ✅ للفيديو المحلي أيضاً
-        if (lv) {
-            if (this.isVideoMuted) {
-                lv.style.backgroundColor = '#0a0e27';
-            } else {
-                lv.style.backgroundColor = 'transparent';
-            }
-        }
-        
         console.log(`🔄 تبديل الكاميرا إلى ${newFacing === 'user' ? 'أمامية' : 'خلفية'}`);
     } catch (e) {
         console.error('❌ فشل تبديل الكاميرا:', e);
     }
 },
+
     
     
     // ==================== 12. إرسال الملفات ====================
