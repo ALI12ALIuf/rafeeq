@@ -360,13 +360,12 @@ async receiveCall(callerId, callData) {
             return;
         }
         
-        // ✅ 7.1 إيقاف الفيديو بشكل افتراضي (يحتاج المستخدم لتفعيله)
+        // ✅ تفعيل الفيديو مباشرة إذا كانت مكالمة فيديو (7.1)
         if (this.callType === 'video') {
             const videoTrack = this.localStream.getVideoTracks()[0];
             if (videoTrack) {
-                videoTrack.enabled = false;
-                this.isVideoMuted = true;
-                console.log('✅ تم إيقاف الكاميرا بشكل افتراضي (يحتاج المستخدم لتفعيلها)');
+                videoTrack.enabled = true;
+                console.log('✅ تم تفعيل مسار الفيديو المحلي');
             }
         }
         
@@ -374,7 +373,7 @@ async receiveCall(callerId, callData) {
         
         this.pc = new RTCPeerConnection(this.servers);
         
-        // ✅ 7.2 إضافة جميع المسارات (صوت وفيديو) إلى PeerConnection
+        // ✅ إضافة جميع المسارات (صوت وفيديو) إلى PeerConnection (7.2)
         this.localStream.getTracks().forEach(track => {
             this.pc.addTrack(track, this.localStream);
             console.log(`➕ تم إضافة مسار ${track.kind}`);
@@ -384,7 +383,7 @@ async receiveCall(callerId, callData) {
             if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
         };
         
-        // ✅ 7.3 دالة ontrack المعدلة للفيديو البعيد
+        // ✅ دالة ontrack المعدلة للفيديو البعيد (7.3)
         this.pc.ontrack = e => {
             console.log('📞 استقبال مسار:', e.track.kind);
             
@@ -397,6 +396,7 @@ async receiveCall(callerId, callData) {
                     console.log('✅ تم ربط الفيديو البعيد');
                 } else {
                     console.log('⚠️ عنصر remoteVideo غير موجود');
+                    // محاولة إعادة المحاولة بعد 500ms
                     setTimeout(() => {
                         const rv2 = document.getElementById('remoteVideo');
                         if (rv2) {
@@ -432,13 +432,13 @@ async receiveCall(callerId, callData) {
             console.log('✅ تم إرسال الرد');
         }
         
-        // ✅ 7.4 تأكيد ربط الفيديو المحلي بعد إنشاء الـ PeerConnection
+        // ✅ تأكيد ربط الفيديو المحلي بعد إنشاء الـ PeerConnection (7.4)
         if (this.callType === 'video') {
             setTimeout(() => {
                 const lv = document.getElementById('localVideo');
                 if (lv && this.localStream) {
                     lv.srcObject = this.localStream;
-                    console.log('✅ تم ربط الفيديو المحلي (كاميرا متوقفة)');
+                    console.log('✅ تم ربط الفيديو المحلي');
                 }
             }, 500);
         }
@@ -449,7 +449,6 @@ async receiveCall(callerId, callData) {
         this.endCall(); 
     }
 },
-
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
 
@@ -1139,18 +1138,6 @@ showCallUI(type) {
             }
         }, 100);
         
-        // ✅ 10.2 تحديث شكل زر الكاميرا إذا كانت متوقفة افتراضياً
-        if (this.isVideoMuted) {
-            const muteVideoBtn = document.getElementById('muteVideoBtn');
-            if (muteVideoBtn) {
-                const icon = muteVideoBtn.querySelector('i');
-                if (icon) {
-                    icon.className = 'fas fa-video-slash';
-                    muteVideoBtn.style.color = '#f44336';
-                }
-            }
-        }
-        
     } else {
         const speakerBtn = document.getElementById('speakerBtn');
         speakerBtn?.addEventListener('click', () => {
@@ -1183,8 +1170,7 @@ showCallUI(type) {
         this.startCallTimer();
     }
 },
-
- 
+    
 
 // ==================== 11. التحكم بالمكالمة (بدون تعديلات الخلفية) ====================
 
