@@ -360,12 +360,12 @@ async receiveCall(callerId, callData) {
             return;
         }
         
-        // ✅ تفعيل الفيديو مباشرة إذا كانت مكالمة فيديو
+        // ✅ تفعيل الفيديو مباشرة إذا كانت مكالمة فيديو (7.1)
         if (this.callType === 'video') {
             const videoTrack = this.localStream.getVideoTracks()[0];
             if (videoTrack) {
                 videoTrack.enabled = true;
-                console.log('✅ تم تفعيل مسار الفيديو');
+                console.log('✅ تم تفعيل مسار الفيديو المحلي');
             }
         }
         
@@ -373,7 +373,7 @@ async receiveCall(callerId, callData) {
         
         this.pc = new RTCPeerConnection(this.servers);
         
-        // ✅ إضافة جميع المسارات (صوت وفيديو) إلى PeerConnection
+        // ✅ إضافة جميع المسارات (صوت وفيديو) إلى PeerConnection (7.2)
         this.localStream.getTracks().forEach(track => {
             this.pc.addTrack(track, this.localStream);
             console.log(`➕ تم إضافة مسار ${track.kind}`);
@@ -383,13 +383,27 @@ async receiveCall(callerId, callData) {
             if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
         };
         
+        // ✅ دالة ontrack المعدلة للفيديو البعيد (7.3)
         this.pc.ontrack = e => {
-            console.log(`📞 استقبال مسار ${e.track.kind}`);
-            if (this.callType === 'video') {
+            console.log('📞 استقبال مسار:', e.track.kind);
+            
+            if (e.track.kind === 'video') {
+                console.log('✅ تم استقبال فيديو بعيد');
                 const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) {
+                if (rv) {
                     rv.srcObject = e.streams[0];
+                    rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
                     console.log('✅ تم ربط الفيديو البعيد');
+                } else {
+                    console.log('⚠️ عنصر remoteVideo غير موجود');
+                    // محاولة إعادة المحاولة بعد 500ms
+                    setTimeout(() => {
+                        const rv2 = document.getElementById('remoteVideo');
+                        if (rv2) {
+                            rv2.srcObject = e.streams[0];
+                            console.log('✅ تم ربط الفيديو البعيد (بعد التأخير)');
+                        }
+                    }, 500);
                 }
             } else if (e.track.kind === 'audio') {
                 this.setupRemoteAudio(e.streams[0]);
@@ -418,7 +432,7 @@ async receiveCall(callerId, callData) {
             console.log('✅ تم إرسال الرد');
         }
         
-        // ✅ تأكيد ربط الفيديو المحلي بعد إنشاء الـ PeerConnection
+        // ✅ تأكيد ربط الفيديو المحلي بعد إنشاء الـ PeerConnection (7.4)
         if (this.callType === 'video') {
             setTimeout(() => {
                 const lv = document.getElementById('localVideo');
@@ -956,214 +970,206 @@ async receiveCall(callerId, callData) {
         }
     },
     
-    // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
+// ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
+
+showCallUI(type) {
+    document.body.classList.add('in-call');
+    const existingUi = document.getElementById('callUI');
+    if (existingUi) existingUi.remove();
     
-    showCallUI(type) {
-        document.body.classList.add('in-call');
-        const existingUi = document.getElementById('callUI');
-        if (existingUi) existingUi.remove();
-        
-        const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
-        const appColor = '#2196F3';
-        const bgColor = '#0a0e27';
-        
-        let uiHTML = '';
-        if (type === 'video') {
-            uiHTML = `
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .local-video {
-                        border: 3px solid rgba(255,255,255,0.3);
-                        transition: all 0.3s ease;
-                        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-                    }
-                </style>
-                <!-- ✅ 10.1 طبقة خلفية لحل مشكلة الشاشة السوداء عند إيقاف الكاميرا -->
-                <div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:${bgColor};"></div>
-                <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
-                <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
-                <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا">
-                        <i class="fas fa-video"></i>
-                    </button>
-                </div>`;
-        } else {
-            uiHTML = `
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .avatar-animation {
-                        animation: float 3s ease-in-out infinite;
-                    }
-                    @keyframes float {
-                        0% { transform: translateY(0px); }
-                        50% { transform: translateY(-10px); }
-                        100% { transform: translateY(0px); }
-                    }
-                </style>
-                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:${bgColor};z-index:9997;"></div>
-                <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
-                    <div class="avatar-animation" style="font-size:6rem;margin-bottom:15px;filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">${contactAvatar}</div>
-                    <div style="font-size:1.8rem;color:white;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
-                    <div style="margin-top:8px;color:#4CAF50;font-size:0.9rem;background:rgba(76,175,80,0.2);padding:5px 15px;border-radius:20px;display:inline-block;">
-                        <i class="fas fa-phone-alt" style="margin-left:5px;"></i> <span id="callTimer">00:00</span>
-                    </div>
+    const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
+    const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
+    const appColor = '#2196F3';
+    const bgColor = '#0a0e27';
+    
+    let uiHTML = '';
+    if (type === 'video') {
+        uiHTML = `
+            <style>
+                @keyframes pulse {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+                    70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+                }
+                .call-btn {
+                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    backdrop-filter: blur(10px);
+                    background: rgba(30, 30, 40, 0.85) !important;
+                    border: 1px solid rgba(255,255,255,0.15) !important;
+                }
+                .call-btn:active {
+                    transform: scale(1.1);
+                    background: rgba(50, 50, 60, 0.95) !important;
+                }
+                .end-call-btn {
+                    background: linear-gradient(135deg, #f44336, #d32f2f) !important;
+                    animation: pulse 1.5s infinite;
+                }
+                .end-call-btn:active {
+                    transform: scale(1.1);
+                    background: linear-gradient(135deg, #ff6659, #e53935) !important;
+                }
+                .local-video {
+                    border: 3px solid rgba(255,255,255,0.3);
+                    transition: all 0.3s ease;
+                    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                }
+            </style>
+            <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
+            <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
+            <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
+                <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+                <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا">
+                    <i class="fas fa-video"></i>
+                </button>
+            </div>`;
+    } else {
+        uiHTML = `
+            <style>
+                @keyframes pulse {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+                    70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+                }
+                .call-btn {
+                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    backdrop-filter: blur(10px);
+                    background: rgba(30, 30, 40, 0.85) !important;
+                    border: 1px solid rgba(255,255,255,0.15) !important;
+                }
+                .call-btn:active {
+                    transform: scale(1.1);
+                    background: rgba(50, 50, 60, 0.95) !important;
+                }
+                .end-call-btn {
+                    background: linear-gradient(135deg, #f44336, #d32f2f) !important;
+                    animation: pulse 1.5s infinite;
+                }
+                .end-call-btn:active {
+                    transform: scale(1.1);
+                    background: linear-gradient(135deg, #ff6659, #e53935) !important;
+                }
+                .avatar-animation {
+                    animation: float 3s ease-in-out infinite;
+                }
+                @keyframes float {
+                    0% { transform: translateY(0px); }
+                    50% { transform: translateY(-10px); }
+                    100% { transform: translateY(0px); }
+                }
+            </style>
+            <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:${bgColor};z-index:9997;"></div>
+            <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
+                <div class="avatar-animation" style="font-size:6rem;margin-bottom:15px;filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">${contactAvatar}</div>
+                <div style="font-size:1.8rem;color:white;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
+                <div style="margin-top:8px;color:#4CAF50;font-size:0.9rem;background:rgba(76,175,80,0.2);padding:5px 15px;border-radius:20px;display:inline-block;">
+                    <i class="fas fa-phone-alt" style="margin-left:5px;"></i> <span id="callTimer">00:00</span>
                 </div>
-                <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                </div>`;
-        }
-        
-        const ui = document.createElement('div');
-        ui.id = 'callUI';
-        ui.innerHTML = uiHTML;
-        document.body.appendChild(ui);
-        
-        document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
-        
-        if (type === 'video') {
-            const lv = document.getElementById('localVideo');
-            if (lv && this.localStream) lv.srcObject = this.localStream;
-            document.getElementById('switchCameraBtn')?.addEventListener('click', () => this.switchCamera());
-            
-            const muteAudioBtn = document.getElementById('muteAudioBtn');
-            muteAudioBtn?.addEventListener('click', () => {
-                this.toggleAudio();
-                const icon = muteAudioBtn.querySelector('i');
-                if (icon) {
-                    if (this.isAudioMuted) {
-                        icon.className = 'fas fa-microphone-slash';
-                        muteAudioBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-microphone';
-                        muteAudioBtn.style.color = appColor;
-                    }
-                }
-            });
-            
-            const muteVideoBtn = document.getElementById('muteVideoBtn');
-            muteVideoBtn?.addEventListener('click', () => {
-                this.toggleVideo();
-                const icon = muteVideoBtn.querySelector('i');
-                if (icon) {
-                    if (this.isVideoMuted) {
-                        icon.className = 'fas fa-video-slash';
-                        muteVideoBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-video';
-                        muteVideoBtn.style.color = appColor;
-                    }
-                }
-            });
-        } else {
-            const speakerBtn = document.getElementById('speakerBtn');
-            speakerBtn?.addEventListener('click', () => {
-                this.toggleSpeaker();
-                const icon = speakerBtn.querySelector('i');
-                if (icon) {
-                    if (this.isSpeakerEnabled) {
-                        icon.className = 'fas fa-volume-up';
-                    } else {
-                        icon.className = 'fas fa-volume-mute';
-                    }
-                }
-            });
-            
-            const muteBtn = document.getElementById('muteBtn');
-            muteBtn?.addEventListener('click', () => {
-                this.toggleMute();
-                const icon = muteBtn.querySelector('i');
-                if (icon) {
-                    if (this.isAudioMuted) {
-                        icon.className = 'fas fa-microphone-slash';
-                        muteBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-microphone';
-                        muteBtn.style.color = appColor;
-                    }
-                }
-            });
-            
-            this.startCallTimer();
-        }
-    },
+            </div>
+            <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
+                <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+                <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+                <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
+                    <i class="fas fa-microphone"></i>
+                </button>
+            </div>`;
+    }
     
-    startCallTimer() {
-        if (this.callTimerInterval) clearInterval(this.callTimerInterval);
-        let seconds = 0;
-        this.callTimerInterval = setInterval(() => {
-            if (!this.isInCall) {
-                clearInterval(this.callTimerInterval);
-                return;
+    const ui = document.createElement('div');
+    ui.id = 'callUI';
+    ui.innerHTML = uiHTML;
+    document.body.appendChild(ui);
+    
+    document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
+    
+    if (type === 'video') {
+        const lv = document.getElementById('localVideo');
+        if (lv && this.localStream) lv.srcObject = this.localStream;
+        document.getElementById('switchCameraBtn')?.addEventListener('click', () => this.switchCamera());
+        
+        const muteAudioBtn = document.getElementById('muteAudioBtn');
+        muteAudioBtn?.addEventListener('click', () => {
+            this.toggleAudio();
+            const icon = muteAudioBtn.querySelector('i');
+            if (icon) {
+                if (this.isAudioMuted) {
+                    icon.className = 'fas fa-microphone-slash';
+                    muteAudioBtn.style.color = '#f44336';
+                } else {
+                    icon.className = 'fas fa-microphone';
+                    muteAudioBtn.style.color = appColor;
+                }
             }
-            seconds++;
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            const timerEl = document.getElementById('callTimer');
-            if (timerEl) timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }, 1000);
-    },
+        });
+        
+        const muteVideoBtn = document.getElementById('muteVideoBtn');
+        muteVideoBtn?.addEventListener('click', () => {
+            this.toggleVideo();
+            const icon = muteVideoBtn.querySelector('i');
+            if (icon) {
+                if (this.isVideoMuted) {
+                    icon.className = 'fas fa-video-slash';
+                    muteVideoBtn.style.color = '#f44336';
+                } else {
+                    icon.className = 'fas fa-video';
+                    muteVideoBtn.style.color = appColor;
+                }
+            }
+        });
+        
+        // ✅ 10.1 إعادة تعيين remoteVideo لضمان جاهزيته لاستقبال الفيديو البعيد
+        setTimeout(() => {
+            const rv = document.getElementById('remoteVideo');
+            if (rv) {
+                rv.srcObject = null;
+                console.log('✅ تم إعادة تعيين remoteVideo (القسم 10.1)');
+            }
+        }, 100);
+        
+    } else {
+        const speakerBtn = document.getElementById('speakerBtn');
+        speakerBtn?.addEventListener('click', () => {
+            this.toggleSpeaker();
+            const icon = speakerBtn.querySelector('i');
+            if (icon) {
+                if (this.isSpeakerEnabled) {
+                    icon.className = 'fas fa-volume-up';
+                } else {
+                    icon.className = 'fas fa-volume-mute';
+                }
+            }
+        });
+        
+        const muteBtn = document.getElementById('muteBtn');
+        muteBtn?.addEventListener('click', () => {
+            this.toggleMute();
+            const icon = muteBtn.querySelector('i');
+            if (icon) {
+                if (this.isAudioMuted) {
+                    icon.className = 'fas fa-microphone-slash';
+                    muteBtn.style.color = '#f44336';
+                } else {
+                    icon.className = 'fas fa-microphone';
+                    muteBtn.style.color = appColor;
+                }
+            }
+        });
+        
+        this.startCallTimer();
+    }
+},
     
 
 // ==================== 11. التحكم بالمكالمة (بدون تعديلات الخلفية) ====================
