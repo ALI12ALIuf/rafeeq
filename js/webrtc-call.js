@@ -224,7 +224,7 @@ const CallSystem = {
         }
     },
     
-    // ==================== 5. المكالمة المرئية ====================
+    // ==================== 5. المكالمة المرئية (معدل - كاميرا خلفية) ====================
     
     async startVideoCall(calleeId) {
         if (!window.auth?.currentUser) {
@@ -248,9 +248,10 @@ const CallSystem = {
                 }).catch(() => {});
             }
             
+            // ✅ تم تغيير facingMode من 'user' إلى 'environment' (كاميرا خلفية)
             const constraints = { 
                 audio: true, 
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
             };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
@@ -322,7 +323,7 @@ const CallSystem = {
     },
 
     
-// ==================== 7. استقبال المكالمات ====================
+// ==================== 7. استقبال المكالمات (معدل - كاميرا خلفية) ====================
 
 async receiveCall(callerId, callData) {
     if (this.isInCall) {
@@ -348,9 +349,10 @@ async receiveCall(callerId, callData) {
         silentAudio.volume = 0;
         silentAudio.play().catch(() => {});
         
+        // ✅ تم تغيير facingMode من 'user' إلى 'environment' (كاميرا خلفية)
         const constraints = { 
             audio: true, 
-            video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } : false
+            video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } : false
         };
         
         this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
