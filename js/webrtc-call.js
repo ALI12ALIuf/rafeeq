@@ -404,339 +404,90 @@ const CallSystem = {
         }
     },
     
-    // ========== شاشة المكالمة الواردة (بتصميم مطور) ==========255,255,255,0.6);">
-     
-// ========== شاشة المكالمة الواردة (بتصميم السحب) ==========
-showIncomingCall(callerId, callData) {
-    if (callData.type === 'datachannel') {
-        console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
-        this.handleSignaling(callData);
-        return;
-    }
-    
-    console.log('🔔 عرض شاشة المكالمة الواردة...');
-    this.currentCallId = callerId;
-    
-    const fetchUserName = async () => {
-        try {
-            const userDoc = await window.db.collection('users').doc(callerId).get();
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-                return userData.name || 'مستخدم';
-            }
-        } catch (e) {
-            console.error('خطأ في جلب اسم المستخدم:', e);
+    showIncomingCall(callerId, callData) {
+        if (callData.type === 'datachannel') {
+            console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
+            this.handleSignaling(callData);
+            return;
         }
-        return 'مستخدم';
-    };
-    
-    const fetchUserAvatar = async () => {
-        try {
-            const userDoc = await window.db.collection('users').doc(callerId).get();
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-                if (typeof window.getEmojiForUser === 'function') {
-                    return window.getEmojiForUser(userData);
+        
+        console.log('🔔 عرض شاشة المكالمة الواردة...');
+        this.currentCallId = callerId;
+        
+        const fetchUserName = async () => {
+            try {
+                const userDoc = await window.db.collection('users').doc(callerId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    return userData.name || 'مستخدم';
                 }
-                const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
-                return emojiMap[userData.avatarType] || '👤';
+            } catch (e) {
+                console.error('خطأ في جلب اسم المستخدم:', e);
             }
-        } catch (e) {}
-        return '👤';
-    };
-    
-    Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
-        const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
-        const appColor = '#2196F3';
-        
-        const existingOverlay = document.getElementById('incomingCall');
-        if (existingOverlay) existingOverlay.remove();
-        
-        const overlay = document.createElement('div'); 
-        overlay.id = 'incomingCall';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;';
-        
-        overlay.innerHTML = `
-            <style>
-                @keyframes float {
-                    0% { transform: translateY(0px); }
-                    50% { transform: translateY(-10px); }
-                    100% { transform: translateY(0px); }
-                }
-                @keyframes ring {
-                    0% { transform: rotate(0deg); }
-                    25% { transform: rotate(5deg); }
-                    50% { transform: rotate(0deg); }
-                    75% { transform: rotate(-5deg); }
-                    100% { transform: rotate(0deg); }
-                }
-                @keyframes slideIn {
-                    0% { opacity: 0; transform: translateY(50px); }
-                    100% { opacity: 1; transform: translateY(0); }
-                }
-                .incoming-avatar {
-                    animation: float 2s ease-in-out infinite;
-                    font-size: 6rem;
-                    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
-                }
-                .incoming-ringer {
-                    animation: ring 1s ease-in-out infinite;
-                }
-                .swipe-container {
-                    width: 300px;
-                    height: 70px;
-                    background: rgba(255,255,255,0.1);
-                    border-radius: 60px;
-                    position: relative;
-                    cursor: pointer;
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255,255,255,0.2);
-                    margin-top: 30px;
-                    animation: slideIn 0.5s ease-out;
-                }
-                .swipe-thumb {
-                    width: 60px;
-                    height: 60px;
-                    background: linear-gradient(135deg, ${appColor}, #1976D2);
-                    border-radius: 50%;
-                    position: absolute;
-                    top: 5px;
-                    left: 5px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.8rem;
-                    color: white;
-                    transition: left 0.1s linear;
-                    cursor: grab;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                    z-index: 3;
-                }
-                .swipe-thumb:active {
-                    cursor: grabbing;
-                }
-                .swipe-track-left {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    height: 100%;
-                    width: 0%;
-                    background: linear-gradient(135deg, #4CAF50, #2E7D32);
-                    border-radius: 60px;
-                    transition: width 0.1s linear;
-                    z-index: 1;
-                }
-                .swipe-track-right {
-                    position: absolute;
-                    top: 0;
-                    right: 0;
-                    height: 100%;
-                    width: 0%;
-                    background: linear-gradient(135deg, #f44336, #d32f2f);
-                    border-radius: 60px;
-                    transition: width 0.1s linear;
-                    z-index: 1;
-                }
-                .swipe-icon-left {
-                    position: absolute;
-                    left: 20px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 1.2rem;
-                    color: rgba(255,255,255,0.7);
-                    z-index: 2;
-                    pointer-events: none;
-                }
-                .swipe-icon-right {
-                    position: absolute;
-                    right: 20px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 1.2rem;
-                    color: rgba(255,255,255,0.7);
-                    z-index: 2;
-                    pointer-events: none;
-                }
-                .swipe-label {
-                    position: absolute;
-                    left: 50%;
-                    top: 50%;
-                    transform: translate(-50%, -50%);
-                    font-size: 0.8rem;
-                    color: rgba(255,255,255,0.6);
-                    z-index: 2;
-                    pointer-events: none;
-                    white-space: nowrap;
-                }
-                .call-type-badge {
-                    margin-top: 12px;
-                    color: #4CAF50;
-                    font-size: 1rem;
-                    background: rgba(76,175,80,0.2);
-                    padding: 6px 18px;
-                    border-radius: 25px;
-                    display: inline-block;
-                }
-            </style>
-            <div style="text-align:center;">
-                <div class="incoming-avatar">${contactAvatar}</div>
-                <div style="font-size:1.8rem;font-weight:bold;margin-top:10px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
-                <div class="call-type-badge">
-                    <i class="fas fa-phone-alt" style="margin-left:5px;"></i> ${callTypeText}
-                </div>
-            </div>
-            
-            <div class="swipe-container" id="swipeContainer">
-                <div class="swipe-track-left" id="swipeTrackLeft"></div>
-                <div class="swipe-track-right" id="swipeTrackRight"></div>
-                <div class="swipe-icon-left">📞</div>
-                <div class="swipe-icon-right">📞</div>
-                <div class="swipe-label" id="swipeLabel">اسحب لليسار للقبول | لليمين للرفض</div>
-                <div class="swipe-thumb" id="swipeThumb">
-                    <i class="fas fa-arrows-alt-h"></i>
-                </div>
-            </div>
-            
-            <div style="position:absolute;bottom:30px;left:0;right:0;text-align:center;">
-                <div class="incoming-ringer" style="font-size:0.8rem;color:rgba(255,255,255,0.6);">
-                    <i class="fas fa-volume-up"></i> جاري الاتصال...
-                </div>
-            </div>`;
-        
-        document.body.appendChild(overlay);
-        
-        // ========== منطق السحب ==========
-        const container = document.getElementById('swipeContainer');
-        const thumb = document.getElementById('swipeThumb');
-        const trackLeft = document.getElementById('swipeTrackLeft');
-        const trackRight = document.getElementById('swipeTrackRight');
-        const swipeLabel = document.getElementById('swipeLabel');
-        
-        let isDragging = false;
-        let startX = 0;
-        let currentLeft = 5;
-        const containerWidth = 300;
-        const thumbWidth = 60;
-        const maxLeft = containerWidth - thumbWidth - 5;
-        let acceptTriggered = false;
-        let rejectTriggered = false;
-        
-        const resetSwipe = () => {
-            currentLeft = 5;
-            thumb.style.left = '5px';
-            trackLeft.style.width = '0%';
-            trackRight.style.width = '0%';
-            swipeLabel.style.opacity = '1';
-            swipeLabel.textContent = 'اسحب لليسار للقبول | لليمين للرفض';
-            thumb.innerHTML = '<i class="fas fa-arrows-alt-h"></i>';
-            thumb.style.background = `linear-gradient(135deg, ${appColor}, #1976D2)`;
-            acceptTriggered = false;
-            rejectTriggered = false;
+            return 'مستخدم';
         };
         
-        const onStart = (e) => {
-            if (acceptTriggered || rejectTriggered) return;
-            isDragging = true;
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            startX = clientX - currentLeft;
-            thumb.style.transition = 'none';
-            e.preventDefault();
+        const fetchUserAvatar = async () => {
+            try {
+                const userDoc = await window.db.collection('users').doc(callerId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    if (typeof window.getEmojiForUser === 'function') {
+                        return window.getEmojiForUser(userData);
+                    }
+                    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
+                    return emojiMap[userData.avatarType] || '👤';
+                }
+            } catch (e) {}
+            return '👤';
         };
         
-        const onMove = (e) => {
-            if (!isDragging || acceptTriggered || rejectTriggered) return;
-            e.preventDefault();
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            let newLeft = clientX - startX;
-            newLeft = Math.min(maxLeft, Math.max(5, newLeft));
-            currentLeft = newLeft;
-            thumb.style.left = currentLeft + 'px';
+        Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
+            const callTypeText = callData.type === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
             
-            // تحديث المسارات حسب الاتجاه
-            const leftProgress = (currentLeft - 5) / (maxLeft - 5);
+            const existingOverlay = document.getElementById('incomingCall');
+            if (existingOverlay) existingOverlay.remove();
             
-            if (currentLeft < maxLeft / 2) {
-                // السحب لليسار (قبول)
-                const leftWidth = (currentLeft - 5) * 2;
-                trackLeft.style.width = Math.min(leftWidth, 100) + '%';
-                trackRight.style.width = '0%';
-                if (leftProgress > 0.6) {
-                    trackLeft.style.width = '100%';
-                    swipeLabel.textContent = '✓ إفلات للقبول';
-                    swipeLabel.style.color = '#4CAF50';
-                    thumb.innerHTML = '<i class="fas fa-check"></i>';
-                    thumb.style.background = 'linear-gradient(135deg, #4CAF50, #2E7D32)';
-                } else {
-                    trackLeft.style.width = leftProgress * 100 + '%';
-                    swipeLabel.textContent = 'اسحب لليسار للقبول';
-                    swipeLabel.style.color = 'rgba(255,255,255,0.6)';
-                    thumb.innerHTML = '<i class="fas fa-arrows-alt-h"></i>';
-                    thumb.style.background = `linear-gradient(135deg, ${appColor}, #1976D2)`;
-                }
-            } else {
-                // السحب لليمين (رفض)
-                const rightProgress = (currentLeft - maxLeft / 2) / (maxLeft / 2);
-                const rightWidth = (maxLeft - currentLeft) * 2;
-                trackRight.style.width = Math.min(rightWidth, 100) + '%';
-                trackLeft.style.width = '0%';
-                if (rightProgress > 0.6) {
-                    trackRight.style.width = '100%';
-                    swipeLabel.textContent = '✗ إفلات للرفض';
-                    swipeLabel.style.color = '#f44336';
-                    thumb.innerHTML = '<i class="fas fa-times"></i>';
-                    thumb.style.background = 'linear-gradient(135deg, #f44336, #d32f2f)';
-                } else {
-                    trackRight.style.width = rightProgress * 100 + '%';
-                    swipeLabel.textContent = 'اسحب لليمين للرفض';
-                    swipeLabel.style.color = 'rgba(255,255,255,0.6)';
-                    thumb.innerHTML = '<i class="fas fa-arrows-alt-h"></i>';
-                    thumb.style.background = `linear-gradient(135deg, ${appColor}, #1976D2)`;
-                }
-            }
-        };
-        
-        const onEnd = () => {
-            if (!isDragging) return;
-            isDragging = false;
-            thumb.style.transition = 'left 0.3s ease';
+            const overlay = document.createElement('div'); 
+            overlay.id = 'incomingCall';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;gap:30px;';
+            overlay.innerHTML = `
+                <div style="text-align:center;">
+                    <div style="font-size:5rem;margin-bottom:10px;">${contactAvatar}</div>
+                    <div style="font-size:1.8rem;font-weight:bold;">${contactName}</div>
+                    <div style="font-size:1.2rem;margin-top:8px;color:#4CAF50;">${callTypeText}</div>
+                </div>
+                <div style="display:flex;gap:40px;">
+                    <button id="btnAccept" style="width:80px;height:80px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:transform 0.2s;">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                    <button id="btnReject" style="width:80px;height:80px;border-radius:50%;background:#f44336;color:white;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:transform 0.2s;">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>`;
+            document.body.appendChild(overlay);
             
-            const leftProgress = (currentLeft - 5) / (maxLeft - 5);
+            document.getElementById('btnAccept').onclick = () => { 
+                overlay.remove(); 
+                this.receiveCall(callerId, callData); 
+            };
             
-            if (leftProgress > 0.6 && !acceptTriggered && !rejectTriggered) {
-                // قبول المكالمة
-                acceptTriggered = true;
-                overlay.remove();
-                this.receiveCall(callerId, callData);
-            } else if ((1 - leftProgress) > 0.6 && !acceptTriggered && !rejectTriggered) {
-                // رفض المكالمة
-                rejectTriggered = true;
+            document.getElementById('btnReject').onclick = () => { 
                 overlay.remove();
                 this.sendSignal(callerId, { type: 'reject' });
-            } else {
-                resetSwipe();
-            }
-        };
-        
-        // إضافة مستمعي الأحداث
-        thumb.addEventListener('mousedown', onStart);
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onEnd);
-        thumb.addEventListener('touchstart', onStart, { passive: false });
-        document.addEventListener('touchmove', onMove, { passive: false });
-        document.addEventListener('touchend', onEnd);
-        
-        // إخفاء الشاشة تلقائياً بعد 30 ثانية
-        setTimeout(() => {
-            const stillThere = document.getElementById('incomingCall');
-            if (stillThere) {
-                stillThere.remove();
-                console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً (انتهت المهلة)');
-                this.sendSignal(callerId, { type: 'reject' });
-            }
-        }, 30000);
-    });
-},
-
+            };
+            
+            setTimeout(() => {
+                const stillThere = document.getElementById('incomingCall');
+                if (stillThere) {
+                    stillThere.remove();
+                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً (انتهت المهلة)');
+                    this.sendSignal(callerId, { type: 'reject' });
+                }
+            }, 30000);
+        });
+    },
+    
     // ==================== Data Channel وإدارة الاتصال ====================
     
     setupDataChannel(channel) {
@@ -937,7 +688,7 @@ showIncomingCall(callerId, callData) {
         }
     },
     
-    // ==================== واجهة المستخدم (بتصميم حديث) ====================
+    // ==================== واجهة المستخدم (المعدلة بتصميم جديد وأيقونات ملونة) ====================
     
     showCallUI(type) {
         document.body.classList.add('in-call');
