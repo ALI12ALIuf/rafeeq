@@ -419,6 +419,8 @@ const CallSystem = {
     const callType = callData.type === 'video' ? 'video' : 'audio';
     const callTypeText = callType === 'video' ? '📹 مكالمة فيديو' : '📞 مكالمة صوتية';
     const appColor = '#2196F3';
+    // ✅ تحديد الأيقونة حسب نوع المكالمة
+    const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
     
     const fetchUserName = async () => {
         try {
@@ -477,10 +479,6 @@ const CallSystem = {
                     50% { transform: rotate(0deg); }
                     75% { transform: rotate(-6deg); }
                     100% { transform: rotate(0deg); }
-                }
-                @keyframes thumbPulse {
-                    0%, 100% { transform: scale(1); }
-                    50% { transform: scale(1.05); }
                 }
                 .avatar-float {
                     animation: float 2.5s ease-in-out infinite;
@@ -591,7 +589,7 @@ const CallSystem = {
                     <div class="center-dot"></div>
                     
                     <div id="leftThumb" class="swipe-thumb thumb-left">
-                        <i class="fas fa-phone"></i>
+                        <i class="fas ${acceptIcon}"></i>
                     </div>
                     <div id="rightThumb" class="swipe-thumb thumb-right">
                         <i class="fas fa-phone-slash"></i>
