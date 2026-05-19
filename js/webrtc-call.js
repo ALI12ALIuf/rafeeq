@@ -407,8 +407,8 @@ const CallSystem = {
     // ========== شاشة المكالمة الواردة بأزرار السحب ==========
     
     
-    
-     showIncomingCall(callerId, callData) {
+
+    showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
         console.log('📡 استلام طلب فتح Data Channel (لإرسال الملفات) - لا حاجة لعرض شاشة');
         this.handleSignaling(callData);
@@ -479,17 +479,13 @@ const CallSystem = {
                     75% { transform: rotate(-6deg); }
                     100% { transform: rotate(0deg); }
                 }
-                @keyframes arrowBounceLeft {
-                    0%, 100% { transform: translateX(0px); }
-                    50% { transform: translateX(10px); }
+                @keyframes arrowMoveLeft {
+                    0%, 100% { transform: translateX(0px); opacity: 0.8; }
+                    50% { transform: translateX(12px); opacity: 1; }
                 }
-                @keyframes arrowBounceRight {
-                    0%, 100% { transform: translateX(0px); }
-                    50% { transform: translateX(-10px); }
-                }
-                @keyframes glowPulse {
-                    0% { box-shadow: 0 0 5px rgba(76,175,80,0.3); }
-                    100% { box-shadow: 0 0 20px rgba(76,175,80,0.6); }
+                @keyframes arrowMoveRight {
+                    0%, 100% { transform: translateX(0px); opacity: 0.8; }
+                    50% { transform: translateX(-12px); opacity: 1; }
                 }
                 .avatar-float {
                     animation: float 2.5s ease-in-out infinite;
@@ -499,7 +495,7 @@ const CallSystem = {
                     transform-origin: center;
                 }
                 .swipe-container {
-                    width: 380px;
+                    width: 360px;
                     margin: 30px auto;
                     position: relative;
                 }
@@ -508,14 +504,13 @@ const CallSystem = {
                     height: 80px;
                     border-radius: 50px;
                     position: relative;
-                    overflow: visible;
+                    overflow: hidden;
                     cursor: grab;
                     user-select: none;
                     touch-action: none;
                     background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
                     border: 2px solid rgba(255,255,255,0.2);
                     box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-                    border-radius: 50px;
                 }
                 .swipe-button:active {
                     cursor: grabbing;
@@ -532,14 +527,14 @@ const CallSystem = {
                     z-index: 5;
                     border-radius: 2px;
                 }
-                /* الأسهم الخارجية - أمام الزر */
-                .arrow-left-outer {
+                /* الأسهم داخل الزر وفي المقدمة */
+                .arrow-left-inner {
                     position: absolute;
-                    left: -45px;
+                    left: 20px;
                     top: 50%;
                     transform: translateY(-50%);
-                    width: 40px;
-                    height: 40px;
+                    width: 44px;
+                    height: 44px;
                     background: linear-gradient(135deg, #4CAF50, #2e7d32);
                     border-radius: 50%;
                     display: flex;
@@ -548,17 +543,18 @@ const CallSystem = {
                     font-size: 1.8rem;
                     color: white;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                    animation: arrowBounceLeft 1s ease-in-out infinite;
-                    z-index: 30;
-                    border: 2px solid rgba(255,255,255,0.3);
+                    animation: arrowMoveLeft 1s ease-in-out infinite;
+                    z-index: 25;
+                    border: 2px solid rgba(255,255,255,0.4);
+                    pointer-events: none;
                 }
-                .arrow-right-outer {
+                .arrow-right-inner {
                     position: absolute;
-                    right: -45px;
+                    right: 20px;
                     top: 50%;
                     transform: translateY(-50%);
-                    width: 40px;
-                    height: 40px;
+                    width: 44px;
+                    height: 44px;
                     background: linear-gradient(135deg, #f44336, #c62828);
                     border-radius: 50%;
                     display: flex;
@@ -567,11 +563,12 @@ const CallSystem = {
                     font-size: 1.8rem;
                     color: white;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                    animation: arrowBounceRight 1s ease-in-out infinite;
-                    z-index: 30;
-                    border: 2px solid rgba(255,255,255,0.3);
+                    animation: arrowMoveRight 1s ease-in-out infinite;
+                    z-index: 25;
+                    border: 2px solid rgba(255,255,255,0.4);
+                    pointer-events: none;
                 }
-                .arrow-left-outer i, .arrow-right-outer i {
+                .arrow-left-inner i, .arrow-right-inner i {
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
                 }
                 .swipe-thumb {
@@ -587,7 +584,7 @@ const CallSystem = {
                     box-shadow: 0 8px 25px rgba(0,0,0,0.5);
                     transition: left 0.1s linear, right 0.1s linear;
                     cursor: grab;
-                    z-index: 20;
+                    z-index: 30;
                     backdrop-filter: blur(5px);
                     border: 2px solid rgba(255,255,255,0.4);
                 }
@@ -615,18 +612,18 @@ const CallSystem = {
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255,255,255,0.15);
                 }
-                .center-dot {
+                .center-glow {
                     position: absolute;
                     top: 50%;
                     left: 50%;
                     transform: translate(-50%, -50%);
-                    width: 12px;
-                    height: 12px;
-                    background: rgba(255,255,255,0.6);
+                    width: 16px;
+                    height: 16px;
+                    background: rgba(255,255,255,0.5);
                     border-radius: 50%;
                     pointer-events: none;
-                    z-index: 25;
-                    box-shadow: 0 0 15px rgba(255,255,255,0.5);
+                    z-index: 20;
+                    box-shadow: 0 0 15px rgba(255,255,255,0.6);
                 }
             </style>
             
@@ -637,18 +634,18 @@ const CallSystem = {
             </div>
             
             <div class="swipe-container">
-                <!-- السهم الأيسر (أخضر) - خارج الزر -->
-                <div class="arrow-left-outer">
-                    <i class="fas fa-arrow-right"></i>
-                </div>
-                <!-- السهم الأيمن (أحمر) - خارج الزر -->
-                <div class="arrow-right-outer">
-                    <i class="fas fa-arrow-left"></i>
-                </div>
-                
                 <div id="swipeButton" class="swipe-button">
+                    <!-- الأسهم داخل الزر وفي المقدمة -->
+                    <div class="arrow-left-inner">
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                    <div class="arrow-right-inner">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                    
                     <div class="divider-line"></div>
-                    <div class="center-dot"></div>
+                    <div class="center-glow"></div>
+                    
                     <div id="leftThumb" class="swipe-thumb thumb-left">
                         <i class="fas fa-phone"></i>
                     </div>
@@ -794,7 +791,7 @@ const CallSystem = {
             }
         }, 30000);
     });
-},
+}, 
     
         
     
