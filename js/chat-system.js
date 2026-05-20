@@ -13,7 +13,6 @@ const PresenceSystem = {
 
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
-    isInSameChat: false,  // ✅ متغير جديد: هل نحن في نفس المحادثة؟
     
     init() { this.loadAllChats(); },
     
@@ -77,13 +76,7 @@ const ChatSystem = {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
     openChat(friendId, friendName, friendAvatar) {
-        this.currentChat = friendId;
-        this.isInSameChat = true;  // ✅ أصبحنا في نفس المحادثة
-        
-        // ✅ تحديث الأزرار فوراً عند فتح المحادثة
-        this.updateAttachmentButtons(this.friendOnline);
-        
-        document.body.classList.add('conversation-open');
+        this.currentChat = friendId; document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
         if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
@@ -127,63 +120,42 @@ const ChatSystem = {
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
         
-        // ✅ تحديث الأزرار بناءً على حالة الاتصال ووجودنا في نفس المحادثة
-        this.updateAttachmentButtons(isOnline);
+        if (isOnline) {
+            this.updateAttachmentButtons(true);
+        } else {
+            this.updateAttachmentButtons(false);
+        }
     },
     
-    // ========== الدالة المعدلة (تعطيل الأزرار بالكامل) ==========
+    // ========== الدالة المعدلة (تعطيل أزرار الاتصال عند عدم الاتصال) ==========
     updateAttachmentButtons(isOnline) {
-        // البحث عن قائمة الأزرار
-        const attachmentMenu = document.getElementById('attachmentMenu');
+        // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
+        const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
+        btns.forEach(btn => { 
+            if (isOnline) { 
+                btn.classList.remove('locked'); 
+                btn.title = ''; 
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            } else { 
+                btn.classList.add('locked'); 
+                btn.title = 'غير متاح - المستخدم غير متصل';
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            } 
+        });
         
-        // ✅ إذا لم نكن في نفس المحادثة، الأزرار معتمة وغير قابلة للضغط
-        if (!this.isInSameChat) {
-            if (attachmentMenu) {
-                const btns = attachmentMenu.querySelectorAll('button');
-                btns.forEach(btn => {
-                    btn.style.opacity = '0.5';
-                    btn.style.pointerEvents = 'none';
-                    btn.title = 'افتح المحادثة أولاً';
-                });
-            }
-            
-            // تعطيل أزرار الاتصال أيضاً
-            const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]');
-            const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]');
-            if (audioCallBtn) {
-                audioCallBtn.style.opacity = '0.5';
-                audioCallBtn.style.pointerEvents = 'none';
-                audioCallBtn.title = 'افتح المحادثة أولاً';
-            }
-            if (videoCallBtn) {
-                videoCallBtn.style.opacity = '0.5';
-                videoCallBtn.style.pointerEvents = 'none';
-                videoCallBtn.title = 'افتح المحادثة أولاً';
-            }
-            
-            console.log('🎛️ لسنا في نفس المحادثة → الأزرار معتمة');
-            return;
-        }
+        // ✅ تعطيل أزرار الاتصال (الصوتي والمرئي) إذا كان المستخدم غير متصل
+        // البحث عن أزرار الاتصال بطرق مختلفة
+        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
+                             document.querySelector('.audio-call-btn') ||
+                             document.querySelector('#audioCallBtn') ||
+                             document.querySelector('button[data-call="audio"]');
         
-        // ✅ نحن في نفس المحادثة → الأزرار تعتمد على حالة اتصال المستخدم
-        if (attachmentMenu) {
-            const btns = attachmentMenu.querySelectorAll('button');
-            btns.forEach(btn => {
-                if (isOnline) {
-                    btn.style.opacity = '1';
-                    btn.style.pointerEvents = 'auto';
-                    btn.title = '';
-                } else {
-                    btn.style.opacity = '0.5';
-                    btn.style.pointerEvents = 'none';
-                    btn.title = 'غير متاح - المستخدم غير متصل';
-                }
-            });
-        }
-        
-        // ✅ أزرار الاتصال
-        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]');
-        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]');
+        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
+                             document.querySelector('.video-call-btn') ||
+                             document.querySelector('#videoCallBtn') ||
+                             document.querySelector('button[data-call="video"]');
         
         if (audioCallBtn) {
             if (isOnline) {
@@ -209,7 +181,7 @@ const ChatSystem = {
             }
         }
         
-        console.log(`🎛️ تحديث الأزرار: في نفس المحادثة ✅ | المستخدم ${isOnline ? 'متصل ✅' : 'غير متصل ❌'}`);
+        console.log(`🎛️ تحديث الأزرار: المستخدم ${isOnline ? 'متصل ✅' : 'غير متصل ❌'}`);
     },
     
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
@@ -443,7 +415,6 @@ const ChatSystem = {
     },
     
     closeChat() {
-        this.isInSameChat = false;  // ✅ خرجنا من المحادثة
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
