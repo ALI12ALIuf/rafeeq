@@ -13,47 +13,9 @@ const PresenceSystem = {
 
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
-    friendInConversation: false,
+    friendInConversation: false,  // ✅ هل الطرف الآخر في نفس المحادثة؟
     
-    init() { 
-        this.loadAllChats(); 
-        this.setupPageFocusListener();  // ✅ إضافة مستمع التركيز على الصفحة
-    },
-    
-    // ✅ مستمع لحدث التركيز على الصفحة (عند العودة إلى التطبيق)
-    setupPageFocusListener() {
-        window.addEventListener('focus', () => {
-            if (this.currentChat && this.friendOnline) {
-                console.log('👁️ الصفحة في المقدمة - تحديث حالة المحادثة');
-                this.sendConversationStatus(true);
-                this.requestConversationStatus();
-            }
-        });
-    },
-    
-    // ✅ طلب حالة المحادثة من الطرف الآخر
-    async requestConversationStatus() {
-        if (!this.currentChat) return;
-        try {
-            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!myPrivateKey || !receiverPublicKey) return;
-            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-                type: 'conversation_status_request',
-                timestamp: Date.now()
-            }), sharedKey);
-            await SecureChatSystem.sendToServer(this.currentChat, { 
-                id: Date.now().toString(), 
-                type: 'conversation_status_request', 
-                data: encrypted, 
-                timestamp: Date.now() 
-            });
-            console.log('📤 تم إرسال طلب حالة المحادثة إلى:', this.currentChat);
-        } catch(e) {
-            console.error('خطأ في طلب حالة المحادثة:', e);
-        }
-    },
+    init() { this.loadAllChats(); },
     
     loadAllChats() { 
         for (let i = 0; i < localStorage.length; i++) { 
@@ -114,6 +76,7 @@ const ChatSystem = {
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
+    // ========== دالة إرسال حالة المحادثة ==========
     async sendConversationStatus(isOpen) {
         if (!this.currentChat) return;
         try {
@@ -138,6 +101,7 @@ const ChatSystem = {
         }
     },
     
+    // ========== تحديث حالة الطرف الآخر في المحادثة ==========
     updateFriendConversationStatus(friendId, isInConversation) {
         if (this.currentChat !== friendId) return;
         this.friendInConversation = isInConversation;
@@ -145,9 +109,12 @@ const ChatSystem = {
         this.updateAllButtons();
     },
     
+    // ========== تحديث جميع الأزرار (تعتمد فقط على friendInConversation) ==========
     updateAllButtons() {
+        // ✅ الشرط الوحيد: الطرف الآخر في نفس المحادثة (لا حاجة لـ friendOnline)
         const canUse = this.friendInConversation;
         
+        // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
         const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
         btns.forEach(btn => { 
             if (canUse) { 
@@ -163,6 +130,7 @@ const ChatSystem = {
             } 
         });
         
+        // تعطيل أزرار الاتصال (الصوتي والمرئي)
         const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
                              document.querySelector('.audio-call-btn') ||
                              document.querySelector('#audioCallBtn') ||
@@ -212,14 +180,10 @@ const ChatSystem = {
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
         
+        // ✅ إرسال إشارة بأن المستخدم فتح المحادثة
         setTimeout(() => {
             this.sendConversationStatus(true);
         }, 500);
-        
-        // ✅ طلب حالة المحادثة من الطرف الآخر
-        setTimeout(() => {
-            this.requestConversationStatus();
-        }, 1000);
         
         setTimeout(() => { 
             if (this.friendOnline) {
@@ -259,6 +223,7 @@ const ChatSystem = {
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
         
+        // ✅ تحديث الأزرار
         this.updateAllButtons();
     },
     
@@ -333,6 +298,7 @@ const ChatSystem = {
     },
     
     async sendFileWithRetry(file, type, maxRetries = 3) {
+        // ✅ التحقق: الطرف الآخر في نفس المحادثة فقط
         if (!this.friendInConversation) {
             alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
             return false;
@@ -518,6 +484,7 @@ const ChatSystem = {
     },
     
     closeChat() {
+        // ✅ إرسال إشارة بإغلاق المحادثة
         this.sendConversationStatus(false);
         
         document.body.classList.remove('conversation-open');
