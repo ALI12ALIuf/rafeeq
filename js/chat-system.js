@@ -27,7 +27,7 @@ const ChatSystem = {
         this.setupFeatureButton();
     },
     
-    // ✅ إعداد زر التفعيل (معدل بالكامل)
+    // ✅ إعداد زر التفعيل
     setupFeatureButton() {
         setTimeout(() => {
             let btn = document.getElementById('enableFeaturesBtn');
@@ -300,7 +300,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅ إعادة تعيين عند خروج المستخدم (معدلة)
+    // ✅ إعادة تعيين عند خروج المستخدم
     resetFeatures() {
         console.log('🔄 resetFeatures - إعادة تعيين الميزات');
         this.featuresEnabled = false;
@@ -317,7 +317,6 @@ const ChatSystem = {
             btn.title = 'تفعيل الميزات';
         }
         
-        // إرسال إشارة إلغاء إلى الطرف الآخر (مع محاولة إعادة)
         if (this.currentChat) {
             this.sendFeatureCancelWithRetry();
         }
@@ -368,8 +367,11 @@ const ChatSystem = {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         
+        console.log('✅ featuresEnabled بعد الإلغاء:', this.featuresEnabled);
+        
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
         }
         
         const btn = document.getElementById('enableFeaturesBtn');
@@ -377,6 +379,8 @@ const ChatSystem = {
             btn.style.background = '#f44336';
             btn.title = 'تفعيل الميزات';
             console.log('✅ تم تغيير لون الزر إلى الأحمر');
+        } else {
+            console.log('⚠️ لم يتم العثور على الزر');
         }
         
         this.updateAllButtons();
@@ -597,10 +601,34 @@ const ChatSystem = {
         }
     },
     
+    // ✅ دالة تحديث حالة المحادثة (معدلة - مع حل بديل)
     updateFriendConversationStatus(friendId, isInConversation) {
         if (this.currentChat !== friendId) return;
         this.friendInConversation = isInConversation;
         console.log(`👥 تحديث حالة المحادثة للطرف الآخر: ${isInConversation ? 'في المحادثة ✅' : 'ليس في المحادثة ❌'}`);
+        
+        // ✅ إذا خرج الطرف الآخر من المحادثة، قم بإلغاء تفعيل الميزات فوراً (حل بديل)
+        if (!isInConversation && this.featuresEnabled) {
+            console.log('⚠️ الطرف الآخر خرج من المحادثة - إلغاء تفعيل الميزات (حل بديل)');
+            this.featuresEnabled = false;
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            if (this.featureBlinkInterval) {
+                clearInterval(this.featureBlinkInterval);
+            }
+            
+            const btn = document.getElementById('enableFeaturesBtn');
+            if (btn) {
+                btn.style.background = '#f44336';
+                btn.title = 'تفعيل الميزات';
+                console.log('✅ تم تغيير لون الزر إلى الأحمر (حل بديل)');
+            }
+            
+            this.updateAllButtons();
+            this.showNotification('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+        }
+        
         this.updateAllButtons();
     },
     
@@ -923,13 +951,11 @@ const ChatSystem = {
         }); 
     },
     
-    // ✅ closeChat المعدلة بالكامل
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         console.log('currentChat:', this.currentChat);
         console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
         
-        // إرسال إشارات الإلغاء والإغلاق
         this.resetFeatures();
         this.sendConversationStatus(false);
         
