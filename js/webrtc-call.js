@@ -140,19 +140,14 @@ const CallSystem = {
         }
     },
     
-    // ==================== 4. المكالمة الصوتية (مع كود تشخيصي) ====================
+    // ==================== 4. المكالمة الصوتية ====================
     
     async startAudioCall(calleeId) {
-        // ✅ كود تشخيصي
-        alert('🔵 دالة startAudioCall تم استدعاؤها بنجاح داخل CallSystem');
-        
         if (!window.auth?.currentUser) {
-            alert('❌ لا يوجد مستخدم مسجل');
             console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
             return;
         }
         if (this.isInCall) {
-            alert('❌ أنت في مكالمة حالياً');
             console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
             return;
         }
@@ -179,12 +174,10 @@ const CallSystem = {
             
             const audioTracks = this.localStream.getAudioTracks();
             if (audioTracks.length === 0) {
-                alert('❌ لا يمكن الوصول إلى الميكروفون');
                 this.endCall();
                 return;
             }
             console.log('✅ تم الحصول على الميكروفون');
-            alert('✅ تم الحصول على الميكروفون');
             
             this.showCallUI('audio');
             
@@ -224,11 +217,9 @@ const CallSystem = {
             await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
             console.log('✅ تم إرسال العرض');
-            alert('✅ تم إرسال المكالمة إلى الطرف الآخر');
             
         } catch (e) { 
             console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
-            alert(`❌ خطأ في بدء المكالمة: ${e.message}`);
             this.endCall(); 
         }
     },
@@ -1182,7 +1173,7 @@ showCallUI(type) {
             }
         });
         
-        // ✅ 10.1 بدء مؤقت المكالمة
+        // بدء مؤقت المكالمة
         this.startCallTimer();
     }
 },
@@ -1522,29 +1513,11 @@ if (typeof window !== 'undefined') {
 
 // ==================== 17. الدوال العامة ====================
 window.startAudioCall = async () => {
-    // ✅ كود تشخيصي تلقائي (نظام التشخيص)
-    alert('🔍 1️⃣ تم الضغط على زر الاتصال الصوتي');
-    
     if (!ChatSystem.currentChat) {
-        alert('❌ الخطأ: لا توجد محادثة مفتوحة! الرجاء اختيار محادثة أولاً');
+        alert('الرجاء اختيار محادثة أولاً');
         return;
     }
-    
-    alert(`✅ 2️⃣ المحادثة مفتوحة: ${ChatSystem.currentChat}`);
-    
-    if (typeof CallSystem.startAudioCall !== 'function') {
-        alert('❌ الخطأ: دالة startAudioCall غير موجودة في CallSystem');
-        return;
-    }
-    
-    alert('✅ 3️⃣ الدالة موجودة، جاري بدء المكالمة...');
-    
-    try {
-        await CallSystem.startAudioCall(ChatSystem.currentChat);
-        alert('✅ 4️⃣ تم بدء المكالمة الصوتية بنجاح!');
-    } catch (error) {
-        alert(`❌ 4️⃣ خطأ في المكالمة: ${error.message}`);
-    }
+    await CallSystem.startAudioCall(ChatSystem.currentChat);
 };
 
 window.startVideoCall = async () => {
@@ -1561,4 +1534,3 @@ window.cleanupCallState = async () => {
 };
 
 console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
-console.log('✅ نظام التشخيص التلقائي للمكالمات الصوتية جاهز - سيظهر لك تنبيهات عند الضغط على زر الاتصال الصوتي');
