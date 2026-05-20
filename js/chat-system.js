@@ -15,12 +15,421 @@ const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
     friendInConversation: false,
     
+    // ✅ متغيرات نظام التفعيل
+    featuresEnabled: false,
+    featureRequestPending: false,
+    featureRequestReceived: false,
+    featureBlinkInterval: null,
+    
     init() { 
         this.loadAllChats(); 
-        this.setupPageFocusListener();  // ✅ إضافة مستمع التركيز على الصفحة
+        this.setupPageFocusListener();
+        this.setupFeatureButton();
     },
     
-    // ✅ مستمع لحدث التركيز على الصفحة (عند العودة إلى التطبيق)
+    // ✅ إعداد زر التفعيل
+    setupFeatureButton() {
+        // البحث عن زر التفعيل أو إنشائه
+        setTimeout(() => {
+            let btn = document.getElementById('enableFeaturesBtn');
+            if (!btn) {
+                // محاولة إضافة الزر في مكان مناسب
+                const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer');
+                if (container) {
+                    btn = document.createElement('button');
+                    btn.id = 'enableFeaturesBtn';
+                    btn.innerHTML = '🔓';
+                    btn.title = 'تفعيل الميزات (اتصال، صور، ملفات)';
+                    btn.style.cssText = `
+                        width: 45px;
+                        height: 45px;
+                        border-radius: 50%;
+                        background: #f44336;
+                        border: none;
+                        cursor: pointer;
+                        margin: 0 5px;
+                        font-size: 1.2rem;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    `;
+                    btn.onclick = () => this.requestEnableFeatures();
+                    container.appendChild(btn);
+                }
+            }
+        }, 1000);
+    },
+    
+    // ✅ بدء تأثير الوميض
+    startFeatureBlink() {
+        if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (!btn) return;
+        
+        let blinkCount = 0;
+        this.featureBlinkInterval = setInterval(() => {
+            if (!this.featureRequestPending && !this.featureRequestReceived) {
+                clearInterval(this.featureBlinkInterval);
+                btn.style.background = '#f44336';
+                return;
+            }
+            
+            blinkCount++;
+            if (blinkCount % 2 === 0) {
+                btn.style.background = '#2196F3';
+                btn.style.transform = 'scale(1.1)';
+            } else {
+                btn.style.background = '#4CAF50';
+                btn.style.transform = 'scale(1)';
+            }
+            
+            // بعد 30 ومضة (15 ثانية)، توقف
+            if (blinkCount > 30) {
+                clearInterval(this.featureBlinkInterval);
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                btn.style.background = '#f44336';
+                btn.style.transform = 'scale(1)';
+            }
+        }, 500);
+    },
+    
+    // ✅ إرسال طلب تفعيل الميزات
+    async requestEnableFeatures() {
+        if (!this.currentChat) {
+            alert('الرجاء اختيار محادثة أولاً');
+            return;
+        }
+        if (this.featuresEnabled) {
+            alert('الميزات مفعلة بالفعل');
+            return;
+        }
+        if (this.featureRequestPending) {
+            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+            return;
+        }
+        
+        this.featureRequestPending = true;
+        this.startFeatureBlink();
+        
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_request',
+                action: 'enable',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_request', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('📨 تم إرسال طلب تفعيل الميزات');
+            this.showNotification('📨 تم إرسال طلب تفعيل الميزات إلى الطرف الآخر');
+        } catch(e) {
+            this.featureRequestPending = false;
+            this.startFeatureBlink();
+            this.showNotification('❌ فشل إرسال الطلب');
+        }
+    },
+    
+    // ✅ معالجة طلب تفعيل الميزات (استقبال)
+    async handleFeatureRequest(fromId) {
+        if (this.featuresEnabled) {
+            await this.acceptFeatureRequest();
+            return;
+        }
+        
+        // ترمش الأيقونة عند المستلم
+        this.featureRequestReceived = true;
+        this.startFeatureBlink();
+        
+        // عرض إشعار
+        this.showNotification('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
+    },
+    
+    // ✅ قبول طلب تفعيل الميزات
+    async acceptFeatureRequest() {
+        if (!this.featureRequestReceived && !this.featureRequestPending) {
+            // يمكن قبول حتى بدون طلب (للتزامن)
+        }
+        
+        this.featuresEnabled = true;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#4CAF50';
+            btn.style.transform = 'scale(1)';
+            btn.title = 'الميزات مفعلة ✅';
+        }
+        
+        // إرسال قبول إلى الطرف الآخر
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_response',
+                action: 'accepted',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_response', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            
+            this.updateAllButtons();
+            this.showNotification('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
+        } catch(e) {
+            console.error('خطأ في إرسال القبول:', e);
+        }
+    },
+    
+    // ✅ رفض طلب تفعيل الميزات
+    async rejectFeatureRequest() {
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+        }
+        
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_response',
+                action: 'rejected',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_response', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            this.showNotification('❌ تم رفض الطلب');
+        } catch(e) {}
+    },
+    
+    // ✅ معالجة رد الطرف الآخر
+    handleFeatureResponse(fromId, action) {
+        if (action === 'accepted') {
+            this.featuresEnabled = true;
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            if (this.featureBlinkInterval) {
+                clearInterval(this.featureBlinkInterval);
+            }
+            
+            const btn = document.getElementById('enableFeaturesBtn');
+            if (btn) {
+                btn.style.background = '#4CAF50';
+                btn.title = 'الميزات مفعلة ✅';
+            }
+            
+            this.updateAllButtons();
+            this.showNotification('✅ تم تفعيل الميزات!');
+        } else if (action === 'rejected') {
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            if (this.featureBlinkInterval) {
+                clearInterval(this.featureBlinkInterval);
+            }
+            
+            const btn = document.getElementById('enableFeaturesBtn');
+            if (btn) {
+                btn.style.background = '#f44336';
+            }
+            this.showNotification('❌ تم رفض طلب تفعيل الميزات');
+        }
+    },
+    
+    // ✅ إعادة تعيين عند خروج المستخدم
+    resetFeatures() {
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+        }
+        
+        // إرسال إشارة إلغاء إلى الطرف الآخر
+        if (this.currentChat) {
+            this.sendFeatureCancel();
+        }
+        
+        this.updateAllButtons();
+    },
+    
+    // ✅ إرسال إشارة إلغاء عند الخروج
+    async sendFeatureCancel() {
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_cancel',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_cancel', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+        } catch(e) {}
+    },
+    
+    // ✅ معالجة إلغاء الطرف الآخر
+    handleFeatureCancel() {
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+        }
+        
+        this.updateAllButtons();
+        this.showNotification('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+    },
+    
+    // ✅ إظهار إشعار بدون مربع حوار
+    showNotification(message) {
+        // إزالة أي إشعار سابق
+        const oldNotif = document.getElementById('featureNotification');
+        if (oldNotif) oldNotif.remove();
+        
+        const notification = document.createElement('div');
+        notification.id = 'featureNotification';
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            z-index: 10001;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            white-space: nowrap;
+            animation: fadeOut 3s forwards;
+        `;
+        document.body.appendChild(notification);
+        
+        // إضافة الـ keyframes إذا لم تكن موجودة
+        if (!document.querySelector('#fadeOutKeyframes')) {
+            const style = document.createElement('style');
+            style.id = 'fadeOutKeyframes';
+            style.textContent = `
+                @keyframes fadeOut {
+                    0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    70% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    100% { opacity: 0; transform: translateX(-50%) translateY(-20px); visibility: hidden; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        setTimeout(() => notification.remove(), 3000);
+    },
+    
+    // ✅ تحديث الأزرار (معدل ليشمل featuresEnabled)
+    updateAllButtons() {
+        // ✅ الميزات تعمل فقط إذا: الطرفان في المحادثة + تم تفعيل الميزات
+        const canUse = (this.friendInConversation && this.featuresEnabled);
+        
+        const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
+        btns.forEach(btn => { 
+            if (canUse) { 
+                btn.classList.remove('locked'); 
+                btn.title = ''; 
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            } else { 
+                btn.classList.add('locked'); 
+                btn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            } 
+        });
+        
+        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
+                             document.querySelector('.audio-call-btn') ||
+                             document.querySelector('#audioCallBtn') ||
+                             document.querySelector('button[data-call="audio"]');
+        
+        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
+                             document.querySelector('.video-call-btn') ||
+                             document.querySelector('#videoCallBtn') ||
+                             document.querySelector('button[data-call="video"]');
+        
+        if (audioCallBtn) {
+            if (canUse) {
+                audioCallBtn.style.opacity = '1';
+                audioCallBtn.style.pointerEvents = 'auto';
+                audioCallBtn.title = 'مكالمة صوتية';
+            } else {
+                audioCallBtn.style.opacity = '0.5';
+                audioCallBtn.style.pointerEvents = 'none';
+                audioCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            }
+        }
+        
+        if (videoCallBtn) {
+            if (canUse) {
+                videoCallBtn.style.opacity = '1';
+                videoCallBtn.style.pointerEvents = 'auto';
+                videoCallBtn.title = 'مكالمة فيديو';
+            } else {
+                videoCallBtn.style.opacity = '0.5';
+                videoCallBtn.style.pointerEvents = 'none';
+                videoCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            }
+        }
+        
+        console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
+    },
+    
     setupPageFocusListener() {
         window.addEventListener('focus', () => {
             if (this.currentChat && this.friendOnline) {
@@ -31,7 +440,6 @@ const ChatSystem = {
         });
     },
     
-    // ✅ طلب حالة المحادثة من الطرف الآخر
     async requestConversationStatus() {
         if (!this.currentChat) return;
         try {
@@ -145,64 +553,10 @@ const ChatSystem = {
         this.updateAllButtons();
     },
     
-    updateAllButtons() {
-        const canUse = this.friendInConversation;
-        
-        const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
-        btns.forEach(btn => { 
-            if (canUse) { 
-                btn.classList.remove('locked'); 
-                btn.title = ''; 
-                btn.style.opacity = '1';
-                btn.style.pointerEvents = 'auto';
-            } else { 
-                btn.classList.add('locked'); 
-                btn.title = 'غير متاح - الطرف الآخر ليس في المحادثة';
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-            } 
-        });
-        
-        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
-                             document.querySelector('.audio-call-btn') ||
-                             document.querySelector('#audioCallBtn') ||
-                             document.querySelector('button[data-call="audio"]');
-        
-        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
-                             document.querySelector('.video-call-btn') ||
-                             document.querySelector('#videoCallBtn') ||
-                             document.querySelector('button[data-call="video"]');
-        
-        if (audioCallBtn) {
-            if (canUse) {
-                audioCallBtn.style.opacity = '1';
-                audioCallBtn.style.pointerEvents = 'auto';
-                audioCallBtn.title = 'مكالمة صوتية';
-            } else {
-                audioCallBtn.style.opacity = '0.5';
-                audioCallBtn.style.pointerEvents = 'none';
-                audioCallBtn.title = 'غير متاح - الطرف الآخر ليس في المحادثة';
-            }
-        }
-        
-        if (videoCallBtn) {
-            if (canUse) {
-                videoCallBtn.style.opacity = '1';
-                videoCallBtn.style.pointerEvents = 'auto';
-                videoCallBtn.title = 'مكالمة فيديو';
-            } else {
-                videoCallBtn.style.opacity = '0.5';
-                videoCallBtn.style.pointerEvents = 'none';
-                videoCallBtn.title = 'غير متاح - الطرف الآخر ليس في المحادثة';
-            }
-        }
-        
-        console.log(`🎛️ تحديث الأزرار: الطرف الآخر في المحادثة: ${this.friendInConversation ? 'نعم ✅' : 'لا ❌'} | الإستخدام: ${canUse ? 'مسموح ✅' : 'ممنوع ❌'}`);
-    },
-    
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         this.friendInConversation = false;
+        this.resetFeatures(); // ✅ إعادة تعيين عند فتح محادثة جديدة
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
@@ -216,7 +570,6 @@ const ChatSystem = {
             this.sendConversationStatus(true);
         }, 500);
         
-        // ✅ طلب حالة المحادثة من الطرف الآخر
         setTimeout(() => {
             this.requestConversationStatus();
         }, 1000);
@@ -229,6 +582,9 @@ const ChatSystem = {
         
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+        
+        // ✅ إعداد زر التفعيل
+        setTimeout(() => this.setupFeatureButton(), 500);
     },
     
     updateFriendStatus(friendId, isOnline, userData = null) {
@@ -333,8 +689,8 @@ const ChatSystem = {
     },
     
     async sendFileWithRetry(file, type, maxRetries = 3) {
-        if (!this.friendInConversation) {
-            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return false;
         }
         
@@ -350,8 +706,8 @@ const ChatSystem = {
     },
     
     async _ensureChannelReady() {
-        if (!this.friendInConversation) {
-            alert('الطرف الآخر ليس في المحادثة حالياً');
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
             return false;
         }
         
@@ -377,8 +733,8 @@ const ChatSystem = {
     
     async sendImage(file) { 
         if (!this.currentChat) return;
-        if (!this.friendInConversation) {
-            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
         if (!(await this._ensureChannelReady())) return;
@@ -397,8 +753,8 @@ const ChatSystem = {
     
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
-        if (!this.friendInConversation) {
-            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
         
@@ -430,8 +786,8 @@ const ChatSystem = {
     
     async sendFile(file) { 
         if (!this.currentChat) return;
-        if (!this.friendInConversation) {
-            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
         if (!(await this._ensureChannelReady())) return;
@@ -449,8 +805,8 @@ const ChatSystem = {
     
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
-        if (!this.friendInConversation) {
-            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
         if (!(await this._ensureChannelReady())) return;
@@ -468,8 +824,8 @@ const ChatSystem = {
     
     async shareLocationDirect() { 
         if (!this.currentChat) return; 
-        if (!this.friendInConversation) {
-            alert('لا يمكن المشاركة - الطرف الآخر ليس في المحادثة');
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
             return;
         }
         if (!(await this._ensureChannelReady())) return;
@@ -518,6 +874,7 @@ const ChatSystem = {
     },
     
     closeChat() {
+        this.resetFeatures(); // ✅ إعادة تعيين عند الخروج
         this.sendConversationStatus(false);
         
         document.body.classList.remove('conversation-open');
