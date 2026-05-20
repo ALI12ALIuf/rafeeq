@@ -227,7 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (مع معالجة conversation_status و conversation_status_request) ==========
+    // ========== الدالة المعدلة (مع معالجة جميع أنواع الرسائل) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -275,9 +275,33 @@ const SecureChatSystem = {
             else if (msg.package.type === 'conversation_status_request') {
                 console.log('📤 استلام طلب حالة محادثة من:', msg.from);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    // إرسال الحالة الحالية (المحادثة مفتوحة)
                     console.log('📤 الرد على طلب الحالة - المحادثة مفتوحة');
                     ChatSystem.sendConversationStatus(true);
+                }
+            }
+            // ✅✅ معالجة طلب تفعيل الميزات (feature_request)
+            else if (msg.package.type === 'feature_request') {
+                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                const requestData = JSON.parse(decryptedData);
+                console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
+                    ChatSystem.handleFeatureRequest(msg.from);
+                }
+            }
+            // ✅✅ معالجة رد تفعيل الميزات (feature_response)
+            else if (msg.package.type === 'feature_response') {
+                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                const responseData = JSON.parse(decryptedData);
+                console.log('🔓 استلام رد على طلب التفعيل من:', msg.from, '| الحالة:', responseData.action);
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
+                    ChatSystem.handleFeatureResponse(msg.from, responseData.action);
+                }
+            }
+            // ✅✅ معالجة إلغاء تفعيل الميزات (feature_cancel)
+            else if (msg.package.type === 'feature_cancel') {
+                console.log('🔓 استلام إلغاء تفعيل الميزات من:', msg.from);
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureCancel) {
+                    ChatSystem.handleFeatureCancel();
                 }
             }
             // الحفاظ على وظيفة الموقع والملفات
