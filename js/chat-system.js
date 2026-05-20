@@ -13,7 +13,7 @@ const PresenceSystem = {
 
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
-    friendInConversation: false,  // ✅ متغير جديد: هل الطرف الآخر في نفس المحادثة؟
+    friendInConversation: false,  // ✅ هل الطرف الآخر في نفس المحادثة؟
     
     init() { this.loadAllChats(); },
     
@@ -109,10 +109,10 @@ const ChatSystem = {
         this.updateAllButtons();
     },
     
-    // ========== تحديث جميع الأزرار (حسب الاتصال والمحادثة) ==========
+    // ========== تحديث جميع الأزرار (تعتمد فقط على friendInConversation) ==========
     updateAllButtons() {
-        // الشرط: المستخدم متصل + الطرف الآخر في نفس المحادثة
-        const canUse = (this.friendOnline && this.friendInConversation);
+        // ✅ الشرط الوحيد: الطرف الآخر في نفس المحادثة (لا حاجة لـ friendOnline)
+        const canUse = this.friendInConversation;
         
         // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
         const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
@@ -124,7 +124,7 @@ const ChatSystem = {
                 btn.style.pointerEvents = 'auto';
             } else { 
                 btn.classList.add('locked'); 
-                btn.title = this.friendOnline ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - المستخدم غير متصل';
+                btn.title = 'غير متاح - الطرف الآخر ليس في المحادثة';
                 btn.style.opacity = '0.5';
                 btn.style.pointerEvents = 'none';
             } 
@@ -149,7 +149,7 @@ const ChatSystem = {
             } else {
                 audioCallBtn.style.opacity = '0.5';
                 audioCallBtn.style.pointerEvents = 'none';
-                audioCallBtn.title = this.friendOnline ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'المستخدم غير متصل';
+                audioCallBtn.title = 'غير متاح - الطرف الآخر ليس في المحادثة';
             }
         }
         
@@ -161,16 +161,16 @@ const ChatSystem = {
             } else {
                 videoCallBtn.style.opacity = '0.5';
                 videoCallBtn.style.pointerEvents = 'none';
-                videoCallBtn.title = this.friendOnline ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'المستخدم غير متصل';
+                videoCallBtn.title = 'غير متاح - الطرف الآخر ليس في المحادثة';
             }
         }
         
-        console.log(`🎛️ تحديث الأزرار: المستخدم ${this.friendOnline ? 'متصل ✅' : 'غير متصل ❌'} | الطرف الآخر في المحادثة: ${this.friendInConversation ? 'نعم ✅' : 'لا ❌'} | الإستخدام: ${canUse ? 'مسموح ✅' : 'ممنوع ❌'}`);
+        console.log(`🎛️ تحديث الأزرار: الطرف الآخر في المحادثة: ${this.friendInConversation ? 'نعم ✅' : 'لا ❌'} | الإستخدام: ${canUse ? 'مسموح ✅' : 'ممنوع ❌'}`);
     },
     
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
-        this.friendInConversation = false; // ✅ إعادة تعيين عند فتح المحادثة
+        this.friendInConversation = false;
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
@@ -213,7 +213,6 @@ const ChatSystem = {
         
         if (isOnline) {
             statusHtml = '🟢 متصل';
-            // إذا كان الطرف الآخر في المحادثة، أضف مؤشراً
             if (this.friendInConversation) {
                 statusHtml += ' 📱 في المحادثة';
             }
@@ -299,8 +298,8 @@ const ChatSystem = {
     },
     
     async sendFileWithRetry(file, type, maxRetries = 3) {
-        // ✅ التحقق: هل يمكن الإرسال؟ (متصل + في نفس المحادثة)
-        if (!this.friendOnline || !this.friendInConversation) {
+        // ✅ التحقق: الطرف الآخر في نفس المحادثة فقط
+        if (!this.friendInConversation) {
             alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
             return false;
         }
@@ -317,7 +316,7 @@ const ChatSystem = {
     },
     
     async _ensureChannelReady() {
-        if (!this.friendOnline || !this.friendInConversation) {
+        if (!this.friendInConversation) {
             alert('الطرف الآخر ليس في المحادثة حالياً');
             return false;
         }
@@ -344,7 +343,7 @@ const ChatSystem = {
     
     async sendImage(file) { 
         if (!this.currentChat) return;
-        if (!this.friendOnline || !this.friendInConversation) {
+        if (!this.friendInConversation) {
             alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
             return;
         }
@@ -364,7 +363,7 @@ const ChatSystem = {
     
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
-        if (!this.friendOnline || !this.friendInConversation) {
+        if (!this.friendInConversation) {
             alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
             return;
         }
@@ -397,7 +396,7 @@ const ChatSystem = {
     
     async sendFile(file) { 
         if (!this.currentChat) return;
-        if (!this.friendOnline || !this.friendInConversation) {
+        if (!this.friendInConversation) {
             alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
             return;
         }
@@ -416,7 +415,7 @@ const ChatSystem = {
     
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
-        if (!this.friendOnline || !this.friendInConversation) {
+        if (!this.friendInConversation) {
             alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
             return;
         }
@@ -435,7 +434,7 @@ const ChatSystem = {
     
     async shareLocationDirect() { 
         if (!this.currentChat) return; 
-        if (!this.friendOnline || !this.friendInConversation) {
+        if (!this.friendInConversation) {
             alert('لا يمكن المشاركة - الطرف الآخر ليس في المحادثة');
             return;
         }
