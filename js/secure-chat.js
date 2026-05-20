@@ -227,7 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (هذا هو التعديل الوحيد) ==========
+    // ========== الدالة المعدلة (مع إضافة معالجة conversation_status) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -263,6 +263,15 @@ const SecureChatSystem = {
                     if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
                         CallSystem.handleSignaling(parsedData);
                     }
+                }
+            }
+            // ✅ معالجة رسالة حالة المحادثة (conversation_status)
+            else if (msg.package.type === 'conversation_status') {
+                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                const statusData = JSON.parse(decryptedData);
+                console.log('💬 استلام حالة محادثة من:', msg.from, '| مفتوحة:', statusData.isOpen);
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.updateFriendConversationStatus) {
+                    ChatSystem.updateFriendConversationStatus(msg.from, statusData.isOpen);
                 }
             }
             // الحفاظ على وظيفة الموقع والملفات
