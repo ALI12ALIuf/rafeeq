@@ -50,7 +50,6 @@ const ChatSystem = {
                         transition: all 0.3s ease;
                         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                     `;
-                    // ✅ دالة ذكية للزر
                     btn.onclick = () => {
                         console.log('🔘 تم الضغط على الزر');
                         console.log('featureRequestReceived:', this.featureRequestReceived);
@@ -174,7 +173,7 @@ const ChatSystem = {
         console.log('✅ تم تفعيل وضع الاستقبال');
     },
     
-    // ✅ قبول طلب تفعيل الميزات (معدلة)
+    // ✅ قبول طلب تفعيل الميزات
     async acceptFeatureRequest() {
         console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
         
@@ -204,7 +203,6 @@ const ChatSystem = {
             console.log('⚠️ لم يتم العثور على الزر');
         }
         
-        // إرسال قبول إلى الطرف الآخر
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
@@ -302,7 +300,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅ إعادة تعيين عند خروج المستخدم
+    // ✅ إعادة تعيين عند خروج المستخدم (معدلة)
     resetFeatures() {
         console.log('🔄 resetFeatures - إعادة تعيين الميزات');
         this.featuresEnabled = false;
@@ -319,19 +317,28 @@ const ChatSystem = {
             btn.title = 'تفعيل الميزات';
         }
         
+        // إرسال إشارة إلغاء إلى الطرف الآخر (مع محاولة إعادة)
         if (this.currentChat) {
-            this.sendFeatureCancel();
+            this.sendFeatureCancelWithRetry();
         }
         
         this.updateAllButtons();
     },
     
-    // ✅ إرسال إشارة إلغاء عند الخروج
-    async sendFeatureCancel() {
+    // ✅ إرسال إشارة إلغاء مع إعادة محاولة
+    async sendFeatureCancelWithRetry(retryCount = 0) {
+        const maxRetries = 3;
+        console.log(`📤 sendFeatureCancel - محاولة ${retryCount + 1}/${maxRetries + 1} إلى:`, this.currentChat);
+        
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!myPrivateKey || !receiverPublicKey) return;
+            if (!myPrivateKey || !receiverPublicKey) {
+                if (retryCount < maxRetries) {
+                    setTimeout(() => this.sendFeatureCancelWithRetry(retryCount + 1), 500);
+                }
+                return;
+            }
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
                 type: 'feature_cancel',
@@ -343,12 +350,20 @@ const ChatSystem = {
                 data: encrypted, 
                 timestamp: Date.now() 
             });
-        } catch(e) {}
+            console.log('✅ تم إرسال إشارة الإلغاء بنجاح');
+        } catch(e) {
+            console.error('❌ خطأ في إرسال الإلغاء:', e);
+            if (retryCount < maxRetries) {
+                setTimeout(() => this.sendFeatureCancelWithRetry(retryCount + 1), 500);
+            }
+        }
     },
     
-    // ✅ معالجة إلغاء الطرف الآخر
+    // ✅ معالجة إلغاء الطرف الآخر (معدلة)
     handleFeatureCancel() {
-        console.log('🔓 handleFeatureCancel - تم استلام إلغاء');
+        console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
+        console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
+        
         this.featuresEnabled = false;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -360,10 +375,13 @@ const ChatSystem = {
         const btn = document.getElementById('enableFeaturesBtn');
         if (btn) {
             btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+            console.log('✅ تم تغيير لون الزر إلى الأحمر');
         }
         
         this.updateAllButtons();
         this.showNotification('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+        console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
     },
     
     // ✅ إظهار إشعار بدون مربع حوار
@@ -905,9 +923,17 @@ const ChatSystem = {
         }); 
     },
     
+    // ✅ closeChat المعدلة بالكامل
     closeChat() {
+        console.log('🔴 closeChat - بدء إغلاق المحادثة');
+        console.log('currentChat:', this.currentChat);
+        console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
+        
+        // إرسال إشارات الإلغاء والإغلاق
         this.resetFeatures();
         this.sendConversationStatus(false);
+        
+        console.log('✅ تم إرسال إشارات الإغلاق');
         
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
@@ -917,6 +943,8 @@ const ChatSystem = {
         this.currentChat = null;
         this.friendOnline = false;
         this.friendInConversation = false;
+        
+        console.log('✅ closeChat - انتهى');
     },
     
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
