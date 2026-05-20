@@ -13,6 +13,7 @@ const PresenceSystem = {
 
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
+    friendInConversation: false,  // ✅ متغير جديد: هل الطرف الآخر في نفس المحادثة؟
     
     init() { this.loadAllChats(); },
     
@@ -75,8 +76,102 @@ const ChatSystem = {
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
+    // ========== دالة إرسال حالة المحادثة ==========
+    async sendConversationStatus(isOpen) {
+        if (!this.currentChat) return;
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'conversation_status', 
+                isOpen: isOpen,
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'conversation_status', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log(`📬 تم إرسال حالة المحادثة: ${isOpen ? 'مفتوحة' : 'مغلقة'}`);
+        } catch(e) {
+            console.error('خطأ في إرسال حالة المحادثة:', e);
+        }
+    },
+    
+    // ========== تحديث حالة الطرف الآخر في المحادثة ==========
+    updateFriendConversationStatus(friendId, isInConversation) {
+        if (this.currentChat !== friendId) return;
+        this.friendInConversation = isInConversation;
+        console.log(`👥 تحديث حالة المحادثة للطرف الآخر: ${isInConversation ? 'في المحادثة ✅' : 'ليس في المحادثة ❌'}`);
+        this.updateAllButtons();
+    },
+    
+    // ========== تحديث جميع الأزرار (حسب الاتصال والمحادثة) ==========
+    updateAllButtons() {
+        // الشرط: المستخدم متصل + الطرف الآخر في نفس المحادثة
+        const canUse = (this.friendOnline && this.friendInConversation);
+        
+        // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
+        const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
+        btns.forEach(btn => { 
+            if (canUse) { 
+                btn.classList.remove('locked'); 
+                btn.title = ''; 
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            } else { 
+                btn.classList.add('locked'); 
+                btn.title = this.friendOnline ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - المستخدم غير متصل';
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            } 
+        });
+        
+        // تعطيل أزرار الاتصال (الصوتي والمرئي)
+        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
+                             document.querySelector('.audio-call-btn') ||
+                             document.querySelector('#audioCallBtn') ||
+                             document.querySelector('button[data-call="audio"]');
+        
+        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
+                             document.querySelector('.video-call-btn') ||
+                             document.querySelector('#videoCallBtn') ||
+                             document.querySelector('button[data-call="video"]');
+        
+        if (audioCallBtn) {
+            if (canUse) {
+                audioCallBtn.style.opacity = '1';
+                audioCallBtn.style.pointerEvents = 'auto';
+                audioCallBtn.title = 'مكالمة صوتية';
+            } else {
+                audioCallBtn.style.opacity = '0.5';
+                audioCallBtn.style.pointerEvents = 'none';
+                audioCallBtn.title = this.friendOnline ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'المستخدم غير متصل';
+            }
+        }
+        
+        if (videoCallBtn) {
+            if (canUse) {
+                videoCallBtn.style.opacity = '1';
+                videoCallBtn.style.pointerEvents = 'auto';
+                videoCallBtn.title = 'مكالمة فيديو';
+            } else {
+                videoCallBtn.style.opacity = '0.5';
+                videoCallBtn.style.pointerEvents = 'none';
+                videoCallBtn.title = this.friendOnline ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'المستخدم غير متصل';
+            }
+        }
+        
+        console.log(`🎛️ تحديث الأزرار: المستخدم ${this.friendOnline ? 'متصل ✅' : 'غير متصل ❌'} | الطرف الآخر في المحادثة: ${this.friendInConversation ? 'نعم ✅' : 'لا ❌'} | الإستخدام: ${canUse ? 'مسموح ✅' : 'ممنوع ❌'}`);
+    },
+    
     openChat(friendId, friendName, friendAvatar) {
-        this.currentChat = friendId; document.body.classList.add('conversation-open');
+        this.currentChat = friendId;
+        this.friendInConversation = false; // ✅ إعادة تعيين عند فتح المحادثة
+        document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
         if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
@@ -84,6 +179,11 @@ const ChatSystem = {
         document.getElementById('conversationPage').style.display = 'flex';
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
+        
+        // ✅ إرسال إشارة بأن المستخدم فتح المحادثة
+        setTimeout(() => {
+            this.sendConversationStatus(true);
+        }, 500);
         
         setTimeout(() => { 
             if (this.friendOnline) {
@@ -113,6 +213,10 @@ const ChatSystem = {
         
         if (isOnline) {
             statusHtml = '🟢 متصل';
+            // إذا كان الطرف الآخر في المحادثة، أضف مؤشراً
+            if (this.friendInConversation) {
+                statusHtml += ' 📱 في المحادثة';
+            }
         } else {
             statusHtml = '🔴 غير متصل';
         }
@@ -120,68 +224,8 @@ const ChatSystem = {
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
         
-        if (isOnline) {
-            this.updateAttachmentButtons(true);
-        } else {
-            this.updateAttachmentButtons(false);
-        }
-    },
-    
-    // ========== الدالة المعدلة (تعطيل أزرار الاتصال عند عدم الاتصال) ==========
-    updateAttachmentButtons(isOnline) {
-        // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
-        const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
-        btns.forEach(btn => { 
-            if (isOnline) { 
-                btn.classList.remove('locked'); 
-                btn.title = ''; 
-                btn.style.opacity = '1';
-                btn.style.pointerEvents = 'auto';
-            } else { 
-                btn.classList.add('locked'); 
-                btn.title = 'غير متاح - المستخدم غير متصل';
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-            } 
-        });
-        
-        // ✅ تعطيل أزرار الاتصال (الصوتي والمرئي) إذا كان المستخدم غير متصل
-        // البحث عن أزرار الاتصال بطرق مختلفة
-        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
-                             document.querySelector('.audio-call-btn') ||
-                             document.querySelector('#audioCallBtn') ||
-                             document.querySelector('button[data-call="audio"]');
-        
-        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
-                             document.querySelector('.video-call-btn') ||
-                             document.querySelector('#videoCallBtn') ||
-                             document.querySelector('button[data-call="video"]');
-        
-        if (audioCallBtn) {
-            if (isOnline) {
-                audioCallBtn.style.opacity = '1';
-                audioCallBtn.style.pointerEvents = 'auto';
-                audioCallBtn.title = 'مكالمة صوتية';
-            } else {
-                audioCallBtn.style.opacity = '0.5';
-                audioCallBtn.style.pointerEvents = 'none';
-                audioCallBtn.title = 'المستخدم غير متصل';
-            }
-        }
-        
-        if (videoCallBtn) {
-            if (isOnline) {
-                videoCallBtn.style.opacity = '1';
-                videoCallBtn.style.pointerEvents = 'auto';
-                videoCallBtn.title = 'مكالمة فيديو';
-            } else {
-                videoCallBtn.style.opacity = '0.5';
-                videoCallBtn.style.pointerEvents = 'none';
-                videoCallBtn.title = 'المستخدم غير متصل';
-            }
-        }
-        
-        console.log(`🎛️ تحديث الأزرار: المستخدم ${isOnline ? 'متصل ✅' : 'غير متصل ❌'}`);
+        // ✅ تحديث الأزرار
+        this.updateAllButtons();
     },
     
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
@@ -255,6 +299,12 @@ const ChatSystem = {
     },
     
     async sendFileWithRetry(file, type, maxRetries = 3) {
+        // ✅ التحقق: هل يمكن الإرسال؟ (متصل + في نفس المحادثة)
+        if (!this.friendOnline || !this.friendInConversation) {
+            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+            return false;
+        }
+        
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
@@ -267,8 +317,8 @@ const ChatSystem = {
     },
     
     async _ensureChannelReady() {
-        if (!this.friendOnline) {
-            alert('المستخدم غير متصل حالياً');
+        if (!this.friendOnline || !this.friendInConversation) {
+            alert('الطرف الآخر ليس في المحادثة حالياً');
             return false;
         }
         
@@ -294,6 +344,10 @@ const ChatSystem = {
     
     async sendImage(file) { 
         if (!this.currentChat) return;
+        if (!this.friendOnline || !this.friendInConversation) {
+            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+            return;
+        }
         if (!(await this._ensureChannelReady())) return;
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
@@ -310,6 +364,10 @@ const ChatSystem = {
     
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
+        if (!this.friendOnline || !this.friendInConversation) {
+            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+            return;
+        }
         
         try {
             await SecureChatSystem.validateVideo(file);
@@ -339,6 +397,10 @@ const ChatSystem = {
     
     async sendFile(file) { 
         if (!this.currentChat) return;
+        if (!this.friendOnline || !this.friendInConversation) {
+            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+            return;
+        }
         if (!(await this._ensureChannelReady())) return;
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
@@ -354,6 +416,10 @@ const ChatSystem = {
     
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
+        if (!this.friendOnline || !this.friendInConversation) {
+            alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
+            return;
+        }
         if (!(await this._ensureChannelReady())) return;
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
@@ -369,6 +435,10 @@ const ChatSystem = {
     
     async shareLocationDirect() { 
         if (!this.currentChat) return; 
+        if (!this.friendOnline || !this.friendInConversation) {
+            alert('لا يمكن المشاركة - الطرف الآخر ليس في المحادثة');
+            return;
+        }
         if (!(await this._ensureChannelReady())) return;
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
@@ -415,12 +485,17 @@ const ChatSystem = {
     },
     
     closeChat() {
+        // ✅ إرسال إشارة بإغلاق المحادثة
+        this.sendConversationStatus(false);
+        
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
         PresenceSystem.stopAll();
         if (!CallSystem.isInCall) CallSystem.cleanupConnections();
-        this.currentChat = null; this.friendOnline = false;
+        this.currentChat = null;
+        this.friendOnline = false;
+        this.friendInConversation = false;
     },
     
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
