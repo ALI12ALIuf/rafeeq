@@ -227,7 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (مع كود تشخيصي لـ conversation_status) ==========
+    // ========== الدالة المعدلة (مع معالجة conversation_status و conversation_status_request) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -262,25 +262,25 @@ const SecureChatSystem = {
                     }
                 }
             }
-            // ✅ معالجة رسالة حالة المحادثة (conversation_status) مع كود تشخيصي
+            // ✅ معالجة رسالة حالة المحادثة (conversation_status)
             else if (msg.package.type === 'conversation_status') {
-                // ✅ كود تشخيصي - يظهر تنبيه
-                alert('📨 1️⃣ تم استلام رسالة conversation_status');
-                
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const statusData = JSON.parse(decryptedData);
-                
-                alert(`📨 2️⃣ المستخدم: ${msg.from} | المحادثة ${statusData.isOpen ? 'مفتوحة ✅' : 'مغلقة ❌'}`);
                 console.log('💬 استلام حالة محادثة من:', msg.from, '| مفتوحة:', statusData.isOpen);
-                
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.updateFriendConversationStatus) {
-                    alert('📨 3️⃣ جاري استدعاء updateFriendConversationStatus');
                     ChatSystem.updateFriendConversationStatus(msg.from, statusData.isOpen);
-                } else {
-                    alert('❌ 3️⃣ ChatSystem.updateFriendConversationStatus غير موجود');
-                    console.error('❌ ChatSystem.updateFriendConversationStatus غير موجود');
                 }
             }
+            // ✅ معالجة طلب حالة المحادثة (conversation_status_request)
+            else if (msg.package.type === 'conversation_status_request') {
+                console.log('📤 استلام طلب حالة محادثة من:', msg.from);
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
+                    // إرسال الحالة الحالية (المحادثة مفتوحة)
+                    console.log('📤 الرد على طلب الحالة - المحادثة مفتوحة');
+                    ChatSystem.sendConversationStatus(true);
+                }
+            }
+            // الحفاظ على وظيفة الموقع والملفات
             else if (msg.package.type === 'location') {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
