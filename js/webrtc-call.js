@@ -143,6 +143,12 @@ const CallSystem = {
 // ==================== 4. المكالمة الصوتية ====================
 
 async startAudioCall(calleeId) {
+    // ✅ منع بدء المكالمة إذا كان الطرف الآخر غير متصل (بدون رسالة تنبيه)
+    if (!ChatSystem.friendOnline) {
+        console.log('❌ لا يمكن بدء المكالمة: المستخدم غير متصل');
+        return;
+    }
+    
     if (!window.auth?.currentUser) {
         console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
         return;
@@ -225,67 +231,71 @@ async startAudioCall(calleeId) {
         this.endCall(); 
     }
 },
-            
-
     
     // ==================== 5. المكالمة المرئية ====================
     
-    async startVideoCall(calleeId) {
-        if (!window.auth?.currentUser) {
-            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-            return;
+async startVideoCall(calleeId) {
+    // ✅ منع بدء المكالمة إذا كان الطرف الآخر غير متصل (بدون رسالة تنبيه)
+    if (!ChatSystem.friendOnline) {
+        console.log('❌ لا يمكن بدء المكالمة: المستخدم غير متصل');
+        return;
+    }
+    
+    if (!window.auth?.currentUser) {
+        console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
+        return;
+    }
+    if (this.isInCall) {
+        console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+        return;
+    }
+    
+    this.isInCall = true;
+    this.callType = 'video';
+    this.currentCallId = calleeId;
+    
+    try {
+        if (window.auth?.currentUser) {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: true,
+                callType: 'video'
+            }).catch(() => {});
         }
-        if (this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+        
+        const constraints = { 
+            audio: true, 
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
+        };
+        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (this.localStream.getAudioTracks().length === 0) {
+            this.endCall();
             return;
         }
         
-        this.isInCall = true;
-        this.callType = 'video';
-        this.currentCallId = calleeId;
+        this.showCallUI('video');
+        this.pc = new RTCPeerConnection(this.servers);
+        this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+        this.dc = this.pc.createDataChannel('chat');
+        this.setupDataChannel(this.dc);
         
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: 'video'
-                }).catch(() => {});
-            }
-            
-            const constraints = { 
-                audio: true, 
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
-            };
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
-                return;
-            }
-            
-            this.showCallUI('video');
-            this.pc = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => {
-                const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) rv.srcObject = e.streams[0];
-            };
-            this.pc.onconnectionstatechange = () => {
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
-            };
-            
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
-            
-        } catch (e) { 
-            this.endCall(); 
-        }
-    },
+        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+        this.pc.ontrack = e => {
+            const rv = document.getElementById('remoteVideo');
+            if (rv && e.streams[0]) rv.srcObject = e.streams[0];
+        };
+        this.pc.onconnectionstatechange = () => {
+            if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
+        };
+        
+        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+        await this.pc.setLocalDescription(offer);
+        await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
+        
+    } catch (e) { 
+        this.endCall(); 
+    }
+},
     
     // ==================== 6. إعداد الصوت عن بعد ====================
     
