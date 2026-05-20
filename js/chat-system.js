@@ -27,14 +27,12 @@ const ChatSystem = {
         this.setupFeatureButton();
     },
     
-    // ✅ إعداد زر التفعيل
+    // ✅ إعداد زر التفعيل (معدل بالكامل)
     setupFeatureButton() {
-        // البحث عن زر التفعيل أو إنشائه
         setTimeout(() => {
             let btn = document.getElementById('enableFeaturesBtn');
             if (!btn) {
-                // محاولة إضافة الزر في مكان مناسب
-                const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer');
+                const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
                 if (container) {
                     btn = document.createElement('button');
                     btn.id = 'enableFeaturesBtn';
@@ -52,8 +50,31 @@ const ChatSystem = {
                         transition: all 0.3s ease;
                         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                     `;
-                    btn.onclick = () => this.requestEnableFeatures();
+                    // ✅ دالة ذكية للزر
+                    btn.onclick = () => {
+                        console.log('🔘 تم الضغط على الزر');
+                        console.log('featureRequestReceived:', this.featureRequestReceived);
+                        console.log('featureRequestPending:', this.featureRequestPending);
+                        console.log('featuresEnabled:', this.featuresEnabled);
+                        
+                        if (this.featureRequestReceived) {
+                            console.log('✅ قبول الطلب');
+                            this.acceptFeatureRequest();
+                        } else if (this.featuresEnabled) {
+                            console.log('⚠️ الميزات مفعلة بالفعل');
+                            alert('الميزات مفعلة بالفعل');
+                        } else if (this.featureRequestPending) {
+                            console.log('⏳ طلب قيد الانتظار');
+                            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+                        } else {
+                            console.log('📨 إرسال طلب جديد');
+                            this.requestEnableFeatures();
+                        }
+                    };
                     container.appendChild(btn);
+                    console.log('✅ تم إضافة زر التفعيل');
+                } else {
+                    console.log('⚠️ لم يتم العثور على حاوية للزر');
                 }
             }
         }, 1000);
@@ -71,6 +92,7 @@ const ChatSystem = {
             if (!this.featureRequestPending && !this.featureRequestReceived) {
                 clearInterval(this.featureBlinkInterval);
                 btn.style.background = '#f44336';
+                btn.style.transform = 'scale(1)';
                 return;
             }
             
@@ -83,7 +105,6 @@ const ChatSystem = {
                 btn.style.transform = 'scale(1)';
             }
             
-            // بعد 30 ومضة (15 ثانية)، توقف
             if (blinkCount > 30) {
                 clearInterval(this.featureBlinkInterval);
                 this.featureRequestPending = false;
@@ -139,31 +160,38 @@ const ChatSystem = {
     
     // ✅ معالجة طلب تفعيل الميزات (استقبال)
     async handleFeatureRequest(fromId) {
+        console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
+        
         if (this.featuresEnabled) {
+            console.log('الميزات مفعلة بالفعل، قبول تلقائي');
             await this.acceptFeatureRequest();
             return;
         }
         
-        // ترمش الأيقونة عند المستلم
         this.featureRequestReceived = true;
         this.startFeatureBlink();
-        
-        // عرض إشعار
         this.showNotification('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
+        console.log('✅ تم تفعيل وضع الاستقبال');
     },
     
-    // ✅ قبول طلب تفعيل الميزات
+    // ✅ قبول طلب تفعيل الميزات (معدلة)
     async acceptFeatureRequest() {
+        console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
+        
         if (!this.featureRequestReceived && !this.featureRequestPending) {
-            // يمكن قبول حتى بدون طلب (للتزامن)
+            console.log('⚠️ لا يوجد طلب معلق');
+            return;
         }
         
         this.featuresEnabled = true;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         
+        console.log('✅ featuresEnabled =', this.featuresEnabled);
+        
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
         }
         
         const btn = document.getElementById('enableFeaturesBtn');
@@ -171,6 +199,9 @@ const ChatSystem = {
             btn.style.background = '#4CAF50';
             btn.style.transform = 'scale(1)';
             btn.title = 'الميزات مفعلة ✅';
+            console.log('✅ تم تغيير لون الزر إلى الأخضر');
+        } else {
+            console.log('⚠️ لم يتم العثور على الزر');
         }
         
         // إرسال قبول إلى الطرف الآخر
@@ -190,12 +221,14 @@ const ChatSystem = {
                 data: encrypted, 
                 timestamp: Date.now() 
             });
-            
-            this.updateAllButtons();
-            this.showNotification('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
+            console.log('✅ تم إرسال قبول التفعيل');
         } catch(e) {
-            console.error('خطأ في إرسال القبول:', e);
+            console.error('❌ خطأ في إرسال القبول:', e);
         }
+        
+        this.updateAllButtons();
+        this.showNotification('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
+        console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
     },
     
     // ✅ رفض طلب تفعيل الميزات
@@ -234,6 +267,8 @@ const ChatSystem = {
     
     // ✅ معالجة رد الطرف الآخر
     handleFeatureResponse(fromId, action) {
+        console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
+        
         if (action === 'accepted') {
             this.featuresEnabled = true;
             this.featureRequestPending = false;
@@ -269,6 +304,7 @@ const ChatSystem = {
     
     // ✅ إعادة تعيين عند خروج المستخدم
     resetFeatures() {
+        console.log('🔄 resetFeatures - إعادة تعيين الميزات');
         this.featuresEnabled = false;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -283,7 +319,6 @@ const ChatSystem = {
             btn.title = 'تفعيل الميزات';
         }
         
-        // إرسال إشارة إلغاء إلى الطرف الآخر
         if (this.currentChat) {
             this.sendFeatureCancel();
         }
@@ -313,6 +348,7 @@ const ChatSystem = {
     
     // ✅ معالجة إلغاء الطرف الآخر
     handleFeatureCancel() {
+        console.log('🔓 handleFeatureCancel - تم استلام إلغاء');
         this.featuresEnabled = false;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -332,7 +368,6 @@ const ChatSystem = {
     
     // ✅ إظهار إشعار بدون مربع حوار
     showNotification(message) {
-        // إزالة أي إشعار سابق
         const oldNotif = document.getElementById('featureNotification');
         if (oldNotif) oldNotif.remove();
         
@@ -356,7 +391,6 @@ const ChatSystem = {
         `;
         document.body.appendChild(notification);
         
-        // إضافة الـ keyframes إذا لم تكن موجودة
         if (!document.querySelector('#fadeOutKeyframes')) {
             const style = document.createElement('style');
             style.id = 'fadeOutKeyframes';
@@ -373,9 +407,8 @@ const ChatSystem = {
         setTimeout(() => notification.remove(), 3000);
     },
     
-    // ✅ تحديث الأزرار (معدل ليشمل featuresEnabled)
+    // ✅ تحديث الأزرار
     updateAllButtons() {
-        // ✅ الميزات تعمل فقط إذا: الطرفان في المحادثة + تم تفعيل الميزات
         const canUse = (this.friendInConversation && this.featuresEnabled);
         
         const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
@@ -556,7 +589,7 @@ const ChatSystem = {
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         this.friendInConversation = false;
-        this.resetFeatures(); // ✅ إعادة تعيين عند فتح محادثة جديدة
+        this.resetFeatures();
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
@@ -583,7 +616,6 @@ const ChatSystem = {
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
         
-        // ✅ إعداد زر التفعيل
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
@@ -874,7 +906,7 @@ const ChatSystem = {
     },
     
     closeChat() {
-        this.resetFeatures(); // ✅ إعادة تعيين عند الخروج
+        this.resetFeatures();
         this.sendConversationStatus(false);
         
         document.body.classList.remove('conversation-open');
