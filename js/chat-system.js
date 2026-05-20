@@ -13,7 +13,7 @@ const PresenceSystem = {
 
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
-    friendInConversation: false,  // ✅ هل الطرف الآخر في نفس المحادثة؟
+    friendInConversation: false,
     
     init() { this.loadAllChats(); },
     
@@ -76,7 +76,6 @@ const ChatSystem = {
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
-    // ========== دالة إرسال حالة المحادثة ==========
     async sendConversationStatus(isOpen) {
         if (!this.currentChat) return;
         try {
@@ -101,18 +100,31 @@ const ChatSystem = {
         }
     },
     
-    // ========== تحديث حالة الطرف الآخر في المحادثة ==========
+    // ========== دالة تحديث حالة الطرف الآخر (مع كود تشخيصي) ==========
     updateFriendConversationStatus(friendId, isInConversation) {
-        if (this.currentChat !== friendId) return;
+        // ✅ كود تشخيصي - يظهر تنبيه
+        alert(`🔍 1️⃣ تم استدعاء updateFriendConversationStatus\nالمستخدم: ${friendId}\nالحالة: ${isInConversation ? 'في المحادثة' : 'ليس في المحادثة'}`);
+        
+        if (this.currentChat !== friendId) {
+            alert(`⚠️ 2️⃣ تم تجاهل التحديث لأن currentChat مختلف\ncurrentChat: ${this.currentChat}\nfriendId: ${friendId}`);
+            return;
+        }
+        
         this.friendInConversation = isInConversation;
+        alert(`✅ 3️⃣ تم تحديث friendInConversation إلى: ${isInConversation}`);
         console.log(`👥 تحديث حالة المحادثة للطرف الآخر: ${isInConversation ? 'في المحادثة ✅' : 'ليس في المحادثة ❌'}`);
+        
         this.updateAllButtons();
+        alert(`✅ 4️⃣ تم تحديث الأزرار`);
     },
     
-    // ========== تحديث جميع الأزرار (تعتمد فقط على friendInConversation) ==========
+    // ========== تحديث جميع الأزرار (مع كود تشخيصي) ==========
     updateAllButtons() {
-        // ✅ الشرط الوحيد: الطرف الآخر في نفس المحادثة (لا حاجة لـ friendOnline)
+        // ✅ كود تشخيصي
+        alert(`🔘 تحديث الأزرار - friendInConversation: ${this.friendInConversation}`);
+        
         const canUse = this.friendInConversation;
+        alert(`🔘 canUse: ${canUse} - ${canUse ? 'الأزرار ستعمل ✅' : 'الأزرار لن تعمل ❌'}`);
         
         // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
         const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
@@ -180,7 +192,6 @@ const ChatSystem = {
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
         
-        // ✅ إرسال إشارة بأن المستخدم فتح المحادثة
         setTimeout(() => {
             this.sendConversationStatus(true);
         }, 500);
@@ -223,7 +234,6 @@ const ChatSystem = {
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
         
-        // ✅ تحديث الأزرار
         this.updateAllButtons();
     },
     
@@ -298,7 +308,6 @@ const ChatSystem = {
     },
     
     async sendFileWithRetry(file, type, maxRetries = 3) {
-        // ✅ التحقق: الطرف الآخر في نفس المحادثة فقط
         if (!this.friendInConversation) {
             alert('لا يمكن الإرسال - الطرف الآخر ليس في المحادثة');
             return false;
@@ -484,7 +493,6 @@ const ChatSystem = {
     },
     
     closeChat() {
-        // ✅ إرسال إشارة بإغلاق المحادثة
         this.sendConversationStatus(false);
         
         document.body.classList.remove('conversation-open');
