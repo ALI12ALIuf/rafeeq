@@ -1182,13 +1182,33 @@ showCallUI(type) {
             }
         });
         
+        // ✅ 10.1 بدء مؤقت المكالمة
         this.startCallTimer();
     }
 },
 
+// ==================== 11. مؤقت المكالمة ====================
+
+startCallTimer() {
+    if (this.callTimerInterval) clearInterval(this.callTimerInterval);
+    let seconds = 0;
+    this.callTimerInterval = setInterval(() => {
+        if (!this.isInCall) {
+            clearInterval(this.callTimerInterval);
+            return;
+        }
+        seconds++;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        const timerEl = document.getElementById('callTimer');
+        if (timerEl) timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }, 1000);
+},
+
+
  
 
-// ==================== 11. التحكم بالمكالمة ====================
+// ==================== 12. التحكم بالمكالمة ====================
 
 toggleMute() {
     this.isAudioMuted = !this.isAudioMuted;
@@ -1257,7 +1277,7 @@ async switchCamera() {
 
     
     
-    // ==================== 12. إرسال الملفات ====================
+    // ==================== 13. إرسال الملفات ====================
     
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') {
@@ -1394,7 +1414,7 @@ async switchCamera() {
         });
     },
     
-    // ==================== 13. إنهاء المكالمة ====================
+    // ==================== 14. إنهاء المكالمة ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
@@ -1480,7 +1500,7 @@ async switchCamera() {
     }
 };
 
-// ==================== 14. التنظيف التلقائي عند تحميل الصفحة ====================
+// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
@@ -1491,7 +1511,7 @@ if (typeof document !== 'undefined') {
     });
 }
 
-// ==================== 15. التنظيف قبل إغلاق الصفحة ====================
+// ==================== 16. التنظيف قبل إغلاق الصفحة ====================
 if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', () => {
         if (CallSystem.isInCall) {
@@ -1500,7 +1520,7 @@ if (typeof window !== 'undefined') {
     });
 }
 
-// ==================== 16. الدوال العامة ====================
+// ==================== 17. الدوال العامة ====================
 window.startAudioCall = async () => {
     // ✅ كود تشخيصي تلقائي (نظام التشخيص)
     alert('🔍 1️⃣ تم الضغط على زر الاتصال الصوتي');
