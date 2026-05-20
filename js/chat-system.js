@@ -76,7 +76,6 @@ const ChatSystem = {
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
-    // ========== دالة openChat المعدلة (مع استدعاء updateAttachmentButtons) ==========
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         this.isInSameChat = true;  // ✅ أصبحنا في نفس المحادثة
@@ -132,47 +131,59 @@ const ChatSystem = {
         this.updateAttachmentButtons(isOnline);
     },
     
-    // ========== الدالة المعدلة (تعطيل أزرار الاتصال عند عدم الاتصال أو عدم وجود نفس المحادثة) ==========
+    // ========== الدالة المعدلة (تعطيل الأزرار بالكامل) ==========
     updateAttachmentButtons(isOnline) {
+        // البحث عن قائمة الأزرار
+        const attachmentMenu = document.getElementById('attachmentMenu');
+        
         // ✅ إذا لم نكن في نفس المحادثة، الأزرار معتمة وغير قابلة للضغط
         if (!this.isInSameChat) {
-            const allBtns = document.querySelectorAll('#attachmentMenu button, .call-buttons button, [onclick*="Call"], [data-call]');
-            allBtns.forEach(btn => {
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-                btn.title = 'افتح المحادثة أولاً';
-            });
+            if (attachmentMenu) {
+                const btns = attachmentMenu.querySelectorAll('button');
+                btns.forEach(btn => {
+                    btn.style.opacity = '0.5';
+                    btn.style.pointerEvents = 'none';
+                    btn.title = 'افتح المحادثة أولاً';
+                });
+            }
+            
+            // تعطيل أزرار الاتصال أيضاً
+            const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]');
+            const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]');
+            if (audioCallBtn) {
+                audioCallBtn.style.opacity = '0.5';
+                audioCallBtn.style.pointerEvents = 'none';
+                audioCallBtn.title = 'افتح المحادثة أولاً';
+            }
+            if (videoCallBtn) {
+                videoCallBtn.style.opacity = '0.5';
+                videoCallBtn.style.pointerEvents = 'none';
+                videoCallBtn.title = 'افتح المحادثة أولاً';
+            }
+            
             console.log('🎛️ لسنا في نفس المحادثة → الأزرار معتمة');
             return;
         }
         
         // ✅ نحن في نفس المحادثة → الأزرار تعتمد على حالة اتصال المستخدم
-        // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
-        const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
-        btns.forEach(btn => { 
-            if (isOnline) { 
-                btn.classList.remove('locked'); 
-                btn.title = ''; 
-                btn.style.opacity = '1';
-                btn.style.pointerEvents = 'auto';
-            } else { 
-                btn.classList.add('locked'); 
-                btn.title = 'غير متاح - المستخدم غير متصل';
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-            } 
-        });
+        if (attachmentMenu) {
+            const btns = attachmentMenu.querySelectorAll('button');
+            btns.forEach(btn => {
+                if (isOnline) {
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
+                    btn.title = '';
+                } else {
+                    btn.style.opacity = '0.5';
+                    btn.style.pointerEvents = 'none';
+                    btn.title = 'غير متاح - المستخدم غير متصل';
+                }
+            });
+        }
         
-        // ✅ تعطيل أزرار الاتصال (الصوتي والمرئي) إذا كان المستخدم غير متصل
-        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
-                             document.querySelector('.audio-call-btn') ||
-                             document.querySelector('#audioCallBtn') ||
-                             document.querySelector('button[data-call="audio"]');
-        
-        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
-                             document.querySelector('.video-call-btn') ||
-                             document.querySelector('#videoCallBtn') ||
-                             document.querySelector('button[data-call="video"]');
+        // ✅ أزرار الاتصال
+        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]');
+        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]');
         
         if (audioCallBtn) {
             if (isOnline) {
