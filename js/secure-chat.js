@@ -227,7 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (مع إضافة معالجة conversation_status) ==========
+    // ========== الدالة المعدلة (مع كود تشخيصي لـ conversation_status) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -248,9 +248,7 @@ const SecureChatSystem = {
                 console.log('📞 استلام إشارة WebRTC من:', msg.from);
                 console.log('📞 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
                 
-                // التحقق: هل هذه مكالمة واردة جديدة (offer)؟
                 if (parsedData.sdp && parsedData.sdp.type === 'offer') {
-                    // مكالمة واردة جديدة - إظهار شاشة القبول/الرفض
                     console.log('📞 مكالمة واردة جديدة من:', msg.from, 'نوع:', parsedData.type || 'audio');
                     if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
                         CallSystem.showIncomingCall(msg.from, parsedData);
@@ -259,22 +257,30 @@ const SecureChatSystem = {
                     }
                 } 
                 else {
-                    // رد على مكالمة قائمة أو ICE candidate
                     if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
                         CallSystem.handleSignaling(parsedData);
                     }
                 }
             }
-            // ✅ معالجة رسالة حالة المحادثة (conversation_status)
+            // ✅ معالجة رسالة حالة المحادثة (conversation_status) مع كود تشخيصي
             else if (msg.package.type === 'conversation_status') {
+                // ✅ كود تشخيصي - يظهر تنبيه
+                alert('📨 1️⃣ تم استلام رسالة conversation_status');
+                
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const statusData = JSON.parse(decryptedData);
+                
+                alert(`📨 2️⃣ المستخدم: ${msg.from} | المحادثة ${statusData.isOpen ? 'مفتوحة ✅' : 'مغلقة ❌'}`);
                 console.log('💬 استلام حالة محادثة من:', msg.from, '| مفتوحة:', statusData.isOpen);
+                
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.updateFriendConversationStatus) {
+                    alert('📨 3️⃣ جاري استدعاء updateFriendConversationStatus');
                     ChatSystem.updateFriendConversationStatus(msg.from, statusData.isOpen);
+                } else {
+                    alert('❌ 3️⃣ ChatSystem.updateFriendConversationStatus غير موجود');
+                    console.error('❌ ChatSystem.updateFriendConversationStatus غير موجود');
                 }
             }
-            // الحفاظ على وظيفة الموقع والملفات
             else if (msg.package.type === 'location') {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
@@ -282,7 +288,6 @@ const SecureChatSystem = {
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
             }
             else if (msg.package.type === 'file' || msg.package.type === 'image' || msg.package.type === 'video') {
-                // معالجة الملفات (إذا كانت ترسل عبر النظام)
                 const decryptedFile = await this.decryptData(msg.package.data, sharedKey);
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: msg.package.type, data: decryptedFile, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() });
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
