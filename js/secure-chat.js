@@ -227,7 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (مع معالجة جميع أنواع الرسائل) ==========
+    // ========== الدالة المعدلة (مع كود تشخيصي لـ feature_cancel) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -279,7 +279,7 @@ const SecureChatSystem = {
                     ChatSystem.sendConversationStatus(true);
                 }
             }
-            // ✅✅ معالجة طلب تفعيل الميزات (feature_request)
+            // ✅ معالجة طلب تفعيل الميزات (feature_request)
             else if (msg.package.type === 'feature_request') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const requestData = JSON.parse(decryptedData);
@@ -288,7 +288,7 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureRequest(msg.from);
                 }
             }
-            // ✅✅ معالجة رد تفعيل الميزات (feature_response)
+            // ✅ معالجة رد تفعيل الميزات (feature_response)
             else if (msg.package.type === 'feature_response') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const responseData = JSON.parse(decryptedData);
@@ -297,11 +297,16 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
-            // ✅✅ معالجة إلغاء تفعيل الميزات (feature_cancel)
+            // ✅✅ معالجة إلغاء تفعيل الميزات (feature_cancel) مع كود تشخيصي
             else if (msg.package.type === 'feature_cancel') {
-                console.log('🔓 استلام إلغاء تفعيل الميزات من:', msg.from);
+                console.log('🔓🔓🔓 استلام إشارة feature_cancel من:', msg.from);
+                alert('📨 تم استلام إشارة إلغاء التفعيل من الطرف الآخر!');  // ✅ كود تشخيصي
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureCancel) {
+                    console.log('✅ جاري استدعاء ChatSystem.handleFeatureCancel');
                     ChatSystem.handleFeatureCancel();
+                } else {
+                    console.error('❌ ChatSystem.handleFeatureCancel غير موجود');
+                    alert('❌ ChatSystem.handleFeatureCancel غير موجود');
                 }
             }
             // الحفاظ على وظيفة الموقع والملفات
