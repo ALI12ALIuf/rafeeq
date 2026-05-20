@@ -13,6 +13,7 @@ const PresenceSystem = {
 
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
+    isInSameChat: false,  // ✅ متغير جديد: هل نحن في نفس المحادثة؟
     
     init() { this.loadAllChats(); },
     
@@ -76,7 +77,9 @@ const ChatSystem = {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
     openChat(friendId, friendName, friendAvatar) {
-        this.currentChat = friendId; document.body.classList.add('conversation-open');
+        this.currentChat = friendId;
+        this.isInSameChat = true;  // ✅ أصبحنا في نفس المحادثة
+        document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
         if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
@@ -120,15 +123,25 @@ const ChatSystem = {
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
         
-        if (isOnline) {
-            this.updateAttachmentButtons(true);
-        } else {
-            this.updateAttachmentButtons(false);
-        }
+        // ✅ تحديث الأزرار بناءً على حالة الاتصال ووجودنا في نفس المحادثة
+        this.updateAttachmentButtons(isOnline);
     },
     
-    // ========== الدالة المعدلة (تعطيل أزرار الاتصال عند عدم الاتصال) ==========
+    // ========== الدالة المعدلة (تعطيل أزرار الاتصال عند عدم الاتصال أو عدم وجود نفس المحادثة) ==========
     updateAttachmentButtons(isOnline) {
+        // ✅ إذا لم نكن في نفس المحادثة، الأزرار معتمة وغير قابلة للضغط
+        if (!this.isInSameChat) {
+            const allBtns = document.querySelectorAll('#attachmentMenu button, .call-buttons button, [onclick*="Call"], [data-call]');
+            allBtns.forEach(btn => {
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+                btn.title = 'افتح المحادثة أولاً';
+            });
+            console.log('🎛️ لسنا في نفس المحادثة → الأزرار معتمة');
+            return;
+        }
+        
+        // ✅ نحن في نفس المحادثة → الأزرار تعتمد على حالة اتصال المستخدم
         // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
         const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
         btns.forEach(btn => { 
@@ -146,7 +159,6 @@ const ChatSystem = {
         });
         
         // ✅ تعطيل أزرار الاتصال (الصوتي والمرئي) إذا كان المستخدم غير متصل
-        // البحث عن أزرار الاتصال بطرق مختلفة
         const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
                              document.querySelector('.audio-call-btn') ||
                              document.querySelector('#audioCallBtn') ||
@@ -181,7 +193,7 @@ const ChatSystem = {
             }
         }
         
-        console.log(`🎛️ تحديث الأزرار: المستخدم ${isOnline ? 'متصل ✅' : 'غير متصل ❌'}`);
+        console.log(`🎛️ تحديث الأزرار: في نفس المحادثة ✅ | المستخدم ${isOnline ? 'متصل ✅' : 'غير متصل ❌'}`);
     },
     
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
@@ -415,6 +427,7 @@ const ChatSystem = {
     },
     
     closeChat() {
+        this.isInSameChat = false;  // ✅ خرجنا من المحادثة
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
