@@ -14,13 +14,13 @@ const PresenceSystem = {
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
     friendInConversation: false,
+    pendingConversationStatus: {},  // ✅ تخزين الحالة للمستخدمين الآخرين
     
     init() { 
         this.loadAllChats(); 
-        this.setupPageFocusListener();  // ✅ إضافة مستمع التركيز على الصفحة
+        this.setupPageFocusListener();
     },
     
-    // ✅ مستمع لحدث التركيز على الصفحة (عند العودة إلى التطبيق)
     setupPageFocusListener() {
         window.addEventListener('focus', () => {
             if (this.currentChat && this.friendOnline) {
@@ -31,7 +31,6 @@ const ChatSystem = {
         });
     },
     
-    // ✅ طلب حالة المحادثة من الطرف الآخر
     async requestConversationStatus() {
         if (!this.currentChat) return;
         try {
@@ -114,12 +113,21 @@ const ChatSystem = {
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
-    async sendConversationStatus(isOpen) {
+    async sendConversationStatus(isOpen, retryCount = 0) {
         if (!this.currentChat) return;
+        
+        const maxRetries = 3;
+        
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!myPrivateKey || !receiverPublicKey) return;
+            if (!myPrivateKey || !receiverPublicKey) {
+                if (retryCount < maxRetries) {
+                    console.log(`🔄 إعادة محاولة إرسال حالة المحادثة (${retryCount + 1}/${maxRetries})...`);
+                    setTimeout(() => this.sendConversationStatus(isOpen, retryCount + 1), 500);
+                }
+                return;
+            }
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
                 type: 'conversation_status', 
@@ -135,14 +143,35 @@ const ChatSystem = {
             console.log(`📬 تم إرسال حالة المحادثة: ${isOpen ? 'مفتوحة' : 'مغلقة'}`);
         } catch(e) {
             console.error('خطأ في إرسال حالة المحادثة:', e);
+            if (retryCount < maxRetries) {
+                setTimeout(() => this.sendConversationStatus(isOpen, retryCount + 1), 500);
+            }
         }
     },
     
+    // ✅ دالة تحديث حالة الطرف الآخر (معدلة لتخزين الحالة)
     updateFriendConversationStatus(friendId, isInConversation) {
-        if (this.currentChat !== friendId) return;
-        this.friendInConversation = isInConversation;
-        console.log(`👥 تحديث حالة المحادثة للطرف الآخر: ${isInConversation ? 'في المحادثة ✅' : 'ليس في المحادثة ❌'}`);
-        this.updateAllButtons();
+        // إذا كانت هذه المحادثة هي نفسها المفتوحة حالياً
+        if (this.currentChat === friendId) {
+            this.friendInConversation = isInConversation;
+            console.log(`👥 تحديث حالة المحادثة للطرف الآخر: ${isInConversation ? 'في المحادثة ✅' : 'ليس في المحادثة ❌'}`);
+            this.updateAllButtons();
+            
+            // تحديث النص في الشريط العلوي
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl && this.friendOnline) {
+                let statusHtml = '🟢 متصل';
+                if (isInConversation) {
+                    statusHtml += ' 📱 في المحادثة';
+                }
+                statusEl.innerHTML = statusHtml;
+            }
+        } 
+        // ✅ تخزين الحالة للمستخدمين الآخرين (عندما تكون المحادثة مغلقة)
+        else {
+            this.pendingConversationStatus[friendId] = isInConversation;
+            console.log(`💾 تم تخزين حالة المحادثة لـ ${friendId}: ${isInConversation ? 'مفتوحة' : 'مغلقة'}`);
+        }
     },
     
     updateAllButtons() {
@@ -202,7 +231,15 @@ const ChatSystem = {
     
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
-        this.friendInConversation = false;
+        
+        // ✅ استرجاع الحالة المخزنة مسبقاً
+        if (this.pendingConversationStatus && this.pendingConversationStatus[friendId] !== undefined) {
+            this.friendInConversation = this.pendingConversationStatus[friendId];
+            console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
+        } else {
+            this.friendInConversation = false;
+        }
+        
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
@@ -216,7 +253,6 @@ const ChatSystem = {
             this.sendConversationStatus(true);
         }, 500);
         
-        // ✅ طلب حالة المحادثة من الطرف الآخر
         setTimeout(() => {
             this.requestConversationStatus();
         }, 1000);
@@ -517,8 +553,21 @@ const ChatSystem = {
         }); 
     },
     
+    // ✅ دالة closeChat المعدلة (مع إعادة محاولة)
     closeChat() {
-        this.sendConversationStatus(false);
+        // إرسال إشارة إغلاق مع إعادة محاولة
+        const sendCloseSignal = async (retryCount = 0) => {
+            try {
+                await this.sendConversationStatus(false);
+                console.log('📬 تم إرسال إشارة إغلاق المحادثة');
+            } catch(e) {
+                if (retryCount < 3) {
+                    console.log(`🔄 إعادة محاولة إرسال إشارة الإغلاق (${retryCount + 1}/3)`);
+                    setTimeout(() => sendCloseSignal(retryCount + 1), 500);
+                }
+            }
+        };
+        sendCloseSignal();
         
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
@@ -528,6 +577,9 @@ const ChatSystem = {
         this.currentChat = null;
         this.friendOnline = false;
         this.friendInConversation = false;
+        
+        // تحديث الأزرار فوراً
+        this.updateAllButtons();
     },
     
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
