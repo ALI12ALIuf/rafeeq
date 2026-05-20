@@ -76,9 +76,14 @@ const ChatSystem = {
     
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
+    // ========== دالة openChat المعدلة (مع استدعاء updateAttachmentButtons) ==========
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         this.isInSameChat = true;  // ✅ أصبحنا في نفس المحادثة
+        
+        // ✅ تحديث الأزرار فوراً عند فتح المحادثة
+        this.updateAttachmentButtons(this.friendOnline);
+        
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
