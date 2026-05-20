@@ -780,205 +780,213 @@ async receiveCall(callerId, callData) {
 },
 
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+ // ==================== 9. Data Channel وإدارة الاتصال ====================
+
+setupDataChannel(channel) {
+    if (!channel) return;
+    console.log('📡 إعداد Data Channel');
     
-    setupDataChannel(channel) {
-        if (!channel) return;
-        console.log('📡 إعداد Data Channel');
-        
-        channel.onmessage = e => {
-            try {
-                const msg = JSON.parse(e.data);
-                if (msg.type === 'ping') return;
-                if (msg.type === 'call_status') {
-                    this.handleCallStatus(msg);
-                    return;
-                }
-                if (msg.chunk !== undefined) {
-                    this.handleChunkMessage(msg);
-                    return;
-                }
-                const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
-                if (ChatSystem.currentChat) {
-                    ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                    ChatSystem.displayMessage(displayMsg);
-                }
-            } catch (error) {
-                console.error('خطأ في معالجة الرسالة:', error);
+    channel.onmessage = e => {
+        try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'ping') return;
+            if (msg.type === 'call_status') {
+                this.handleCallStatus(msg);
+                return;
             }
-        };
-        
-        channel.onopen = () => {
-            console.log('✅ Data Channel مفتوح');
-            if (this.reconnectTimer) {
-                clearTimeout(this.reconnectTimer);
-                this.reconnectTimer = null;
+            if (msg.chunk !== undefined) {
+                this.handleChunkMessage(msg);
+                return;
             }
-            this.reconnectAttempts = 0;
-            this.sendCallStatus('connected');
-            
-            if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = setInterval(() => {
-                if (this.dc && this.dc.readyState === 'open') {
-                    this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-                }
-            }, 2000);
-        };
-        
-        channel.onclose = () => {
-            console.log('❌ Data Channel مغلق');
-            this.sendCallStatus('disconnected');
-            if (this.keepAliveInterval) {
-                clearInterval(this.keepAliveInterval);
-                this.keepAliveInterval = null;
+            const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
+            if (ChatSystem.currentChat) {
+                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
+                ChatSystem.displayMessage(displayMsg);
             }
-            this.scheduleReconnect();
-        };
-        
-        channel.onerror = (e) => {
-            console.error('❌ خطأ في Data Channel:', e);
-            this.scheduleReconnect();
-        };
-    },
-    
-    handleCallStatus(msg) {
-        if (msg.status === 'connected') {
-            console.log('📞 الطرف الآخر متصل');
-        } else if (msg.status === 'disconnected') {
-            console.log('📞 الطرف الآخر قطع الاتصال');
-            if (this.isInCall) {
-                this.endCall();
-            }
+        } catch (error) {
+            console.error('خطأ في معالجة الرسالة:', error);
         }
-    },
+    };
     
-    sendCallStatus(status) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
-        }
-    },
-    
-    scheduleReconnect() {
-        if (!ChatSystem.currentChat || !ChatSystem.friendOnline) return;
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
-        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
-        this.reconnectTimer = setTimeout(async () => {
-            try {
-                if (ChatSystem.currentChat && ChatSystem.friendOnline) {
-                    await this.ensureDataChannelOnly(ChatSystem.currentChat);
-                }
-            } catch (error) {}
+    channel.onopen = () => {
+        console.log('✅ Data Channel مفتوح');
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
-        }, delay);
-    },
-    
-    async ensureDataChannel(calleeId) {
-        if (!calleeId) return;
-        if (this.dc && this.dc.readyState === 'open') return;
-        if (this.dc && this.dc.readyState === 'connecting') {
-            return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    clearInterval(checkInterval);
-                    reject(new Error('انتهت مهلة انتظار القناة'));
-                }, 10000);
-                const checkInterval = setInterval(() => {
-                    if (!this.dc) {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                    } else if (this.dc.readyState === 'open') {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        resolve();
-                    } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                    }
-                }, 500);
-            });
         }
-        return this.createNewDataChannel(calleeId);
-    },
-    
-    async createNewDataChannel(calleeId) {
         this.reconnectAttempts = 0;
-        this.cleanupConnections();
+        this.sendCallStatus('connected');
+        
+        if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
+        this.keepAliveInterval = setInterval(() => {
+            if (this.dc && this.dc.readyState === 'open') {
+                this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+            }
+        }, 2000);
+    };
+    
+    channel.onclose = () => {
+        console.log('❌ Data Channel مغلق');
+        this.sendCallStatus('disconnected');
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
+        this.scheduleReconnect();
+    };
+    
+    channel.onerror = (e) => {
+        console.error('❌ خطأ في Data Channel:', e);
+        this.scheduleReconnect();
+    };
+},
+
+handleCallStatus(msg) {
+    if (msg.status === 'connected') {
+        console.log('📞 الطرف الآخر متصل');
+    } else if (msg.status === 'disconnected') {
+        console.log('📞 الطرف الآخر قطع الاتصال');
+        if (this.isInCall) {
+            this.endCall();
+        }
+    }
+},
+
+sendCallStatus(status) {
+    if (this.dc && this.dc.readyState === 'open') {
+        this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
+    }
+},
+
+scheduleReconnect() {
+    if (!ChatSystem.currentChat || !ChatSystem.friendOnline) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
+    this.reconnectTimer = setTimeout(async () => {
         try {
+            if (ChatSystem.currentChat && ChatSystem.friendOnline) {
+                await this.ensureDataChannelOnly(ChatSystem.currentChat);
+            }
+        } catch (error) {}
+        this.reconnectTimer = null;
+    }, delay);
+},
+
+async ensureDataChannel(calleeId) {
+    if (!calleeId) return;
+    if (this.dc && this.dc.readyState === 'open') return;
+    if (this.dc && this.dc.readyState === 'connecting') {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                clearInterval(checkInterval);
+                reject(new Error('انتهت مهلة انتظار القناة'));
+            }, 10000);
+            const checkInterval = setInterval(() => {
+                if (!this.dc) {
+                    clearInterval(checkInterval);
+                    clearTimeout(timeout);
+                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
+                } else if (this.dc.readyState === 'open') {
+                    clearInterval(checkInterval);
+                    clearTimeout(timeout);
+                    resolve();
+                } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
+                    clearInterval(checkInterval);
+                    clearTimeout(timeout);
+                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
+                }
+            }, 500);
+        });
+    }
+    return this.createNewDataChannel(calleeId);
+},
+
+async createNewDataChannel(calleeId) {
+    this.reconnectAttempts = 0;
+    this.cleanupConnections();
+    try {
+        this.pc = new RTCPeerConnection(this.servers);
+        this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
+        this.setupDataChannel(this.dc);
+        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
+        this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
+        this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
+        this.pc.onconnectionstatechange = () => {
+            switch(this.pc?.connectionState) {
+                case 'connected': this.reconnectAttempts = 0; break;
+                case 'failed': case 'disconnected': this.scheduleReconnect(); break;
+            }
+        };
+        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+        await this.pc.setLocalDescription(offer);
+        await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
+    } catch (error) {
+        throw error;
+    }
+},
+
+async handleSignaling(data) {
+    try {
+        if (data.type === 'reject') {
+            console.log('📞 الطرف الآخر رفض المكالمة');
+            const inc = document.getElementById('incomingCall');
+            if (inc) inc.remove();
+            this.endCall();
+            return;
+        }
+        
+        if (data.type === 'call_ended') {
+            console.log('📞 المتصل أنهى المكالمة قبل الرد');
+            const inc = document.getElementById('incomingCall');
+            if (inc) inc.remove();
+            this.endCall();
+            return;
+        }
+        
+        if (!this.pc) {
             this.pc = new RTCPeerConnection(this.servers);
-            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-            this.setupDataChannel(this.dc);
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
-            this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
-            this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-            this.pc.onconnectionstatechange = () => {
-                switch(this.pc?.connectionState) {
-                    case 'connected': this.reconnectAttempts = 0; break;
-                    case 'failed': case 'disconnected': this.scheduleReconnect(); break;
-                }
-            };
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-        } catch (error) {
-            throw error;
+            this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
+            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
         }
-    },
+        if (data.sdp) {
+            await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            if (data.sdp.type === 'offer') {
+                const answer = await this.pc.createAnswer();
+                await this.pc.setLocalDescription(answer);
+                await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
+            }
+        } else if (data.candidate) {
+            if (this.pc && data.candidate) {
+                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        }
+    } catch (e) {
+        console.warn('Signaling error:', e);
+    }
+},
+
+// ✅ الدالة المعدلة (مع إضافة فحص اتصال المستخدم)
+async sendSignal(calleeId, data) {
+    // منع إرسال الإشارات إذا كان الطرف الآخر غير متصل
+    if (!ChatSystem.friendOnline) {
+        console.log('❌ المستخدم غير متصل، تم إلغاء إرسال الإشارة');
+        return;
+    }
     
-    async handleSignaling(data) {
-        try {
-            if (data.type === 'reject') {
-                console.log('📞 الطرف الآخر رفض المكالمة');
-                const inc = document.getElementById('incomingCall');
-                if (inc) inc.remove();
-                this.endCall();
-                return;
-            }
-            
-            if (data.type === 'call_ended') {
-                console.log('📞 المتصل أنهى المكالمة قبل الرد');
-                const inc = document.getElementById('incomingCall');
-                if (inc) inc.remove();
-                this.endCall();
-                return;
-            }
-            
-            if (!this.pc) {
-                this.pc = new RTCPeerConnection(this.servers);
-                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
-                this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
-            }
-            if (data.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                if (data.sdp.type === 'offer') {
-                    const answer = await this.pc.createAnswer();
-                    await this.pc.setLocalDescription(answer);
-                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
-                }
-            } else if (data.candidate) {
-                if (this.pc && data.candidate) {
-                    await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            }
-        } catch (e) {
-            console.warn('Signaling error:', e);
-        }
-    },
-    
-    async sendSignal(calleeId, data) {
-        try {
-            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
-            if (!myPrivateKey || !receiverPublicKey) return;
-            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-            await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        } catch (error) {
-            console.error('خطأ في إرسال الإشارة:', error);
-        }
-    },
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
+        await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
+    } catch (error) {
+        console.error('خطأ في إرسال الإشارة:', error);
+    }
+},   
+
     
 // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
