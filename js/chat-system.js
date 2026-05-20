@@ -95,7 +95,6 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ========== الدالة المعدلة - إزالة "منذ X ساعة" و "في مكالمة" ==========
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
@@ -112,14 +111,11 @@ const ChatSystem = {
         
         let statusHtml = '';
         
-        // ✅ فقط نص "متصل" أو "غير متصل" بدون "منذ X ساعة"
         if (isOnline) {
             statusHtml = '🟢 متصل';
         } else {
             statusHtml = '🔴 غير متصل';
         }
-        
-        // ✅ تم إزالة نص "📞 في مكالمة" نهائياً
         
         statusEl.innerHTML = statusHtml;
         statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
@@ -131,9 +127,61 @@ const ChatSystem = {
         }
     },
     
+    // ========== الدالة المعدلة (تعطيل أزرار الاتصال عند عدم الاتصال) ==========
     updateAttachmentButtons(isOnline) {
+        // تعطيل أزرار الإرسال (الملفات، الصور، الفيديو، الموقع، البصمة)
         const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
-        btns.forEach(btn => { if (isOnline) { btn.classList.remove('locked'); btn.title = ''; } else { btn.classList.add('locked'); btn.title = 'غير متاح - المستخدم غير متصل'; } });
+        btns.forEach(btn => { 
+            if (isOnline) { 
+                btn.classList.remove('locked'); 
+                btn.title = ''; 
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            } else { 
+                btn.classList.add('locked'); 
+                btn.title = 'غير متاح - المستخدم غير متصل';
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            } 
+        });
+        
+        // ✅ تعطيل أزرار الاتصال (الصوتي والمرئي) إذا كان المستخدم غير متصل
+        // البحث عن أزرار الاتصال بطرق مختلفة
+        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
+                             document.querySelector('.audio-call-btn') ||
+                             document.querySelector('#audioCallBtn') ||
+                             document.querySelector('button[data-call="audio"]');
+        
+        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
+                             document.querySelector('.video-call-btn') ||
+                             document.querySelector('#videoCallBtn') ||
+                             document.querySelector('button[data-call="video"]');
+        
+        if (audioCallBtn) {
+            if (isOnline) {
+                audioCallBtn.style.opacity = '1';
+                audioCallBtn.style.pointerEvents = 'auto';
+                audioCallBtn.title = 'مكالمة صوتية';
+            } else {
+                audioCallBtn.style.opacity = '0.5';
+                audioCallBtn.style.pointerEvents = 'none';
+                audioCallBtn.title = 'المستخدم غير متصل';
+            }
+        }
+        
+        if (videoCallBtn) {
+            if (isOnline) {
+                videoCallBtn.style.opacity = '1';
+                videoCallBtn.style.pointerEvents = 'auto';
+                videoCallBtn.title = 'مكالمة فيديو';
+            } else {
+                videoCallBtn.style.opacity = '0.5';
+                videoCallBtn.style.pointerEvents = 'none';
+                videoCallBtn.title = 'المستخدم غير متصل';
+            }
+        }
+        
+        console.log(`🎛️ تحديث الأزرار: المستخدم ${isOnline ? 'متصل ✅' : 'غير متصل ❌'}`);
     },
     
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
