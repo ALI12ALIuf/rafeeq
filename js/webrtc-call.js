@@ -783,7 +783,7 @@ const CallSystem = {
         });
     },
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+// ==================== 9. Data Channel وإدارة الاتصال ====================
 
     setupDataChannel(channel) {
         if (!channel) return;
@@ -793,6 +793,22 @@ const CallSystem = {
             try {
                 const msg = JSON.parse(e.data);
                 if (msg.type === 'ping') return;
+                
+                // ✅ معالجة إشارة "أنا أختار ملفاً" لمنع قطع الاتصال
+                if (msg.type === 'file_selection_start') {
+                    console.log('📁 الطرف الآخر يختار ملفاً - الحفاظ على الاتصال');
+                    // إعادة تعيين مؤقت الـ keepAlive لمنع قطع الاتصال أثناء اختيار الملف
+                    if (this.keepAliveInterval) {
+                        clearInterval(this.keepAliveInterval);
+                        this.keepAliveInterval = setInterval(() => {
+                            if (this.dc && this.dc.readyState === 'open') {
+                                this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                            }
+                        }, 2000);
+                    }
+                    return;
+                }
+                
                 if (msg.type === 'call_status') {
                     this.handleCallStatus(msg);
                     return;
