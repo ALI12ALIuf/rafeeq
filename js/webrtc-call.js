@@ -871,7 +871,7 @@ const CallSystem = {
     },
 
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+// ==================== 9. Data Channel وإدارة الاتصال ====================
 
     setupDataChannel(channel) {
         if (!channel) return;
@@ -916,7 +916,7 @@ const CallSystem = {
             }, 2000);
         };
         
-        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند انقطاع القناة
+        // ✅✅✅ إلغاء تفعيل الميزات عند انقطاع القناة
         channel.onclose = () => {
             console.log('❌ Data Channel مغلق');
             this.sendCallStatus('disconnected');
@@ -949,7 +949,7 @@ const CallSystem = {
             }
         };
         
-        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند خطأ القناة
+        // ✅✅✅ إلغاء تفعيل الميزات عند خطأ القناة
         channel.onerror = (e) => {
             console.error('❌ خطأ في Data Channel:', e);
             this.scheduleReconnect();
@@ -1121,6 +1121,138 @@ const CallSystem = {
             console.error('خطأ في إرسال الإشارة:', error);
         }
     },
+
+    // ========== ✅✅✅ دوال إرسال واستقبال الملفات المعدلة (بدون إغلاق عمدي) ==========
+
+    async sendFileDirect(file, type) {
+        // ✅ التحقق من القناة ومحاولة فتحها إذا كانت مغلقة
+        if (!this.dc || this.dc.readyState !== 'open') {
+            console.log('⚠️ Data Channel غير مفتوح، جاري فتحه...');
+            const opened = await this.ensureDataChannelOnly(ChatSystem.currentChat);
+            if (!opened || !this.dc || this.dc.readyState !== 'open') {
+                console.log('❌ لا يمكن فتح القناة');
+                return false;
+            }
+        }
+        
+        try {
+            let blobToSend = file;
+            if (type === 'image') {
+                blobToSend = await this.compressImage(file);
+            }
+            
+            const b64 = await this.fileToBase64(blobToSend);
+            const fileId = Date.now().toString();
+            
+            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} | الحجم: ${(b64.length / 1024).toFixed(1)}KB`);
+            
+            const message = {
+                type: type,
+                data: b64,
+                chunk: 0,
+                total: 1,
+                id: fileId,
+                fileName: file.name || 'ملف'
+            };
+            this.dc.send(JSON.stringify(message));
+            console.log('✅ تم إرسال الملف');
+            
+            // ✅ فقط إذا انقطعت القناة بعد الإرسال، نعيد فتحها (بدون إغلاق عمدي)
+            setTimeout(() => {
+                if (!this.dc || this.dc.readyState !== 'open') {
+                    console.log('🔄 القناة انقطعت بعد الإرسال، إعادة فتحها...');
+                    this.ensureDataChannelOnly(ChatSystem.currentChat).then(() => {
+                        console.log('✅ تم إعادة فتح القناة بنجاح');
+                        if (typeof ChatSystem !== 'undefined') {
+                            ChatSystem.featuresEnabled = true;
+                            ChatSystem.updateAllButtons();
+                        }
+                    }).catch(err => console.log('⚠️ فشل إعادة الفتح:', err));
+                }
+            }, 1000);
+            
+            return true;
+        } catch (e) {
+            console.error('❌ فشل إرسال الملف:', e);
+            return false;
+        }
+    },
+
+    handleChunkMessage(msg) {
+        if (!this.incomingChunks[msg.id]) {
+            this.incomingChunks[msg.id] = [];
+            this.incomingFileInfo[msg.id] = {
+                type: msg.type,
+                fileName: msg.fileName,
+                total: msg.total,
+                received: 0
+            };
+            ChatSystem.showProgressBar('جاري استلام الملف...', 0);
+        }
+        
+        this.incomingChunks[msg.id][msg.chunk] = msg.data;
+        this.incomingFileInfo[msg.id].received++;
+        const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
+        const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
+        ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
+        
+        if (this.incomingFileInfo[msg.id].received === msg.total) {
+            this.processCompleteFile(msg);
+        }
+    },
+
+    processCompleteFile(msg) {
+        try {
+            const fullData = this.incomingChunks[msg.id].join('');
+            
+            let finalData = fullData;
+            
+            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
+                finalData = 'data:image/jpeg;base64,' + fullData;
+            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
+                finalData = 'data:video/mp4;base64,' + fullData;
+            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
+                finalData = 'data:audio/webm;base64,' + fullData;
+            }
+            
+            const displayMsg = {
+                id: msg.id,
+                type: msg.type === 'location' ? 'text' : msg.type,
+                data: finalData,
+                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+                sender: 'friend',
+                time: new Date().toISOString()
+            };
+            
+            if (ChatSystem.currentChat) {
+                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
+                ChatSystem.displayMessage(displayMsg);
+            }
+            ChatSystem.hideProgressBar();
+            
+            // ✅ فقط إذا انقطعت القناة بعد الاستلام، نعيد فتحها (بدون إغلاق عمدي)
+            setTimeout(() => {
+                if (!this.dc || this.dc.readyState !== 'open') {
+                    console.log('🔄 القناة انقطعت بعد الاستلام، إعادة فتحها...');
+                    this.ensureDataChannelOnly(ChatSystem.currentChat).then(() => {
+                        console.log('✅ تم إعادة فتح القناة بنجاح');
+                        if (typeof ChatSystem !== 'undefined') {
+                            ChatSystem.featuresEnabled = true;
+                            ChatSystem.updateAllButtons();
+                        }
+                    }).catch(err => console.log('⚠️ فشل إعادة الفتح:', err));
+                }
+            }, 1000);
+            
+            delete this.incomingChunks[msg.id];
+            delete this.incomingFileInfo[msg.id];
+        } catch (error) {
+            console.error('❌ خطأ في معالجة الملف المكتمل:', error);
+            ChatSystem.hideProgressBar();
+        }
+    },
+
+    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
