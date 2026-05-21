@@ -794,6 +794,21 @@ const CallSystem = {
                 const msg = JSON.parse(e.data);
                 if (msg.type === 'ping') return;
                 
+                // ✅ معالجة إشارة "أنا أختار ملفاً" لمنع قطع الاتصال
+                if (msg.type === 'file_selection_start') {
+                    console.log('📁 الطرف الآخر يختار ملفاً - الحفاظ على الاتصال');
+                    // إعادة تعيين مؤقت الـ keepAlive لمنع قطع الاتصال أثناء اختيار الملف
+                    if (this.keepAliveInterval) {
+                        clearInterval(this.keepAliveInterval);
+                        this.keepAliveInterval = setInterval(() => {
+                            if (this.dc && this.dc.readyState === 'open') {
+                                this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                            }
+                        }, 2000);
+                    }
+                    return;
+                }
+                
                 if (msg.type === 'call_status') {
                     this.handleCallStatus(msg);
                     return;
@@ -829,7 +844,7 @@ const CallSystem = {
             }, 2000);
         };
         
-        // ✅ إلغاء تفعيل الميزات عند انقطاع القناة
+        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند انقطاع القناة
         channel.onclose = () => {
             console.log('❌ Data Channel مغلق');
             this.sendCallStatus('disconnected');
@@ -839,6 +854,7 @@ const CallSystem = {
             }
             this.scheduleReconnect();
             
+            // ✅ إلغاء تفعيل الميزات عند انقطاع القناة (الطرف الآخر أغلق المتصفح)
             if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
                 console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
                 ChatSystem.featuresEnabled = false;
@@ -861,11 +877,12 @@ const CallSystem = {
             }
         };
         
-        // ✅ إلغاء تفعيل الميزات عند خطأ القناة
+        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند خطأ القناة
         channel.onerror = (e) => {
             console.error('❌ خطأ في Data Channel:', e);
             this.scheduleReconnect();
             
+            // ✅ إلغاء تفعيل الميزات عند خطأ القناة
             if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
                 console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
                 ChatSystem.featuresEnabled = false;
@@ -1032,107 +1049,6 @@ const CallSystem = {
             console.error('خطأ في إرسال الإشارة:', error);
         }
     },
-
-    // ========== ✅✅✅ دوال معالجة الملفات المطورة ==========
-
-    handleChunkMessage(msg) {
-        try {
-            // ✅ معالجة الملفات الصغيرة كقطعة واحدة
-            if (msg.total === 1) {
-                console.log('📥 استلام ملف كامل (قطعة واحدة)');
-                this.processCompleteFile(msg);
-                return;
-            }
-            
-            // ✅ تخزين مؤقت للشفرات للملفات الكبيرة
-            if (!this.incomingChunks[msg.id]) {
-                this.incomingChunks[msg.id] = [];
-                this.incomingFileInfo[msg.id] = {
-                    type: msg.type,
-                    fileName: msg.fileName,
-                    total: msg.total,
-                    received: 0
-                };
-                if (typeof ChatSystem !== 'undefined') {
-                    ChatSystem.showProgressBar('جاري استلام الملف...', 0);
-                }
-            }
-            
-            this.incomingChunks[msg.id][msg.chunk] = msg.data;
-            this.incomingFileInfo[msg.id].received++;
-            
-            // ✅ تحديث التقدم بشكل أقل تكراراً
-            const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-            if (progress >= 100 || Math.floor(progress) % 10 === 0) {
-                if (typeof ChatSystem !== 'undefined') {
-                    ChatSystem.updateProgressBar(progress, `جاري استلام ${msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف'}... ${Math.round(progress)}%`);
-                }
-            }
-            
-            // ✅ عند اكتمال الملف، قم بمعالجته
-            if (this.incomingFileInfo[msg.id].received === msg.total) {
-                this.processCompleteFile(msg);
-            }
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الشفرة:', error);
-        }
-    },
-
-    // ✅ دالة لمعالجة الملف المكتمل
-    processCompleteFile(msg) {
-        try {
-            let finalData;
-            
-            // ✅ إذا كان الملف قطعة واحدة
-            if (msg.total === 1) {
-                finalData = msg.data;
-            } else {
-                // ✅ دمج الأجزاء للملفات الكبيرة
-                const chunks = this.incomingChunks[msg.id];
-                if (!chunks) return;
-                finalData = chunks.join('');
-            }
-            
-            // ✅ إضافة الرأس المناسب حسب نوع الملف
-            if (msg.type === 'image' && !finalData.startsWith('data:image')) {
-                finalData = 'data:image/jpeg;base64,' + finalData;
-            } else if (msg.type === 'video' && !finalData.startsWith('data:video')) {
-                finalData = 'data:video/mp4;base64,' + finalData;
-            } else if (msg.type === 'voice' && !finalData.startsWith('data:audio')) {
-                finalData = 'data:audio/webm;base64,' + finalData;
-            }
-            
-            const displayMsg = {
-                id: msg.id,
-                type: msg.type === 'location' ? 'text' : msg.type,
-                data: finalData,
-                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
-                sender: 'friend',
-                time: new Date().toISOString()
-            };
-            
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-            
-            if (typeof ChatSystem !== 'undefined') {
-                ChatSystem.hideProgressBar();
-            }
-            
-            // ✅ تنظيف الذاكرة
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
-            
-            console.log('✅ تم استلام الملف وعرضه بنجاح');
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الملف المكتمل:', error);
-            if (typeof ChatSystem !== 'undefined') {
-                ChatSystem.hideProgressBar();
-            }
-        }
-    },
-
     
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
