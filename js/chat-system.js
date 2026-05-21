@@ -25,6 +25,49 @@ const ChatSystem = {
         this.loadAllChats(); 
         this.setupPageFocusListener();
         this.setupFeatureButton();
+        this.setupBeforeUnloadListener(); // ✅ إضافة مستمع beforeunload
+    },
+    
+    // ✅ إضافة مستمع beforeunload لاكتشاف إغلاق الصفحة/المتصفح
+    setupBeforeUnloadListener() {
+        window.addEventListener('beforeunload', () => {
+            if (this.currentChat && this.featuresEnabled) {
+                console.log('🚪 الصفحة تغلق - إرسال إشارة إلغاء إلى:', this.currentChat);
+                this.sendFeatureCancelBeforeUnload(this.currentChat);
+            }
+        });
+    },
+    
+    // ✅ إرسال إشارة إلغاء فورية قبل إغلاق الصفحة (مع keepalive)
+    async sendFeatureCancelBeforeUnload(chatId) {
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_cancel',
+                timestamp: Date.now()
+            }), sharedKey);
+            
+            const messageData = {
+                to: chatId,
+                from: window.auth?.currentUser?.uid,
+                package: { 
+                    id: Date.now().toString(), 
+                    type: 'feature_cancel', 
+                    data: encrypted, 
+                    timestamp: Date.now() 
+                },
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + SecureChatSystem.MESSAGE_EXPIRY_HOURS * 3600000))
+            };
+            
+            await window.db.collection('secure_messages').add(messageData);
+            console.log('✅ تم إرسال إشارة الإلغاء قبل إغلاق الصفحة');
+        } catch(e) {
+            console.error('❌ فشل إرسال إشارة الإلغاء قبل الإغلاق:', e);
+        }
     },
     
     setupFeatureButton() {
