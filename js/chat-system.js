@@ -21,80 +21,11 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
-    // ✅ متغيرات مراقبة نبضات القلب
-    heartbeatTimer: null,
-    HEARTBEAT_TIMEOUT_NORMAL: 10000,     // 10 ثواني عادي
-    HEARTBEAT_TIMEOUT_SELECTING: 60000,  // 60 ثانية أثناء اختيار ملف
-    currentHeartbeatTimeout: 10000,
-    
     init() { 
         this.loadAllChats(); 
         this.setupPageFocusListener();
         this.setupFeatureButton();
         this.setupBeforeUnloadListener();
-    },
-    
-    // ✅ بدء مراقبة نبضات القلب
-    startHeartbeatWatcher() {
-        if (this.heartbeatTimer) clearTimeout(this.heartbeatTimer);
-        this.heartbeatTimer = setTimeout(() => {
-            console.log('💔 انقطاع نبضات الطرف الآخر لأكثر من ' + (this.currentHeartbeatTimeout / 1000) + ' ثانية - خروج نهائي');
-            if (this.featuresEnabled && this.currentChat) {
-                console.log('🔴 إلغاء تفعيل الميزات بسبب انقطاع النبضات');
-                this.featuresEnabled = false;
-                this.featureRequestPending = false;
-                this.featureRequestReceived = false;
-                
-                if (this.featureBlinkInterval) {
-                    clearInterval(this.featureBlinkInterval);
-                    this.featureBlinkInterval = null;
-                }
-                
-                const btn = document.getElementById('enableFeaturesBtn');
-                if (btn) {
-                    btn.style.background = '#f44336';
-                    btn.title = 'تفعيل الميزات';
-                }
-                
-                this.updateAllButtons();
-            }
-        }, this.currentHeartbeatTimeout);
-    },
-    
-    // ✅ إعادة تعيين مراقبة النبضات (عند استلام نبضة جديدة)
-    resetHeartbeatWatcher() {
-        if (this.heartbeatTimer) {
-            clearTimeout(this.heartbeatTimer);
-            this.startHeartbeatWatcher();
-        }
-    },
-    
-    // ✅ تمديد مهلة النبضات (أثناء اختيار ملف)
-    extendHeartbeatTimeout() {
-        console.log('⏰ تمديد مهلة النبضات إلى 60 ثانية (الطرف الآخر يختار ملفاً)');
-        this.currentHeartbeatTimeout = this.HEARTBEAT_TIMEOUT_SELECTING;
-        if (this.heartbeatTimer) {
-            clearTimeout(this.heartbeatTimer);
-            this.startHeartbeatWatcher();
-        }
-    },
-    
-    // ✅ إعادة المهلة إلى الوضع الطبيعي
-    resetHeartbeatToNormal() {
-        console.log('⏰ إعادة مهلة النبضات إلى 10 ثواني');
-        this.currentHeartbeatTimeout = this.HEARTBEAT_TIMEOUT_NORMAL;
-        if (this.heartbeatTimer) {
-            clearTimeout(this.heartbeatTimer);
-            this.startHeartbeatWatcher();
-        }
-    },
-    
-    // ✅ إيقاف مراقبة النبضات (عند إغلاق القناة)
-    stopHeartbeatWatcher() {
-        if (this.heartbeatTimer) {
-            clearTimeout(this.heartbeatTimer);
-            this.heartbeatTimer = null;
-        }
     },
     
     setupBeforeUnloadListener() {
@@ -764,9 +695,6 @@ const ChatSystem = {
         this.displayMessages(friendId);
         PresenceSystem.watchFriend(friendId);
         
-        // ✅ إعادة تعيين مهلة النبضات عند فتح المحادثة
-        this.currentHeartbeatTimeout = this.HEARTBEAT_TIMEOUT_NORMAL;
-        
         setTimeout(() => {
             this.sendConversationStatus(true);
         }, 500);
@@ -787,13 +715,14 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅ دالة updateFriendStatus المعدلة
+    // ✅✅✅ دالة updateFriendStatus المعدلة (تم إضافة شرط لمنع إطفاء الميزات أثناء اختيار الملف)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
         // ✅ منع إطفاء الميزات إذا كان الطرف الآخر يختار ملفاً مؤقتاً
         if (!isOnline && this.featuresEnabled && this.currentChat === friendId) {
             console.log('⚠️ تجاهل إطفاء الميزات: قد يكون الطرف الآخر يختار ملفاً');
+            // فقط نحدث حالة الاتصال المرئية، لكن ما نغير الميزات
             this.friendOnline = isOnline;
             const statusEl = document.getElementById('conversationStatus');
             if (statusEl) {
@@ -825,11 +754,6 @@ const ChatSystem = {
             }
             
             this.updateAllButtons();
-        }
-        
-        // ✅ إذا عاد الطرف الآخر متصلاً، أعد تعيين مهلة النبضات
-        if (isOnline && this.heartbeatTimer) {
-            this.resetHeartbeatWatcher();
         }
         
         if (!userData && window.auth?.currentUser) {
@@ -969,7 +893,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅ دوال الإرسال (مع إشارة file_selection_start)
+    // ✅✅✅ دوال الإرسال المعدلة (مع إضافة إشارة file_selection_start)
     
     async sendImage(file) { 
         if (!this.currentChat) return;
@@ -1177,9 +1101,6 @@ const ChatSystem = {
         }
         
         this.updateAllButtons();
-        
-        // ✅ إيقاف مراقبة نبضات القلب عند إغلاق المحادثة
-        this.stopHeartbeatWatcher();
         
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
