@@ -14,6 +14,7 @@ const PresenceSystem = {
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
     friendInConversation: false,
+    _pendingConversationStatus: {},  // ✅ تخزين حالة المحادثة للمستخدمين الآخرين
     
     // ✅ متغيرات نظام التفعيل
     featuresEnabled: false,
@@ -358,7 +359,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅ معالجة إلغاء الطرف الآخر (معدلة مع alert تشخيصي)
+    // ✅ معالجة إلغاء الطرف الآخر (معدلة)
     handleFeatureCancel() {
         alert('🔓🔓🔓 تم استدعاء handleFeatureCancel بنجاح!');
         console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
@@ -602,32 +603,66 @@ const ChatSystem = {
         }
     },
     
-    // ✅ دالة تحديث حالة المحادثة (معدلة - مع حل بديل)
+    // ✅ دالة تحديث حالة المحادثة (معدلة بالكامل)
     updateFriendConversationStatus(friendId, isInConversation) {
-        if (this.currentChat !== friendId) return;
-        this.friendInConversation = isInConversation;
-        console.log(`👥 تحديث حالة المحادثة للطرف الآخر: ${isInConversation ? 'في المحادثة ✅' : 'ليس في المحادثة ❌'}`);
+        console.log(`👥 استلام تحديث حالة المحادثة من: ${friendId}, في المحادثة: ${isInConversation}`);
+        console.log('currentChat الحالي:', this.currentChat);
         
-        // ✅ إذا خرج الطرف الآخر من المحادثة، قم بإلغاء تفعيل الميزات فوراً (حل بديل)
-        if (!isInConversation && this.featuresEnabled) {
-            console.log('⚠️ الطرف الآخر خرج من المحادثة - إلغاء تفعيل الميزات (حل بديل)');
-            this.featuresEnabled = false;
-            this.featureRequestPending = false;
-            this.featureRequestReceived = false;
+        // ✅ إذا كانت هذه المحادثة هي نفسها المفتوحة حالياً
+        if (this.currentChat === friendId) {
+            this.friendInConversation = isInConversation;
+            console.log(`✅ تحديث friendInConversation إلى: ${isInConversation}`);
             
-            if (this.featureBlinkInterval) {
-                clearInterval(this.featureBlinkInterval);
+            // ✅ إذا خرج الطرف الآخر من المحادثة، قم بإلغاء تفعيل الميزات فوراً
+            if (!isInConversation) {
+                console.log('⚠️ الطرف الآخر خرج من المحادثة - إلغاء تفعيل الميزات');
+                this.featuresEnabled = false;
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                
+                if (this.featureBlinkInterval) {
+                    clearInterval(this.featureBlinkInterval);
+                    this.featureBlinkInterval = null;
+                }
+                
+                const btn = document.getElementById('enableFeaturesBtn');
+                if (btn) {
+                    btn.style.background = '#f44336';
+                    btn.title = 'تفعيل الميزات';
+                    console.log('✅ تم تغيير لون الزر إلى الأحمر');
+                }
+                
+                this.updateAllButtons();
+                this.showNotification('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
             }
+        } 
+        // ✅ حتى لو لم تكن المحادثة مفتوحة، نخزن الحالة للمستخدم
+        else {
+            // تخزين الحالة للمستخدم
+            this._pendingConversationStatus[friendId] = isInConversation;
+            console.log(`💾 تم تخزين حالة المحادثة لـ ${friendId}: ${isInConversation ? 'مفتوحة' : 'مغلقة'}`);
             
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-                console.log('✅ تم تغيير لون الزر إلى الأحمر (حل بديل)');
+            // ✅ إذا كانت الحالة "خرج من المحادثة" (false) لأي مستخدم،
+            // وكانت الميزات مفعلة، قم بإلغاء التفعيل فوراً
+            if (!isInConversation && this.featuresEnabled) {
+                console.log(`⚠️ المستخدم ${friendId} خرج من المحادثة - إلغاء تفعيل الميزات`);
+                this.featuresEnabled = false;
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                
+                if (this.featureBlinkInterval) {
+                    clearInterval(this.featureBlinkInterval);
+                }
+                
+                const btn = document.getElementById('enableFeaturesBtn');
+                if (btn) {
+                    btn.style.background = '#f44336';
+                    btn.title = 'تفعيل الميزات';
+                }
+                
+                this.updateAllButtons();
+                this.showNotification(`⚠️ ${friendId} خرج من المحادثة، تم إلغاء تفعيل الميزات`);
             }
-            
-            this.updateAllButtons();
-            this.showNotification('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
         }
         
         this.updateAllButtons();
@@ -635,7 +670,16 @@ const ChatSystem = {
     
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
-        this.friendInConversation = false;
+        
+        // ✅ استرجاع الحالة المخزنة مسبقاً
+        if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
+            this.friendInConversation = this._pendingConversationStatus[friendId];
+            console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
+            delete this._pendingConversationStatus[friendId];
+        } else {
+            this.friendInConversation = false;
+        }
+        
         this.resetFeatures();
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
