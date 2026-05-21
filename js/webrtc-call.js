@@ -4,7 +4,7 @@
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
-    reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
+    reconnectTimer: null, maxReconnectAttempts: 5, reconnectAttempts: 0,
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
