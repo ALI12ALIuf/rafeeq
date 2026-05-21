@@ -25,10 +25,9 @@ const ChatSystem = {
         this.loadAllChats(); 
         this.setupPageFocusListener();
         this.setupFeatureButton();
-        this.setupBeforeUnloadListener(); // ✅ إضافة مستمع beforeunload
+        this.setupBeforeUnloadListener();
     },
     
-    // ✅ إضافة مستمع beforeunload لاكتشاف إغلاق الصفحة/المتصفح
     setupBeforeUnloadListener() {
         window.addEventListener('beforeunload', () => {
             if (this.currentChat && this.featuresEnabled) {
@@ -38,7 +37,6 @@ const ChatSystem = {
         });
     },
     
-    // ✅ إرسال إشارة إلغاء فورية قبل إغلاق الصفحة (مع keepalive)
     async sendFeatureCancelBeforeUnload(chatId) {
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -717,9 +715,32 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
+    // ✅✅✅ دالة updateFriendStatus المعدلة (مع إضافة إلغاء الميزات عند عدم الاتصال)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         this.friendOnline = isOnline;
+        
+        // ✅ إضافة جديدة: إذا كان المستخدم غير متصل، قم بإلغاء تفعيل الميزات فوراً
+        if (!isOnline && this.featuresEnabled) {
+            console.log('🔴 المستخدم غير متصل - إلغاء تفعيل الميزات');
+            this.featuresEnabled = false;
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            if (this.featureBlinkInterval) {
+                clearInterval(this.featureBlinkInterval);
+                this.featureBlinkInterval = null;
+            }
+            
+            const btn = document.getElementById('enableFeaturesBtn');
+            if (btn) {
+                btn.style.background = '#f44336';
+                btn.title = 'تفعيل الميزات';
+                console.log('✅ تم تغيير لون الزر إلى الأحمر (المستخدم غير متصل)');
+            }
+            
+            this.updateAllButtons();
+        }
         
         if (!userData && window.auth?.currentUser) {
             window.db.collection('users').doc(friendId).get().then(doc => {
