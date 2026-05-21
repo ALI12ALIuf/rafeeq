@@ -828,7 +828,7 @@ const CallSystem = {
             }, 2000);
         };
         
-        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند انقطاع القناة
+        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند انقطاع القناة (للكشف السريع عن الخروج النهائي)
         channel.onclose = () => {
             console.log('❌ Data Channel مغلق');
             this.sendCallStatus('disconnected');
@@ -838,9 +838,9 @@ const CallSystem = {
             }
             this.scheduleReconnect();
             
-            // ✅ إلغاء تفعيل الميزات عند انقطاع القناة (الطرف الآخر أغلق المتصفح)
+            // ✅✅✅ كشف الخروج النهائي من المتصفح (حل سريع)
             if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
+                console.log('🔌 انقطاع القناة - الخروج النهائي، إلغاء تفعيل الميزات فوراً');
                 ChatSystem.featuresEnabled = false;
                 ChatSystem.featureRequestPending = false;
                 ChatSystem.featureRequestReceived = false;
@@ -857,7 +857,7 @@ const CallSystem = {
                 }
                 
                 ChatSystem.updateAllButtons();
-                console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
+                console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال (خروج نهائي)');
             }
         };
         
