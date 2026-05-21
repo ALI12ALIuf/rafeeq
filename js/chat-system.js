@@ -358,8 +358,9 @@ const ChatSystem = {
         }
     },
     
-    // ✅ معالجة إلغاء الطرف الآخر (معدلة)
+    // ✅ معالجة إلغاء الطرف الآخر (معدلة مع alert تشخيصي)
     handleFeatureCancel() {
+        alert('🔓🔓🔓 تم استدعاء handleFeatureCancel بنجاح!');
         console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
         console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
         
