@@ -56,10 +56,17 @@ window.sendFile = () => { const i = document.createElement('input'); i.type = 'f
 window.sendVoiceNote = () => { if (!navigator.mediaDevices?.getUserMedia) { alert('المتصفح لا يدعم تسجيل الصوت'); return; } navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => { if (e.data.size > 0) ch.push(e.data); }; mr.onstop = () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: 'audio/webm' }); if (blob.size > 0) ChatSystem.sendVoiceNote(blob); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') mr.stop(); }; } setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 900000); }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.shareLocation = () => { if (ChatSystem.friendOnline && CallSystem.dc?.readyState === 'open') ChatSystem.shareLocationDirect(); else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => ChatSystem.sendMessage(`📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`), () => alert('فشل تحديد الموقع')); else alert('المتصفح لا يدعم تحديد الموقع'); document.getElementById('attachmentMenu').style.display = 'none'; };
 
-// ========== إغلاق المحادثة - يرجع لآخر صفحة في المكدس ==========
+// ========== إغلاق المحادثة - يرجع لآخر صفحة في المكدس (معدل) ==========
 window.closeConversation = () => { 
+    console.log('🔴 closeConversation - بدء إغلاق المحادثة');
+    
+    // ✅ إنهاء أي مكالمة نشطة
     CallSystem.endCall(); 
+    
+    // ✅ إغلاق المحادثة وإرسال إشارات الإلغاء إلى الطرف الآخر
     ChatSystem.closeChat();
+    
+    console.log('✅ تم إغلاق المحادثة وإرسال إشارات الإلغاء');
     
     setTimeout(() => {
         const lastPage = popPage(); // نجيب آخر صفحة من المكدس
@@ -91,6 +98,14 @@ window.closeConversation = () => {
         }
     }, 200);
 };
+
+// ✅ إضافة مستمع للرجوع عبر زر المتصفح (popstate)
+window.addEventListener('popstate', () => {
+    if (ChatSystem.currentChat) {
+        console.log('🔴 تم اكتشاف رجوع عبر المتصفح - إغلاق المحادثة');
+        ChatSystem.closeChat();
+    }
+});
 
 window.openImage = (data) => { const win = window.open('', '_blank'); if (win) win.document.write(`<img src="${data}" style="max-width:100%;height:auto;">`); };
 window.openFile = (data, fileName) => { const link = document.createElement('a'); link.href = data; link.download = fileName || 'file'; link.click(); };
