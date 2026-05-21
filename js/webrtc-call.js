@@ -792,23 +792,7 @@ const CallSystem = {
         channel.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
-                if (msg.type === 'ping') {
-                    // ✅ تحديث مهلة نبضات القلب عند الطرف الآخر
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.resetHeartbeatWatcher) {
-                        ChatSystem.resetHeartbeatWatcher();
-                    }
-                    return;
-                }
-                
-                // ✅ معالجة إشارة بدء اختيار ملف (لتمديد مهلة نبضات القلب)
-                if (msg.type === 'file_selection_start') {
-                    console.log('📁 الطرف الآخر بدأ اختيار ملف - تمديد مهلة النبضات');
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.extendHeartbeatTimeout) {
-                        ChatSystem.extendHeartbeatTimeout();
-                    }
-                    return;
-                }
-                
+                if (msg.type === 'ping') return;
                 if (msg.type === 'call_status') {
                     this.handleCallStatus(msg);
                     return;
@@ -836,11 +820,6 @@ const CallSystem = {
             this.reconnectAttempts = 0;
             this.sendCallStatus('connected');
             
-            // ✅ بدء مراقبة نبضات القلب
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.startHeartbeatWatcher) {
-                ChatSystem.startHeartbeatWatcher();
-            }
-            
             if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = setInterval(() => {
                 if (this.dc && this.dc.readyState === 'open') {
@@ -849,7 +828,7 @@ const CallSystem = {
             }, 2000);
         };
         
-        // ✅ كشف الخروج النهائي من المتصفح
+        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند انقطاع القناة
         channel.onclose = () => {
             console.log('❌ Data Channel مغلق');
             this.sendCallStatus('disconnected');
@@ -859,14 +838,9 @@ const CallSystem = {
             }
             this.scheduleReconnect();
             
-            // ✅ إيقاف مراقبة نبضات القلب
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.stopHeartbeatWatcher) {
-                ChatSystem.stopHeartbeatWatcher();
-            }
-            
-            // ✅ إلغاء تفعيل الميزات فوراً
+            // ✅ إلغاء تفعيل الميزات عند انقطاع القناة (الطرف الآخر أغلق المتصفح)
             if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                console.log('🔌 انقطاع القناة - الخروج النهائي، إلغاء تفعيل الميزات فوراً');
+                console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
                 ChatSystem.featuresEnabled = false;
                 ChatSystem.featureRequestPending = false;
                 ChatSystem.featureRequestReceived = false;
@@ -883,19 +857,14 @@ const CallSystem = {
                 }
                 
                 ChatSystem.updateAllButtons();
-                console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال (خروج نهائي)');
+                console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
             }
         };
         
-        // ✅ إلغاء تفعيل الميزات عند خطأ القناة
+        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند خطأ القناة
         channel.onerror = (e) => {
             console.error('❌ خطأ في Data Channel:', e);
             this.scheduleReconnect();
-            
-            // ✅ إيقاف مراقبة نبضات القلب
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.stopHeartbeatWatcher) {
-                ChatSystem.stopHeartbeatWatcher();
-            }
             
             // ✅ إلغاء تفعيل الميزات عند خطأ القناة
             if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
@@ -1064,52 +1033,6 @@ const CallSystem = {
             console.error('خطأ في إرسال الإشارة:', error);
         }
     },
-    
-    // ✅ دالة الإرسال المعدلة (لإعادة ضبط مهلة النبضات بعد الإرسال)
-    async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
-            return false;
-        }
-        
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
-            }
-            
-            const b64 = await this.fileToBase64(blobToSend);
-            const fileId = Date.now().toString();
-            
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} | الحجم: ${(b64.length / 1024).toFixed(1)}KB`);
-            
-            const message = {
-                type: type,
-                data: b64,
-                chunk: 0,
-                total: 1,
-                id: fileId,
-                fileName: file.name || 'ملف'
-            };
-            this.dc.send(JSON.stringify(message));
-            console.log('✅ تم إرسال الملف');
-            
-            // ✅ إعادة ضبط مهلة نبضات القلب إلى الوضع الطبيعي بعد الإرسال
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.resetHeartbeatToNormal) {
-                ChatSystem.resetHeartbeatToNormal();
-            }
-            
-            return true;
-        } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            // ✅ حتى لو فشل، نعيد ضبط المهلة
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.resetHeartbeatToNormal) {
-                ChatSystem.resetHeartbeatToNormal();
-            }
-            return false;
-        }
-    },
-    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
