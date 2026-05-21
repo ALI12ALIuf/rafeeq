@@ -26,28 +26,6 @@ const ChatSystem = {
         this.setupPageFocusListener();
         this.setupFeatureButton();
         this.setupBeforeUnloadListener();
-        this.setupReconnectOnFocus();  // ✅ إضافة مستمع إعادة الاتصال عند العودة للصفحة
-    },
-    
-    // ✅✅✅ إضافة جديدة: إعادة فتح القناة عند العودة إلى الصفحة (بعد اختيار الملف)
-    setupReconnectOnFocus() {
-        window.addEventListener('focus', () => {
-            if (this.currentChat && this.featuresEnabled && this.friendOnline) {
-                console.log('🔄 العودة إلى التطبيق - إعادة فتح القناة إذا كانت مغلقة');
-                setTimeout(() => {
-                    if ((!CallSystem.dc || CallSystem.dc.readyState !== 'open') && this.friendInConversation) {
-                        console.log('📡 القناة مغلقة، جاري إعادة فتحها...');
-                        CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
-                            console.log('✅ تم إعادة فتح القناة بنجاح');
-                        }).catch((err) => {
-                            console.log('⚠️ فشل إعادة فتح القناة:', err);
-                        });
-                    } else if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-                        console.log('✅ القناة لا تزال مفتوحة');
-                    }
-                }, 500);
-            }
-        });
     },
     
     setupBeforeUnloadListener() {
