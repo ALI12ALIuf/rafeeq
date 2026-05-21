@@ -301,9 +301,37 @@ const ChatSystem = {
         }
     },
     
-    // ✅ إعادة تعيين عند خروج المستخدم
+    // ✅ إرسال إشارة إلغاء فوراً (دالة جديدة)
+    async sendFeatureCancelImmediately(chatId) {
+        console.log('📤 sendFeatureCancelImmediately - إرسال إلغاء إلى:', chatId);
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_cancel',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(chatId, { 
+                id: Date.now().toString(), 
+                type: 'feature_cancel', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('✅ تم إرسال إشارة الإلغاء بنجاح إلى:', chatId);
+        } catch(e) {
+            console.error('❌ خطأ في إرسال الإلغاء:', e);
+        }
+    },
+    
+    // ✅ إعادة تعيين عند خروج المستخدم (معدلة - ترسل إشارة فوراً)
     resetFeatures() {
         console.log('🔄 resetFeatures - إعادة تعيين الميزات');
+        
+        // ✅ حفظ معرف المحادثة قبل إعادة التعيين
+        const chatId = this.currentChat;
+        
         this.featuresEnabled = false;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -318,8 +346,10 @@ const ChatSystem = {
             btn.title = 'تفعيل الميزات';
         }
         
-        if (this.currentChat) {
-            this.sendFeatureCancelWithRetry();
+        // ✅ إرسال إشارة إلغاء فوراً (بغض النظر عن أي شيء)
+        if (chatId) {
+            console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
+            this.sendFeatureCancelImmediately(chatId);
         }
         
         this.updateAllButtons();
@@ -996,16 +1026,41 @@ const ChatSystem = {
         }); 
     },
     
+    // ✅ دالة closeChat المعدلة (ترسل إشارة إلغاء قبل مسح currentChat)
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         console.log('currentChat:', this.currentChat);
         console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
         
-        this.resetFeatures();
-        this.sendConversationStatus(false);
+        // ✅ حفظ معرف المحادثة قبل مسحه
+        const chatId = this.currentChat;
         
-        console.log('✅ تم إرسال إشارات الإغلاق');
+        // ✅ إرسال إشارة إلغاء فوراً
+        if (chatId) {
+            console.log('📤 إرسال إشارة إلغاء إلى:', chatId);
+            this.sendFeatureCancelImmediately(chatId);
+            this.sendConversationStatus(false);
+        }
         
+        // ✅ إعادة تعيين الميزات
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+        }
+        
+        this.updateAllButtons();
+        
+        // ✅ إخفاء الواجهة ومسح المتغيرات
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
