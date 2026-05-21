@@ -877,7 +877,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅✅✅ دوال الإرسال المعدلة (مع إضافة إشارة file_selection_start)
+    // ✅✅✅ دوال الإرسال المعدلة
     
     async sendImage(file) { 
         if (!this.currentChat) return;
@@ -885,14 +885,6 @@ const ChatSystem = {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
-        
-        // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
-        await new Promise(r => setTimeout(r, 200));
         
         if (!(await this._ensureChannelReady())) return;
         
@@ -914,14 +906,6 @@ const ChatSystem = {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
-        
-        // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
-        await new Promise(r => setTimeout(r, 200));
         
         try {
             await SecureChatSystem.validateVideo(file);
@@ -956,14 +940,6 @@ const ChatSystem = {
             return;
         }
         
-        // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
-        await new Promise(r => setTimeout(r, 200));
-        
         if (!(await this._ensureChannelReady())) return;
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
@@ -983,14 +959,6 @@ const ChatSystem = {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
-        
-        // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
-        await new Promise(r => setTimeout(r, 200));
         
         if (!(await this._ensureChannelReady())) return;
         
@@ -1098,7 +1066,81 @@ const ChatSystem = {
         console.log('✅ closeChat - انتهى');
     },
     
-    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; },
+    
+    // ========== ✅✅✅ دوال اختيار الملفات الجديدة (لربط الأزرار بها) ==========
+    
+    selectImage() {
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async (e) => {
+            if (e.target.files && e.target.files[0]) {
+                await this.sendImage(e.target.files[0]);
+            }
+        };
+        input.click();
+    },
+    
+    selectVideo() {
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'video/*';
+        input.onchange = async (e) => {
+            if (e.target.files && e.target.files[0]) {
+                await this.sendVideoFile(e.target.files[0]);
+            }
+        };
+        input.click();
+    },
+    
+    selectFile() {
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '*/*';
+        input.onchange = async (e) => {
+            if (e.target.files && e.target.files[0]) {
+                await this.sendFile(e.target.files[0]);
+            }
+        };
+        input.click();
+    },
+    
+    selectVoiceNote() {
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'audio/*';
+        input.onchange = async (e) => {
+            if (e.target.files && e.target.files[0]) {
+                await this.sendVoiceNote(e.target.files[0]);
+            }
+        };
+        input.click();
+    },
 };
 
 ChatSystem.init();
