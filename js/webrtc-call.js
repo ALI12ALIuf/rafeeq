@@ -783,6 +783,7 @@ const CallSystem = {
         });
     },
     
+
 // ==================== 9. Data Channel وإدارة الاتصال ====================
 
     setupDataChannel(channel) {
@@ -944,10 +945,11 @@ const CallSystem = {
         if (this.dc && this.dc.readyState === 'open') return;
         if (this.dc && this.dc.readyState === 'connecting') {
             return new Promise((resolve, reject) => {
+                // ✅✅✅ تم زيادة المهلة من 10000 إلى 60000 (60 ثانية)
                 const timeout = setTimeout(() => {
                     clearInterval(checkInterval);
                     reject(new Error('انتهت مهلة انتظار القناة'));
-                }, 10000);
+                }, 60000);
                 const checkInterval = setInterval(() => {
                     if (!this.dc) {
                         clearInterval(checkInterval);
@@ -1049,6 +1051,8 @@ const CallSystem = {
             console.error('خطأ في إرسال الإشارة:', error);
         }
     },
+    
+    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
