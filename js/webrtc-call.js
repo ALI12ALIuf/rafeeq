@@ -4,7 +4,7 @@
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
-    reconnectTimer: null, maxReconnectAttempts: 5, reconnectAttempts: 0,
+    reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
@@ -795,20 +795,7 @@ const CallSystem = {
                 const msg = JSON.parse(e.data);
                 if (msg.type === 'ping') return;
                 
-                // ✅ معالجة إشارة "أنا أختار ملفاً" لمنع قطع الاتصال
-                if (msg.type === 'file_selection_start') {
-                    console.log('📁 الطرف الآخر يختار ملفاً - الحفاظ على الاتصال');
-                    // إعادة تعيين مؤقت الـ keepAlive لمنع قطع الاتصال أثناء اختيار الملف
-                    if (this.keepAliveInterval) {
-                        clearInterval(this.keepAliveInterval);
-                        this.keepAliveInterval = setInterval(() => {
-                            if (this.dc && this.dc.readyState === 'open') {
-                                this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-                            }
-                        }, 2000);
-                    }
-                    return;
-                }
+                // ❌ تم إزالة معالجة file_selection_start
                 
                 if (msg.type === 'call_status') {
                     this.handleCallStatus(msg);
@@ -845,7 +832,7 @@ const CallSystem = {
             }, 2000);
         };
         
-        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند انقطاع القناة
+        // ✅ إلغاء تفعيل الميزات عند انقطاع القناة (تم الإبقاء عليه)
         channel.onclose = () => {
             console.log('❌ Data Channel مغلق');
             this.sendCallStatus('disconnected');
@@ -878,7 +865,7 @@ const CallSystem = {
             }
         };
         
-        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند خطأ القناة
+        // ✅ إلغاء تفعيل الميزات عند خطأ القناة (تم الإبقاء عليه)
         channel.onerror = (e) => {
             console.error('❌ خطأ في Data Channel:', e);
             this.scheduleReconnect();
@@ -945,11 +932,11 @@ const CallSystem = {
         if (this.dc && this.dc.readyState === 'open') return;
         if (this.dc && this.dc.readyState === 'connecting') {
             return new Promise((resolve, reject) => {
-                // ✅✅✅ تم زيادة المهلة من 10000 إلى 60000 (60 ثانية)
+                // ✅ تم إعادة المهلة إلى 10000 (10 ثوانٍ)
                 const timeout = setTimeout(() => {
                     clearInterval(checkInterval);
                     reject(new Error('انتهت مهلة انتظار القناة'));
-                }, 60000);
+                }, 10000);
                 const checkInterval = setInterval(() => {
                     if (!this.dc) {
                         clearInterval(checkInterval);
@@ -1050,8 +1037,7 @@ const CallSystem = {
         } catch (error) {
             console.error('خطأ في إرسال الإشارة:', error);
         }
-    },
-    
+    },    
     
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
