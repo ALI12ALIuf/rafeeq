@@ -14,9 +14,8 @@ const PresenceSystem = {
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
     friendInConversation: false,
-    _pendingConversationStatus: {},  // ✅ تخزين حالة المحادثة للمستخدمين الآخرين
+    _pendingConversationStatus: {},
     
-    // ✅ متغيرات نظام التفعيل
     featuresEnabled: false,
     featureRequestPending: false,
     featureRequestReceived: false,
@@ -28,7 +27,6 @@ const ChatSystem = {
         this.setupFeatureButton();
     },
     
-    // ✅ إعداد زر التفعيل
     setupFeatureButton() {
         setTimeout(() => {
             let btn = document.getElementById('enableFeaturesBtn');
@@ -80,7 +78,6 @@ const ChatSystem = {
         }, 1000);
     },
     
-    // ✅ بدء تأثير الوميض
     startFeatureBlink() {
         if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
         
@@ -115,7 +112,6 @@ const ChatSystem = {
         }, 500);
     },
     
-    // ✅ إرسال طلب تفعيل الميزات
     async requestEnableFeatures() {
         if (!this.currentChat) {
             alert('الرجاء اختيار محادثة أولاً');
@@ -158,7 +154,6 @@ const ChatSystem = {
         }
     },
     
-    // ✅ معالجة طلب تفعيل الميزات (استقبال)
     async handleFeatureRequest(fromId) {
         console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
         
@@ -174,7 +169,6 @@ const ChatSystem = {
         console.log('✅ تم تفعيل وضع الاستقبال');
     },
     
-    // ✅ قبول طلب تفعيل الميزات
     async acceptFeatureRequest() {
         console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
         
@@ -230,7 +224,6 @@ const ChatSystem = {
         console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
     },
     
-    // ✅ رفض طلب تفعيل الميزات
     async rejectFeatureRequest() {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -264,7 +257,6 @@ const ChatSystem = {
         } catch(e) {}
     },
     
-    // ✅ معالجة رد الطرف الآخر
     handleFeatureResponse(fromId, action) {
         console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
         
@@ -301,7 +293,6 @@ const ChatSystem = {
         }
     },
     
-    // ✅ إرسال إشارة إلغاء فوراً (دالة جديدة)
     async sendFeatureCancelImmediately(chatId) {
         console.log('📤 sendFeatureCancelImmediately - إرسال إلغاء إلى:', chatId);
         try {
@@ -325,11 +316,9 @@ const ChatSystem = {
         }
     },
     
-    // ✅ إعادة تعيين عند خروج المستخدم (معدلة - ترسل إشارة فوراً)
     resetFeatures() {
         console.log('🔄 resetFeatures - إعادة تعيين الميزات');
         
-        // ✅ حفظ معرف المحادثة قبل إعادة التعيين
         const chatId = this.currentChat;
         
         this.featuresEnabled = false;
@@ -346,7 +335,6 @@ const ChatSystem = {
             btn.title = 'تفعيل الميزات';
         }
         
-        // ✅ إرسال إشارة إلغاء فوراً (بغض النظر عن أي شيء)
         if (chatId) {
             console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
             this.sendFeatureCancelImmediately(chatId);
@@ -355,7 +343,6 @@ const ChatSystem = {
         this.updateAllButtons();
     },
     
-    // ✅ إرسال إشارة إلغاء مع إعادة محاولة
     async sendFeatureCancelWithRetry(retryCount = 0) {
         const maxRetries = 3;
         console.log(`📤 sendFeatureCancel - محاولة ${retryCount + 1}/${maxRetries + 1} إلى:`, this.currentChat);
@@ -389,9 +376,8 @@ const ChatSystem = {
         }
     },
     
-    // ✅ معالجة إلغاء الطرف الآخر (معدلة)
+    // ✅ معالجة إلغاء الطرف الآخر (معدلة - بدون Alert)
     handleFeatureCancel() {
-        alert('🔓🔓🔓 تم استدعاء handleFeatureCancel بنجاح!');
         console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
         console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
         
@@ -420,7 +406,6 @@ const ChatSystem = {
         console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
     },
     
-    // ✅ إظهار إشعار بدون مربع حوار
     showNotification(message) {
         const oldNotif = document.getElementById('featureNotification');
         if (oldNotif) oldNotif.remove();
@@ -461,7 +446,6 @@ const ChatSystem = {
         setTimeout(() => notification.remove(), 3000);
     },
     
-    // ✅ تحديث الأزرار
     updateAllButtons() {
         const canUse = (this.friendInConversation && this.featuresEnabled);
         
@@ -633,17 +617,14 @@ const ChatSystem = {
         }
     },
     
-    // ✅ دالة تحديث حالة المحادثة (معدلة بالكامل)
     updateFriendConversationStatus(friendId, isInConversation) {
         console.log(`👥 استلام تحديث حالة المحادثة من: ${friendId}, في المحادثة: ${isInConversation}`);
         console.log('currentChat الحالي:', this.currentChat);
         
-        // ✅ إذا كانت هذه المحادثة هي نفسها المفتوحة حالياً
         if (this.currentChat === friendId) {
             this.friendInConversation = isInConversation;
             console.log(`✅ تحديث friendInConversation إلى: ${isInConversation}`);
             
-            // ✅ إذا خرج الطرف الآخر من المحادثة، قم بإلغاء تفعيل الميزات فوراً
             if (!isInConversation) {
                 console.log('⚠️ الطرف الآخر خرج من المحادثة - إلغاء تفعيل الميزات');
                 this.featuresEnabled = false;
@@ -666,14 +647,10 @@ const ChatSystem = {
                 this.showNotification('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
             }
         } 
-        // ✅ حتى لو لم تكن المحادثة مفتوحة، نخزن الحالة للمستخدم
         else {
-            // تخزين الحالة للمستخدم
             this._pendingConversationStatus[friendId] = isInConversation;
             console.log(`💾 تم تخزين حالة المحادثة لـ ${friendId}: ${isInConversation ? 'مفتوحة' : 'مغلقة'}`);
             
-            // ✅ إذا كانت الحالة "خرج من المحادثة" (false) لأي مستخدم،
-            // وكانت الميزات مفعلة، قم بإلغاء التفعيل فوراً
             if (!isInConversation && this.featuresEnabled) {
                 console.log(`⚠️ المستخدم ${friendId} خرج من المحادثة - إلغاء تفعيل الميزات`);
                 this.featuresEnabled = false;
@@ -701,7 +678,6 @@ const ChatSystem = {
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
-        // ✅ استرجاع الحالة المخزنة مسبقاً
         if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
             this.friendInConversation = this._pendingConversationStatus[friendId];
             console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
@@ -1026,23 +1002,19 @@ const ChatSystem = {
         }); 
     },
     
-    // ✅ دالة closeChat المعدلة (ترسل إشارة إلغاء قبل مسح currentChat)
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         console.log('currentChat:', this.currentChat);
         console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
         
-        // ✅ حفظ معرف المحادثة قبل مسحه
         const chatId = this.currentChat;
         
-        // ✅ إرسال إشارة إلغاء فوراً
         if (chatId) {
             console.log('📤 إرسال إشارة إلغاء إلى:', chatId);
             this.sendFeatureCancelImmediately(chatId);
             this.sendConversationStatus(false);
         }
         
-        // ✅ إعادة تعيين الميزات
         this.featuresEnabled = false;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -1060,7 +1032,6 @@ const ChatSystem = {
         
         this.updateAllButtons();
         
-        // ✅ إخفاء الواجهة ومسح المتغيرات
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
