@@ -715,10 +715,26 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
+    // ✅✅✅ دالة updateFriendStatus المعدلة (تم إضافة شرط لمنع إطفاء الميزات أثناء اختيار الملف)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
+        
+        // ✅ منع إطفاء الميزات إذا كان الطرف الآخر يختار ملفاً مؤقتاً
+        if (!isOnline && this.featuresEnabled && this.currentChat === friendId) {
+            console.log('⚠️ تجاهل إطفاء الميزات: قد يكون الطرف الآخر يختار ملفاً');
+            // فقط نحدث حالة الاتصال المرئية، لكن ما نغير الميزات
+            this.friendOnline = isOnline;
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '🟢 متصل (قد يختار ملفاً)';
+                statusEl.className = 'conversation-status online';
+            }
+            return;
+        }
+        
         this.friendOnline = isOnline;
         
+        // الباقي كما هو لإطفاء الميزات في الحالات الحقيقية
         if (!isOnline && this.featuresEnabled) {
             console.log('🔴 المستخدم غير متصل - إلغاء تفعيل الميزات');
             this.featuresEnabled = false;
