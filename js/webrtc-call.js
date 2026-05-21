@@ -466,6 +466,323 @@ const CallSystem = {
         }
     },
 
+    
+    // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
+
+    showIncomingCall(callerId, callData) {
+        if (callData.type === 'datachannel') {
+            console.log('📡 استلام طلب فتح Data Channel - لا حاجة لعرض شاشة');
+            this.handleSignaling(callData);
+            return;
+        }
+        
+        console.log('🔔 عرض شاشة المكالمة الواردة...');
+        this.currentCallId = callerId;
+        
+        const callType = callData.type === 'video' ? 'video' : 'audio';
+        const appColor = '#2196F3';
+        const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
+        
+        const fetchUserName = async () => {
+            try {
+                const userDoc = await window.db.collection('users').doc(callerId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    return userData.name || 'مستخدم';
+                }
+            } catch (e) {}
+            return 'مستخدم';
+        };
+        
+        const fetchUserAvatar = async () => {
+            try {
+                const userDoc = await window.db.collection('users').doc(callerId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
+                    return emojiMap[userData.avatarType] || '👤';
+                }
+            } catch (e) {}
+            return '👤';
+        };
+        
+        Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
+            const existingOverlay = document.getElementById('incomingCall');
+            if (existingOverlay) existingOverlay.remove();
+            
+            const overlay = document.createElement('div');
+            overlay.id = 'incomingCall';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: #0a0e27;
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            `;
+            
+            overlay.innerHTML = `
+                <style>
+                    @keyframes float {
+                        0%, 100% { transform: translateY(0px); }
+                        50% { transform: translateY(-15px); }
+                    }
+                    @keyframes ring {
+                        0% { transform: rotate(0deg); }
+                        25% { transform: rotate(6deg); }
+                        50% { transform: rotate(0deg); }
+                        75% { transform: rotate(-6deg); }
+                        100% { transform: rotate(0deg); }
+                    }
+                    .avatar-float {
+                        animation: float 2.5s ease-in-out infinite;
+                    }
+                    .ring-animation {
+                        animation: ring 1.2s ease-in-out infinite;
+                        transform-origin: center;
+                    }
+                    .swipe-container {
+                        width: 360px;
+                        margin: 30px auto;
+                        position: relative;
+                    }
+                    .swipe-button {
+                        width: 100%;
+                        height: 80px;
+                        border-radius: 50px;
+                        position: relative;
+                        overflow: hidden;
+                        cursor: grab;
+                        user-select: none;
+                        touch-action: none;
+                        background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
+                        border: 2px solid ${appColor};
+                        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+                    }
+                    .swipe-button:active {
+                        cursor: grabbing;
+                    }
+                    .divider-line {
+                        position: absolute;
+                        top: 10px;
+                        bottom: 10px;
+                        left: 50%;
+                        width: 2px;
+                        background: ${appColor};
+                        transform: translateX(-50%);
+                        pointer-events: none;
+                        z-index: 5;
+                        border-radius: 2px;
+                        box-shadow: 0 0 8px ${appColor};
+                    }
+                    .swipe-thumb {
+                        position: absolute;
+                        top: 8px;
+                        width: 64px;
+                        height: 64px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 1.8rem;
+                        box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+                        transition: left 0.1s linear, right 0.1s linear;
+                        cursor: grab;
+                        z-index: 30;
+                        backdrop-filter: blur(5px);
+                        border: 2px solid ${appColor};
+                    }
+                    .swipe-thumb:active {
+                        cursor: grabbing;
+                        transform: scale(0.96);
+                    }
+                    .thumb-left {
+                        left: 8px;
+                        background: linear-gradient(145deg, #4CAF50, #1b5e2a);
+                        color: white;
+                    }
+                    .thumb-right {
+                        right: 8px;
+                        left: auto;
+                        background: linear-gradient(145deg, #f44336, #8b0000);
+                        color: white;
+                    }
+                    .center-dot {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 14px;
+                        height: 14px;
+                        background: ${appColor};
+                        border-radius: 50%;
+                        pointer-events: none;
+                        z-index: 20;
+                        box-shadow: 0 0 12px ${appColor};
+                    }
+                </style>
+                
+                <div style="text-align: center; margin-bottom: 50px;">
+                    <div class="avatar-float ring-animation" style="font-size: 5.5rem; margin-bottom: 15px; filter: drop-shadow(0 10px 25px rgba(0,0,0,0.4));">${contactAvatar}</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 8px; letter-spacing: -0.5px;">${contactName}</div>
+                </div>
+                
+                <div class="swipe-container">
+                    <div id="swipeButton" class="swipe-button">
+                        <div class="divider-line"></div>
+                        <div class="center-dot"></div>
+                        
+                        <div id="leftThumb" class="swipe-thumb thumb-left">
+                            <i class="fas ${acceptIcon}"></i>
+                        </div>
+                        <div id="rightThumb" class="swipe-thumb thumb-right">
+                            <i class="fas fa-phone-slash"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            const button = document.getElementById('swipeButton');
+            const leftThumb = document.getElementById('leftThumb');
+            const rightThumb = document.getElementById('rightThumb');
+            
+            let isDraggingLeft = false;
+            let isDraggingRight = false;
+            let leftStartX = 0;
+            let rightStartX = 0;
+            let leftCurrentPos = 8;
+            let rightCurrentPos = 8;
+            const buttonWidth = button.clientWidth;
+            const centerPos = buttonWidth / 2;
+            const maxLeftMove = centerPos - 40;
+            const maxRightMove = centerPos - 40;
+            
+            const onLeftStart = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isDraggingLeft = true;
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const rect = leftThumb.getBoundingClientRect();
+                leftStartX = clientX - (rect.left - button.getBoundingClientRect().left);
+                leftThumb.style.transition = 'none';
+            };
+            
+            const onLeftMove = (e) => {
+                if (!isDraggingLeft) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
+                newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
+                leftCurrentPos = newLeft;
+                leftThumb.style.left = newLeft + 'px';
+            };
+            
+            const onLeftEnd = () => {
+                if (!isDraggingLeft) return;
+                isDraggingLeft = false;
+                leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+                
+                if (leftCurrentPos >= maxLeftMove - 10) {
+                    leftThumb.style.left = maxLeftMove + 'px';
+                    setTimeout(() => {
+                        overlay.remove();
+                        this.receiveCall(callerId, callData);
+                    }, 200);
+                } else {
+                    leftThumb.style.left = '8px';
+                }
+            };
+            
+            const onRightStart = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isDraggingRight = true;
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const rect = rightThumb.getBoundingClientRect();
+                rightStartX = (rect.right - clientX);
+                rightThumb.style.transition = 'none';
+            };
+            
+            const onRightMove = (e) => {
+                if (!isDraggingRight) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const containerRect = button.getBoundingClientRect();
+                let newRight = (containerRect.right - clientX) - rightStartX;
+                newRight = Math.max(8, Math.min(newRight, maxRightMove));
+                rightCurrentPos = newRight;
+                rightThumb.style.right = newRight + 'px';
+            };
+            
+            const onRightEnd = () => {
+                if (!isDraggingRight) return;
+                isDraggingRight = false;
+                rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+                
+                if (rightCurrentPos >= maxRightMove - 10) {
+                    rightThumb.style.right = maxRightMove + 'px';
+                    setTimeout(() => {
+                        overlay.remove();
+                        this.sendSignal(callerId, { type: 'reject' });
+                    }, 200);
+                } else {
+                    rightThumb.style.right = '8px';
+                }
+            };
+            
+            leftThumb.addEventListener('mousedown', onLeftStart);
+            leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+            
+            rightThumb.addEventListener('mousedown', onRightStart);
+            rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+            
+            document.addEventListener('mousemove', (e) => {
+                onLeftMove(e);
+                onRightMove(e);
+            });
+            document.addEventListener('mouseup', () => {
+                onLeftEnd();
+                onRightEnd();
+            });
+            document.addEventListener('touchmove', (e) => {
+                onLeftMove(e);
+                onRightMove(e);
+            }, { passive: false });
+            document.addEventListener('touchend', () => {
+                onLeftEnd();
+                onRightEnd();
+            });
+            
+            overlay._cleanup = () => {
+                document.removeEventListener('mousemove', onLeftMove);
+                document.removeEventListener('mouseup', onLeftEnd);
+                document.removeEventListener('mousemove', onRightMove);
+                document.removeEventListener('mouseup', onRightEnd);
+            };
+            
+            setTimeout(() => {
+                const stillThere = document.getElementById('incomingCall');
+                if (stillThere) {
+                    if (stillThere._cleanup) stillThere._cleanup();
+                    stillThere.remove();
+                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
+                    this.sendSignal(callerId, { type: 'reject' });
+                }
+            }, 30000);
+        });
+    },
+    
     // ==================== 9. Data Channel وإدارة الاتصال ====================
 
     setupDataChannel(channel) {
@@ -716,543 +1033,6 @@ const CallSystem = {
             console.error('خطأ في إرسال الإشارة:', error);
         }
     },
-
-    // ========== ✅✅✅ دوال إرسال واستقبال الملفات المعدلة ==========
-
-    async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
-            return false;
-        }
-        
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
-            }
-            
-            const b64 = await this.fileToBase64(blobToSend);
-            const fileId = Date.now().toString();
-            
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} | الحجم: ${(b64.length / 1024).toFixed(1)}KB`);
-            
-            const message = {
-                type: type,
-                data: b64,
-                chunk: 0,
-                total: 1,
-                id: fileId,
-                fileName: file.name || 'ملف'
-            };
-            this.dc.send(JSON.stringify(message));
-            console.log('✅ تم إرسال الملف');
-            
-            // ✅✅✅ إعادة ضبط القناة بعد الإرسال
-            setTimeout(() => {
-                console.log('🔄 إعادة ضبط القناة بعد الإرسال...');
-                
-                if (this.dc) {
-                    try { this.dc.close(); } catch(e) {}
-                    this.dc = null;
-                }
-                if (this.pc) {
-                    try { this.pc.close(); } catch(e) {}
-                    this.pc = null;
-                }
-                
-                if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                    this.ensureDataChannelOnly(ChatSystem.currentChat).then(() => {
-                        console.log('✅ تم إعادة فتح القناة بنجاح');
-                        if (typeof ChatSystem !== 'undefined') {
-                            ChatSystem.featuresEnabled = true;
-                            ChatSystem.updateAllButtons();
-                        }
-                    }).catch(err => console.log('⚠️ فشل إعادة الفتح:', err));
-                }
-            }, 500);
-            
-            return true;
-        } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            
-            // ✅✅✅ حتى لو فشل، نحاول نعيد فتح القناة
-            setTimeout(() => {
-                if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                    this.ensureDataChannelOnly(ChatSystem.currentChat).catch(err => console.log('⚠️ فشل إعادة الفتح بعد الخطأ:', err));
-                }
-            }, 500);
-            
-            return false;
-        }
-    },
-
-    handleChunkMessage(msg) {
-        if (!this.incomingChunks[msg.id]) {
-            this.incomingChunks[msg.id] = [];
-            this.incomingFileInfo[msg.id] = {
-                type: msg.type,
-                fileName: msg.fileName,
-                total: msg.total,
-                received: 0
-            };
-            ChatSystem.showProgressBar('جاري استلام الملف...', 0);
-        }
-        
-        this.incomingChunks[msg.id][msg.chunk] = msg.data;
-        this.incomingFileInfo[msg.id].received++;
-        const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-        const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
-        ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-        
-        if (this.incomingFileInfo[msg.id].received === msg.total) {
-            this.processCompleteFile(msg);
-        }
-    },
-
-    processCompleteFile(msg) {
-        try {
-            const fullData = this.incomingChunks[msg.id].join('');
-            
-            let finalData = fullData;
-            
-            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
-                finalData = 'data:image/jpeg;base64,' + fullData;
-            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
-                finalData = 'data:video/mp4;base64,' + fullData;
-            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
-                finalData = 'data:audio/webm;base64,' + fullData;
-            }
-            
-            const displayMsg = {
-                id: msg.id,
-                type: msg.type === 'location' ? 'text' : msg.type,
-                data: finalData,
-                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
-                sender: 'friend',
-                time: new Date().toISOString()
-            };
-            
-            if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-            ChatSystem.hideProgressBar();
-            
-            // ✅✅✅ إعادة ضبط القناة بعد الاستلام
-            setTimeout(() => {
-                console.log('🔄 إعادة ضبط القناة بعد الاستلام...');
-                
-                if (this.dc) {
-                    try { this.dc.close(); } catch(e) {}
-                    this.dc = null;
-                }
-                if (this.pc) {
-                    try { this.pc.close(); } catch(e) {}
-                    this.pc = null;
-                }
-                
-                if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                    this.ensureDataChannelOnly(ChatSystem.currentChat).then(() => {
-                        console.log('✅ تم إعادة فتح القناة بنجاح');
-                        if (typeof ChatSystem !== 'undefined') {
-                            ChatSystem.featuresEnabled = true;
-                            ChatSystem.updateAllButtons();
-                        }
-                    }).catch(err => console.log('⚠️ فشل إعادة الفتح:', err));
-                }
-            }, 500);
-            
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الملف المكتمل:', error);
-            ChatSystem.hideProgressBar();
-        }
-    },
-
-    
-// ==================== 9. Data Channel وإدارة الاتصال ====================
-
-    setupDataChannel(channel) {
-        if (!channel) return;
-        console.log('📡 إعداد Data Channel');
-        
-        channel.onmessage = e => {
-            try {
-                const msg = JSON.parse(e.data);
-                if (msg.type === 'ping') return;
-                if (msg.type === 'call_status') {
-                    this.handleCallStatus(msg);
-                    return;
-                }
-                if (msg.chunk !== undefined) {
-                    this.handleChunkMessage(msg);
-                    return;
-                }
-                const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
-                if (ChatSystem.currentChat) {
-                    ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                    ChatSystem.displayMessage(displayMsg);
-                }
-            } catch (error) {
-                console.error('خطأ في معالجة الرسالة:', error);
-            }
-        };
-        
-        channel.onopen = () => {
-            console.log('✅ Data Channel مفتوح');
-            if (this.reconnectTimer) {
-                clearTimeout(this.reconnectTimer);
-                this.reconnectTimer = null;
-            }
-            this.reconnectAttempts = 0;
-            this.sendCallStatus('connected');
-            
-            if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = setInterval(() => {
-                if (this.dc && this.dc.readyState === 'open') {
-                    this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-                }
-            }, 2000);
-        };
-        
-        // ✅✅✅ إلغاء تفعيل الميزات عند انقطاع القناة
-        channel.onclose = () => {
-            console.log('❌ Data Channel مغلق');
-            this.sendCallStatus('disconnected');
-            if (this.keepAliveInterval) {
-                clearInterval(this.keepAliveInterval);
-                this.keepAliveInterval = null;
-            }
-            this.scheduleReconnect();
-            
-            // ✅ إلغاء تفعيل الميزات عند انقطاع القناة (الطرف الآخر أغلق المتصفح)
-            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-                ChatSystem.featuresEnabled = false;
-                ChatSystem.featureRequestPending = false;
-                ChatSystem.featureRequestReceived = false;
-                
-                if (ChatSystem.featureBlinkInterval) {
-                    clearInterval(ChatSystem.featureBlinkInterval);
-                    ChatSystem.featureBlinkInterval = null;
-                }
-                
-                const btn = document.getElementById('enableFeaturesBtn');
-                if (btn) {
-                    btn.style.background = '#f44336';
-                    btn.title = 'تفعيل الميزات';
-                }
-                
-                ChatSystem.updateAllButtons();
-                console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-            }
-        };
-        
-        // ✅✅✅ إلغاء تفعيل الميزات عند خطأ القناة
-        channel.onerror = (e) => {
-            console.error('❌ خطأ في Data Channel:', e);
-            this.scheduleReconnect();
-            
-            // ✅ إلغاء تفعيل الميزات عند خطأ القناة
-            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-                ChatSystem.featuresEnabled = false;
-                ChatSystem.featureRequestPending = false;
-                ChatSystem.featureRequestReceived = false;
-                
-                if (ChatSystem.featureBlinkInterval) {
-                    clearInterval(ChatSystem.featureBlinkInterval);
-                    ChatSystem.featureBlinkInterval = null;
-                }
-                
-                const btn = document.getElementById('enableFeaturesBtn');
-                if (btn) {
-                    btn.style.background = '#f44336';
-                    btn.title = 'تفعيل الميزات';
-                }
-                
-                ChatSystem.updateAllButtons();
-                console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-            }
-        };
-    },
-
-    handleCallStatus(msg) {
-        if (msg.status === 'connected') {
-            console.log('📞 الطرف الآخر متصل');
-        } else if (msg.status === 'disconnected') {
-            console.log('📞 الطرف الآخر قطع الاتصال');
-            if (this.isInCall) {
-                this.endCall();
-            }
-        }
-    },
-
-    sendCallStatus(status) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
-        }
-    },
-
-    scheduleReconnect() {
-        if (!ChatSystem.currentChat || !ChatSystem.friendOnline) return;
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
-        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
-        this.reconnectTimer = setTimeout(async () => {
-            try {
-                if (ChatSystem.currentChat && ChatSystem.friendOnline) {
-                    await this.ensureDataChannelOnly(ChatSystem.currentChat);
-                }
-            } catch (error) {}
-            this.reconnectTimer = null;
-        }, delay);
-    },
-
-    async ensureDataChannel(calleeId) {
-        if (!calleeId) return;
-        if (this.dc && this.dc.readyState === 'open') return;
-        if (this.dc && this.dc.readyState === 'connecting') {
-            return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    clearInterval(checkInterval);
-                    reject(new Error('انتهت مهلة انتظار القناة'));
-                }, 10000);
-                const checkInterval = setInterval(() => {
-                    if (!this.dc) {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                    } else if (this.dc.readyState === 'open') {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        resolve();
-                    } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                    }
-                }, 500);
-            });
-        }
-        return this.createNewDataChannel(calleeId);
-    },
-
-    async createNewDataChannel(calleeId) {
-        this.reconnectAttempts = 0;
-        this.cleanupConnections();
-        try {
-            this.pc = new RTCPeerConnection(this.servers);
-            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-            this.setupDataChannel(this.dc);
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
-            this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
-            this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-            this.pc.onconnectionstatechange = () => {
-                switch(this.pc?.connectionState) {
-                    case 'connected': this.reconnectAttempts = 0; break;
-                    case 'failed': case 'disconnected': this.scheduleReconnect(); break;
-                }
-            };
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-        } catch (error) {
-            throw error;
-        }
-    },
-
-    async handleSignaling(data) {
-        try {
-            if (data.type === 'reject') {
-                console.log('📞 الطرف الآخر رفض المكالمة');
-                const inc = document.getElementById('incomingCall');
-                if (inc) inc.remove();
-                this.endCall();
-                return;
-            }
-            
-            if (data.type === 'call_ended') {
-                console.log('📞 المتصل أنهى المكالمة قبل الرد');
-                const inc = document.getElementById('incomingCall');
-                if (inc) inc.remove();
-                this.endCall();
-                return;
-            }
-            
-            if (!this.pc) {
-                this.pc = new RTCPeerConnection(this.servers);
-                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
-                this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
-            }
-            if (data.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                if (data.sdp.type === 'offer') {
-                    const answer = await this.pc.createAnswer();
-                    await this.pc.setLocalDescription(answer);
-                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
-                }
-            } else if (data.candidate) {
-                if (this.pc && data.candidate) {
-                    await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            }
-        } catch (e) {
-            console.warn('Signaling error:', e);
-        }
-    },
-
-    async sendSignal(calleeId, data) {
-        if (!ChatSystem.friendOnline) {
-            console.log('❌ المستخدم غير متصل، تم إلغاء إرسال الإشارة');
-            return;
-        }
-        
-        try {
-            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
-            if (!myPrivateKey || !receiverPublicKey) return;
-            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-            await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        } catch (error) {
-            console.error('خطأ في إرسال الإشارة:', error);
-        }
-    },
-
-    // ========== ✅✅✅ دوال إرسال واستقبال الملفات المعدلة (بدون إغلاق عمدي) ==========
-
-    async sendFileDirect(file, type) {
-        // ✅ التحقق من القناة ومحاولة فتحها إذا كانت مغلقة
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('⚠️ Data Channel غير مفتوح، جاري فتحه...');
-            const opened = await this.ensureDataChannelOnly(ChatSystem.currentChat);
-            if (!opened || !this.dc || this.dc.readyState !== 'open') {
-                console.log('❌ لا يمكن فتح القناة');
-                return false;
-            }
-        }
-        
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
-            }
-            
-            const b64 = await this.fileToBase64(blobToSend);
-            const fileId = Date.now().toString();
-            
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} | الحجم: ${(b64.length / 1024).toFixed(1)}KB`);
-            
-            const message = {
-                type: type,
-                data: b64,
-                chunk: 0,
-                total: 1,
-                id: fileId,
-                fileName: file.name || 'ملف'
-            };
-            this.dc.send(JSON.stringify(message));
-            console.log('✅ تم إرسال الملف');
-            
-            // ✅ فقط إذا انقطعت القناة بعد الإرسال، نعيد فتحها (بدون إغلاق عمدي)
-            setTimeout(() => {
-                if (!this.dc || this.dc.readyState !== 'open') {
-                    console.log('🔄 القناة انقطعت بعد الإرسال، إعادة فتحها...');
-                    this.ensureDataChannelOnly(ChatSystem.currentChat).then(() => {
-                        console.log('✅ تم إعادة فتح القناة بنجاح');
-                        if (typeof ChatSystem !== 'undefined') {
-                            ChatSystem.featuresEnabled = true;
-                            ChatSystem.updateAllButtons();
-                        }
-                    }).catch(err => console.log('⚠️ فشل إعادة الفتح:', err));
-                }
-            }, 1000);
-            
-            return true;
-        } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            return false;
-        }
-    },
-
-    handleChunkMessage(msg) {
-        if (!this.incomingChunks[msg.id]) {
-            this.incomingChunks[msg.id] = [];
-            this.incomingFileInfo[msg.id] = {
-                type: msg.type,
-                fileName: msg.fileName,
-                total: msg.total,
-                received: 0
-            };
-            ChatSystem.showProgressBar('جاري استلام الملف...', 0);
-        }
-        
-        this.incomingChunks[msg.id][msg.chunk] = msg.data;
-        this.incomingFileInfo[msg.id].received++;
-        const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-        const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
-        ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-        
-        if (this.incomingFileInfo[msg.id].received === msg.total) {
-            this.processCompleteFile(msg);
-        }
-    },
-
-    processCompleteFile(msg) {
-        try {
-            const fullData = this.incomingChunks[msg.id].join('');
-            
-            let finalData = fullData;
-            
-            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
-                finalData = 'data:image/jpeg;base64,' + fullData;
-            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
-                finalData = 'data:video/mp4;base64,' + fullData;
-            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
-                finalData = 'data:audio/webm;base64,' + fullData;
-            }
-            
-            const displayMsg = {
-                id: msg.id,
-                type: msg.type === 'location' ? 'text' : msg.type,
-                data: finalData,
-                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
-                sender: 'friend',
-                time: new Date().toISOString()
-            };
-            
-            if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-            ChatSystem.hideProgressBar();
-            
-            // ✅ فقط إذا انقطعت القناة بعد الاستلام، نعيد فتحها (بدون إغلاق عمدي)
-            setTimeout(() => {
-                if (!this.dc || this.dc.readyState !== 'open') {
-                    console.log('🔄 القناة انقطعت بعد الاستلام، إعادة فتحها...');
-                    this.ensureDataChannelOnly(ChatSystem.currentChat).then(() => {
-                        console.log('✅ تم إعادة فتح القناة بنجاح');
-                        if (typeof ChatSystem !== 'undefined') {
-                            ChatSystem.featuresEnabled = true;
-                            ChatSystem.updateAllButtons();
-                        }
-                    }).catch(err => console.log('⚠️ فشل إعادة الفتح:', err));
-                }
-            }, 1000);
-            
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الملف المكتمل:', error);
-            ChatSystem.hideProgressBar();
-        }
-    },
-
-    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
