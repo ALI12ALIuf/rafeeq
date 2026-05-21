@@ -227,7 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (مع كود تشخيصي لـ feature_cancel) ==========
+    // ========== الدالة المعدلة (مع إزالة alert) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -262,7 +262,6 @@ const SecureChatSystem = {
                     }
                 }
             }
-            // ✅ معالجة رسالة حالة المحادثة (conversation_status)
             else if (msg.package.type === 'conversation_status') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const statusData = JSON.parse(decryptedData);
@@ -271,7 +270,6 @@ const SecureChatSystem = {
                     ChatSystem.updateFriendConversationStatus(msg.from, statusData.isOpen);
                 }
             }
-            // ✅ معالجة طلب حالة المحادثة (conversation_status_request)
             else if (msg.package.type === 'conversation_status_request') {
                 console.log('📤 استلام طلب حالة محادثة من:', msg.from);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
@@ -279,7 +277,6 @@ const SecureChatSystem = {
                     ChatSystem.sendConversationStatus(true);
                 }
             }
-            // ✅ معالجة طلب تفعيل الميزات (feature_request)
             else if (msg.package.type === 'feature_request') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const requestData = JSON.parse(decryptedData);
@@ -288,7 +285,6 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureRequest(msg.from);
                 }
             }
-            // ✅ معالجة رد تفعيل الميزات (feature_response)
             else if (msg.package.type === 'feature_response') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const responseData = JSON.parse(decryptedData);
@@ -297,10 +293,10 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
-            // ✅✅ معالجة إلغاء تفعيل الميزات (feature_cancel) مع كود تشخيصي
+            // ✅✅ معالجة إلغاء تفعيل الميزات (feature_cancel) - بدون alert
             else if (msg.package.type === 'feature_cancel') {
-                console.log('🔓🔓🔓 استلام إشارة feature_cancel من:', msg.from);
-                alert('📨 تم استلام إشارة إلغاء التفعيل من الطرف الآخر!');  // ✅ كود تشخيصي
+                console.log('🔓 استلام إشارة feature_cancel من:', msg.from);
+                
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureCancel) {
                     console.log('✅ جاري استدعاء ChatSystem.handleFeatureCancel');
                     ChatSystem.handleFeatureCancel();
@@ -319,10 +315,8 @@ const SecureChatSystem = {
                             ChatSystem.updateAllButtons();
                         }
                     }
-                    alert('❌ ChatSystem.handleFeatureCancel غير موجود - تم استخدام الحل البديل');
                 }
             }
-            // الحفاظ على وظيفة الموقع والملفات
             else if (msg.package.type === 'location') {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
