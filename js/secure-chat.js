@@ -306,7 +306,20 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureCancel();
                 } else {
                     console.error('❌ ChatSystem.handleFeatureCancel غير موجود');
-                    alert('❌ ChatSystem.handleFeatureCancel غير موجود');
+                    // حل بديل: إعادة تعيين مباشرة
+                    if (typeof ChatSystem !== 'undefined') {
+                        ChatSystem.featuresEnabled = false;
+                        ChatSystem.featureRequestPending = false;
+                        ChatSystem.featureRequestReceived = false;
+                        
+                        const btn = document.getElementById('enableFeaturesBtn');
+                        if (btn) btn.style.background = '#f44336';
+                        
+                        if (typeof ChatSystem.updateAllButtons === 'function') {
+                            ChatSystem.updateAllButtons();
+                        }
+                    }
+                    alert('❌ ChatSystem.handleFeatureCancel غير موجود - تم استخدام الحل البديل');
                 }
             }
             // الحفاظ على وظيفة الموقع والملفات
