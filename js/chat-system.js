@@ -21,6 +21,10 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
+    // ✅ متغيرات جديدة لمنع إطفاء الميزات أثناء اختيار الملف
+    isFileSelecting: false,
+    disconnectTimer: null,
+    
     init() { 
         this.loadAllChats(); 
         this.setupPageFocusListener();
@@ -715,18 +719,18 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (تم إضافة شرط لمنع إطفاء الميزات أثناء اختيار الملف)
+    // ✅✅✅ دالة updateFriendStatus المعدلة (مع isFileSelecting و disconnectTimer)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
-        // ✅ منع إطفاء الميزات إذا كان الطرف الآخر يختار ملفاً مؤقتاً
-        if (!isOnline && this.featuresEnabled && this.currentChat === friendId) {
-            console.log('⚠️ تجاهل إطفاء الميزات: قد يكون الطرف الآخر يختار ملفاً');
-            // فقط نحدث حالة الاتصال المرئية، لكن ما نغير الميزات
+        // ✅ إذا كان الطرف الآخر يختار ملف حالياً، نتجاهل أي تغيير في حالة الاتصال
+        if (this.isFileSelecting) {
+            console.log('⚠️ الطرف الآخر يختار ملف حالياً - تجاهل تحديث حالة الاتصال');
+            // نحدث الحالة المرئية فقط
             this.friendOnline = isOnline;
             const statusEl = document.getElementById('conversationStatus');
             if (statusEl) {
-                statusEl.innerHTML = '🟢 متصل (قد يختار ملفاً)';
+                statusEl.innerHTML = '🟢 متصل (يختار ملف)';
                 statusEl.className = 'conversation-status online';
             }
             return;
@@ -734,26 +738,36 @@ const ChatSystem = {
         
         this.friendOnline = isOnline;
         
-        // الباقي كما هو لإطفاء الميزات في الحالات الحقيقية
-        if (!isOnline && this.featuresEnabled) {
-            console.log('🔴 المستخدم غير متصل - إلغاء تفعيل الميزات');
-            this.featuresEnabled = false;
-            this.featureRequestPending = false;
-            this.featureRequestReceived = false;
-            
-            if (this.featureBlinkInterval) {
-                clearInterval(this.featureBlinkInterval);
-                this.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-                console.log('✅ تم تغيير لون الزر إلى الأحمر (المستخدم غير متصل)');
-            }
-            
-            this.updateAllButtons();
+        // ✅ إذا صار غير متصل والميزات مفعلة
+        if (!isOnline && this.featuresEnabled && !this.disconnectTimer) {
+            console.log('⏳ المستخدم غير متصل، ننتظر 60 ثانية قبل إطفاء الميزات');
+            this.disconnectTimer = setTimeout(() => {
+                console.log('❌ انتهت 60 ثانية والمستخدم لا يزال غير متصل - إلغاء تفعيل الميزات');
+                this.featuresEnabled = false;
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                
+                if (this.featureBlinkInterval) {
+                    clearInterval(this.featureBlinkInterval);
+                    this.featureBlinkInterval = null;
+                }
+                
+                const btn = document.getElementById('enableFeaturesBtn');
+                if (btn) {
+                    btn.style.background = '#f44336';
+                    btn.title = 'تفعيل الميزات';
+                }
+                
+                this.updateAllButtons();
+                this.disconnectTimer = null;
+            }, 60000); // 60 ثانية
+        }
+        
+        // ✅ إذا رجع متصل خلال المهلة، نلغي الإطفاء
+        if (isOnline && this.disconnectTimer) {
+            console.log('✅ المستخدم رجع متصل خلال المهلة - إلغاء إطفاء الميزات');
+            clearTimeout(this.disconnectTimer);
+            this.disconnectTimer = null;
         }
         
         if (!userData && window.auth?.currentUser) {
@@ -767,7 +781,6 @@ const ChatSystem = {
         if (!statusEl) return;
         
         let statusHtml = '';
-        
         if (isOnline) {
             statusHtml = '🟢 متصل';
         } else {
@@ -893,13 +906,22 @@ const ChatSystem = {
         }
     },
     
-    // ✅✅✅ دوال الإرسال المعدلة (مع إضافة إشارة file_selection_start)
+    // ✅✅✅ دوال الإرسال المعدلة (مع isFileSelecting)
     
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
+        }
+        
+        // ✅ بدء اختيار الملف
+        this.isFileSelecting = true;
+        
+        // ✅ إلغاء أي مؤقت سابق
+        if (this.disconnectTimer) {
+            clearTimeout(this.disconnectTimer);
+            this.disconnectTimer = null;
         }
         
         // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
@@ -910,7 +932,10 @@ const ChatSystem = {
         // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
-        if (!(await this._ensureChannelReady())) return;
+        if (!(await this._ensureChannelReady())) {
+            this.isFileSelecting = false;
+            return;
+        }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'image');
@@ -922,6 +947,9 @@ const ChatSystem = {
                 this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
             } else alert('فشل إرسال الصورة');
         }
+        
+        // ✅ انتهى اختيار الملف
+        this.isFileSelecting = false;
     },
     
     async sendVideoFile(file) { 
@@ -929,6 +957,15 @@ const ChatSystem = {
         if (!this.friendInConversation || !this.featuresEnabled) {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
+        }
+        
+        // ✅ بدء اختيار الملف
+        this.isFileSelecting = true;
+        
+        // ✅ إلغاء أي مؤقت سابق
+        if (this.disconnectTimer) {
+            clearTimeout(this.disconnectTimer);
+            this.disconnectTimer = null;
         }
         
         // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
@@ -943,10 +980,14 @@ const ChatSystem = {
             await SecureChatSystem.validateVideo(file);
         } catch (error) {
             alert(error.message);
+            this.isFileSelecting = false;
             return;
         }
         
-        if (!(await this._ensureChannelReady())) return;
+        if (!(await this._ensureChannelReady())) {
+            this.isFileSelecting = false;
+            return;
+        }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
@@ -963,6 +1004,9 @@ const ChatSystem = {
                 } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
+        
+        // ✅ انتهى اختيار الملف
+        this.isFileSelecting = false;
     },
     
     async sendFile(file) { 
@@ -970,6 +1014,15 @@ const ChatSystem = {
         if (!this.friendInConversation || !this.featuresEnabled) {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
+        }
+        
+        // ✅ بدء اختيار الملف
+        this.isFileSelecting = true;
+        
+        // ✅ إلغاء أي مؤقت سابق
+        if (this.disconnectTimer) {
+            clearTimeout(this.disconnectTimer);
+            this.disconnectTimer = null;
         }
         
         // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
@@ -980,7 +1033,10 @@ const ChatSystem = {
         // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
-        if (!(await this._ensureChannelReady())) return;
+        if (!(await this._ensureChannelReady())) {
+            this.isFileSelecting = false;
+            return;
+        }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'file');
@@ -991,6 +1047,9 @@ const ChatSystem = {
                 this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
             } else alert('فشل إرسال الملف');
         }
+        
+        // ✅ انتهى اختيار الملف
+        this.isFileSelecting = false;
     },
     
     async sendVoiceNote(audioBlob) { 
@@ -998,6 +1057,15 @@ const ChatSystem = {
         if (!this.friendInConversation || !this.featuresEnabled) {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
+        }
+        
+        // ✅ بدء اختيار الملف
+        this.isFileSelecting = true;
+        
+        // ✅ إلغاء أي مؤقت سابق
+        if (this.disconnectTimer) {
+            clearTimeout(this.disconnectTimer);
+            this.disconnectTimer = null;
         }
         
         // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
@@ -1008,7 +1076,10 @@ const ChatSystem = {
         // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
-        if (!(await this._ensureChannelReady())) return;
+        if (!(await this._ensureChannelReady())) {
+            this.isFileSelecting = false;
+            return;
+        }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(audioBlob, 'voice');
@@ -1019,6 +1090,9 @@ const ChatSystem = {
                 this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
             } else alert('فشل إرسال البصمة الصوتية');
         }
+        
+        // ✅ انتهى اختيار الملف
+        this.isFileSelecting = false;
     },
     
     async shareLocationDirect() { 
