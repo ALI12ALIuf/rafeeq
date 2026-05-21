@@ -145,12 +145,11 @@ const ChatSystem = {
                 data: encrypted, 
                 timestamp: Date.now() 
             });
-            console.log('📨 تم إرسال طلب تفعيل الميزات');
-            this.showNotification('📨 تم إرسال طلب تفعيل الميزات إلى الطرف الآخر');
+            console.log('📨 تم إرسال طلب تفعيل الميزات إلى الطرف الآخر');
         } catch(e) {
             this.featureRequestPending = false;
             this.startFeatureBlink();
-            this.showNotification('❌ فشل إرسال الطلب');
+            console.log('❌ فشل إرسال الطلب');
         }
     },
     
@@ -165,7 +164,7 @@ const ChatSystem = {
         
         this.featureRequestReceived = true;
         this.startFeatureBlink();
-        this.showNotification('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
+        console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
         console.log('✅ تم تفعيل وضع الاستقبال');
     },
     
@@ -220,7 +219,7 @@ const ChatSystem = {
         }
         
         this.updateAllButtons();
-        this.showNotification('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
+        console.log('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
         console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
     },
     
@@ -253,7 +252,7 @@ const ChatSystem = {
                 data: encrypted, 
                 timestamp: Date.now() 
             });
-            this.showNotification('❌ تم رفض الطلب');
+            console.log('❌ تم رفض الطلب');
         } catch(e) {}
     },
     
@@ -276,7 +275,7 @@ const ChatSystem = {
             }
             
             this.updateAllButtons();
-            this.showNotification('✅ تم تفعيل الميزات!');
+            console.log('✅ تم تفعيل الميزات!');
         } else if (action === 'rejected') {
             this.featureRequestPending = false;
             this.featureRequestReceived = false;
@@ -289,7 +288,7 @@ const ChatSystem = {
             if (btn) {
                 btn.style.background = '#f44336';
             }
-            this.showNotification('❌ تم رفض طلب تفعيل الميزات');
+            console.log('❌ تم رفض طلب تفعيل الميزات');
         }
     },
     
@@ -376,7 +375,6 @@ const ChatSystem = {
         }
     },
     
-    // ✅ معالجة إلغاء الطرف الآخر (معدلة - بدون Alert)
     handleFeatureCancel() {
         console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
         console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
@@ -402,48 +400,8 @@ const ChatSystem = {
         }
         
         this.updateAllButtons();
-        this.showNotification('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+        console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
         console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
-    },
-    
-    showNotification(message) {
-        const oldNotif = document.getElementById('featureNotification');
-        if (oldNotif) oldNotif.remove();
-        
-        const notification = document.createElement('div');
-        notification.id = 'featureNotification';
-        notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.85);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 30px;
-            z-index: 10001;
-            font-size: 14px;
-            backdrop-filter: blur(10px);
-            white-space: nowrap;
-            animation: fadeOut 3s forwards;
-        `;
-        document.body.appendChild(notification);
-        
-        if (!document.querySelector('#fadeOutKeyframes')) {
-            const style = document.createElement('style');
-            style.id = 'fadeOutKeyframes';
-            style.textContent = `
-                @keyframes fadeOut {
-                    0% { opacity: 1; transform: translateX(-50%) translateY(0); }
-                    70% { opacity: 1; transform: translateX(-50%) translateY(0); }
-                    100% { opacity: 0; transform: translateX(-50%) translateY(-20px); visibility: hidden; }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        setTimeout(() => notification.remove(), 3000);
     },
     
     updateAllButtons() {
@@ -644,7 +602,7 @@ const ChatSystem = {
                 }
                 
                 this.updateAllButtons();
-                this.showNotification('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+                console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
             }
         } 
         else {
@@ -668,7 +626,7 @@ const ChatSystem = {
                 }
                 
                 this.updateAllButtons();
-                this.showNotification(`⚠️ ${friendId} خرج من المحادثة، تم إلغاء تفعيل الميزات`);
+                console.log(`⚠️ ${friendId} خرج من المحادثة، تم إلغاء تفعيل الميزات`);
             }
         }
         
@@ -734,9 +692,7 @@ const ChatSystem = {
         
         if (isOnline) {
             statusHtml = '🟢 متصل';
-            if (this.friendInConversation) {
-                statusHtml += ' 📱 في المحادثة';
-            }
+            // تم إزالة نص "📱 في المحادثة" نهائياً
         } else {
             statusHtml = '🔴 غير متصل';
         }
