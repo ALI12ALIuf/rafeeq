@@ -24,6 +24,7 @@ const ChatSystem = {
     // ✅ متغيرات المؤقت 60 ثانية
     offlineStartTime: null,
     offlineTimer: null,
+    offlineCountdownInterval: null,  // ✅ للعداد التنازلي
     
     init() { 
         this.loadAllChats(); 
@@ -719,25 +720,41 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (مع مؤقت 60 ثانية)
+    // ✅✅✅ دالة updateFriendStatus المعدلة (ثلاث حالات مع عداد تنازلي)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
-        // إذا صار الطرف الآخر غير متصل
+        // الحالة 1: الشخص غير متصل (نبدأ العداد التنازلي 60 ثانية)
         if (!isOnline) {
-            // إذا كان timer شغال نمسحه
-            if (this.offlineTimer) {
-                clearTimeout(this.offlineTimer);
-                this.offlineTimer = null;
-            }
+            // مسح أي مؤقتات قديمة
+            if (this.offlineTimer) clearTimeout(this.offlineTimer);
+            if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
             
-            // نسجل وقت بدء الانقطاع
             this.offlineStartTime = Date.now();
             this.friendOnline = false;
             
-            // نضبط مؤقت 60 ثانية
+            let secondsLeft = 60;
+            const statusEl = document.getElementById('conversationStatus');
+            
+            // دالة تحديث العداد التنازلي
+            const updateCountdown = () => {
+                if (statusEl) {
+                    statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
+                    statusEl.className = 'conversation-status offline-temp';
+                }
+                secondsLeft--;
+                
+                if (secondsLeft < 0) {
+                    clearInterval(this.offlineCountdownInterval);
+                    this.offlineCountdownInterval = null;
+                }
+            };
+            
+            updateCountdown();
+            this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
+            
+            // بعد 60 ثانية، إذا لساته غير متصل → نطفي الميزات ونحول للأحمر
             this.offlineTimer = setTimeout(() => {
-                // إذا لساته غير متصل بعد 60 ثانية
                 if (!this.friendOnline && this.featuresEnabled) {
                     console.log('🔴 الطرف الآخر غير متصل لأكثر من 60 ثانية - إلغاء الميزات');
                     this.featuresEnabled = false;
@@ -757,25 +774,32 @@ const ChatSystem = {
                     
                     this.updateAllButtons();
                 }
+                
+                // إيقاف العداد وتحديث النص إلى أحمر
+                if (this.offlineCountdownInterval) {
+                    clearInterval(this.offlineCountdownInterval);
+                    this.offlineCountdownInterval = null;
+                }
+                
+                if (statusEl && !this.friendOnline) {
+                    statusEl.innerHTML = '🔴 غير متصل';
+                    statusEl.className = 'conversation-status offline';
+                }
+                
                 this.offlineTimer = null;
             }, 60000);
             
-            // تحديث النص المرئي
-            const statusEl = document.getElementById('conversationStatus');
-            if (statusEl) {
-                statusEl.innerHTML = '🟡 غير متصل مؤقتاً...';
-                statusEl.className = 'conversation-status offline';
-            }
             return;
         }
         
-        // إذا رجع متصل خلال 60 ثانية
+        // الحالة 2: الشخص رجع متصل خلال 60 ثانية (نرجع الميزات كما هي)
         if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 60000) {
             console.log('✅ الطرف الآخر عاد خلال 60 ثانية - إبقاء الميزات مفعلة');
-            if (this.offlineTimer) {
-                clearTimeout(this.offlineTimer);
-                this.offlineTimer = null;
-            }
+            
+            if (this.offlineTimer) clearTimeout(this.offlineTimer);
+            if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
+            
+            this.offlineTimer = null;
             this.offlineStartTime = null;
             this.friendOnline = true;
             
@@ -787,7 +811,7 @@ const ChatSystem = {
             return;
         }
         
-        // الحالة الطبيعية (أول مرة أو بعد انتهاء المهلة)
+        // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
         this.friendOnline = isOnline;
         
         if (!userData && window.auth?.currentUser) {
@@ -801,15 +825,18 @@ const ChatSystem = {
         if (!statusEl) return;
         
         let statusHtml = '';
+        let statusClass = '';
         
         if (isOnline) {
             statusHtml = '🟢 متصل';
+            statusClass = 'conversation-status online';
         } else {
             statusHtml = '🔴 غير متصل';
+            statusClass = 'conversation-status offline';
         }
         
         statusEl.innerHTML = statusHtml;
-        statusEl.className = `conversation-status ${isOnline ? 'online' : 'offline'}`;
+        statusEl.className = statusClass;
         
         this.updateAllButtons();
     },
