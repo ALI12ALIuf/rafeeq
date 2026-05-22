@@ -21,7 +21,7 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
-    // ✅ متغيرات المؤقت 60 ثانية
+    // ✅ متغيرات المؤقت (120 ثانية)
     offlineStartTime: null,
     offlineTimer: null,
     offlineCountdownInterval: null,
@@ -720,7 +720,7 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (ثلاث حالات: أخضر ← أصفر مع عداد ← أحمر + إرسال إشارة إلغاء للمرسل)
+    // ✅✅✅ دالة updateFriendStatus المعدلة (ثلاث حالات مع عداد 120 ثانية)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
@@ -738,14 +738,14 @@ const ChatSystem = {
             }
             
             // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
-            // نبدأ العداد الأصفر 60 ثانية
+            // نبدأ العداد الأصفر 120 ثانية
             if (this.offlineTimer) clearTimeout(this.offlineTimer);
             if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
             
             this.offlineStartTime = Date.now();
             this.friendOnline = false;
             
-            let secondsLeft = 60;
+            let secondsLeft = 120;  // ✅ تم التعديل من 60 إلى 120
             const statusEl = document.getElementById('conversationStatus');
             
             const updateCountdown = () => {
@@ -765,7 +765,7 @@ const ChatSystem = {
             
             this.offlineTimer = setTimeout(() => {
                 if (!this.friendOnline && this.featuresEnabled) {
-                    console.log('🔴 60 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى المرسل');
+                    console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى المرسل');
                     
                     // ✅ إرسال إشارة إلغاء إلى الطرف الآخر (المرسل)
                     if (this.currentChat) {
@@ -801,14 +801,13 @@ const ChatSystem = {
                 }
                 
                 this.offlineTimer = null;
-            }, 60000);
-            
+            }, 120000);  // ✅ تم التعديل من 60000 إلى 120000
             return;
         }
         
-        // الحالة 2: الشخص رجع متصل خلال 60 ثانية (نرجع الميزات كما هي)
-        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 60000) {
-            console.log('✅ الطرف الآخر عاد خلال 60 ثانية - إبقاء الميزات مفعلة');
+        // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
+        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {  // ✅ تم التعديل
+            console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
             
             if (this.offlineTimer) clearTimeout(this.offlineTimer);
             if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
