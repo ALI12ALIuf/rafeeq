@@ -720,7 +720,7 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (ثلاث حالات: أخضر ← أصفر مع عداد ← أحمر)
+    // ✅✅✅ دالة updateFriendStatus المعدلة (ثلاث حالات: أخضر ← أصفر مع عداد ← أحمر + إرسال إشارة إلغاء للمرسل)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
@@ -765,7 +765,13 @@ const ChatSystem = {
             
             this.offlineTimer = setTimeout(() => {
                 if (!this.friendOnline && this.featuresEnabled) {
-                    console.log('🔴 60 ثانية وما رجع - إلغاء الميزات');
+                    console.log('🔴 60 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى المرسل');
+                    
+                    // ✅ إرسال إشارة إلغاء إلى الطرف الآخر (المرسل)
+                    if (this.currentChat) {
+                        this.sendFeatureCancelImmediately(this.currentChat);
+                    }
+                    
                     this.featuresEnabled = false;
                     this.featureRequestPending = false;
                     this.featureRequestReceived = false;
