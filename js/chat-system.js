@@ -720,7 +720,7 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (ثلاث حالات: أخضر ← أصفر مع عداد ← أحمر + إرسال إشارة إلغاء للمرسل)
+    // ✅✅✅ دالة updateFriendStatus المعدلة (ثلاث حالات: أخضر ← أصفر مع عداد ← أحمر + إرسال إشارة إلغاء للمرسل + ميزة إعادة التفعيل التلقائي)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
@@ -820,6 +820,31 @@ const ChatSystem = {
             const statusEl = document.getElementById('conversationStatus');
             if (statusEl) {
                 statusEl.innerHTML = '🟢 متصل';
+                statusEl.className = 'conversation-status online';
+            }
+            return;
+        }
+        
+        // ✅✅✅ ميزة إضافية جديدة: إذا رجع أحمد متصل ولكن الميزات عنده غير مفعلة
+        if (isOnline && !this.featuresEnabled && this.currentChat === friendId) {
+            console.log('🔄 المستخدم عاد متصل لكن الميزات غير مفعلة - أطلب إعادة التفعيل');
+            
+            // إرسال إشارة إلغاء إلى الطرف الآخر
+            if (this.currentChat) {
+                this.sendFeatureCancelImmediately(this.currentChat);
+            }
+            
+            // إعادة فتح القناة بعد نصف ثانية
+            setTimeout(() => {
+                if (this.currentChat) {
+                    CallSystem.ensureDataChannelOnly(this.currentChat);
+                }
+            }, 500);
+            
+            this.friendOnline = true;
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '🟢 متصل (جاري إعادة التفعيل...)';
                 statusEl.className = 'conversation-status online';
             }
             return;
