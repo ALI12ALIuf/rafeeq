@@ -20,6 +20,7 @@ const ChatSystem = {
     featureRequestPending: false,
     featureRequestReceived: false,
     featureBlinkInterval: null,
+    isSelectingFile: false,  // ✅ متغير لتحديد حالة اختيار الملف
     
     init() { 
         this.loadAllChats(); 
@@ -715,18 +716,17 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (تم إضافة شرط لمنع إطفاء الميزات أثناء اختيار الملف)
+    // ✅✅✅ دالة updateFriendStatus المعدلة بالكامل (مع isSelectingFile)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
-        // ✅ منع إطفاء الميزات إذا كان الطرف الآخر يختار ملفاً مؤقتاً
-        if (!isOnline && this.featuresEnabled && this.currentChat === friendId) {
-            console.log('⚠️ تجاهل إطفاء الميزات: قد يكون الطرف الآخر يختار ملفاً');
-            // فقط نحدث حالة الاتصال المرئية، لكن ما نغير الميزات
+        // ✅ إذا كان المستخدم يختار ملفاً حالياً، تجاهل تغيير حالة الاتصال
+        if (!isOnline && this.isSelectingFile) {
+            console.log('⚠️ تجاهل إطفاء الميزات: الطرف الآخر يختار ملفاً حالياً');
             this.friendOnline = isOnline;
             const statusEl = document.getElementById('conversationStatus');
             if (statusEl) {
-                statusEl.innerHTML = '🟢 متصل (قد يختار ملفاً)';
+                statusEl.innerHTML = '🟢 متصل (يختار ملفاً)';
                 statusEl.className = 'conversation-status online';
             }
             return;
@@ -734,9 +734,9 @@ const ChatSystem = {
         
         this.friendOnline = isOnline;
         
-        // الباقي كما هو لإطفاء الميزات في الحالات الحقيقية
+        // الحالة الطبيعية: إذا المستخدم غير متصل وما عم يختار ملف → نطفي الميزات
         if (!isOnline && this.featuresEnabled) {
-            console.log('🔴 المستخدم غير متصل - إلغاء تفعيل الميزات');
+            console.log('🔴 المستخدم غير متصل حقيقياً - إلغاء تفعيل الميزات');
             this.featuresEnabled = false;
             this.featureRequestPending = false;
             this.featureRequestReceived = false;
@@ -893,7 +893,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅✅✅ دوال الإرسال المعدلة (مع إضافة إشارة file_selection_start)
+    // ✅✅✅ دوال الإرسال المعدلة (مع إضافة isSelectingFile)
     
     async sendImage(file) { 
         if (!this.currentChat) return;
@@ -901,6 +901,9 @@ const ChatSystem = {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
+        
+        // ✅ تفعيل حالة اختيار الملف
+        this.isSelectingFile = true;
         
         // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
@@ -910,7 +913,10 @@ const ChatSystem = {
         // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
-        if (!(await this._ensureChannelReady())) return;
+        if (!(await this._ensureChannelReady())) {
+            this.isSelectingFile = false;
+            return;
+        }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'image');
@@ -922,6 +928,9 @@ const ChatSystem = {
                 this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
             } else alert('فشل إرسال الصورة');
         }
+        
+        // ✅ إلغاء حالة اختيار الملف بعد 5 ثوانٍ
+        setTimeout(() => { this.isSelectingFile = false; }, 5000);
     },
     
     async sendVideoFile(file) { 
@@ -930,6 +939,9 @@ const ChatSystem = {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
+        
+        // ✅ تفعيل حالة اختيار الملف
+        this.isSelectingFile = true;
         
         // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
@@ -943,10 +955,14 @@ const ChatSystem = {
             await SecureChatSystem.validateVideo(file);
         } catch (error) {
             alert(error.message);
+            this.isSelectingFile = false;
             return;
         }
         
-        if (!(await this._ensureChannelReady())) return;
+        if (!(await this._ensureChannelReady())) {
+            this.isSelectingFile = false;
+            return;
+        }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
@@ -963,6 +979,9 @@ const ChatSystem = {
                 } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
+        
+        // ✅ إلغاء حالة اختيار الملف بعد 5 ثوانٍ
+        setTimeout(() => { this.isSelectingFile = false; }, 5000);
     },
     
     async sendFile(file) { 
@@ -972,6 +991,9 @@ const ChatSystem = {
             return;
         }
         
+        // ✅ تفعيل حالة اختيار الملف
+        this.isSelectingFile = true;
+        
         // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
@@ -980,7 +1002,10 @@ const ChatSystem = {
         // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
-        if (!(await this._ensureChannelReady())) return;
+        if (!(await this._ensureChannelReady())) {
+            this.isSelectingFile = false;
+            return;
+        }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'file');
@@ -991,6 +1016,9 @@ const ChatSystem = {
                 this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
             } else alert('فشل إرسال الملف');
         }
+        
+        // ✅ إلغاء حالة اختيار الملف بعد 5 ثوانٍ
+        setTimeout(() => { this.isSelectingFile = false; }, 5000);
     },
     
     async sendVoiceNote(audioBlob) { 
@@ -1000,6 +1028,9 @@ const ChatSystem = {
             return;
         }
         
+        // ✅ تفعيل حالة اختيار الملف
+        this.isSelectingFile = true;
+        
         // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
@@ -1008,7 +1039,10 @@ const ChatSystem = {
         // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
-        if (!(await this._ensureChannelReady())) return;
+        if (!(await this._ensureChannelReady())) {
+            this.isSelectingFile = false;
+            return;
+        }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(audioBlob, 'voice');
@@ -1019,6 +1053,9 @@ const ChatSystem = {
                 this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
             } else alert('فشل إرسال البصمة الصوتية');
         }
+        
+        // ✅ إلغاء حالة اختيار الملف بعد 5 ثوانٍ
+        setTimeout(() => { this.isSelectingFile = false; }, 5000);
     },
     
     async shareLocationDirect() { 
