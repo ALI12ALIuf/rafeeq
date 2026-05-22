@@ -783,7 +783,7 @@ const CallSystem = {
         });
     },
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+// ==================== 9. Data Channel وإدارة الاتصال ====================
 
     setupDataChannel(channel) {
         if (!channel) return;
@@ -797,6 +797,35 @@ const CallSystem = {
                     this.handleCallStatus(msg);
                     return;
                 }
+                
+                // ✅✅✅ معالجة إشارة اختيار الملف
+                if (msg.type === 'file_picker_opened') {
+                    console.log('📂 الطرف الآخر يختار ملفاً - مهلة 60 ثانية');
+                    if (this.filePickerTimer) clearTimeout(this.filePickerTimer);
+                    this.filePickerTimer = setTimeout(() => {
+                        console.log('⚠️ انتهت المهلة (60 ثانية) - إطفاء الميزات');
+                        if (ChatSystem.featuresEnabled) {
+                            ChatSystem.featuresEnabled = false;
+                            ChatSystem.featureRequestPending = false;
+                            ChatSystem.featureRequestReceived = false;
+                            
+                            if (ChatSystem.featureBlinkInterval) {
+                                clearInterval(ChatSystem.featureBlinkInterval);
+                                ChatSystem.featureBlinkInterval = null;
+                            }
+                            
+                            const btn = document.getElementById('enableFeaturesBtn');
+                            if (btn) {
+                                btn.style.background = '#f44336';
+                                btn.title = 'تفعيل الميزات';
+                            }
+                            
+                            ChatSystem.updateAllButtons();
+                        }
+                    }, 60000);
+                    return;
+                }
+                
                 if (msg.chunk !== undefined) {
                     this.handleChunkMessage(msg);
                     return;
@@ -1033,6 +1062,9 @@ const CallSystem = {
             console.error('خطأ في إرسال الإشارة:', error);
         }
     },
+
+    
+    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
