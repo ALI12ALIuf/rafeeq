@@ -1,6 +1,4 @@
-// ========== chat-system.js ==========
-// نظام الدردشة E2EE + نظام الحضور Presence
-
+// ==================== القسم 1: تعريف PresenceSystem ====================
 const PresenceSystem = {
     listeners: {}, heartbeatInterval: null,
     async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
@@ -11,6 +9,7 @@ const PresenceSystem = {
     stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
 };
 
+// ==================== القسم 2: تعريف ChatSystem ====================
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
     friendInConversation: false,
@@ -26,6 +25,7 @@ const ChatSystem = {
     offlineTimer: null,
     offlineCountdownInterval: null,
     
+    // ==================== القسم 3: init ====================
     init() { 
         this.loadAllChats(); 
         this.setupPageFocusListener();
@@ -33,6 +33,7 @@ const ChatSystem = {
         this.setupBeforeUnloadListener();
     },
     
+    // ==================== القسم 4: setupBeforeUnloadListener و sendFeatureCancelBeforeUnload ====================
     setupBeforeUnloadListener() {
         window.addEventListener('beforeunload', () => {
             if (this.currentChat && this.featuresEnabled) {
@@ -73,6 +74,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 5: setupFeatureButton ====================
     setupFeatureButton() {
         setTimeout(() => {
             let btn = document.getElementById('enableFeaturesBtn');
@@ -124,6 +126,7 @@ const ChatSystem = {
         }, 1000);
     },
     
+    // ==================== القسم 6: startFeatureBlink ====================
     startFeatureBlink() {
         if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
         
@@ -158,6 +161,7 @@ const ChatSystem = {
         }, 500);
     },
     
+    // ==================== القسم 7: requestEnableFeatures ====================
     async requestEnableFeatures() {
         if (!this.currentChat) {
             alert('الرجاء اختيار محادثة أولاً');
@@ -199,6 +203,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 8: handleFeatureRequest ====================
     async handleFeatureRequest(fromId) {
         console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
         
@@ -214,6 +219,7 @@ const ChatSystem = {
         console.log('✅ تم تفعيل وضع الاستقبال');
     },
     
+    // ==================== القسم 9: acceptFeatureRequest ====================
     async acceptFeatureRequest() {
         console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
         
@@ -269,6 +275,7 @@ const ChatSystem = {
         console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
     },
     
+    // ==================== القسم 10: rejectFeatureRequest ====================
     async rejectFeatureRequest() {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -302,6 +309,7 @@ const ChatSystem = {
         } catch(e) {}
     },
     
+    // ==================== القسم 11: handleFeatureResponse ====================
     handleFeatureResponse(fromId, action) {
         console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
         
@@ -338,6 +346,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 12: sendFeatureCancelImmediately ====================
     async sendFeatureCancelImmediately(chatId) {
         console.log('📤 sendFeatureCancelImmediately - إرسال إلغاء إلى:', chatId);
         try {
@@ -361,6 +370,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 13: resetFeatures ====================
     resetFeatures() {
         console.log('🔄 resetFeatures - إعادة تعيين الميزات');
         
@@ -388,6 +398,7 @@ const ChatSystem = {
         this.updateAllButtons();
     },
     
+    // ==================== القسم 14: sendFeatureCancelWithRetry ====================
     async sendFeatureCancelWithRetry(retryCount = 0) {
         const maxRetries = 3;
         console.log(`📤 sendFeatureCancel - محاولة ${retryCount + 1}/${maxRetries + 1} إلى:`, this.currentChat);
@@ -421,6 +432,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 15: handleFeatureCancel ====================
     handleFeatureCancel() {
         console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
         console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
@@ -450,6 +462,7 @@ const ChatSystem = {
         console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
     },
     
+    // ==================== القسم 16: updateAllButtons ====================
     updateAllButtons() {
         const canUse = (this.friendInConversation && this.featuresEnabled);
         
@@ -505,6 +518,7 @@ const ChatSystem = {
         console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
     },
     
+    // ==================== القسم 17: setupPageFocusListener ====================
     setupPageFocusListener() {
         window.addEventListener('focus', () => {
             if (this.currentChat && this.friendOnline) {
@@ -515,6 +529,7 @@ const ChatSystem = {
         });
     },
     
+    // ==================== القسم 18: requestConversationStatus ====================
     async requestConversationStatus() {
         if (!this.currentChat) return;
         try {
@@ -538,6 +553,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 19: loadAllChats ====================
     loadAllChats() { 
         for (let i = 0; i < localStorage.length; i++) { 
             const k = localStorage.key(i); 
@@ -548,6 +564,7 @@ const ChatSystem = {
         } 
     },
     
+    // ==================== القسم 20: showProgressBar ====================
     showProgressBar(message, percent) {
         let bar = document.getElementById('progressBar');
         if (!bar) {
@@ -588,6 +605,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 21: updateProgressBar ====================
     updateProgressBar(percent, message) {
         const fill = document.getElementById('progressFill');
         const perc = document.getElementById('progressPercent');
@@ -595,8 +613,10 @@ const ChatSystem = {
         if (perc) perc.textContent = Math.round(percent) + '%';
     },
     
+    // ==================== القسم 22: hideProgressBar ====================
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
+    // ==================== القسم 23: sendConversationStatus ====================
     async sendConversationStatus(isOpen) {
         if (!this.currentChat) return;
         try {
@@ -621,6 +641,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 24: updateFriendConversationStatus ====================
     updateFriendConversationStatus(friendId, isInConversation) {
         console.log(`👥 استلام تحديث حالة المحادثة من: ${friendId}, في المحادثة: ${isInConversation}`);
         console.log('currentChat الحالي:', this.currentChat);
@@ -679,6 +700,7 @@ const ChatSystem = {
         this.updateAllButtons();
     },
     
+    // ==================== القسم 25: openChat ====================
     openChat(friendId, friendName, friendAvatar) {
         this.currentChat = friendId;
         
@@ -720,7 +742,7 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (الوقت 120 ثانية)
+    // ==================== القسم 26: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
@@ -745,7 +767,7 @@ const ChatSystem = {
             this.offlineStartTime = Date.now();
             this.friendOnline = false;
             
-            let secondsLeft = 120;  // ✅ تم التغيير من 60 إلى 120
+            let secondsLeft = 120;
             const statusEl = document.getElementById('conversationStatus');
             
             const updateCountdown = () => {
@@ -767,7 +789,6 @@ const ChatSystem = {
                 if (!this.friendOnline && this.featuresEnabled) {
                     console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى المرسل');
                     
-                    // ✅ إرسال إشارة إلغاء إلى الطرف الآخر (المرسل)
                     if (this.currentChat) {
                         this.sendFeatureCancelImmediately(this.currentChat);
                     }
@@ -801,13 +822,13 @@ const ChatSystem = {
                 }
                 
                 this.offlineTimer = null;
-            }, 120000);  // ✅ تم التغيير من 60000 إلى 120000 (120 ثانية)
+            }, 120000);
             
             return;
         }
         
         // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
-        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {  // ✅ تم التغيير من 60000 إلى 120000
+        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {
             console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
             
             if (this.offlineTimer) clearTimeout(this.offlineTimer);
@@ -855,8 +876,10 @@ const ChatSystem = {
         this.updateAllButtons();
     },
     
+    // ==================== القسم 27: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
     
+    // ==================== القسم 28: displayMessage ====================
     displayMessage(msg) {
         const c = document.getElementById('messagesContainer'); 
         if (!c) return;
@@ -911,6 +934,7 @@ const ChatSystem = {
         c.scrollTop = c.scrollHeight;
     },
     
+    // ==================== القسم 29: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         const mid = Date.now().toString(); 
@@ -925,6 +949,7 @@ const ChatSystem = {
         } catch (e) { return false; } 
     },
     
+    // ==================== القسم 30: sendFileWithRetry ====================
     async sendFileWithRetry(file, type, maxRetries = 3) {
         if (!this.friendInConversation || !this.featuresEnabled) {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
@@ -942,6 +967,7 @@ const ChatSystem = {
         this.hideProgressBar(); return false;
     },
     
+    // ==================== القسم 31: _ensureChannelReady ====================
     async _ensureChannelReady() {
         if (!this.friendInConversation || !this.featuresEnabled) {
             alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
@@ -968,8 +994,7 @@ const ChatSystem = {
         }
     },
     
-    // ✅✅✅ دوال الإرسال المعدلة (مع إضافة إشارة file_selection_start)
-    
+    // ==================== القسم 32: sendImage ====================
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -977,12 +1002,10 @@ const ChatSystem = {
             return;
         }
         
-        // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
         }
         
-        // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
         if (!(await this._ensureChannelReady())) return;
@@ -999,6 +1022,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 33: sendVideoFile ====================
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1006,12 +1030,10 @@ const ChatSystem = {
             return;
         }
         
-        // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
         }
         
-        // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
         try {
@@ -1040,6 +1062,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 34: sendFile ====================
     async sendFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1047,12 +1070,10 @@ const ChatSystem = {
             return;
         }
         
-        // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
         }
         
-        // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
         if (!(await this._ensureChannelReady())) return;
@@ -1068,6 +1089,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 35: sendVoiceNote ====================
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1075,12 +1097,10 @@ const ChatSystem = {
             return;
         }
         
-        // ✅ إرسال إشارة "سأختار ملف" لمنع قطع الاتصال
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
         }
         
-        // ✅ إعطاء وقت قصير قبل فتح مستكشف الملفات
         await new Promise(r => setTimeout(r, 200));
         
         if (!(await this._ensureChannelReady())) return;
@@ -1096,6 +1116,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 36: shareLocationDirect ====================
     async shareLocationDirect() { 
         if (!this.currentChat) return; 
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1116,6 +1137,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== القسم 37: saveMessage ====================
     saveMessage(friendId, message) { 
         const key = `chat_${friendId}`; 
         let h = []; 
@@ -1137,6 +1159,7 @@ const ChatSystem = {
         this.messages[friendId] = h; 
     },
     
+    // ==================== القسم 38: updateLastMessage ====================
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
             if (item.getAttribute('onclick')?.includes(friendId)) { 
@@ -1147,6 +1170,7 @@ const ChatSystem = {
         }); 
     },
     
+    // ==================== القسم 39: closeChat ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         console.log('currentChat:', this.currentChat);
@@ -1189,7 +1213,9 @@ const ChatSystem = {
         console.log('✅ closeChat - انتهى');
     },
     
+    // ==================== القسم 40: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 
+// ==================== القسم 41: تشغيل النظام ====================
 ChatSystem.init();
