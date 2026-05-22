@@ -21,10 +21,6 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
-    // ✅ متغيرات المؤقت 60 ثانية
-    offlineStartTime: null,
-    offlineTimer: null,
-    
     init() { 
         this.loadAllChats(); 
         this.setupPageFocusListener();
@@ -719,84 +715,28 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (مع نظام المؤقت 60 ثانية)
+    // ✅✅✅ دالة updateFriendStatus المعدلة (تم إضافة شرط لمنع إطفاء الميزات أثناء اختيار الملف)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
-        // إذا صار الطرف الآخر غير متصل
-        if (!isOnline) {
-            // نمسح أي مؤقت سابق
-            if (this.offlineTimer) clearTimeout(this.offlineTimer);
-            
-            // نسجل وقت بدء الانقطاع
-            this.offlineStartTime = Date.now();
-            
-            // نضبط مؤقت 60 ثانية
-            this.offlineTimer = setTimeout(() => {
-                // إذا لساته غير متصل بعد 60 ثانية
-                if (!this.friendOnline && this.featuresEnabled) {
-                    console.log('🔴 الطرف الآخر غير متصل لأكثر من 60 ثانية - إلغاء الميزات');
-                    this.featuresEnabled = false;
-                    this.featureRequestPending = false;
-                    this.featureRequestReceived = false;
-                    
-                    if (this.featureBlinkInterval) {
-                        clearInterval(this.featureBlinkInterval);
-                        this.featureBlinkInterval = null;
-                    }
-                    
-                    const btn = document.getElementById('enableFeaturesBtn');
-                    if (btn) {
-                        btn.style.background = '#f44336';
-                        btn.title = 'تفعيل الميزات';
-                    }
-                    
-                    this.updateAllButtons();
-                }
-                this.offlineTimer = null;
-            }, 60000); // 60 ثانية
-            
-            // تحديث حالة الاتصال المرئية
+        // ✅ منع إطفاء الميزات إذا كان الطرف الآخر يختار ملفاً مؤقتاً
+        if (!isOnline && this.featuresEnabled && this.currentChat === friendId) {
+            console.log('⚠️ تجاهل إطفاء الميزات: قد يكون الطرف الآخر يختار ملفاً');
+            // فقط نحدث حالة الاتصال المرئية، لكن ما نغير الميزات
             this.friendOnline = isOnline;
             const statusEl = document.getElementById('conversationStatus');
             if (statusEl) {
-                statusEl.innerHTML = '🟡 غير متصل مؤقتاً...';
-                statusEl.className = 'conversation-status offline';
-            }
-            return;
-        }
-        
-        // إذا رجع متصل خلال 60 ثانية
-        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 60000) {
-            console.log('✅ الطرف الآخر عاد خلال 60 ثانية - إبقاء الميزات مفعلة');
-            if (this.offlineTimer) {
-                clearTimeout(this.offlineTimer);
-                this.offlineTimer = null;
-            }
-            this.offlineStartTime = null;
-            
-            this.friendOnline = isOnline;
-            const statusEl = document.getElementById('conversationStatus');
-            if (statusEl) {
-                statusEl.innerHTML = '🟢 متصل';
+                statusEl.innerHTML = '🟢 متصل (قد يختار ملفاً)';
                 statusEl.className = 'conversation-status online';
             }
-            
-            // التأكد من أن الميزات لا تزال مفعلة
-            if (!this.featuresEnabled && this.friendInConversation) {
-                console.log('♻️ إعادة تفعيل الميزات بعد العودة');
-                this.featuresEnabled = true;
-                this.updateAllButtons();
-            }
             return;
         }
         
-        // الحالة الطبيعية (أول مرة أو بعد 60 ثانية)
         this.friendOnline = isOnline;
         
-        // الباقي كما هو
+        // الباقي كما هو لإطفاء الميزات في الحالات الحقيقية
         if (!isOnline && this.featuresEnabled) {
-            console.log('🔴 المستخدم غير متصل حقيقياً - إلغاء تفعيل الميزات');
+            console.log('🔴 المستخدم غير متصل - إلغاء تفعيل الميزات');
             this.featuresEnabled = false;
             this.featureRequestPending = false;
             this.featureRequestReceived = false;
@@ -827,6 +767,7 @@ const ChatSystem = {
         if (!statusEl) return;
         
         let statusHtml = '';
+        
         if (isOnline) {
             statusHtml = '🟢 متصل';
         } else {
