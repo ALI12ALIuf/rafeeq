@@ -21,7 +21,7 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
-    // ✅ متغيرات المؤقت (120 ثانية)
+    // ✅ متغيرات المؤقت 120 ثانية
     offlineStartTime: null,
     offlineTimer: null,
     offlineCountdownInterval: null,
@@ -720,7 +720,7 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (ثلاث حالات مع عداد 120 ثانية)
+    // ✅✅✅ دالة updateFriendStatus المعدلة (الوقت 120 ثانية)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
@@ -745,7 +745,7 @@ const ChatSystem = {
             this.offlineStartTime = Date.now();
             this.friendOnline = false;
             
-            let secondsLeft = 120;  // ✅ تم التعديل من 60 إلى 120
+            let secondsLeft = 120;  // ✅ تم التغيير من 60 إلى 120
             const statusEl = document.getElementById('conversationStatus');
             
             const updateCountdown = () => {
@@ -801,12 +801,13 @@ const ChatSystem = {
                 }
                 
                 this.offlineTimer = null;
-            }, 120000);  // ✅ تم التعديل من 60000 إلى 120000
+            }, 120000);  // ✅ تم التغيير من 60000 إلى 120000 (120 ثانية)
+            
             return;
         }
         
         // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
-        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {  // ✅ تم التعديل
+        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {  // ✅ تم التغيير من 60000 إلى 120000
             console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
             
             if (this.offlineTimer) clearTimeout(this.offlineTimer);
