@@ -21,6 +21,10 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
+    // ✅ متغيرات المؤقت 60 ثانية
+    offlineStartTime: null,
+    offlineTimer: null,
+    
     init() { 
         this.loadAllChats(); 
         this.setupPageFocusListener();
@@ -715,46 +719,76 @@ const ChatSystem = {
         setTimeout(() => this.setupFeatureButton(), 500);
     },
     
-    // ✅✅✅ دالة updateFriendStatus المعدلة (تم إضافة شرط لمنع إطفاء الميزات أثناء اختيار الملف)
+    // ✅✅✅ دالة updateFriendStatus المعدلة (مع مؤقت 60 ثانية)
     updateFriendStatus(friendId, isOnline, userData = null) {
         if (this.currentChat !== friendId) return;
         
-        // ✅ منع إطفاء الميزات إذا كان الطرف الآخر يختار ملفاً مؤقتاً
-        if (!isOnline && this.featuresEnabled && this.currentChat === friendId) {
-            console.log('⚠️ تجاهل إطفاء الميزات: قد يكون الطرف الآخر يختار ملفاً');
-            // فقط نحدث حالة الاتصال المرئية، لكن ما نغير الميزات
-            this.friendOnline = isOnline;
+        // إذا صار الطرف الآخر غير متصل
+        if (!isOnline) {
+            // إذا كان timer شغال نمسحه
+            if (this.offlineTimer) {
+                clearTimeout(this.offlineTimer);
+                this.offlineTimer = null;
+            }
+            
+            // نسجل وقت بدء الانقطاع
+            this.offlineStartTime = Date.now();
+            this.friendOnline = false;
+            
+            // نضبط مؤقت 60 ثانية
+            this.offlineTimer = setTimeout(() => {
+                // إذا لساته غير متصل بعد 60 ثانية
+                if (!this.friendOnline && this.featuresEnabled) {
+                    console.log('🔴 الطرف الآخر غير متصل لأكثر من 60 ثانية - إلغاء الميزات');
+                    this.featuresEnabled = false;
+                    this.featureRequestPending = false;
+                    this.featureRequestReceived = false;
+                    
+                    if (this.featureBlinkInterval) {
+                        clearInterval(this.featureBlinkInterval);
+                        this.featureBlinkInterval = null;
+                    }
+                    
+                    const btn = document.getElementById('enableFeaturesBtn');
+                    if (btn) {
+                        btn.style.background = '#f44336';
+                        btn.title = 'تفعيل الميزات';
+                    }
+                    
+                    this.updateAllButtons();
+                }
+                this.offlineTimer = null;
+            }, 60000);
+            
+            // تحديث النص المرئي
             const statusEl = document.getElementById('conversationStatus');
             if (statusEl) {
-                statusEl.innerHTML = '🟢 متصل (قد يختار ملفاً)';
+                statusEl.innerHTML = '🟡 غير متصل مؤقتاً...';
+                statusEl.className = 'conversation-status offline';
+            }
+            return;
+        }
+        
+        // إذا رجع متصل خلال 60 ثانية
+        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 60000) {
+            console.log('✅ الطرف الآخر عاد خلال 60 ثانية - إبقاء الميزات مفعلة');
+            if (this.offlineTimer) {
+                clearTimeout(this.offlineTimer);
+                this.offlineTimer = null;
+            }
+            this.offlineStartTime = null;
+            this.friendOnline = true;
+            
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '🟢 متصل';
                 statusEl.className = 'conversation-status online';
             }
             return;
         }
         
+        // الحالة الطبيعية (أول مرة أو بعد انتهاء المهلة)
         this.friendOnline = isOnline;
-        
-        // الباقي كما هو لإطفاء الميزات في الحالات الحقيقية
-        if (!isOnline && this.featuresEnabled) {
-            console.log('🔴 المستخدم غير متصل - إلغاء تفعيل الميزات');
-            this.featuresEnabled = false;
-            this.featureRequestPending = false;
-            this.featureRequestReceived = false;
-            
-            if (this.featureBlinkInterval) {
-                clearInterval(this.featureBlinkInterval);
-                this.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-                console.log('✅ تم تغيير لون الزر إلى الأحمر (المستخدم غير متصل)');
-            }
-            
-            this.updateAllButtons();
-        }
         
         if (!userData && window.auth?.currentUser) {
             window.db.collection('users').doc(friendId).get().then(doc => {
