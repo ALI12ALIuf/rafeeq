@@ -1168,7 +1168,6 @@ const ChatSystem = {
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
         
-        // عرض مؤقت للتحميل
         const loading = document.createElement('div');
         loading.textContent = '📍 جاري تحديد موقعك...';
         loading.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:8px16px;border-radius:30px;z-index:10002;';
@@ -1185,7 +1184,6 @@ const ChatSystem = {
                 url: `https://www.google.com/maps?q=${lat},${lng}`
             };
             
-            // ✅ عرض نافذة تأكيد الموقع مع حقل إدخال لعدد الضغطات
             this.showLocationSwipeModalWithClicks(locationData);
             
         }, () => { 
@@ -1195,10 +1193,11 @@ const ChatSystem = {
     }
 },
 
-// ✅ دالة عرض نافذة تأكيد الموقع مع حقل إدخال لعدد الضغطات
 showLocationSwipeModalWithClicks(locationData) {
     const existing = document.getElementById('locationSwipeModal');
     if (existing) existing.remove();
+    
+    const appColor = '#2196F3';
     
     const overlay = document.createElement('div');
     overlay.id = 'locationSwipeModal';
@@ -1223,29 +1222,44 @@ showLocationSwipeModalWithClicks(locationData) {
             <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
             <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي؟</p>
             
+            <!-- الإحداثيات (بدون أي علامة حمراء) -->
             <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 15px;">
                 <div style="color: #4CAF50; font-size: 0.7rem;">📍 الإحداثيات</div>
                 <div style="color: white; font-weight: bold; font-size: 0.85rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
-            <!-- ✅ حقل إدخال عدد الضغطات -->
+            <!-- عدد مرات فتح الموقع (النص في المنتصف) -->
             <div style="margin-bottom: 20px;">
-                <div style="color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-align: right;">👆 عدد مرات فتح الموقع</div>
+                <div style="color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-align: center;">👆 عدد مرات فتح الموقع</div>
                 <div style="display: flex; gap: 8px; align-items: center; justify-content: center;">
-                    <input type="number" id="clicksCountInput" min="1" max="100" value="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white;">
+                    <input type="number" id="clicksCountInput" min="1" max="15" value="1" step="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white; font-family: monospace;">
                     <span style="color: white;">ضغطات</span>
                 </div>
-                <p style="color: #888; font-size: 0.65rem; margin-top: 8px;">📌 بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
+                <div id="clicksError" style="color: #f44336; font-size: 0.65rem; margin-top: 5px; display: none;">⚠️ الحد الأقصى 15 ضغطة</div>
             </div>
             
+            <!-- خانة بدون حدود (بلا حدود) -->
+            <div style="margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="unlimitedCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
+                    <span style="color: ${appColor};">♾️ بلا حدود (لا ينتهي)</span>
+                </label>
+            </div>
+            
+            <!-- نص توضيحي (بدون أي دمبوس/أيقونة) -->
+            <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">📌 بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
+            
+            <!-- شريط السحب -->
             <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
-                <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid #2196F3;">
-                    <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: #2196F3; transform: translateX(-50%);"></div>
-                    <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: #2196F3; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+                <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor};">
+                    <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%);"></div>
+                    <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: ${appColor}; border-radius: 50%; transform: translate(-50%, -50%);"></div>
                     
-                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #4CAF50, #1b5e2a); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
+                    <!-- اليد اليسرى (قبول) -->
+                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, ${appColor}, #1565C0); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
                         <i class="fas fa-check"></i>
                     </div>
+                    <!-- اليد اليمنى (رفض) -->
                     <div id="rightThumb" style="position: absolute; top: 8px; right: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #f44336, #8b0000); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: right 0.05s linear; color: white;">
                         <i class="fas fa-times"></i>
                     </div>
@@ -1260,6 +1274,45 @@ showLocationSwipeModalWithClicks(locationData) {
     const leftThumb = document.getElementById('leftThumb');
     const rightThumb = document.getElementById('rightThumb');
     const clicksInput = document.getElementById('clicksCountInput');
+    const clicksError = document.getElementById('clicksError');
+    const unlimitedCheckbox = document.getElementById('unlimitedCheckbox');
+    
+    // التحقق من صحة الإدخال
+    const validateClicks = () => {
+        let value = parseInt(clicksInput.value);
+        if (isNaN(value)) value = 1;
+        if (value < 1) value = 1;
+        if (value > 15) {
+            clicksError.style.display = 'block';
+            clicksInput.style.border = '2px solid #f44336';
+            return false;
+        } else {
+            clicksError.style.display = 'none';
+            clicksInput.style.border = 'none';
+            return true;
+        }
+    };
+    
+    clicksInput.addEventListener('input', () => {
+        let value = parseInt(clicksInput.value);
+        if (isNaN(value)) clicksInput.value = 1;
+        if (value > 15) clicksInput.value = 15;
+        if (value < 1) clicksInput.value = 1;
+        validateClicks();
+    });
+    
+    // عند تفعيل "بلا حدود"، نعطل حقل الإدخال
+    unlimitedCheckbox.addEventListener('change', () => {
+        clicksInput.disabled = unlimitedCheckbox.checked;
+        if (unlimitedCheckbox.checked) {
+            clicksInput.style.opacity = '0.5';
+            clicksError.style.display = 'none';
+        } else {
+            clicksInput.style.opacity = '1';
+            validateClicks();
+        }
+    });
+    
     const buttonWidth = button.clientWidth;
     const centerPos = buttonWidth / 2;
     const maxLeftMove = centerPos - 35;
@@ -1291,16 +1344,27 @@ showLocationSwipeModalWithClicks(locationData) {
         leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
         if (leftCurrentPos >= maxLeftMove - 10) {
             leftThumb.style.left = maxLeftMove + 'px';
+            
+            // التحقق من صحة الإدخال قبل الإرسال
+            if (!unlimitedCheckbox.checked && !validateClicks()) {
+                alert('⚠️ عدد الضغطات غير صالح (1-15)');
+                leftThumb.style.left = '8px';
+                return;
+            }
+            
             setTimeout(() => {
-                // ✅ الحصول على عدد الضغطات من حقل الإدخال
-                let maxClicks = parseInt(clicksInput.value);
-                if (isNaN(maxClicks) || maxClicks < 1) maxClicks = 1;
+                let maxClicks;
+                if (unlimitedCheckbox.checked) {
+                    maxClicks = 999999; // بلا حدود
+                } else {
+                    maxClicks = parseInt(clicksInput.value);
+                    if (isNaN(maxClicks) || maxClicks < 1) maxClicks = 1;
+                    if (maxClicks > 15) maxClicks = 15;
+                }
                 
-                // تحديث بيانات الموقع مع عدد الضغطات
                 locationData.maxClicks = maxClicks;
                 locationData.clicksRemaining = maxClicks;
                 
-                // إرسال الموقع
                 CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
                 const msgId = Date.now().toString();
                 this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
@@ -1357,6 +1421,7 @@ showLocationSwipeModalWithClicks(locationData) {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
 },
+    
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
