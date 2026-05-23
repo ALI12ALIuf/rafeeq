@@ -1257,6 +1257,19 @@ showLocationSwipeModalWithClicks(locationData) {
             input:checked + .toggle-slider:before {
                 transform: translateX(30px);
             }
+            .click-preset {
+                background: #1a1a2e;
+                color: white;
+                border: 1px solid #333;
+                padding: 6px 12px;
+                border-radius: 20px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .click-preset:hover {
+                background: #4CAF50;
+                border-color: #4CAF50;
+            }
         </style>
         
         <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
@@ -1270,13 +1283,25 @@ showLocationSwipeModalWithClicks(locationData) {
                 <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
-            <!-- عدد مرات فتح الموقع (يبدأ من 0) -->
+            <!-- عدد مرات فتح الموقع -->
             <div style="margin-bottom: 15px;">
                 <div style="color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-align: center;">عدد مرات فتح الموقع</div>
-                <div style="display: flex; gap: 8px; align-items: center; justify-content: center;">
-                    <input type="number" id="clicksCountInput" min="0" max="15" value="0" step="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white; font-family: monospace;">
+                <div style="display: flex; gap: 8px; align-items: center; justify-content: center; margin-bottom: 10px;">
+                    <input type="number" id="clicksCountInput" min="1" max="15" value="1" step="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white; font-family: monospace;">
                     <span style="color: white;">ضغطات</span>
                 </div>
+                
+                <!-- ✅ أزرار اختيار سريعة -->
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
+                    <button type="button" class="click-preset" data-clicks="1">1</button>
+                    <button type="button" class="click-preset" data-clicks="2">2</button>
+                    <button type="button" class="click-preset" data-clicks="3">3</button>
+                    <button type="button" class="click-preset" data-clicks="4">4</button>
+                    <button type="button" class="click-preset" data-clicks="5">5</button>
+                    <button type="button" class="click-preset" data-clicks="10">10</button>
+                    <button type="button" class="click-preset" data-clicks="15">15</button>
+                </div>
+                
                 <div id="clicksError" style="color: #f44336; font-size: 0.65rem; margin-top: 5px; display: none;">الحد الأقصى 15 ضغطة</div>
             </div>
             
@@ -1321,11 +1346,21 @@ showLocationSwipeModalWithClicks(locationData) {
     const clicksError = document.getElementById('clicksError');
     const unlimitedToggle = document.getElementById('unlimitedToggle');
     
+    // ✅ دالة التحقق من صحة الإدخال (تسمح بمسح الحقل)
     const validateClicks = () => {
-        let value = parseInt(clicksInput.value);
-        if (isNaN(value)) value = 0;
-        if (value < 0) value = 0;
-        if (value > 15) {
+        const value = clicksInput.value;
+        if (value === "" || value === null) {
+            clicksError.style.display = 'none';
+            clicksInput.style.border = 'none';
+            return true; // الحقل فارغ، مقبول مؤقتاً
+        }
+        let numValue = parseInt(value);
+        if (isNaN(numValue)) {
+            clicksError.style.display = 'block';
+            clicksInput.style.border = '2px solid #f44336';
+            return false;
+        }
+        if (numValue < 1 || numValue > 15) {
             clicksError.style.display = 'block';
             clicksInput.style.border = '2px solid #f44336';
             return false;
@@ -1336,12 +1371,37 @@ showLocationSwipeModalWithClicks(locationData) {
         }
     };
     
+    // ✅ معالج الإدخال (يسمح بمسح الحقل)
     clicksInput.addEventListener('input', () => {
-        let value = parseInt(clicksInput.value);
-        if (isNaN(value)) clicksInput.value = 0;
-        if (value > 15) clicksInput.value = 15;
-        if (value < 0) clicksInput.value = 0;
+        const value = clicksInput.value;
+        if (value === "") {
+            // الحقل فارغ، لا شيء نتحقق منه
+            clicksError.style.display = 'none';
+            clicksInput.style.border = 'none';
+            return;
+        }
+        let numValue = parseInt(value);
+        if (isNaN(numValue)) {
+            clicksError.style.display = 'block';
+            clicksInput.style.border = '2px solid #f44336';
+            return;
+        }
+        if (numValue > 15) {
+            clicksInput.value = 15;
+        }
+        if (numValue < 1 && numValue !== "") {
+            // إذا كان أقل من 1 ولا يزال المستخدم يكتب، لا نغيره بالقوة
+        }
         validateClicks();
+    });
+    
+    // ✅ معالج أزرار الاختيار السريعة
+    document.querySelectorAll('.click-preset').forEach(btn => {
+        btn.onclick = () => {
+            clicksInput.value = btn.dataset.clicks;
+            validateClicks();
+            clicksInput.focus();
+        };
     });
     
     unlimitedToggle.addEventListener('change', () => {
@@ -1387,25 +1447,28 @@ showLocationSwipeModalWithClicks(locationData) {
         if (leftCurrentPos >= maxLeftMove - 10) {
             leftThumb.style.left = maxLeftMove + 'px';
             
-            if (!unlimitedToggle.checked && !validateClicks()) {
-                alert('⚠️ عدد الضغطات غير صالح (0-15)');
-                leftThumb.style.left = '8px';
-                return;
+            if (!unlimitedToggle.checked) {
+                const value = clicksInput.value;
+                if (value === "" || value === null) {
+                    alert('⚠️ الرجاء إدخال عدد الضغطات (1-15)');
+                    leftThumb.style.left = '8px';
+                    return;
+                }
+                let maxClicks = parseInt(value);
+                if (isNaN(maxClicks) || maxClicks < 1) {
+                    alert('⚠️ عدد الضغطات غير صالح (1-15)');
+                    leftThumb.style.left = '8px';
+                    return;
+                }
+                if (maxClicks > 15) maxClicks = 15;
+                locationData.maxClicks = maxClicks;
+                locationData.clicksRemaining = maxClicks;
+            } else {
+                locationData.maxClicks = 999999;
+                locationData.clicksRemaining = 999999;
             }
             
             setTimeout(() => {
-                let maxClicks;
-                if (unlimitedToggle.checked) {
-                    maxClicks = 999999;
-                } else {
-                    maxClicks = parseInt(clicksInput.value);
-                    if (isNaN(maxClicks) || maxClicks < 0) maxClicks = 0;
-                    if (maxClicks > 15) maxClicks = 15;
-                }
-                
-                locationData.maxClicks = maxClicks;
-                locationData.clicksRemaining = maxClicks;
-                
                 CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
                 const msgId = Date.now().toString();
                 this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
@@ -1462,7 +1525,6 @@ showLocationSwipeModalWithClicks(locationData) {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
 },
-            
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
