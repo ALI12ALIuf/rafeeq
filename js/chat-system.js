@@ -1156,7 +1156,7 @@ const ChatSystem = {
     },
     
     // ==================== القسم 34: shareLocationDirect ====================
-
+    
     async shareLocationDirect() { 
     if (!this.currentChat) return; 
     if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1167,10 +1167,6 @@ const ChatSystem = {
     
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
-        
-        // ✅ أولاً: اختيار عدد الضغطات المسموحة
-        const maxClicks = await this.showClicksPicker();
-        if (maxClicks === null) return; // المستخدم ألغى
         
         // عرض مؤقت للتحميل
         const loading = document.createElement('div');
@@ -1186,13 +1182,11 @@ const ChatSystem = {
             const locationData = {
                 lat: parseFloat(lat),
                 lng: parseFloat(lng),
-                url: `https://www.google.com/maps?q=${lat},${lng}`,
-                maxClicks: maxClicks,           // ✅ عدد الضغطات المسموحة
-                clicksRemaining: maxClicks       // ✅ عدد الضغطات المتبقية
+                url: `https://www.google.com/maps?q=${lat},${lng}`
             };
             
-            // عرض نافذة تأكيد السحب
-            this.showLocationSwipeModal(locationData);
+            // ✅ عرض نافذة تأكيد الموقع مع حقل إدخال لعدد الضغطات
+            this.showLocationSwipeModalWithClicks(locationData);
             
         }, () => { 
             loading.remove();
@@ -1201,57 +1195,8 @@ const ChatSystem = {
     }
 },
 
-// ✅ دالة اختيار عدد الضغطات
-showClicksPicker() {
-    return new Promise((resolve) => {
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.7);
-            z-index: 10005;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        modal.innerHTML = `
-            <div style="background: #0a0e27; border-radius: 40px; width: 300px; max-width: 90%; padding: 25px 20px; text-align: center; color: white;">
-                <div style="font-size: 3rem; margin-bottom: 10px;">👆</div>
-                <h3 style="margin: 0 0 5px;">عدد مرات فتح الموقع</h3>
-                <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">كم مرة يمكن للمستلم فتح الموقع؟</p>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <button class="clicks-option" data-clicks="1" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🔓 ضغطة واحدة</button>
-                    <button class="clicks-option" data-clicks="2" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🔓 ضغطتين</button>
-                    <button class="clicks-option" data-clicks="3" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🔓 3 ضغطات</button>
-                    <button class="clicks-option" data-clicks="5" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🔓 5 ضغطات</button>
-                    <button class="clicks-option" data-clicks="999999" style="background: #2196F3; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">♾️ لا ينتهي</button>
-                </div>
-                <button id="cancelClicks" style="margin-top: 20px; background: #f44336; color: white; border: none; padding: 10px 25px; border-radius: 30px; cursor: pointer; font-size: 0.9rem;">❌ إلغاء</button>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        
-        const buttons = modal.querySelectorAll('.clicks-option');
-        buttons.forEach(btn => {
-            btn.onclick = () => {
-                const clicks = parseInt(btn.dataset.clicks);
-                modal.remove();
-                resolve(clicks);
-            };
-        });
-        
-        document.getElementById('cancelClicks').onclick = () => {
-            modal.remove();
-            resolve(null);
-        };
-    });
-},
-
-// ✅ دالة عرض نافذة تأكيد الموقع (بنفس تصميم المكالمات)
-showLocationSwipeModal(locationData) {
+// ✅ دالة عرض نافذة تأكيد الموقع مع حقل إدخال لعدد الضغطات
+showLocationSwipeModalWithClicks(locationData) {
     const existing = document.getElementById('locationSwipeModal');
     if (existing) existing.remove();
     
@@ -1272,12 +1217,9 @@ showLocationSwipeModal(locationData) {
         backdrop-filter: blur(5px);
     `;
     
-    // عرض عدد الضغطات المختارة في النافذة
-    const clicksText = locationData.maxClicks >= 999999 ? 'لا ينتهي' : `${locationData.maxClicks} ضغطات`;
-    
     overlay.innerHTML = `
         <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
-            <div style="font-size: 4rem; margin-bottom: 10px;">🗺️</div>
+            <div style="font-size: 3rem; margin-bottom: 10px;">🗺️</div>
             <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
             <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي؟</p>
             
@@ -1286,9 +1228,14 @@ showLocationSwipeModal(locationData) {
                 <div style="color: white; font-weight: bold; font-size: 0.85rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
-            <div style="background: rgba(33,150,243,0.15); border-radius: 20px; padding: 8px; margin-bottom: 20px;">
-                <div style="color: #2196F3; font-size: 0.7rem;">👆 عدد مرات الفتح</div>
-                <div style="color: white; font-weight: bold;">${clicksText}</div>
+            <!-- ✅ حقل إدخال عدد الضغطات -->
+            <div style="margin-bottom: 20px;">
+                <div style="color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-align: right;">👆 عدد مرات فتح الموقع</div>
+                <div style="display: flex; gap: 8px; align-items: center; justify-content: center;">
+                    <input type="number" id="clicksCountInput" min="1" max="100" value="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white;">
+                    <span style="color: white;">ضغطات</span>
+                </div>
+                <p style="color: #888; font-size: 0.65rem; margin-top: 8px;">📌 بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
             </div>
             
             <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
@@ -1312,6 +1259,7 @@ showLocationSwipeModal(locationData) {
     const button = document.getElementById('swipeButton');
     const leftThumb = document.getElementById('leftThumb');
     const rightThumb = document.getElementById('rightThumb');
+    const clicksInput = document.getElementById('clicksCountInput');
     const buttonWidth = button.clientWidth;
     const centerPos = buttonWidth / 2;
     const maxLeftMove = centerPos - 35;
@@ -1344,7 +1292,15 @@ showLocationSwipeModal(locationData) {
         if (leftCurrentPos >= maxLeftMove - 10) {
             leftThumb.style.left = maxLeftMove + 'px';
             setTimeout(() => {
-                // ✅ إرسال الموقع مع عدد الضغطات
+                // ✅ الحصول على عدد الضغطات من حقل الإدخال
+                let maxClicks = parseInt(clicksInput.value);
+                if (isNaN(maxClicks) || maxClicks < 1) maxClicks = 1;
+                
+                // تحديث بيانات الموقع مع عدد الضغطات
+                locationData.maxClicks = maxClicks;
+                locationData.clicksRemaining = maxClicks;
+                
+                // إرسال الموقع
                 CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
                 const msgId = Date.now().toString();
                 this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
