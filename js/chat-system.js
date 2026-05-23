@@ -815,8 +815,6 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-    // ==================== القسم 26: displayMessage ====================
-
    // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
@@ -950,7 +948,7 @@ displayMessage(msg) {
         div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'file') {
-        // ✅ التصميم المطلوب للملفات
+        // ✅ التصميم المطلوب للملفات (بحجم ثابت)
         let fileName = msg.fileName || 'ملف';
         
         // حساب حجم الملف تقريباً
@@ -966,24 +964,24 @@ displayMessage(msg) {
         let displayName = fileName;
         
         div.innerHTML = `
-            <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; border: 1px solid #4CAF50;">
+            <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1px solid #4CAF50;">
                 <!-- أيقونة الملف داخل دائرة بيضاء -->
-                <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex-shrink: 0;">
                     <span style="font-size: 1.5rem;">📄</span>
                 </div>
                 
                 <!-- معلومات الملف -->
-                <div style="flex: 1; overflow: hidden;">
-                    <div style="font-weight: bold; font-size: 0.85rem; word-break: break-word; color: white;">${this.escapeHtml(displayName)}</div>
+                <div style="flex: 1; overflow: hidden; min-width: 0;">
+                    <div style="font-weight: bold; font-size: 0.85rem; word-break: break-word; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
                     ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
                 </div>
                 
                 <!-- زر التحميل (أيقونة فقط) -->
-                <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" 
+                <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
                      onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
                      onmouseover="this.style.background='rgba(255,255,255,0.3)'"
                      onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                    <i class="fas fa-download" style="font-size: 1rem;"></i>
+                    <i class="fas fa-download" style="font-size: 1rem; pointer-events: none;"></i>
                 </div>
             </div>
             <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
@@ -992,7 +990,9 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-}, 
+},
+
+    
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
