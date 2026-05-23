@@ -1077,7 +1077,8 @@ const ChatSystem = {
     },
     
     // ==================== القسم 34: shareLocationDirect ====================
-async shareLocationDirect() { 
+
+    async shareLocationDirect() { 
     if (!this.currentChat) return; 
     if (!this.friendInConversation || !this.featuresEnabled) {
         alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
@@ -1087,22 +1088,35 @@ async shareLocationDirect() {
     
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
+        
+        // ✅ رسالة "جاري تحديد الموقع..."
+        const toast = document.createElement('div');
+        toast.textContent = '📍 جاري تحديد موقعك...';
+        toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:8px 16px;border-radius:30px;z-index:10002;font-size:14px;';
+        document.body.appendChild(toast);
+        
         navigator.geolocation.getCurrentPosition(p => { 
-            // ✅ إرسال كائن موقع متكامل
-            const locationData = {
-                lat: p.coords.latitude,
-                lng: p.coords.longitude,
-                url: `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
-            };
-            CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
+            toast.remove();
             
-            const msgId = Date.now().toString();
-            this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            this.displayMessage({ id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-        }, () => alert('فشل تحديد الموقع'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+            const lat = p.coords.latitude.toFixed(6);
+            const lng = p.coords.longitude.toFixed(6);
+            const locationText = `📍 https://www.google.com/maps?q=${lat},${lng}`;
+            
+            // ✅ إضافة النص إلى حقل الكتابة بدلاً من الإرسال المباشر
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                messageInput.value = locationText;
+                messageInput.focus();
+                // تحريك المؤشر إلى نهاية النص
+                messageInput.setSelectionRange(locationText.length, locationText.length);
+            }
+            
+        }, () => { 
+            toast.remove();
+            alert('❌ فشل تحديد موقعك. تأكد من تشغيل خدمات الموقع.');
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     }
 },
-    
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
