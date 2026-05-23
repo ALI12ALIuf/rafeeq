@@ -815,7 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
     
 
-    // ==================== القسم 26: displayMessage ====================
+     // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -838,7 +838,7 @@ displayMessage(msg) {
         div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'location') {
-        // معالجة رسالة الموقع مع نظام الضغطات
+        // معالجة رسالة الموقع
         let locationData = msg.data;
         let locationUrl = '';
         
@@ -857,24 +857,18 @@ displayMessage(msg) {
         
         // ✅ إذا كانت الصلاحية انتهت (clicksRemaining <= 0)
         if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-            // ✅ إزالة النص "🔒 انتهت صلاحية الموقع"، إبقاء القفل فقط
             div.innerHTML = `
-                <div class="message-content" style="background: #888; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
-                    <i class="fas fa-lock" style="font-size: 1.2rem;"></i>
+                <div class="message-content" style="background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>
                 </div>
                 <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
             `;
         } else {
-            // ✅ عرض الموقع مع عداد الضغطات (بدون نص "📍 موقعي")
-            const clicksText = (maxClicks && maxClicks < 999999) ? ` ${clicksRemaining}/${maxClicks}` : '';
-            
+            // ✅ عرض الموقع بدون عداد، فقط أيقونة خريطة
             const locationDiv = document.createElement('div');
             locationDiv.className = 'message-content location-card';
-            locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;';
-            locationDiv.innerHTML = `
-                <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
-                <span>${clicksText}</span>
-            `;
+            locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;';
+            locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
             
             // معالج الضغط على الموقع
             locationDiv.onclick = (e) => {
@@ -889,27 +883,18 @@ displayMessage(msg) {
                 // فتح الخريطة
                 window.open(locationUrl, '_blank');
                 
-                // تقليل عدد الضغطات المتبقية (فقط للمستلم، وليس للمرسل)
+                // ✅ تقليل عدد الضغطات المتبقية (فقط للمستلم، وليس للمرسل)
                 if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
                     clicksRemaining--;
                     
                     // تحديث البيانات في كائن الرسالة
                     msg.data.clicksRemaining = clicksRemaining;
                     
-                    // تحديث واجهة المستخدم
-                    const newClicksText = ` ${clicksRemaining}/${maxClicks}`;
-                    locationDiv.innerHTML = `
-                        <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
-                        <span>${clicksRemaining > 0 ? newClicksText : ''}</span>
-                    `;
-                    
-                    // ✅ إذا وصلت إلى الصفر، قفل الموقع (بدون نص)
+                    // ✅ إذا وصلت إلى الصفر، قفل الموقع
                     if (clicksRemaining <= 0) {
                         locationDiv.style.background = '#888';
                         locationDiv.style.cursor = 'default';
-                        locationDiv.innerHTML = `
-                            <i class="fas fa-lock" style="font-size: 1.2rem;"></i>
-                        `;
+                        locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
                         locationDiv.onclick = () => {
                             alert('🔒 انتهت صلاحية هذا الموقع');
                         };
@@ -969,7 +954,8 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},
+},        
+   
 
     
     // ==================== القسم 27: sendMessage ====================
