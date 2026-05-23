@@ -815,7 +815,6 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
     
     // ==================== القسم 26: displayMessage ====================
-    
     displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -879,7 +878,7 @@ const ChatSystem = {
     } 
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
-        if (videoSrc && typeof videoSrc === 'stasync) {
+        if (videoSrc && typeof videoSrc === 'string') {
             if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
                 videoSrc = 'data:video/mp4;base64,' + videoSrc;
             }
@@ -1077,8 +1076,7 @@ const ChatSystem = {
     },
     
     // ==================== القسم 34: shareLocationDirect ====================
-
-    async shareLocationDirect() { 
+async shareLocationDirect() { 
     if (!this.currentChat) return; 
     if (!this.friendInConversation || !this.featuresEnabled) {
         alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
