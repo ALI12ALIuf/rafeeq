@@ -1168,14 +1168,9 @@ const ChatSystem = {
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
         
-        const loading = document.createElement('div');
-        loading.textContent = 'جاري تحديد موقعك...';
-        loading.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:8px16px;border-radius:30px;z-index:10002;';
-        document.body.appendChild(loading);
+        // ✅ تم إزالة رسالة "جاري تحديد موقعك..." نهائياً
         
         navigator.geolocation.getCurrentPosition(p => { 
-            loading.remove();
-            
             const lat = p.coords.latitude.toFixed(6);
             const lng = p.coords.longitude.toFixed(6);
             const locationData = {
@@ -1187,7 +1182,6 @@ const ChatSystem = {
             this.showLocationSwipeModalWithClicks(locationData);
             
         }, () => { 
-            loading.remove();
             alert('❌ فشل تحديد موقعك');
         }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     }
@@ -1218,57 +1212,50 @@ showLocationSwipeModalWithClicks(locationData) {
     
     overlay.innerHTML = `
         <style>
-            .toggle-switch {
-                position: relative;
-                display: inline-block;
-                width: 60px;
-                height: 30px;
-            }
-            .toggle-switch input {
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }
-            .toggle-slider {
-                position: absolute;
-                cursor: pointer;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: #555;
-                transition: 0.3s;
-                border-radius: 30px;
-            }
-            .toggle-slider:before {
-                position: absolute;
-                content: "";
-                height: 24px;
-                width: 24px;
-                left: 3px;
-                bottom: 3px;
-                background-color: white;
-                transition: 0.3s;
-                border-radius: 50%;
-            }
-            input:checked + .toggle-slider {
-                background-color: #4CAF50;
-            }
-            input:checked + .toggle-slider:before {
-                transform: translateX(30px);
-            }
-            .click-preset {
+            .click-option {
                 background: #1a1a2e;
                 color: white;
-                border: 1px solid #333;
-                padding: 6px 12px;
-                border-radius: 20px;
+                border: 2px solid #333;
+                width: 50px;
+                height: 50px;
+                border-radius: 25px;
+                font-size: 1.2rem;
+                font-weight: bold;
                 cursor: pointer;
                 transition: all 0.2s;
             }
-            .click-preset:hover {
+            .click-option:hover {
+                background: #2196F3;
+                border-color: #2196F3;
+                transform: scale(1.05);
+            }
+            .click-option.active {
                 background: #4CAF50;
                 border-color: #4CAF50;
+                transform: scale(1.05);
+                box-shadow: 0 0 10px rgba(76,175,80,0.5);
+            }
+            .unlimited-btn {
+                background: linear-gradient(145deg, #4CAF50, #2E7D32);
+                color: white;
+                border: none;
+                padding: 10px 25px;
+                border-radius: 30px;
+                font-size: 1rem;
+                font-weight: bold;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.2s;
+            }
+            .unlimited-btn:hover {
+                transform: scale(1.02);
+                box-shadow: 0 0 15px rgba(76,175,80,0.4);
+            }
+            .unlimited-btn.active {
+                background: linear-gradient(145deg, #ff9800, #e68a00);
+                box-shadow: 0 0 15px rgba(255,152,0,0.5);
             }
         </style>
         
@@ -1278,42 +1265,37 @@ showLocationSwipeModalWithClicks(locationData) {
             <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي</p>
             
             <!-- الإحداثيات -->
-            <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 15px;">
+            <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 20px;">
                 <div style="color: #4CAF50; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px;">الإحداثيات</div>
                 <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
             <!-- عدد مرات فتح الموقع -->
-            <div style="margin-bottom: 15px;">
-                <div style="color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-align: center;">عدد مرات فتح الموقع</div>
-                <div style="display: flex; gap: 8px; align-items: center; justify-content: center; margin-bottom: 10px;">
-                    <input type="number" id="clicksCountInput" min="1" max="15" value="1" step="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white; font-family: monospace;">
-                    <span style="color: white;">ضغطات</span>
+            <div style="margin-bottom: 20px;">
+                <div style="color: #4CAF50; font-size: 1rem; font-weight: bold; margin-bottom: 10px; text-align: center;">📊 عدد مرات فتح الموقع</div>
+                
+                <!-- أزرار اختيار الضغطات 1-7 -->
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 15px;">
+                    <button type="button" class="click-option" data-clicks="1">1</button>
+                    <button type="button" class="click-option" data-clicks="2">2</button>
+                    <button type="button" class="click-option" data-clicks="3">3</button>
+                    <button type="button" class="click-option" data-clicks="4">4</button>
+                    <button type="button" class="click-option" data-clicks="5">5</button>
+                    <button type="button" class="click-option" data-clicks="6">6</button>
+                    <button type="button" class="click-option" data-clicks="7">7</button>
                 </div>
                 
-                <!-- ✅ أزرار اختيار سريعة -->
-                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
-                    <button type="button" class="click-preset" data-clicks="1">1</button>
-                    <button type="button" class="click-preset" data-clicks="2">2</button>
-                    <button type="button" class="click-preset" data-clicks="3">3</button>
-                    <button type="button" class="click-preset" data-clicks="4">4</button>
-                    <button type="button" class="click-preset" data-clicks="5">5</button>
-                    <button type="button" class="click-preset" data-clicks="10">10</button>
-                    <button type="button" class="click-preset" data-clicks="15">15</button>
+                <!-- زر بلا حدود -->
+                <div style="display: flex; justify-content: center;">
+                    <button type="button" id="unlimitedBtn" class="unlimited-btn">
+                        <span>♾️</span> بلا حدود
+                    </button>
                 </div>
                 
-                <div id="clicksError" style="color: #f44336; font-size: 0.65rem; margin-top: 5px; display: none;">الحد الأقصى 15 ضغطة</div>
-            </div>
-            
-            <!-- زر السحب (عكس العبارات: بلا حدود في اليسار، محدود في اليمين) -->
-            <div style="margin-bottom: 15px;">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="unlimitedToggle">
-                        <span class="toggle-slider"></span>
-                    </label>
-                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
+                <!-- عرض القيمة المختارة -->
+                <div style="text-align: center; margin-top: 12px; color: #aaa; font-size: 0.8rem;">
+                    <span>✅ الضغطات المختارة: </span>
+                    <span id="selectedClicksValue" style="color: #4CAF50; font-weight: bold;">1</span>
                 </div>
             </div>
             
@@ -1342,78 +1324,39 @@ showLocationSwipeModalWithClicks(locationData) {
     const button = document.getElementById('swipeButton');
     const leftThumb = document.getElementById('leftThumb');
     const rightThumb = document.getElementById('rightThumb');
-    const clicksInput = document.getElementById('clicksCountInput');
-    const clicksError = document.getElementById('clicksError');
-    const unlimitedToggle = document.getElementById('unlimitedToggle');
     
-    // ✅ دالة التحقق من صحة الإدخال (تسمح بمسح الحقل)
-    const validateClicks = () => {
-        const value = clicksInput.value;
-        if (value === "" || value === null) {
-            clicksError.style.display = 'none';
-            clicksInput.style.border = 'none';
-            return true; // الحقل فارغ، مقبول مؤقتاً
-        }
-        let numValue = parseInt(value);
-        if (isNaN(numValue)) {
-            clicksError.style.display = 'block';
-            clicksInput.style.border = '2px solid #f44336';
-            return false;
-        }
-        if (numValue < 1 || numValue > 15) {
-            clicksError.style.display = 'block';
-            clicksInput.style.border = '2px solid #f44336';
-            return false;
-        } else {
-            clicksError.style.display = 'none';
-            clicksInput.style.border = 'none';
-            return true;
-        }
-    };
+    // متغيرات الاختيار
+    let selectedClicks = 1;
+    let isUnlimited = false;
     
-    // ✅ معالج الإدخال (يسمح بمسح الحقل)
-    clicksInput.addEventListener('input', () => {
-        const value = clicksInput.value;
-        if (value === "") {
-            // الحقل فارغ، لا شيء نتحقق منه
-            clicksError.style.display = 'none';
-            clicksInput.style.border = 'none';
-            return;
-        }
-        let numValue = parseInt(value);
-        if (isNaN(numValue)) {
-            clicksError.style.display = 'block';
-            clicksInput.style.border = '2px solid #f44336';
-            return;
-        }
-        if (numValue > 15) {
-            clicksInput.value = 15;
-        }
-        if (numValue < 1 && numValue !== "") {
-            // إذا كان أقل من 1 ولا يزال المستخدم يكتب، لا نغيره بالقوة
-        }
-        validateClicks();
-    });
+    // تفعيل أزرار الاختيار (1-7)
+    const clickOptions = document.querySelectorAll('.click-option');
+    const unlimitedBtn = document.getElementById('unlimitedBtn');
+    const selectedClicksValue = document.getElementById('selectedClicksValue');
     
-    // ✅ معالج أزرار الاختيار السريعة
-    document.querySelectorAll('.click-preset').forEach(btn => {
+    clickOptions.forEach(btn => {
         btn.onclick = () => {
-            clicksInput.value = btn.dataset.clicks;
-            validateClicks();
-            clicksInput.focus();
+            clickOptions.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            unlimitedBtn.classList.remove('active');
+            selectedClicks = parseInt(btn.dataset.clicks);
+            isUnlimited = false;
+            selectedClicksValue.textContent = selectedClicks;
+            selectedClicksValue.style.color = '#4CAF50';
         };
     });
     
-    unlimitedToggle.addEventListener('change', () => {
-        clicksInput.disabled = unlimitedToggle.checked;
-        if (unlimitedToggle.checked) {
-            clicksInput.style.opacity = '0.5';
-            clicksError.style.display = 'none';
-        } else {
-            clicksInput.style.opacity = '1';
-            validateClicks();
-        }
-    });
+    // تفعيل زر بلا حدود
+    unlimitedBtn.onclick = () => {
+        clickOptions.forEach(b => b.classList.remove('active'));
+        unlimitedBtn.classList.add('active');
+        isUnlimited = true;
+        selectedClicksValue.textContent = '♾️ بلا حدود';
+        selectedClicksValue.style.color = '#ff9800';
+    };
+    
+    // تحديد القيمة الافتراضية (1)
+    document.querySelector('.click-option[data-clicks="1"]').classList.add('active');
     
     const buttonWidth = button.clientWidth;
     const centerPos = buttonWidth / 2;
@@ -1447,28 +1390,17 @@ showLocationSwipeModalWithClicks(locationData) {
         if (leftCurrentPos >= maxLeftMove - 10) {
             leftThumb.style.left = maxLeftMove + 'px';
             
-            if (!unlimitedToggle.checked) {
-                const value = clicksInput.value;
-                if (value === "" || value === null) {
-                    alert('⚠️ الرجاء إدخال عدد الضغطات (1-15)');
-                    leftThumb.style.left = '8px';
-                    return;
+            setTimeout(() => {
+                let maxClicks;
+                if (isUnlimited) {
+                    maxClicks = 999999;
+                } else {
+                    maxClicks = selectedClicks;
                 }
-                let maxClicks = parseInt(value);
-                if (isNaN(maxClicks) || maxClicks < 1) {
-                    alert('⚠️ عدد الضغطات غير صالح (1-15)');
-                    leftThumb.style.left = '8px';
-                    return;
-                }
-                if (maxClicks > 15) maxClicks = 15;
+                
                 locationData.maxClicks = maxClicks;
                 locationData.clicksRemaining = maxClicks;
-            } else {
-                locationData.maxClicks = 999999;
-                locationData.clicksRemaining = 999999;
-            }
-            
-            setTimeout(() => {
+                
                 CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
                 const msgId = Date.now().toString();
                 this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
@@ -1525,6 +1457,7 @@ showLocationSwipeModalWithClicks(locationData) {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
 },
+    
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
