@@ -1169,7 +1169,7 @@ const ChatSystem = {
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
         
         const loading = document.createElement('div');
-        loading.textContent = '📍 جاري تحديد موقعك...';
+        loading.textContent = 'جاري تحديد موقعك...';
         loading.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:8px16px;border-radius:30px;z-index:10002;';
         document.body.appendChild(loading);
         
@@ -1217,12 +1217,54 @@ showLocationSwipeModalWithClicks(locationData) {
     `;
     
     overlay.innerHTML = `
+        <style>
+            .toggle-switch {
+                position: relative;
+                display: inline-block;
+                width: 60px;
+                height: 30px;
+            }
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #555;
+                transition: 0.3s;
+                border-radius: 30px;
+            }
+            .toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 24px;
+                width: 24px;
+                left: 3px;
+                bottom: 3px;
+                background-color: white;
+                transition: 0.3s;
+                border-radius: 50%;
+            }
+            input:checked + .toggle-slider {
+                background-color: #4CAF50;
+            }
+            input:checked + .toggle-slider:before {
+                transform: translateX(30px);
+            }
+        </style>
+        
         <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
             <div style="font-size: 3rem; margin-bottom: 10px;">🗺️</div>
             <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
             <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي</p>
             
-            <!-- الإحداثيات (بدون أيقونات، مع تكبير الخط) -->
+            <!-- الإحداثيات -->
             <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 15px;">
                 <div style="color: #4CAF50; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px;">الإحداثيات</div>
                 <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
@@ -1238,28 +1280,30 @@ showLocationSwipeModalWithClicks(locationData) {
                 <div id="clicksError" style="color: #f44336; font-size: 0.65rem; margin-top: 5px; display: none;">الحد الأقصى 15 ضغطة</div>
             </div>
             
-            <!-- خانة بدون حدود (لون منفصل عن حقل الأرقام) -->
+            <!-- زر السحب (Toggle Switch) بدلاً من checkbox -->
             <div style="margin-bottom: 15px;">
-                <label style="display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" id="unlimitedCheckbox" style="width: 20px; height: 20px; cursor: pointer; accent-color: ${appColor};">
-                    <span style="color: white;">بلا حدود</span>
-                </label>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="unlimitedToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
+                </div>
             </div>
             
-            <!-- نص توضيحي (بدون أيقونات) -->
+            <!-- نص توضيحي -->
             <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
             
-            <!-- شريط السحب (باللون الأخضر كما كان سابقاً) -->
+            <!-- شريط السحب -->
             <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
                 <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor};">
                     <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%);"></div>
                     <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: ${appColor}; border-radius: 50%; transform: translate(-50%, -50%);"></div>
                     
-                    <!-- اليد اليسرى (قبول) - باللون الأخضر -->
                     <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #4CAF50, #1b5e2a); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
                         <i class="fas fa-check"></i>
                     </div>
-                    <!-- اليد اليمنى (رفض) -->
                     <div id="rightThumb" style="position: absolute; top: 8px; right: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #f44336, #8b0000); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: right 0.05s linear; color: white;">
                         <i class="fas fa-times"></i>
                     </div>
@@ -1275,7 +1319,7 @@ showLocationSwipeModalWithClicks(locationData) {
     const rightThumb = document.getElementById('rightThumb');
     const clicksInput = document.getElementById('clicksCountInput');
     const clicksError = document.getElementById('clicksError');
-    const unlimitedCheckbox = document.getElementById('unlimitedCheckbox');
+    const unlimitedToggle = document.getElementById('unlimitedToggle');
     
     const validateClicks = () => {
         let value = parseInt(clicksInput.value);
@@ -1300,9 +1344,9 @@ showLocationSwipeModalWithClicks(locationData) {
         validateClicks();
     });
     
-    unlimitedCheckbox.addEventListener('change', () => {
-        clicksInput.disabled = unlimitedCheckbox.checked;
-        if (unlimitedCheckbox.checked) {
+    unlimitedToggle.addEventListener('change', () => {
+        clicksInput.disabled = unlimitedToggle.checked;
+        if (unlimitedToggle.checked) {
             clicksInput.style.opacity = '0.5';
             clicksError.style.display = 'none';
         } else {
@@ -1343,7 +1387,7 @@ showLocationSwipeModalWithClicks(locationData) {
         if (leftCurrentPos >= maxLeftMove - 10) {
             leftThumb.style.left = maxLeftMove + 'px';
             
-            if (!unlimitedCheckbox.checked && !validateClicks()) {
+            if (!unlimitedToggle.checked && !validateClicks()) {
                 alert('⚠️ عدد الضغطات غير صالح (1-15)');
                 leftThumb.style.left = '8px';
                 return;
@@ -1351,7 +1395,7 @@ showLocationSwipeModalWithClicks(locationData) {
             
             setTimeout(() => {
                 let maxClicks;
-                if (unlimitedCheckbox.checked) {
+                if (unlimitedToggle.checked) {
                     maxClicks = 999999;
                 } else {
                     maxClicks = parseInt(clicksInput.value);
