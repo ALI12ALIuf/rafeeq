@@ -813,7 +813,7 @@ const ChatSystem = {
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
-    
+
 
     // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
@@ -948,7 +948,53 @@ displayMessage(msg) {
         div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'file') {
-        div.innerHTML = `<div class="message-content" onclick="window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')" style="cursor:pointer;">📎 ${msg.fileName || 'ملف'}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        // ✅ تصميم محسن للملفات (File Card)
+        let fileName = msg.fileName || 'ملف';
+        let fileExt = fileName.split('.').pop().toLowerCase();
+        
+        // تحديد الأيقونة حسب امتداد الملف
+        let fileIcon = '📎';
+        if (fileExt === 'apk') fileIcon = '📱';
+        else if (fileExt === 'pdf') fileIcon = '📕';
+        else if (fileExt === 'zip' || fileExt === 'rar' || fileExt === '7z') fileIcon = '🗜️';
+        else if (fileExt === 'mp3' || fileExt === 'wav' || fileExt === 'ogg') fileIcon = '🎵';
+        else if (fileExt === 'mp4' || fileExt === 'avi' || fileExt === 'mkv') fileIcon = '🎬';
+        else if (fileExt === 'jpg' || fileExt === 'png' || fileExt === 'jpeg' || fileExt === 'gif') fileIcon = '🖼️';
+        else if (fileExt === 'txt') fileIcon = '📝';
+        else if (fileExt === 'doc' || fileExt === 'docx') fileIcon = '📘';
+        else if (fileExt === 'xls' || fileExt === 'xlsx') fileIcon = '📗';
+        else fileIcon = '📎';
+        
+        // حساب حجم الملف تقريباً
+        let fileSize = '';
+        if (msg.data && typeof msg.data === 'string') {
+            const sizeInBytes = Math.ceil(msg.data.length * 0.75);
+            if (sizeInBytes < 1024) fileSize = sizeInBytes + ' B';
+            else if (sizeInBytes < 1024 * 1024) fileSize = (sizeInBytes / 1024).toFixed(1) + ' KB';
+            else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        // اختصار اسم الملف الطويل
+        let displayName = fileName;
+        if (displayName.length > 35) {
+            const ext = displayName.split('.').pop();
+            const namePart = displayName.substring(0, 25);
+            displayName = namePart + '...' + ext;
+        }
+        
+        div.innerHTML = `
+            <div class="message-content file-card" onclick="window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')" style="cursor: pointer; background: var(--bg-card, #f5f5f5); border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; gap: 12px; min-width: 180px; border: 1px solid var(--border-color, #e0e0e0); transition: all 0.2s;">
+                <div style="font-size: 1.8rem;">${fileIcon}</div>
+                <div style="flex: 1; overflow: hidden;">
+                    <div style="font-weight: bold; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-color, #333);">${this.escapeHtml(displayName)}</div>
+                    ${fileSize ? `<div style="font-size: 0.65rem; color: #888;">${fileSize}</div>` : ''}
+                </div>
+                <div style="color: #4CAF50;">
+                    <i class="fas fa-download"></i>
+                </div>
+            </div>
+            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+        `;
     }
     
     c.appendChild(div); 
