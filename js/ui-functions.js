@@ -55,13 +55,9 @@ window.sendVideo = () => { const i = document.createElement('input'); i.type = '
 window.sendFile = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '*/*'; i.onchange = e => { const f = e.target.files[0]; if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); }; i.click(); document.getElementById('attachmentMenu').style.display = 'none'; };
 window.sendVoiceNote = () => { if (!navigator.mediaDevices?.getUserMedia) { alert('المتصفح لا يدعم تسجيل الصوت'); return; } navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { const mr = new MediaRecorder(s); const ch = []; mr.ondataavailable = e => { if (e.data.size > 0) ch.push(e.data); }; mr.onstop = () => { s.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: 'audio/webm' }); if (blob.size > 0) ChatSystem.sendVoiceNote(blob); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'flex'; if (vb) vb.style.display = 'none'; }; mr.start(); const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); if (sb) sb.style.display = 'none'; if (vb) { vb.style.display = 'flex'; vb.onclick = () => { if (mr.state === 'recording') mr.stop(); }; } setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 900000); }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); document.getElementById('attachmentMenu').style.display = 'none'; };
 
-// ✅✅✅ دالة shareLocation المعدلة (تم إزالة الإرسال البديل عبر السيرفر)
+// ✅✅✅ دالة shareLocation المعدلة (تم إزالة التحقق والتحذيرات نهائياً)
 window.shareLocation = () => { 
-    if (ChatSystem.friendOnline && CallSystem.dc?.readyState === 'open') {
-        ChatSystem.shareLocationDirect(); 
-    } else {
-        alert('⚠️ لا يمكن مشاركة الموقع الآن. الاتصال غير مستقر. انتظر حتى يعود الطرف الآخر.');
-    }
+    ChatSystem.shareLocationDirect(); 
     document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
