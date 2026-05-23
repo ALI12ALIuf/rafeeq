@@ -375,3 +375,71 @@ body.profile-subpage-open .profile-pages {
 body:not(.conversation-open) .conversation-page {
     display: none !important;
 }
+
+
+/* ==================== تنسيق مشغل البصمة الصوتية ==================== */
+
+/* خلفية المشغل */
+.message-audio {
+    background: #4CAF50;
+    border-radius: 20px;
+    height: 40px;
+    min-width: 200px;
+    outline: none;
+}
+
+/* لوحة التحكم */
+.message-audio::-webkit-media-controls-panel {
+    background: #4CAF50;
+}
+
+/* زر التشغيل */
+.message-audio::-webkit-media-controls-play-button {
+    background-color: white;
+    border-radius: 50%;
+    color: #4CAF50;
+}
+
+/* زر كتم الصوت */
+.message-audio::-webkit-media-controls-mute-button {
+    background-color: white;
+    border-radius: 50%;
+    color: #4CAF50;
+}
+
+/* شريط مستوى الصوت */
+.message-audio::-webkit-media-controls-volume-slider {
+    background-color: white;
+    border-radius: 10px;
+}
+
+/* شريط التقدم (العداد) */
+.message-audio::-webkit-media-controls-timeline {
+    background-color: white;
+    border-radius: 10px;
+}
+
+/* الوقت الحالي والوقت المتبقي */
+.message-audio::-webkit-media-controls-current-time-display,
+.message-audio::-webkit-media-controls-time-remaining-display {
+    color: white;
+    font-weight: bold;
+}
+
+/* للمتصفحات التي تعمل بمحرك Firefox */
+.message-audio {
+    background: #4CAF50;
+    border-radius: 20px;
+    padding: 5px;
+}
+
+.message-audio::-moz-range-track {
+    background: white;
+    border-radius: 10px;
+}
+
+.message-audio::-moz-range-thumb {
+    background: #4CAF50;
+    border: none;
+    border-radius: 50%;
+}
