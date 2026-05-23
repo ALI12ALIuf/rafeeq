@@ -1522,60 +1522,70 @@ showLocationSwipeModalWithClicks(locationData) {
         }
         this.messages[friendId] = h; 
     },
+
+   // ==================== القسم 36: updateLastMessage ====================
+updateLastMessage(friendId, lastMessage) { 
+    document.querySelectorAll('.chat-item').forEach(item => { 
+        if (item.getAttribute('onclick')?.includes(friendId)) { 
+            const lm = item.querySelector('.last-message'), tm = item.querySelector('.chat-time'); 
+            if (lm) lm.textContent = lastMessage; 
+            if (tm) tm.textContent = 'الآن'; 
+        } 
+    }); 
+},
+
+// ==================== القسم 37: closeChat ====================
+closeChat() {
+    console.log('🔴 closeChat - بدء إغلاق المحادثة');
+    console.log('currentChat:', this.currentChat);
+    console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
     
-    // ==================== القسم 36: updateLastMessage ====================
-    updateLastMessage(friendId, lastMessage) { 
-        document.querySelectorAll('.chat-item').forEach(item => { 
-            if (item.getAttribute('onclick')?.includes(friendId)) { 
-                const lm = item.querySelector('.last-message'), tm = item.querySelector('.chat-time'); 
-                if (lm) lm.textContent = lastMessage; 
-                if (tm) tm.textContent = 'الآن'; 
-            } 
-        }); 
-    },
+    const chatId = this.currentChat;
     
-    // ==================== القسم 37: closeChat ====================
-    closeChat() {
-        console.log('🔴 closeChat - بدء إغلاق المحادثة');
-        console.log('currentChat:', this.currentChat);
-        console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
+    if (chatId) {
+        console.log('📤 إرسال إشارة إلغاء إلى:', chatId);
+        this.sendFeatureCancelImmediately(chatId);
+        this.sendConversationStatus(false);
         
-        const chatId = this.currentChat;
-        
-        if (chatId) {
-            console.log('📤 إرسال إشارة إلغاء إلى:', chatId);
-            this.sendFeatureCancelImmediately(chatId);
-            this.sendConversationStatus(false);
-        }
-        
-        this.featuresEnabled = false;
-        this.featureRequestPending = false;
-        this.featureRequestReceived = false;
-        
-        if (this.featureBlinkInterval) {
-            clearInterval(this.featureBlinkInterval);
-            this.featureBlinkInterval = null;
-        }
-        
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) {
-            btn.style.background = '#f44336';
-            btn.title = 'تفعيل الميزات';
-        }
-        
-        this.updateAllButtons();
-        
-        document.body.classList.remove('conversation-open');
-        document.getElementById('conversationPage').style.display = 'none';
-        document.querySelector('.chat-page').style.display = 'block';
-        PresenceSystem.stopAll();
-        if (!CallSystem.isInCall) CallSystem.cleanupConnections();
-        this.currentChat = null;
-        this.friendOnline = false;
-        this.friendInConversation = false;
-        
-        console.log('✅ closeChat - انتهى');
-    },
+        // ✅ حذف جميع الملفات والوسائط (صور، فيديو، بصمات، ملفات) عند إغلاق المحادثة
+        const key = `chat_${chatId}`;
+        const messages = this.messages[chatId] || [];
+        // إبقاء النصوص فقط، حذف كل ما هو ليس نصاً
+        const filteredMessages = messages.filter(msg => msg.type === 'text');
+        this.messages[chatId] = filteredMessages;
+        localStorage.setItem(key, JSON.stringify(filteredMessages));
+        console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
+    }
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const btn = document.getElementById('enableFeaturesBtn');
+    if (btn) {
+        btn.style.background = '#f44336';
+        btn.title = 'تفعيل الميزات';
+    }
+    
+    this.updateAllButtons();
+    
+    document.body.classList.remove('conversation-open');
+    document.getElementById('conversationPage').style.display = 'none';
+    document.querySelector('.chat-page').style.display = 'block';
+    PresenceSystem.stopAll();
+    if (!CallSystem.isInCall) CallSystem.cleanupConnections();
+    this.currentChat = null;
+    this.friendOnline = false;
+    this.friendInConversation = false;
+    
+    console.log('✅ closeChat - انتهى');
+}, 
+    
     
     // ==================== القسم 38: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
