@@ -1253,12 +1253,12 @@ showLocationSwipeModalWithClicks(locationData) {
                 background: #1a1a2e;
                 color: white;
                 border: 1px solid #4CAF50;
-                padding: 10px 16px;
-                border-radius: 30px;
+                padding: 6px 12px;
+                border-radius: 20px;
                 cursor: pointer;
                 transition: all 0.2s;
-                font-size: 1rem;
-                min-width: 50px;
+                font-size: 0.9rem;
+                min-width: 40px;
             }
             .click-preset:hover {
                 background: #4CAF50;
@@ -1281,12 +1281,12 @@ showLocationSwipeModalWithClicks(locationData) {
                 <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
-            <!-- عدد مرات فتح الموقع (نص أبيض أكبر) -->
+            <!-- عدد مرات فتح الموقع -->
             <div style="margin-bottom: 15px;">
                 <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; text-align: center;">عدد مرات فتح الموقع</div>
                 
-                <!-- ✅ أزرار اختيار من 1 إلى 7 (بدون حقل إدخال) -->
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0;">
+                <!-- ✅ أزرار اختيار من 1 إلى 7 (حجم صغير مثل السابق) -->
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
                     <button type="button" class="click-preset" data-clicks="1">1</button>
                     <button type="button" class="click-preset" data-clicks="2">2</button>
                     <button type="button" class="click-preset" data-clicks="3">3</button>
@@ -1339,15 +1339,13 @@ showLocationSwipeModalWithClicks(locationData) {
     let selectedClicks = 1;
     let selectedButton = null;
     
-    // ✅ معالج أزرار الاختيار
+    // معالج أزرار الاختيار
     document.querySelectorAll('.click-preset').forEach(btn => {
         btn.onclick = () => {
-            // إزالة التحديد السابق
             if (selectedButton) {
                 selectedButton.style.background = '#1a1a2e';
                 selectedButton.style.borderColor = '#4CAF50';
             }
-            // تحديد الزر الجديد
             selectedButton = btn;
             selectedButton.style.background = '#4CAF50';
             selectedButton.style.borderColor = '#4CAF50';
@@ -1355,7 +1353,7 @@ showLocationSwipeModalWithClicks(locationData) {
         };
     });
     
-    // ✅ تحديد الزر الأول (1) بشكل افتراضي
+    // تحديد الزر الأول (1) بشكل افتراضي
     const firstBtn = document.querySelector('.click-preset[data-clicks="1"]');
     if (firstBtn) {
         firstBtn.style.background = '#4CAF50';
@@ -1366,18 +1364,15 @@ showLocationSwipeModalWithClicks(locationData) {
     
     unlimitedToggle.addEventListener('change', () => {
         if (unlimitedToggle.checked) {
-            // تعطيل الأزرار
             document.querySelectorAll('.click-preset').forEach(btn => {
                 btn.style.opacity = '0.5';
                 btn.style.pointerEvents = 'none';
             });
         } else {
-            // تفعيل الأزرار
             document.querySelectorAll('.click-preset').forEach(btn => {
                 btn.style.opacity = '1';
                 btn.style.pointerEvents = 'auto';
             });
-            // إعادة التحديد للزر المختار
             if (selectedButton) {
                 selectedButton.style.background = '#4CAF50';
             }
@@ -1485,7 +1480,6 @@ showLocationSwipeModalWithClicks(locationData) {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
 },
-    
             
     
     // ==================== القسم 35: saveMessage ====================
