@@ -816,6 +816,8 @@ const ChatSystem = {
 
 
     // ==================== القسم 26: displayMessage ====================
+
+   // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -948,22 +950,8 @@ displayMessage(msg) {
         div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'file') {
-        // ✅ تصميم محسن للملفات (File Card)
+        // ✅ التصميم المطلوب للملفات
         let fileName = msg.fileName || 'ملف';
-        let fileExt = fileName.split('.').pop().toLowerCase();
-        
-        // تحديد الأيقونة حسب امتداد الملف
-        let fileIcon = '📎';
-        if (fileExt === 'apk') fileIcon = '📱';
-        else if (fileExt === 'pdf') fileIcon = '📕';
-        else if (fileExt === 'zip' || fileExt === 'rar' || fileExt === '7z') fileIcon = '🗜️';
-        else if (fileExt === 'mp3' || fileExt === 'wav' || fileExt === 'ogg') fileIcon = '🎵';
-        else if (fileExt === 'mp4' || fileExt === 'avi' || fileExt === 'mkv') fileIcon = '🎬';
-        else if (fileExt === 'jpg' || fileExt === 'png' || fileExt === 'jpeg' || fileExt === 'gif') fileIcon = '🖼️';
-        else if (fileExt === 'txt') fileIcon = '📝';
-        else if (fileExt === 'doc' || fileExt === 'docx') fileIcon = '📘';
-        else if (fileExt === 'xls' || fileExt === 'xlsx') fileIcon = '📗';
-        else fileIcon = '📎';
         
         // حساب حجم الملف تقريباً
         let fileSize = '';
@@ -974,23 +962,28 @@ displayMessage(msg) {
             else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
         
-        // اختصار اسم الملف الطويل
+        // عرض اسم الملف كاملاً مع التفاف تلقائي
         let displayName = fileName;
-        if (displayName.length > 35) {
-            const ext = displayName.split('.').pop();
-            const namePart = displayName.substring(0, 25);
-            displayName = namePart + '...' + ext;
-        }
         
         div.innerHTML = `
-            <div class="message-content file-card" onclick="window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')" style="cursor: pointer; background: var(--bg-card, #f5f5f5); border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; gap: 12px; min-width: 180px; border: 1px solid var(--border-color, #e0e0e0); transition: all 0.2s;">
-                <div style="font-size: 1.8rem;">${fileIcon}</div>
-                <div style="flex: 1; overflow: hidden;">
-                    <div style="font-weight: bold; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-color, #333);">${this.escapeHtml(displayName)}</div>
-                    ${fileSize ? `<div style="font-size: 0.65rem; color: #888;">${fileSize}</div>` : ''}
+            <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; border: 1px solid #4CAF50;">
+                <!-- أيقونة الملف داخل دائرة بيضاء -->
+                <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <span style="font-size: 1.5rem;">📄</span>
                 </div>
-                <div style="color: #4CAF50;">
-                    <i class="fas fa-download"></i>
+                
+                <!-- معلومات الملف -->
+                <div style="flex: 1; overflow: hidden;">
+                    <div style="font-weight: bold; font-size: 0.85rem; word-break: break-word; color: white;">${this.escapeHtml(displayName)}</div>
+                    ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
+                </div>
+                
+                <!-- زر التحميل (أيقونة فقط) -->
+                <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" 
+                     onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
+                     onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                     onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                    <i class="fas fa-download" style="font-size: 1rem;"></i>
                 </div>
             </div>
             <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
@@ -999,8 +992,7 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},
-
+}, 
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
