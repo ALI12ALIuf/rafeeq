@@ -815,59 +815,84 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
     
     // ==================== القسم 26: displayMessage ====================
+    
     displayMessage(msg) {
-        const c = document.getElementById('messagesContainer'); 
-        if (!c) return;
-        const div = document.createElement('div'); 
-        div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
-        div.id = `msg-${msg.id}`;
-        const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-        let statusHtml = ''; 
-        if (msg.sender === 'me') { 
-            let icon = '✓', cls = 'sent'; 
-            if (msg.status === 'delivered') { 
-                icon = '✓✓'; cls = 'delivered'; 
-            } else if (msg.status === 'read') { 
-                icon = '✓✓'; cls = 'read'; 
-            } 
-            statusHtml = `<span class="message-status ${cls}">${icon}</span>`;
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return;
+    const div = document.createElement('div'); 
+    div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
+    div.id = `msg-${msg.id}`;
+    const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    let statusHtml = ''; 
+    if (msg.sender === 'me') { 
+        let icon = '✓', cls = 'sent'; 
+        if (msg.status === 'delivered') { 
+            icon = '✓✓'; cls = 'delivered'; 
+        } else if (msg.status === 'read') { 
+            icon = '✓✓'; cls = 'read'; 
+        } 
+        statusHtml = `<span class="message-status ${cls}">${icon}</span>`;
+    }
+    
+    if (msg.type === 'text') {
+        div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+    } 
+    else if (msg.type === 'location') {
+        // ✅ معالجة رسالة الموقع كأيقونة تفاعلية
+        let locationData = msg.data;
+        let locationUrl = '';
+        
+        if (typeof locationData === 'object' && locationData.url) {
+            locationUrl = locationData.url;
+        } else if (typeof locationData === 'string') {
+            // محاولة استخراج الرابط من النص القديم
+            const match = locationData.match(/https?:\/\/[^\s]+/);
+            locationUrl = match ? match[0] : locationData;
+        } else {
+            locationUrl = '#';
         }
         
-        if (msg.type === 'text') {
-            div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
-        } 
-        else if (msg.type === 'image') {
-            let imageSrc = msg.data;
-            if (imageSrc && typeof imageSrc === 'string') {
-                if (!imageSrc.startsWith('data:image') && !imageSrc.startsWith('http')) {
-                    imageSrc = 'data:image/jpeg;base64,' + imageSrc;
-                }
+        div.innerHTML = `
+            <div class="message-content location-card" onclick="window.open('${locationUrl}', '_blank')" style="cursor: pointer; background: #4CAF50; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
+                <span>📍 موقعي</span>
+                <i class="fas fa-external-link-alt" style="font-size: 0.8rem; opacity: 0.8;"></i>
+            </div>
+            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+        `;
+    }
+    else if (msg.type === 'image') {
+        let imageSrc = msg.data;
+        if (imageSrc && typeof imageSrc === 'string') {
+            if (!imageSrc.startsWith('data:image') && !imageSrc.startsWith('http')) {
+                imageSrc = 'data:image/jpeg;base64,' + imageSrc;
             }
-            div.innerHTML = `<img src="${imageSrc}" class="message-image" onclick="window.openImage('${imageSrc}')" loading="lazy" style="max-width:100%;border-radius:12px;max-height:300px;cursor:pointer;"><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
-        } 
-        else if (msg.type === 'voice') {
-            let audioSrc = msg.data;
-            if (audioSrc && typeof audioSrc === 'string' && !audioSrc.startsWith('data:audio')) {
-                audioSrc = 'data:audio/webm;base64,' + audioSrc;
-            }
-            div.innerHTML = `<audio controls src="${audioSrc}" class="message-audio" preload="metadata" style="width:200px;"></audio><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
-        } 
-        else if (msg.type === 'video') {
-            let videoSrc = msg.data;
-            if (videoSrc && typeof videoSrc === 'string') {
-                if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
-                    videoSrc = 'data:video/mp4;base64,' + videoSrc;
-                }
-            }
-            div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
-        } 
-        else if (msg.type === 'file') {
-            div.innerHTML = `<div class="message-content" onclick="window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')" style="cursor:pointer;">📎 ${msg.fileName || 'ملف'}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
         }
-        
-        c.appendChild(div); 
-        c.scrollTop = c.scrollHeight;
-    },
+        div.innerHTML = `<img src="${imageSrc}" class="message-image" onclick="window.openImage('${imageSrc}')" loading="lazy" style="max-width:100%;border-radius:12px;max-height:300px;cursor:pointer;"><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+    } 
+    else if (msg.type === 'voice') {
+        let audioSrc = msg.data;
+        if (audioSrc && typeof audioSrc === 'string' && !audioSrc.startsWith('data:audio')) {
+            audioSrc = 'data:audio/webm;base64,' + audioSrc;
+        }
+        div.innerHTML = `<audio controls src="${audioSrc}" class="message-audio" preload="metadata" style="width:200px;"></audio><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+    } 
+    else if (msg.type === 'video') {
+        let videoSrc = msg.data;
+        if (videoSrc && typeof videoSrc === 'string') {
+            if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
+                videoSrc = 'data:video/mp4;base64,' + videoSrc;
+            }
+        }
+        div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+    } 
+    else if (msg.type === 'file') {
+        div.innerHTML = `<div class="message-content" onclick="window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')" style="cursor:pointer;">📎 ${msg.fileName || 'ملف'}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+    }
+    
+    c.appendChild(div); 
+    c.scrollTop = c.scrollHeight;
+},
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
@@ -1063,15 +1088,21 @@ async shareLocationDirect() {
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
         navigator.geolocation.getCurrentPosition(p => { 
-            const locMsg = `📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`; 
-            // ✅ التعديل: تغيير type من 'location' إلى 'text'
-            CallSystem.dc.send(JSON.stringify({ type: 'text', data: locMsg, id: Date.now().toString() })); 
+            // ✅ إرسال كائن موقع متكامل
+            const locationData = {
+                lat: p.coords.latitude,
+                lng: p.coords.longitude,
+                url: `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
+            };
+            CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
+            
             const msgId = Date.now().toString();
-            this.saveMessage(this.currentChat, { id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            this.displayMessage({ id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            this.displayMessage({ id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
         }, () => alert('فشل تحديد الموقع'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     }
 },
+    
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
