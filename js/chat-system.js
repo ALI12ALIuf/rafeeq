@@ -814,8 +814,7 @@ const ChatSystem = {
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
     
-    // ==================== القسم 26: displayMessage ====================
-    
+
     // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
@@ -839,7 +838,7 @@ displayMessage(msg) {
         div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'location') {
-        // معالجة رسالة الموقع
+        // معالجة رسالة الموقع مع نظام الضغطات
         let locationData = msg.data;
         let locationUrl = '';
         
@@ -856,79 +855,88 @@ displayMessage(msg) {
         const maxClicks = locationData.maxClicks;
         let clicksRemaining = locationData.clicksRemaining;
         
-        // ✅ إزالة أيقونة القفل والنص "انتهت صلاحية الموقع" - الموقع يبقى كما هو
-        // عرض الموقع مع عداد الضغطات (بدون أيقونة القفل)
-        const clicksText = (maxClicks && maxClicks < 999999) ? ` (${clicksRemaining}/${maxClicks})` : '';
-        
-        // ✅ اللون الأساسي للتطبيق (#2196F3) بدلاً من الأخضر
-        const locationDiv = document.createElement('div');
-        locationDiv.className = 'message-content location-card';
-        locationDiv.style.cssText = `cursor: pointer; background: #2196F3; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 8px;`;
-        locationDiv.innerHTML = `
-            <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
-            <span>📍 موقعي${clicksText}</span>
-            <i class="fas fa-external-link-alt" style="font-size: 0.8rem; opacity: 0.8;"></i>
-        `;
-        
-        // معالج الضغط على الموقع
-        locationDiv.onclick = (e) => {
-            e.stopPropagation();
+        // ✅ إذا كانت الصلاحية انتهت (clicksRemaining <= 0)
+        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+            // ✅ إزالة النص "🔒 انتهت صلاحية الموقع"، إبقاء القفل فقط
+            div.innerHTML = `
+                <div class="message-content" style="background: #888; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fas fa-lock" style="font-size: 1.2rem;"></i>
+                </div>
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+        } else {
+            // ✅ عرض الموقع مع عداد الضغطات (بدون نص "📍 موقعي")
+            const clicksText = (maxClicks && maxClicks < 999999) ? ` ${clicksRemaining}/${maxClicks}` : '';
             
-            // التحقق من الصلاحية - إذا انتهت، يبقى كما هو (لا يتغير لونه)
-            if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                // ✅ لا نعرض رسالة "انتهت صلاحية الموقع" ولا نغير اللون
-                window.open(locationUrl, '_blank');
-                return;
-            }
+            const locationDiv = document.createElement('div');
+            locationDiv.className = 'message-content location-card';
+            locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;';
+            locationDiv.innerHTML = `
+                <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
+                <span>${clicksText}</span>
+            `;
             
-            // فتح الخريطة
-            window.open(locationUrl, '_blank');
-            
-            // تقليل عدد الضغطات المتبقية (فقط للمستلم)
-            if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
-                clicksRemaining--;
+            // معالج الضغط على الموقع
+            locationDiv.onclick = (e) => {
+                e.stopPropagation();
                 
-                // تحديث البيانات في كائن الرسالة
-                msg.data.clicksRemaining = clicksRemaining;
-                
-                // تحديث واجهة المستخدم (بدون تغيير اللون)
-                const newClicksText = ` (${clicksRemaining}/${maxClicks})`;
-                if (clicksRemaining > 0) {
-                    locationDiv.innerHTML = `
-                        <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
-                        <span>📍 موقعي${newClicksText}</span>
-                        <i class="fas fa-external-link-alt" style="font-size: 0.8rem; opacity: 0.8;"></i>
-                    `;
-                } else {
-                    // ✅ عند انتهاء الصلاحية، يبقى اللون أزرق (لا يتحول إلى رمادي)
-                    locationDiv.innerHTML = `
-                        <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
-                        <span>📍 موقعي</span>
-                        <i class="fas fa-external-link-alt" style="font-size: 0.8rem; opacity: 0.8;"></i>
-                    `;
+                // التحقق من الصلاحية
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                    alert('🔒 انتهت صلاحية هذا الموقع');
+                    return;
                 }
                 
-                // تحديث في localStorage
-                if (ChatSystem.currentChat) {
-                    const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
-                    const msgIndex = messages.findIndex(m => m.id === msg.id);
-                    if (msgIndex !== -1) {
-                        messages[msgIndex].data.clicksRemaining = clicksRemaining;
-                        ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                // فتح الخريطة
+                window.open(locationUrl, '_blank');
+                
+                // تقليل عدد الضغطات المتبقية (فقط للمستلم، وليس للمرسل)
+                if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                    clicksRemaining--;
+                    
+                    // تحديث البيانات في كائن الرسالة
+                    msg.data.clicksRemaining = clicksRemaining;
+                    
+                    // تحديث واجهة المستخدم
+                    const newClicksText = ` ${clicksRemaining}/${maxClicks}`;
+                    locationDiv.innerHTML = `
+                        <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
+                        <span>${clicksRemaining > 0 ? newClicksText : ''}</span>
+                    `;
+                    
+                    // ✅ إذا وصلت إلى الصفر، قفل الموقع (بدون نص)
+                    if (clicksRemaining <= 0) {
+                        locationDiv.style.background = '#888';
+                        locationDiv.style.cursor = 'default';
+                        locationDiv.innerHTML = `
+                            <i class="fas fa-lock" style="font-size: 1.2rem;"></i>
+                        `;
+                        locationDiv.onclick = () => {
+                            alert('🔒 انتهت صلاحية هذا الموقع');
+                        };
+                    }
+                    
+                    // تحديث في localStorage
+                    if (ChatSystem.currentChat) {
+                        const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                        const msgIndex = messages.findIndex(m => m.id === msg.id);
+                        if (msgIndex !== -1) {
+                            messages[msgIndex].data.clicksRemaining = clicksRemaining;
+                            ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                        }
                     }
                 }
-            }
-        };
-        
-        div.appendChild(locationDiv);
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'message-info';
-        infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
-        div.appendChild(infoDiv);
-        
-        c.appendChild(div);
-        c.scrollTop = c.scrollHeight;
-        return;
+            };
+            
+            div.appendChild(locationDiv);
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'message-info';
+            infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
+            div.appendChild(infoDiv);
+            
+            c.appendChild(div);
+            c.scrollTop = c.scrollHeight;
+            return;
+        }
     }
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
@@ -962,7 +970,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-    
+
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
