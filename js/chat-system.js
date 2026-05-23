@@ -1220,43 +1220,43 @@ showLocationSwipeModalWithClicks(locationData) {
         <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
             <div style="font-size: 3rem; margin-bottom: 10px;">🗺️</div>
             <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
-            <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي؟</p>
+            <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي</p>
             
-            <!-- الإحداثيات (بدون أي علامة حمراء) -->
+            <!-- الإحداثيات (بدون أيقونات، مع تكبير الخط) -->
             <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 15px;">
-                <div style="color: #4CAF50; font-size: 0.7rem;">📍 الإحداثيات</div>
-                <div style="color: white; font-weight: bold; font-size: 0.85rem;">${locationData.lat} , ${locationData.lng}</div>
+                <div style="color: #4CAF50; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px;">الإحداثيات</div>
+                <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
-            <!-- عدد مرات فتح الموقع (النص في المنتصف) -->
-            <div style="margin-bottom: 20px;">
-                <div style="color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-align: center;">👆 عدد مرات فتح الموقع</div>
+            <!-- عدد مرات فتح الموقع -->
+            <div style="margin-bottom: 15px;">
+                <div style="color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-align: center;">عدد مرات فتح الموقع</div>
                 <div style="display: flex; gap: 8px; align-items: center; justify-content: center;">
                     <input type="number" id="clicksCountInput" min="1" max="15" value="1" step="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white; font-family: monospace;">
                     <span style="color: white;">ضغطات</span>
                 </div>
-                <div id="clicksError" style="color: #f44336; font-size: 0.65rem; margin-top: 5px; display: none;">⚠️ الحد الأقصى 15 ضغطة</div>
+                <div id="clicksError" style="color: #f44336; font-size: 0.65rem; margin-top: 5px; display: none;">الحد الأقصى 15 ضغطة</div>
             </div>
             
-            <!-- خانة بدون حدود (بلا حدود) -->
+            <!-- خانة بدون حدود (لون منفصل عن حقل الأرقام) -->
             <div style="margin-bottom: 15px;">
                 <label style="display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" id="unlimitedCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
-                    <span style="color: ${appColor};">♾️ بلا حدود (لا ينتهي)</span>
+                    <input type="checkbox" id="unlimitedCheckbox" style="width: 20px; height: 20px; cursor: pointer; accent-color: ${appColor};">
+                    <span style="color: white;">بلا حدود</span>
                 </label>
             </div>
             
-            <!-- نص توضيحي (بدون أي دمبوس/أيقونة) -->
-            <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">📌 بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
+            <!-- نص توضيحي (بدون أيقونات) -->
+            <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
             
-            <!-- شريط السحب -->
+            <!-- شريط السحب (باللون الأخضر كما كان سابقاً) -->
             <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
                 <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor};">
                     <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%);"></div>
                     <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: ${appColor}; border-radius: 50%; transform: translate(-50%, -50%);"></div>
                     
-                    <!-- اليد اليسرى (قبول) -->
-                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, ${appColor}, #1565C0); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
+                    <!-- اليد اليسرى (قبول) - باللون الأخضر -->
+                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #4CAF50, #1b5e2a); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
                         <i class="fas fa-check"></i>
                     </div>
                     <!-- اليد اليمنى (رفض) -->
@@ -1277,7 +1277,6 @@ showLocationSwipeModalWithClicks(locationData) {
     const clicksError = document.getElementById('clicksError');
     const unlimitedCheckbox = document.getElementById('unlimitedCheckbox');
     
-    // التحقق من صحة الإدخال
     const validateClicks = () => {
         let value = parseInt(clicksInput.value);
         if (isNaN(value)) value = 1;
@@ -1301,7 +1300,6 @@ showLocationSwipeModalWithClicks(locationData) {
         validateClicks();
     });
     
-    // عند تفعيل "بلا حدود"، نعطل حقل الإدخال
     unlimitedCheckbox.addEventListener('change', () => {
         clicksInput.disabled = unlimitedCheckbox.checked;
         if (unlimitedCheckbox.checked) {
@@ -1345,7 +1343,6 @@ showLocationSwipeModalWithClicks(locationData) {
         if (leftCurrentPos >= maxLeftMove - 10) {
             leftThumb.style.left = maxLeftMove + 'px';
             
-            // التحقق من صحة الإدخال قبل الإرسال
             if (!unlimitedCheckbox.checked && !validateClicks()) {
                 alert('⚠️ عدد الضغطات غير صالح (1-15)');
                 leftThumb.style.left = '8px';
@@ -1355,7 +1352,7 @@ showLocationSwipeModalWithClicks(locationData) {
             setTimeout(() => {
                 let maxClicks;
                 if (unlimitedCheckbox.checked) {
-                    maxClicks = 999999; // بلا حدود
+                    maxClicks = 999999;
                 } else {
                     maxClicks = parseInt(clicksInput.value);
                     if (isNaN(maxClicks) || maxClicks < 1) maxClicks = 1;
