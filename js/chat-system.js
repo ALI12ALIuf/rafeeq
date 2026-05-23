@@ -879,7 +879,7 @@ const ChatSystem = {
     } 
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
-        if (videoSrc && typeof videoSrc === 'string') {
+        if (videoSrc && typeof videoSrc === 'stasync) {
             if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
                 videoSrc = 'data:video/mp4;base64,' + videoSrc;
             }
@@ -1089,33 +1089,175 @@ const ChatSystem = {
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
         
-        // ✅ رسالة "جاري تحديد الموقع..."
-        const toast = document.createElement('div');
-        toast.textContent = '📍 جاري تحديد موقعك...';
-        toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:8px 16px;border-radius:30px;z-index:10002;font-size:14px;';
-        document.body.appendChild(toast);
+        // عرض مؤقت للتحميل
+        const loading = document.createElement('div');
+        loading.textContent = '📍 جاري تحديد موقعك...';
+        loading.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:8px16px;border-radius:30px;z-index:10002;';
+        document.body.appendChild(loading);
         
         navigator.geolocation.getCurrentPosition(p => { 
-            toast.remove();
+            loading.remove();
             
             const lat = p.coords.latitude.toFixed(6);
             const lng = p.coords.longitude.toFixed(6);
-            const locationText = `📍 https://www.google.com/maps?q=${lat},${lng}`;
+            const locationData = {
+                lat: parseFloat(lat),
+                lng: parseFloat(lng),
+                url: `https://www.google.com/maps?q=${lat},${lng}`
+            };
             
-            // ✅ إضافة النص إلى حقل الكتابة بدلاً من الإرسال المباشر
-            const messageInput = document.getElementById('messageInput');
-            if (messageInput) {
-                messageInput.value = locationText;
-                messageInput.focus();
-                // تحريك المؤشر إلى نهاية النص
-                messageInput.setSelectionRange(locationText.length, locationText.length);
-            }
+            // ✅ عرض نافذة تأكيد السحب
+            this.showLocationSwipeModal(locationData);
             
         }, () => { 
-            toast.remove();
-            alert('❌ فشل تحديد موقعك. تأكد من تشغيل خدمات الموقع.');
+            loading.remove();
+            alert('❌ فشل تحديد موقعك');
         }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     }
+},
+
+// ✅ دالة عرض نافذة تأكيد الموقع (بنفس تصميم المكالمات)
+showLocationSwipeModal(locationData) {
+    const existing = document.getElementById('locationSwipeModal');
+    if (existing) existing.remove();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'locationSwipeModal';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 10003;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+        backdrop-filter: blur(5px);
+    `;
+    
+    overlay.innerHTML = `
+        <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
+            <div style="font-size: 4rem; margin-bottom: 10px;">🗺️</div>
+            <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
+            <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي؟</p>
+            
+            <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 25px;">
+                <div style="color: #4CAF50; font-size: 0.7rem;">📍 الإحداثيات</div>
+                <div style="color: white; font-weight: bold;">${locationData.lat} , ${locationData.lng}</div>
+            </div>
+            
+            <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
+                <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid #2196F3;">
+                    <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: #2196F3; transform: translateX(-50%);"></div>
+                    <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: #2196F3; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+                    
+                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #4CAF50, #1b5e2a); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div id="rightThumb" style="position: absolute; top: 8px; right: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #f44336, #8b0000); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: right 0.05s linear; color: white;">
+                        <i class="fas fa-times"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const button = document.getElementById('swipeButton');
+    const leftThumb = document.getElementById('leftThumb');
+    const rightThumb = document.getElementById('rightThumb');
+    const buttonWidth = button.clientWidth;
+    const centerPos = buttonWidth / 2;
+    const maxLeftMove = centerPos - 35;
+    const maxRightMove = centerPos - 35;
+    
+    let isDraggingLeft = false, isDraggingRight = false;
+    let leftCurrentPos = 8, rightCurrentPos = 8;
+    
+    const onLeftStart = (e) => {
+        e.preventDefault();
+        isDraggingLeft = true;
+        leftThumb.style.transition = 'none';
+    };
+    
+    const onLeftMove = (e) => {
+        if (!isDraggingLeft) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newLeft = clientX - rect.left - 27;
+        newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
+        leftCurrentPos = newLeft;
+        leftThumb.style.left = newLeft + 'px';
+    };
+    
+    const onLeftEnd = () => {
+        if (!isDraggingLeft) return;
+        isDraggingLeft = false;
+        leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (leftCurrentPos >= maxLeftMove - 10) {
+            leftThumb.style.left = maxLeftMove + 'px';
+            setTimeout(() => {
+                // ✅ إرسال الموقع
+                CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                overlay.remove();
+            }, 200);
+        } else {
+            leftThumb.style.left = '8px';
+        }
+    };
+    
+    const onRightStart = (e) => {
+        e.preventDefault();
+        isDraggingRight = true;
+        rightThumb.style.transition = 'none';
+    };
+    
+    const onRightMove = (e) => {
+        if (!isDraggingRight) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newRight = rect.right - clientX - 27;
+        newRight = Math.max(8, Math.min(newRight, maxRightMove));
+        rightCurrentPos = newRight;
+        rightThumb.style.right = newRight + 'px';
+    };
+    
+    const onRightEnd = () => {
+        if (!isDraggingRight) return;
+        isDraggingRight = false;
+        rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (rightCurrentPos >= maxRightMove - 10) {
+            rightThumb.style.right = maxRightMove + 'px';
+            setTimeout(() => {
+                overlay.remove();
+            }, 200);
+        } else {
+            rightThumb.style.right = '8px';
+        }
+    };
+    
+    leftThumb.addEventListener('mousedown', onLeftStart);
+    leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+    rightThumb.addEventListener('mousedown', onRightStart);
+    rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+    
+    document.addEventListener('mousemove', (e) => { onLeftMove(e); onRightMove(e); });
+    document.addEventListener('mouseup', () => { onLeftEnd(); onRightEnd(); });
+    document.addEventListener('touchmove', (e) => { onLeftMove(e); onRightMove(e); }, { passive: false });
+    document.addEventListener('touchend', () => { onLeftEnd(); onRightEnd(); });
+    
+    setTimeout(() => {
+        if (document.getElementById('locationSwipeModal')) overlay.remove();
+    }, 30000);
 },
     
     // ==================== القسم 35: saveMessage ====================
