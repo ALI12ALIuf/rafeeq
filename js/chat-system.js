@@ -1052,25 +1052,26 @@ const ChatSystem = {
     },
     
     // ==================== القسم 34: shareLocationDirect ====================
-    async shareLocationDirect() { 
-        if (!this.currentChat) return; 
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
-            return;
-        }
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
-            navigator.geolocation.getCurrentPosition(p => { 
-                const locMsg = `📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`; 
-                CallSystem.dc.send(JSON.stringify({ type: 'location', data: locMsg, id: Date.now().toString() })); 
-                const msgId = Date.now().toString();
-                this.saveMessage(this.currentChat, { id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-                this.displayMessage({ id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            }, () => alert('فشل تحديد الموقع'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-        }
-    },
+async shareLocationDirect() { 
+    if (!this.currentChat) return; 
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
+        return;
+    }
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
+        navigator.geolocation.getCurrentPosition(p => { 
+            const locMsg = `📍 موقعي: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`; 
+            // ✅ التعديل: تغيير type من 'location' إلى 'text'
+            CallSystem.dc.send(JSON.stringify({ type: 'text', data: locMsg, id: Date.now().toString() })); 
+            const msgId = Date.now().toString();
+            this.saveMessage(this.currentChat, { id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            this.displayMessage({ id: msgId, type: 'text', text: locMsg, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+        }, () => alert('فشل تحديد الموقع'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    }
+},
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
