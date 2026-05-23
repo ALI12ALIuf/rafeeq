@@ -815,7 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-    // ==================== القسم 26: displayMessage ====================
+  // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -936,7 +936,15 @@ displayMessage(msg) {
         if (audioSrc && typeof audioSrc === 'string' && !audioSrc.startsWith('data:audio')) {
             audioSrc = 'data:audio/webm;base64,' + audioSrc;
         }
-        div.innerHTML = `<audio controls src="${audioSrc}" class="message-audio" preload="metadata" style="width:200px;"></audio><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        // ✅ تصميم البصمة الصوتية المعدل
+        div.innerHTML = `
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 16px; padding: 8px 12px; display: inline-flex; align-items: center;">
+                <audio controls src="${audioSrc}" class="message-audio" preload="metadata" style="height: 40px; border-radius: 20px; min-width: 200px;">
+                    <source src="${audioSrc}" type="audio/webm">
+                </audio>
+            </div>
+            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+        `;
     } 
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
@@ -990,7 +998,8 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},
+},  
+    
     
     
     // ==================== القسم 27: sendMessage ====================
