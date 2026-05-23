@@ -958,7 +958,7 @@ const ChatSystem = {
     } 
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
-        if (videoSrc && typeof videoSrc === 'strasyncc) {
+        if (videoSrc && typeof videoSrc === 'string') {
             if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
                 videoSrc = 'data:video/mp4;base64,' + videoSrc;
             }
@@ -1485,6 +1485,8 @@ showLocationSwipeModalWithClicks(locationData) {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
 },
+    
+            
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
