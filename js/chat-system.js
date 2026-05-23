@@ -815,7 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-   // ==================== القسم 26: displayMessage ====================
+    // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -948,7 +948,7 @@ displayMessage(msg) {
         div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'file') {
-        // ✅ التصميم المطلوب للملفات (بحجم ثابت)
+        // ✅ التصميم المطلوب للملفات (بحجم ثابت مع break-all للأسماء الطويلة)
         let fileName = msg.fileName || 'ملف';
         
         // حساب حجم الملف تقريباً
@@ -960,7 +960,7 @@ displayMessage(msg) {
             else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
         
-        // عرض اسم الملف كاملاً مع التفاف تلقائي
+        // عرض اسم الملف كاملاً مع التفاف تلقائي وكسر الكلمات الطويلة
         let displayName = fileName;
         
         div.innerHTML = `
@@ -972,7 +972,7 @@ displayMessage(msg) {
                 
                 <!-- معلومات الملف -->
                 <div style="flex: 1; overflow: hidden; min-width: 0;">
-                    <div style="font-weight: bold; font-size: 0.85rem; word-break: break-word; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
+                    <div style="font-weight: bold; font-size: 0.85rem; word-break: break-all; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
                     ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
                 </div>
                 
@@ -991,7 +991,6 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-
     
     
     // ==================== القسم 27: sendMessage ====================
