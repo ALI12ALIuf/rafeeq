@@ -815,7 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
     
 
-     // ==================== القسم 26: displayMessage ====================
+    // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -874,10 +874,9 @@ displayMessage(msg) {
             locationDiv.onclick = (e) => {
                 e.stopPropagation();
                 
-                // التحقق من الصلاحية
+                // ✅ التحقق من الصلاحية - بدون رسالة تحذير
                 if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                    alert('🔒 انتهت صلاحية هذا الموقع');
-                    return;
+                    return; // لا شيء يحدث
                 }
                 
                 // فتح الخريطة
@@ -890,13 +889,13 @@ displayMessage(msg) {
                     // تحديث البيانات في كائن الرسالة
                     msg.data.clicksRemaining = clicksRemaining;
                     
-                    // ✅ إذا وصلت إلى الصفر، قفل الموقع
+                    // ✅ إذا وصلت إلى الصفر، قفل الموقع (بدون رسالة تحذير)
                     if (clicksRemaining <= 0) {
                         locationDiv.style.background = '#888';
                         locationDiv.style.cursor = 'default';
                         locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
                         locationDiv.onclick = () => {
-                            alert('🔒 انتهت صلاحية هذا الموقع');
+                            return; // لا شيء يحدث
                         };
                     }
                     
@@ -954,8 +953,7 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},        
-   
+},
 
     
     // ==================== القسم 27: sendMessage ====================
