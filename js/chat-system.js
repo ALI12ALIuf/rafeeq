@@ -1253,12 +1253,13 @@ showLocationSwipeModalWithClicks(locationData) {
                 background: #1a1a2e;
                 color: white;
                 border: 1px solid #4CAF50;
-                padding: 6px 12px;
-                border-radius: 20px;
+                padding: 8px 14px;
+                border-radius: 25px;
                 cursor: pointer;
                 transition: all 0.2s;
                 font-size: 0.9rem;
-                min-width: 40px;
+                min-width: 44px;
+                text-align: center;
             }
             .click-preset:hover {
                 background: #4CAF50;
@@ -1267,6 +1268,15 @@ showLocationSwipeModalWithClicks(locationData) {
             .click-preset.selected {
                 background: #4CAF50;
                 border-color: #4CAF50;
+            }
+            .numbers-row {
+                display: flex;
+                flex-wrap: nowrap;
+                justify-content: center;
+                gap: 8px;
+                margin: 10px 0;
+                overflow-x: auto;
+                padding: 5px 0;
             }
         </style>
         
@@ -1283,10 +1293,10 @@ showLocationSwipeModalWithClicks(locationData) {
             
             <!-- عدد مرات فتح الموقع -->
             <div style="margin-bottom: 15px;">
-                <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; text-align: center;">عدد مرات فتح الموقع</div>
+                <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 12px; text-align: center;">عدد مرات فتح الموقع</div>
                 
-                <!-- ✅ أزرار اختيار من 1 إلى 7 (حجم صغير مثل السابق) -->
-                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
+                <!-- ✅ أزرار اختيار من 1 إلى 7 (صف واحد) -->
+                <div class="numbers-row">
                     <button type="button" class="click-preset" data-clicks="1">1</button>
                     <button type="button" class="click-preset" data-clicks="2">2</button>
                     <button type="button" class="click-preset" data-clicks="3">3</button>
