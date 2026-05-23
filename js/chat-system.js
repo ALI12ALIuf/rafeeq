@@ -958,7 +958,7 @@ const ChatSystem = {
     } 
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
-        if (videoSrc && typeof videoSrc === 'string') {
+        if (videoSrc && typeof videoSrc === 'strasyncc) {
             if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
                 videoSrc = 'data:video/mp4;base64,' + videoSrc;
             }
@@ -1168,8 +1168,6 @@ const ChatSystem = {
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
         
-        // ✅ تم إزالة رسالة "جاري تحديد موقعك..." نهائياً
-        
         navigator.geolocation.getCurrentPosition(p => { 
             const lat = p.coords.latitude.toFixed(6);
             const lng = p.coords.longitude.toFixed(6);
@@ -1212,50 +1210,63 @@ showLocationSwipeModalWithClicks(locationData) {
     
     overlay.innerHTML = `
         <style>
-            .click-option {
+            .toggle-switch {
+                position: relative;
+                display: inline-block;
+                width: 60px;
+                height: 30px;
+            }
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #555;
+                transition: 0.3s;
+                border-radius: 30px;
+            }
+            .toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 24px;
+                width: 24px;
+                left: 3px;
+                bottom: 3px;
+                background-color: white;
+                transition: 0.3s;
+                border-radius: 50%;
+            }
+            input:checked + .toggle-slider {
+                background-color: #4CAF50;
+            }
+            input:checked + .toggle-slider:before {
+                transform: translateX(30px);
+            }
+            .click-preset {
                 background: #1a1a2e;
                 color: white;
-                border: 2px solid #333;
-                width: 50px;
-                height: 50px;
-                border-radius: 25px;
-                font-size: 1.2rem;
-                font-weight: bold;
+                border: 1px solid #4CAF50;
+                padding: 10px 16px;
+                border-radius: 30px;
                 cursor: pointer;
                 transition: all 0.2s;
+                font-size: 1rem;
+                min-width: 50px;
             }
-            .click-option:hover {
-                background: #2196F3;
-                border-color: #2196F3;
-                transform: scale(1.05);
-            }
-            .click-option.active {
+            .click-preset:hover {
                 background: #4CAF50;
                 border-color: #4CAF50;
-                transform: scale(1.05);
-                box-shadow: 0 0 10px rgba(76,175,80,0.5);
             }
-            .unlimited-btn {
-                background: linear-gradient(145deg, #4CAF50, #2E7D32);
-                color: white;
-                border: none;
-                padding: 10px 25px;
-                border-radius: 30px;
-                font-size: 1rem;
-                font-weight: bold;
-                cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                transition: all 0.2s;
-            }
-            .unlimited-btn:hover {
-                transform: scale(1.02);
-                box-shadow: 0 0 15px rgba(76,175,80,0.4);
-            }
-            .unlimited-btn.active {
-                background: linear-gradient(145deg, #ff9800, #e68a00);
-                box-shadow: 0 0 15px rgba(255,152,0,0.5);
+            .click-preset.selected {
+                background: #4CAF50;
+                border-color: #4CAF50;
             }
         </style>
         
@@ -1270,32 +1281,31 @@ showLocationSwipeModalWithClicks(locationData) {
                 <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
-            <!-- عدد مرات فتح الموقع -->
-            <div style="margin-bottom: 20px;">
-                <div style="color: #4CAF50; font-size: 1rem; font-weight: bold; margin-bottom: 10px; text-align: center;">📊 عدد مرات فتح الموقع</div>
+            <!-- عدد مرات فتح الموقع (نص أبيض أكبر) -->
+            <div style="margin-bottom: 15px;">
+                <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; text-align: center;">عدد مرات فتح الموقع</div>
                 
-                <!-- أزرار اختيار الضغطات 1-7 -->
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 15px;">
-                    <button type="button" class="click-option" data-clicks="1">1</button>
-                    <button type="button" class="click-option" data-clicks="2">2</button>
-                    <button type="button" class="click-option" data-clicks="3">3</button>
-                    <button type="button" class="click-option" data-clicks="4">4</button>
-                    <button type="button" class="click-option" data-clicks="5">5</button>
-                    <button type="button" class="click-option" data-clicks="6">6</button>
-                    <button type="button" class="click-option" data-clicks="7">7</button>
+                <!-- ✅ أزرار اختيار من 1 إلى 7 (بدون حقل إدخال) -->
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0;">
+                    <button type="button" class="click-preset" data-clicks="1">1</button>
+                    <button type="button" class="click-preset" data-clicks="2">2</button>
+                    <button type="button" class="click-preset" data-clicks="3">3</button>
+                    <button type="button" class="click-preset" data-clicks="4">4</button>
+                    <button type="button" class="click-preset" data-clicks="5">5</button>
+                    <button type="button" class="click-preset" data-clicks="6">6</button>
+                    <button type="button" class="click-preset" data-clicks="7">7</button>
                 </div>
-                
-                <!-- زر بلا حدود -->
-                <div style="display: flex; justify-content: center;">
-                    <button type="button" id="unlimitedBtn" class="unlimited-btn">
-                        <span>♾️</span> بلا حدود
-                    </button>
-                </div>
-                
-                <!-- عرض القيمة المختارة -->
-                <div style="text-align: center; margin-top: 12px; color: #aaa; font-size: 0.8rem;">
-                    <span>✅ الضغطات المختارة: </span>
-                    <span id="selectedClicksValue" style="color: #4CAF50; font-weight: bold;">1</span>
+            </div>
+            
+            <!-- زر السحب -->
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="unlimitedToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
                 </div>
             </div>
             
@@ -1324,39 +1334,55 @@ showLocationSwipeModalWithClicks(locationData) {
     const button = document.getElementById('swipeButton');
     const leftThumb = document.getElementById('leftThumb');
     const rightThumb = document.getElementById('rightThumb');
+    const unlimitedToggle = document.getElementById('unlimitedToggle');
     
-    // متغيرات الاختيار
     let selectedClicks = 1;
-    let isUnlimited = false;
+    let selectedButton = null;
     
-    // تفعيل أزرار الاختيار (1-7)
-    const clickOptions = document.querySelectorAll('.click-option');
-    const unlimitedBtn = document.getElementById('unlimitedBtn');
-    const selectedClicksValue = document.getElementById('selectedClicksValue');
-    
-    clickOptions.forEach(btn => {
+    // ✅ معالج أزرار الاختيار
+    document.querySelectorAll('.click-preset').forEach(btn => {
         btn.onclick = () => {
-            clickOptions.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            unlimitedBtn.classList.remove('active');
+            // إزالة التحديد السابق
+            if (selectedButton) {
+                selectedButton.style.background = '#1a1a2e';
+                selectedButton.style.borderColor = '#4CAF50';
+            }
+            // تحديد الزر الجديد
+            selectedButton = btn;
+            selectedButton.style.background = '#4CAF50';
+            selectedButton.style.borderColor = '#4CAF50';
             selectedClicks = parseInt(btn.dataset.clicks);
-            isUnlimited = false;
-            selectedClicksValue.textContent = selectedClicks;
-            selectedClicksValue.style.color = '#4CAF50';
         };
     });
     
-    // تفعيل زر بلا حدود
-    unlimitedBtn.onclick = () => {
-        clickOptions.forEach(b => b.classList.remove('active'));
-        unlimitedBtn.classList.add('active');
-        isUnlimited = true;
-        selectedClicksValue.textContent = '♾️ بلا حدود';
-        selectedClicksValue.style.color = '#ff9800';
-    };
+    // ✅ تحديد الزر الأول (1) بشكل افتراضي
+    const firstBtn = document.querySelector('.click-preset[data-clicks="1"]');
+    if (firstBtn) {
+        firstBtn.style.background = '#4CAF50';
+        firstBtn.style.borderColor = '#4CAF50';
+        selectedButton = firstBtn;
+        selectedClicks = 1;
+    }
     
-    // تحديد القيمة الافتراضية (1)
-    document.querySelector('.click-option[data-clicks="1"]').classList.add('active');
+    unlimitedToggle.addEventListener('change', () => {
+        if (unlimitedToggle.checked) {
+            // تعطيل الأزرار
+            document.querySelectorAll('.click-preset').forEach(btn => {
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            });
+        } else {
+            // تفعيل الأزرار
+            document.querySelectorAll('.click-preset').forEach(btn => {
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            });
+            // إعادة التحديد للزر المختار
+            if (selectedButton) {
+                selectedButton.style.background = '#4CAF50';
+            }
+        }
+    });
     
     const buttonWidth = button.clientWidth;
     const centerPos = buttonWidth / 2;
@@ -1390,17 +1416,19 @@ showLocationSwipeModalWithClicks(locationData) {
         if (leftCurrentPos >= maxLeftMove - 10) {
             leftThumb.style.left = maxLeftMove + 'px';
             
+            let maxClicks;
+            if (unlimitedToggle.checked) {
+                maxClicks = 999999;
+            } else {
+                maxClicks = selectedClicks;
+                if (maxClicks < 1) maxClicks = 1;
+                if (maxClicks > 7) maxClicks = 7;
+            }
+            
+            locationData.maxClicks = maxClicks;
+            locationData.clicksRemaining = maxClicks;
+            
             setTimeout(() => {
-                let maxClicks;
-                if (isUnlimited) {
-                    maxClicks = 999999;
-                } else {
-                    maxClicks = selectedClicks;
-                }
-                
-                locationData.maxClicks = maxClicks;
-                locationData.clicksRemaining = maxClicks;
-                
                 CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
                 const msgId = Date.now().toString();
                 this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
@@ -1457,7 +1485,6 @@ showLocationSwipeModalWithClicks(locationData) {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
 },
-    
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
