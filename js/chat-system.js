@@ -1270,25 +1270,25 @@ showLocationSwipeModalWithClicks(locationData) {
                 <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
-            <!-- عدد مرات فتح الموقع -->
+            <!-- عدد مرات فتح الموقع (يبدأ من 0) -->
             <div style="margin-bottom: 15px;">
                 <div style="color: #aaa; font-size: 0.7rem; margin-bottom: 5px; text-align: center;">عدد مرات فتح الموقع</div>
                 <div style="display: flex; gap: 8px; align-items: center; justify-content: center;">
-                    <input type="number" id="clicksCountInput" min="1" max="15" value="1" step="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white; font-family: monospace;">
+                    <input type="number" id="clicksCountInput" min="0" max="15" value="0" step="1" style="width: 80px; padding: 10px; border-radius: 12px; border: none; text-align: center; font-size: 1rem; background: #1a1a2e; color: white; font-family: monospace;">
                     <span style="color: white;">ضغطات</span>
                 </div>
                 <div id="clicksError" style="color: #f44336; font-size: 0.65rem; margin-top: 5px; display: none;">الحد الأقصى 15 ضغطة</div>
             </div>
             
-            <!-- زر السحب (Toggle Switch) بدلاً من checkbox -->
+            <!-- زر السحب (عكس العبارات: بلا حدود في اليسار، محدود في اليمين) -->
             <div style="margin-bottom: 15px;">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
+                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="unlimitedToggle">
                         <span class="toggle-slider"></span>
                     </label>
-                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
+                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
                 </div>
             </div>
             
@@ -1323,8 +1323,8 @@ showLocationSwipeModalWithClicks(locationData) {
     
     const validateClicks = () => {
         let value = parseInt(clicksInput.value);
-        if (isNaN(value)) value = 1;
-        if (value < 1) value = 1;
+        if (isNaN(value)) value = 0;
+        if (value < 0) value = 0;
         if (value > 15) {
             clicksError.style.display = 'block';
             clicksInput.style.border = '2px solid #f44336';
@@ -1338,9 +1338,9 @@ showLocationSwipeModalWithClicks(locationData) {
     
     clicksInput.addEventListener('input', () => {
         let value = parseInt(clicksInput.value);
-        if (isNaN(value)) clicksInput.value = 1;
+        if (isNaN(value)) clicksInput.value = 0;
         if (value > 15) clicksInput.value = 15;
-        if (value < 1) clicksInput.value = 1;
+        if (value < 0) clicksInput.value = 0;
         validateClicks();
     });
     
@@ -1388,7 +1388,7 @@ showLocationSwipeModalWithClicks(locationData) {
             leftThumb.style.left = maxLeftMove + 'px';
             
             if (!unlimitedToggle.checked && !validateClicks()) {
-                alert('⚠️ عدد الضغطات غير صالح (1-15)');
+                alert('⚠️ عدد الضغطات غير صالح (0-15)');
                 leftThumb.style.left = '8px';
                 return;
             }
@@ -1399,7 +1399,7 @@ showLocationSwipeModalWithClicks(locationData) {
                     maxClicks = 999999;
                 } else {
                     maxClicks = parseInt(clicksInput.value);
-                    if (isNaN(maxClicks) || maxClicks < 1) maxClicks = 1;
+                    if (isNaN(maxClicks) || maxClicks < 0) maxClicks = 0;
                     if (maxClicks > 15) maxClicks = 15;
                 }
                 
@@ -1462,7 +1462,7 @@ showLocationSwipeModalWithClicks(locationData) {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
 },
-    
+            
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
