@@ -815,7 +815,8 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
     
     // ==================== القسم 26: displayMessage ====================
-    displayMessage(msg) {
+    
+   displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
     const div = document.createElement('div'); 
@@ -837,28 +838,108 @@ const ChatSystem = {
         div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'location') {
-        // ✅ معالجة رسالة الموقع كأيقونة تفاعلية
+        // ✅ معالجة رسالة الموقع مع نظام الضغطات
         let locationData = msg.data;
         let locationUrl = '';
         
         if (typeof locationData === 'object' && locationData.url) {
             locationUrl = locationData.url;
         } else if (typeof locationData === 'string') {
-            // محاولة استخراج الرابط من النص القديم
             const match = locationData.match(/https?:\/\/[^\s]+/);
             locationUrl = match ? match[0] : locationData;
         } else {
             locationUrl = '#';
         }
         
-        div.innerHTML = `
-            <div class="message-content location-card" onclick="window.open('${locationUrl}', '_blank')" style="cursor: pointer; background: #4CAF50; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 8px;">
+        // ✅ استخراج معلومات الضغطات
+        const maxClicks = locationData.maxClicks;
+        let clicksRemaining = locationData.clicksRemaining;
+        
+        // ✅ إذا كانت الصلاحية انتهت (clicksRemaining <= 0)
+        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+            div.innerHTML = `
+                <div class="message-content" style="background: #888; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-lock"></i>
+                    <span>🔒 انتهت صلاحية الموقع</span>
+                </div>
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+        } else {
+            // ✅ عرض الموقع مع عداد الضغطات
+            const clicksText = (maxClicks && maxClicks < 999999) ? ` (${clicksRemaining}/${maxClicks})` : '';
+            
+            const locationDiv = document.createElement('div');
+            locationDiv.className = 'message-content location-card';
+            locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; color: white; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 8px;';
+            locationDiv.innerHTML = `
                 <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
-                <span>📍 موقعي</span>
+                <span>📍 موقعي${clicksText}</span>
                 <i class="fas fa-external-link-alt" style="font-size: 0.8rem; opacity: 0.8;"></i>
-            </div>
-            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
-        `;
+            `;
+            
+            // ✅ معالج الضغط على الموقع
+            locationDiv.onclick = (e) => {
+                e.stopPropagation();
+                
+                // التحقق من الصلاحية
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                    alert('🔒 انتهت صلاحية هذا الموقع');
+                    return;
+                }
+                
+                // فتح الخريطة
+                window.open(locationUrl, '_blank');
+                
+                // ✅ تقليل عدد الضغطات المتبقية (فقط للمستلم، وليس للمرسل)
+                if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                    clicksRemaining--;
+                    
+                    // تحديث البيانات في كائن الرسالة
+                    msg.data.clicksRemaining = clicksRemaining;
+                    
+                    // تحديث واجهة المستخدم
+                    const newClicksText = ` (${clicksRemaining}/${maxClicks})`;
+                    locationDiv.innerHTML = `
+                        <i class="fas fa-map-marker-alt" style="font-size: 1.2rem;"></i>
+                        <span>📍 موقعي${clicksRemaining > 0 ? newClicksText : ''}</span>
+                        <i class="fas fa-external-link-alt" style="font-size: 0.8rem; opacity: 0.8;"></i>
+                    `;
+                    
+                    // ✅ إذا وصلت إلى الصفر، قفل الموقع
+                    if (clicksRemaining <= 0) {
+                        locationDiv.style.background = '#888';
+                        locationDiv.style.cursor = 'default';
+                        locationDiv.innerHTML = `
+                            <i class="fas fa-lock"></i>
+                            <span>🔒 انتهت صلاحية الموقع</span>
+                        `;
+                        locationDiv.onclick = () => {
+                            alert('🔒 انتهت صلاحية هذا الموقع');
+                        };
+                    }
+                    
+                    // ✅ تحديث في localStorage
+                    if (ChatSystem.currentChat) {
+                        const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                        const msgIndex = messages.findIndex(m => m.id === msg.id);
+                        if (msgIndex !== -1) {
+                            messages[msgIndex].data.clicksRemaining = clicksRemaining;
+                            ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                        }
+                    }
+                }
+            };
+            
+            div.appendChild(locationDiv);
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'message-info';
+            infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
+            div.appendChild(infoDiv);
+            
+            c.appendChild(div);
+            c.scrollTop = c.scrollHeight;
+            return;
+        }
     }
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
@@ -891,7 +972,7 @@ const ChatSystem = {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},
+}, 
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
@@ -1012,7 +1093,7 @@ const ChatSystem = {
                     const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
                     
-                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    this.displayMessage({ id:displayMessage msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
                     
                     this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
                     
@@ -1076,7 +1157,8 @@ const ChatSystem = {
     },
     
     // ==================== القسم 34: shareLocationDirect ====================
-async shareLocationDirect() { 
+
+   async shareLocationDirect() { 
     if (!this.currentChat) return; 
     if (!this.friendInConversation || !this.featuresEnabled) {
         alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
@@ -1086,6 +1168,10 @@ async shareLocationDirect() {
     
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
+        
+        // ✅ أولاً: اختيار عدد الضغطات المسموحة
+        const maxClicks = await this.showClicksPicker();
+        if (maxClicks === null) return; // المستخدم ألغى
         
         // عرض مؤقت للتحميل
         const loading = document.createElement('div');
@@ -1101,10 +1187,12 @@ async shareLocationDirect() {
             const locationData = {
                 lat: parseFloat(lat),
                 lng: parseFloat(lng),
-                url: `https://www.google.com/maps?q=${lat},${lng}`
+                url: `https://www.google.com/maps?q=${lat},${lng}`,
+                maxClicks: maxClicks,           // ✅ عدد الضغطات المسموحة
+                clicksRemaining: maxClicks       // ✅ عدد الضغطات المتبقية
             };
             
-            // ✅ عرض نافذة تأكيد السحب
+            // عرض نافذة تأكيد السحب
             this.showLocationSwipeModal(locationData);
             
         }, () => { 
@@ -1112,6 +1200,55 @@ async shareLocationDirect() {
             alert('❌ فشل تحديد موقعك');
         }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     }
+},
+
+// ✅ دالة اختيار عدد الضغطات
+showClicksPicker() {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 10005;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        modal.innerHTML = `
+            <div style="background: #0a0e27; border-radius: 40px; width: 300px; max-width: 90%; padding: 25px 20px; text-align: center; color: white;">
+                <div style="font-size: 3rem; margin-bottom: 10px;">👆</div>
+                <h3 style="margin: 0 0 5px;">عدد مرات فتح الموقع</h3>
+                <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">كم مرة يمكن للمستلم فتح الموقع؟</p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="clicks-option" data-clicks="1" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🔓 ضغطة واحدة</button>
+                    <button class="clicks-option" data-clicks="2" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🔓 ضغطتين</button>
+                    <button class="clicks-option" data-clicks="3" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🔓 3 ضغطات</button>
+                    <button class="clicks-option" data-clicks="5" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🔓 5 ضغطات</button>
+                    <button class="clicks-option" data-clicks="999999" style="background: #2196F3; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">♾️ لا ينتهي</button>
+                </div>
+                <button id="cancelClicks" style="margin-top: 20px; background: #f44336; color: white; border: none; padding: 10px 25px; border-radius: 30px; cursor: pointer; font-size: 0.9rem;">❌ إلغاء</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        const buttons = modal.querySelectorAll('.clicks-option');
+        buttons.forEach(btn => {
+            btn.onclick = () => {
+                const clicks = parseInt(btn.dataset.clicks);
+                modal.remove();
+                resolve(clicks);
+            };
+        });
+        
+        document.getElementById('cancelClicks').onclick = () => {
+            modal.remove();
+            resolve(null);
+        };
+    });
 },
 
 // ✅ دالة عرض نافذة تأكيد الموقع (بنفس تصميم المكالمات)
@@ -1136,15 +1273,23 @@ showLocationSwipeModal(locationData) {
         backdrop-filter: blur(5px);
     `;
     
+    // عرض عدد الضغطات المختارة في النافذة
+    const clicksText = locationData.maxClicks >= 999999 ? 'لا ينتهي' : `${locationData.maxClicks} ضغطات`;
+    
     overlay.innerHTML = `
         <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
             <div style="font-size: 4rem; margin-bottom: 10px;">🗺️</div>
             <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
             <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي؟</p>
             
-            <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 25px;">
+            <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 15px;">
                 <div style="color: #4CAF50; font-size: 0.7rem;">📍 الإحداثيات</div>
-                <div style="color: white; font-weight: bold;">${locationData.lat} , ${locationData.lng}</div>
+                <div style="color: white; font-weight: bold; font-size: 0.85rem;">${locationData.lat} , ${locationData.lng}</div>
+            </div>
+            
+            <div style="background: rgba(33,150,243,0.15); border-radius: 20px; padding: 8px; margin-bottom: 20px;">
+                <div style="color: #2196F3; font-size: 0.7rem;">👆 عدد مرات الفتح</div>
+                <div style="color: white; font-weight: bold;">${clicksText}</div>
             </div>
             
             <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
@@ -1200,7 +1345,7 @@ showLocationSwipeModal(locationData) {
         if (leftCurrentPos >= maxLeftMove - 10) {
             leftThumb.style.left = maxLeftMove + 'px';
             setTimeout(() => {
-                // ✅ إرسال الموقع
+                // ✅ إرسال الموقع مع عدد الضغطات
                 CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
                 const msgId = Date.now().toString();
                 this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
@@ -1256,7 +1401,8 @@ showLocationSwipeModal(locationData) {
     setTimeout(() => {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
-},
+}, 
+
     
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
