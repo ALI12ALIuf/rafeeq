@@ -815,6 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
+
     // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
@@ -937,15 +938,57 @@ displayMessage(msg) {
             audioSrc = 'data:audio/webm;base64,' + audioSrc;
         }
         
-        // ✅ التصميم الجديد للبصمة الصوتية (خلفية خضراء، أزرار بيضاء)
+        const audioId = `audio_${msg.id}`;
+        
+        // ✅ مشغل مخصص بدون نقاط ثلاث ودائرة سوداء
         div.innerHTML = `
-            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 16px; padding: 4px 8px; display: inline-flex; align-items: center;">
-                <audio controls src="${audioSrc}" class="message-audio" preload="metadata" style="height: 38px; border-radius: 20px; min-width: 200px;">
-                    <source src="${audioSrc}" type="audio/webm">
-                </audio>
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 10px;">
+                <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>
+                </button>
+                <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.75rem;">0:00</span>
+                <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
             </div>
             <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
         `;
+        
+        // إضافة معالج التشغيل بعد إضافة العنصر
+        setTimeout(() => {
+            const playBtn = div.querySelector('.voice-play-btn');
+            const audioEl = document.getElementById(audioId);
+            const timeSpan = document.getElementById(`time_${audioId}`);
+            
+            if (playBtn && audioEl) {
+                let isPlaying = false;
+                
+                playBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isPlaying) {
+                        audioEl.pause();
+                        playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                        isPlaying = false;
+                    } else {
+                        audioEl.play();
+                        playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                        isPlaying = true;
+                    }
+                };
+                
+                audioEl.ontimeupdate = () => {
+                    const minutes = Math.floor(audioEl.currentTime / 60);
+                    const seconds = Math.floor(audioEl.currentTime % 60);
+                    if (timeSpan) {
+                        timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                };
+                
+                audioEl.onended = () => {
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                    isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
+                };
+            }
+        }, 10);
     } 
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
@@ -1000,8 +1043,6 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-
-    
 
     
     // ==================== القسم 27: sendMessage ====================
