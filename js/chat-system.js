@@ -940,15 +940,18 @@ displayMessage(msg) {
         
         const audioId = `audio_${msg.id}`;
         
-        // ✅ مشغل مخصص (زر كتم على اليسار، زر تشغيل على اليمين)
+        // ✅ مشغل مخصص (ترتيب: تشغيل، إيقاف، عداد الوقت، كتم الصوت)
         div.innerHTML = `
             <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 10px; direction: ltr;">
-                <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.8rem;"></i>
-                </button>
-                <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.75rem; min-width: 40px; text-align: center;">0:00</span>
                 <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
                     <i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>
+                </button>
+                <button class="voice-stop-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-stop" style="color: #f44336; font-size: 0.8rem;"></i>
+                </button>
+                <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.75rem; min-width: 40px; text-align: center;">0:00</span>
+                <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.8rem;"></i>
                 </button>
                 <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
             </div>
@@ -958,6 +961,7 @@ displayMessage(msg) {
         // إضافة معالج التشغيل بعد إضافة العنصر
         setTimeout(() => {
             const playBtn = div.querySelector('.voice-play-btn');
+            const stopBtn = div.querySelector('.voice-stop-btn');
             const muteBtn = div.querySelector('.voice-mute-btn');
             const audioEl = document.getElementById(audioId);
             const timeSpan = document.getElementById(`time_${audioId}`);
@@ -965,7 +969,7 @@ displayMessage(msg) {
             if (playBtn && audioEl) {
                 let isPlaying = false;
                 
-                // زر التشغيل/الإيقاف (على اليمين)
+                // زر التشغيل/الإيقاف المؤقت
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
                     if (isPlaying) {
@@ -979,21 +983,34 @@ displayMessage(msg) {
                     }
                 };
                 
-                // زر كتم/إلغاء كتم الصوت (على اليسار)
+                // زر الإيقاف الكامل (يعيد إلى البداية)
+                stopBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    audioEl.pause();
+                    audioEl.currentTime = 0;
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                    isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
+                };
+                
+                // زر كتم الصوت (يظهر خط واضح عند التفعيل)
                 let isMuted = false;
                 muteBtn.onclick = (e) => {
                     e.stopPropagation();
                     if (isMuted) {
                         audioEl.muted = false;
                         muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                        muteBtn.style.opacity = '1';
                         isMuted = false;
                     } else {
                         audioEl.muted = true;
-                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #f44336; font-size: 0.8rem; text-decoration: line-through;"></i>';
+                        muteBtn.style.opacity = '0.7';
                         isMuted = true;
                     }
                 };
                 
+                // تحديث عداد الوقت
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
                     const seconds = Math.floor(audioEl.currentTime % 60);
@@ -1002,10 +1019,10 @@ displayMessage(msg) {
                     }
                 };
                 
+                // عند انتهاء التشغيل
                 audioEl.onended = () => {
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>';
                     isPlaying = false;
-                    if (timeSpan) timeSpan.textContent = '0:00';
                 };
             }
         }, 10);
