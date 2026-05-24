@@ -939,11 +939,24 @@ displayMessage(msg) {
         }
         
         const audioId = `audio_${msg.id}`;
-        const maxDuration = 30; // المهلة الافتراضية 30 ثانية
-        let timeLeft = maxDuration;
+        const maxExpiry = 30; // المهلة الافتراضية 30 ثانية لانتهاء صلاحية البصمة
+        let timeLeft = maxExpiry;
         let countdownInterval = null;
+        let audioDuration = 0;
         
-        // ✅ مشغل مخصص (ترتيب: تشغيل، إعادة تشغيل، عداد الوقت + المهلة، كتم الصوت)
+        // ✅ إنشاء عنصر audio مؤقت لمعرفة المدة الإجمالية للبصمة
+        const tempAudio = new Audio(audioSrc);
+        tempAudio.addEventListener('loadedmetadata', () => {
+            audioDuration = tempAudio.duration;
+            const durationSpan = document.getElementById(`duration_${audioId}`);
+            if (durationSpan && !isNaN(audioDuration)) {
+                const minutes = Math.floor(audioDuration / 60);
+                const seconds = Math.floor(audioDuration % 60);
+                durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        });
+        
+        // ✅ مشغل مخصص مع عدادين (وقت التشغيل الحالي + المدة الإجمالية)
         div.innerHTML = `
             <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -954,8 +967,12 @@ displayMessage(msg) {
                         <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
                     </button>
                     <div style="text-align: center;">
-                        <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px; display: inline-block;">0:00</span>
-                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.8); margin-top: 2px;">⏱️ <span id="timer_${audioId}">${maxDuration}</span> ث</div>
+                        <div>
+                            <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px; display: inline-block;">0:00</span>
+                            <span style="color: white; font-size: 0.85rem;"> / </span>
+                            <span id="duration_${audioId}" style="color: rgba(255,255,255,0.8); font-size: 0.85rem;">0:00</span>
+                        </div>
+                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7); margin-top: 2px;">⏱️ متبقي: <span id="timer_${audioId}">${maxExpiry}</span> ث</div>
                     </div>
                     <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
                         <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
@@ -983,11 +1000,9 @@ displayMessage(msg) {
                     if (timerSpan && timeLeft >= 0) {
                         timerSpan.textContent = timeLeft;
                         if (timeLeft <= 0) {
-                            // انتهت المهلة، إخفاء البصمة وحذفها
                             if (countdownInterval) clearInterval(countdownInterval);
                             const voiceContainer = div.querySelector('.voice-message');
                             if (voiceContainer) voiceContainer.style.display = 'none';
-                            // حذف من localStorage
                             if (ChatSystem.currentChat) {
                                 const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
                                 const newMessages = messages.filter(m => m.id !== msg.id);
@@ -1038,7 +1053,6 @@ displayMessage(msg) {
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = false;
                     if (timeSpan) timeSpan.textContent = '0:00';
-                    // تشغيل تلقائي
                     audioEl.play();
                     playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = true;
@@ -1131,7 +1145,7 @@ displayMessage(msg) {
 },
 
 
-    
+
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
