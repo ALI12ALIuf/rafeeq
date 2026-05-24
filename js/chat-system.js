@@ -939,20 +939,28 @@ displayMessage(msg) {
         }
         
         const audioId = `audio_${msg.id}`;
+        const maxDuration = 30; // المهلة الافتراضية 30 ثانية
+        let timeLeft = maxDuration;
+        let countdownInterval = null;
         
-        // ✅ مشغل مخصص (ترتيب: تشغيل، إيقاف، عداد الوقت، كتم الصوت)
+        // ✅ مشغل مخصص (ترتيب: تشغيل، إعادة تشغيل، عداد الوقت + المهلة، كتم الصوت)
         div.innerHTML = `
-            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 10px; direction: ltr;">
-                <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>
-                </button>
-                <button class="voice-stop-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-stop" style="color: #f44336; font-size: 0.8rem;"></i>
-                </button>
-                <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.75rem; min-width: 40px; text-align: center;">0:00</span>
-                <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.8rem;"></i>
-                </button>
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>
+                    </button>
+                    <button class="voice-replay-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
+                    </button>
+                    <div style="text-align: center;">
+                        <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px; display: inline-block;">0:00</span>
+                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.8); margin-top: 2px;">⏱️ <span id="timer_${audioId}">${maxDuration}</span> ث</div>
+                    </div>
+                    <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
+                    </button>
+                </div>
                 <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
             </div>
             <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
@@ -961,56 +969,97 @@ displayMessage(msg) {
         // إضافة معالج التشغيل بعد إضافة العنصر
         setTimeout(() => {
             const playBtn = div.querySelector('.voice-play-btn');
-            const stopBtn = div.querySelector('.voice-stop-btn');
+            const replayBtn = div.querySelector('.voice-replay-btn');
             const muteBtn = div.querySelector('.voice-mute-btn');
             const audioEl = document.getElementById(audioId);
             const timeSpan = document.getElementById(`time_${audioId}`);
+            const timerSpan = document.getElementById(`timer_${audioId}`);
             
             if (playBtn && audioEl) {
                 let isPlaying = false;
                 
+                // دالة تحديث المهلة
+                const updateCountdown = () => {
+                    if (timerSpan && timeLeft >= 0) {
+                        timerSpan.textContent = timeLeft;
+                        if (timeLeft <= 0) {
+                            // انتهت المهلة، إخفاء البصمة وحذفها
+                            if (countdownInterval) clearInterval(countdownInterval);
+                            const voiceContainer = div.querySelector('.voice-message');
+                            if (voiceContainer) voiceContainer.style.display = 'none';
+                            // حذف من localStorage
+                            if (ChatSystem.currentChat) {
+                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                                const newMessages = messages.filter(m => m.id !== msg.id);
+                                ChatSystem.messages[ChatSystem.currentChat] = newMessages;
+                                const key = `chat_${ChatSystem.currentChat}`;
+                                localStorage.setItem(key, JSON.stringify(newMessages));
+                            }
+                        }
+                    }
+                };
+                
+                // بدء عداد المهلة
+                const startCountdown = () => {
+                    if (countdownInterval) clearInterval(countdownInterval);
+                    countdownInterval = setInterval(() => {
+                        if (timeLeft > 0) {
+                            timeLeft--;
+                            updateCountdown();
+                        } else {
+                            clearInterval(countdownInterval);
+                        }
+                    }, 1000);
+                };
+                
+                startCountdown();
+                
                 // زر التشغيل/الإيقاف المؤقت
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
+                    if (timeLeft <= 0) return;
                     if (isPlaying) {
                         audioEl.pause();
-                        playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                        playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isPlaying = false;
                     } else {
                         audioEl.play();
-                        playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                        playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isPlaying = true;
                     }
                 };
                 
-                // زر الإيقاف الكامل (يعيد إلى البداية)
-                stopBtn.onclick = (e) => {
+                // زر إعادة التشغيل (سهم دائري)
+                replayBtn.onclick = (e) => {
                     e.stopPropagation();
+                    if (timeLeft <= 0) return;
                     audioEl.pause();
                     audioEl.currentTime = 0;
-                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = false;
                     if (timeSpan) timeSpan.textContent = '0:00';
+                    // تشغيل تلقائي
+                    audioEl.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = true;
                 };
                 
-                // زر كتم الصوت (يظهر خط واضح عند التفعيل)
+                // زر كتم الصوت
                 let isMuted = false;
                 muteBtn.onclick = (e) => {
                     e.stopPropagation();
                     if (isMuted) {
                         audioEl.muted = false;
-                        muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.8rem;"></i>';
-                        muteBtn.style.opacity = '1';
+                        muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isMuted = false;
                     } else {
                         audioEl.muted = true;
-                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #f44336; font-size: 0.8rem; text-decoration: line-through;"></i>';
-                        muteBtn.style.opacity = '0.7';
+                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #f44336; font-size: 0.9rem;"></i>';
                         isMuted = true;
                     }
                 };
                 
-                // تحديث عداد الوقت
+                // تحديث عداد الوقت الحالي
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
                     const seconds = Math.floor(audioEl.currentTime % 60);
@@ -1021,7 +1070,7 @@ displayMessage(msg) {
                 
                 // عند انتهاء التشغيل
                 audioEl.onended = () => {
-                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = false;
                 };
             }
