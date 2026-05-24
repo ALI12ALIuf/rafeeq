@@ -940,13 +940,16 @@ displayMessage(msg) {
         
         const audioId = `audio_${msg.id}`;
         
-        // ✅ مشغل مخصص بدون نقاط ثلاث ودائرة سوداء
+        // ✅ مشغل مخصص (زر كتم على اليسار، زر تشغيل على اليمين)
         div.innerHTML = `
-            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 10px;">
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 10px; direction: ltr;">
+                <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.8rem;"></i>
+                </button>
+                <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.75rem; min-width: 40px; text-align: center;">0:00</span>
                 <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
                     <i class="fas fa-play" style="color: #4CAF50; font-size: 0.8rem;"></i>
                 </button>
-                <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.75rem;">0:00</span>
                 <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
             </div>
             <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
@@ -955,12 +958,14 @@ displayMessage(msg) {
         // إضافة معالج التشغيل بعد إضافة العنصر
         setTimeout(() => {
             const playBtn = div.querySelector('.voice-play-btn');
+            const muteBtn = div.querySelector('.voice-mute-btn');
             const audioEl = document.getElementById(audioId);
             const timeSpan = document.getElementById(`time_${audioId}`);
             
             if (playBtn && audioEl) {
                 let isPlaying = false;
                 
+                // زر التشغيل/الإيقاف (على اليمين)
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
                     if (isPlaying) {
@@ -971,6 +976,21 @@ displayMessage(msg) {
                         audioEl.play();
                         playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.8rem;"></i>';
                         isPlaying = true;
+                    }
+                };
+                
+                // زر كتم/إلغاء كتم الصوت (على اليسار)
+                let isMuted = false;
+                muteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isMuted) {
+                        audioEl.muted = false;
+                        muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                        isMuted = false;
+                    } else {
+                        audioEl.muted = true;
+                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #4CAF50; font-size: 0.8rem;"></i>';
+                        isMuted = true;
                     }
                 };
                 
@@ -1043,6 +1063,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+
 
     
     // ==================== القسم 27: sendMessage ====================
