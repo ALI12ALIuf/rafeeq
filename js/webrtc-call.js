@@ -1330,142 +1330,192 @@ const CallSystem = {
         }
     },
     
+
     // ==================== 13. إرسال الملفات ====================
     
-    async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
-            return false;
+async sendFileDirect(file, type) {
+    if (!this.dc || this.dc.readyState !== 'open') {
+        console.log('❌ Data Channel غير مفتوح');
+        return false;
+    }
+    
+    try {
+        let blobToSend = file;
+        if (type === 'image') {
+            blobToSend = await this.compressImage(file);
         }
         
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
+        const b64 = await this.fileToBase64(blobToSend);
+        const chunkSize = 16000;
+        const totalChunks = Math.ceil(b64.length / chunkSize);
+        const fileId = Date.now().toString();
+        
+        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
+        
+        for (let i = 0; i < totalChunks; i++) {
+            if (this.dc.readyState !== 'open') {
+                ChatSystem.hideProgressBar();
+                return false;
             }
-            
-            const b64 = await this.fileToBase64(blobToSend);
-            const chunkSize = 16000;
-            const totalChunks = Math.ceil(b64.length / chunkSize);
-            const fileId = Date.now().toString();
-            
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
-            
-            for (let i = 0; i < totalChunks; i++) {
-                if (this.dc.readyState !== 'open') {
-                    ChatSystem.hideProgressBar();
-                    return false;
+            const chunk = {
+                type: type,
+                data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
+                chunk: i,
+                total: totalChunks,
+                id: fileId,
+                fileName: file.name || 'ملف'
+            };
+            this.dc.send(JSON.stringify(chunk));
+            const progress = ((i + 1) / totalChunks) * 100;
+            const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
+            ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
+            await new Promise(r => setTimeout(r, 50));
+        }
+        ChatSystem.hideProgressBar();
+        console.log('✅ تم إرسال الملف بنجاح');
+        return true;
+    } catch (e) {
+        console.error('❌ فشل إرسال الملف:', e);
+        ChatSystem.hideProgressBar();
+        return false;
+    }
+},
+
+async sendVoiceWithClicks(audioBlob, maxClicks) {
+    if (!this.dc || this.dc.readyState !== 'open') {
+        console.log('❌ Data Channel غير مفتوح');
+        return false;
+    }
+    
+    try {
+        const b64 = await this.fileToBase64(audioBlob);
+        const chunkSize = 16000;
+        const totalChunks = Math.ceil(b64.length / chunkSize);
+        const fileId = Date.now().toString();
+        
+        console.log(`🎤 إرسال بصمة صوتية مع عدد ضغطات: ${maxClicks === 999999 ? 'غير محدود' : maxClicks} (${totalChunks} جزء)`);
+        
+        for (let i = 0; i < totalChunks; i++) {
+            if (this.dc.readyState !== 'open') {
+                ChatSystem.hideProgressBar();
+                return false;
+            }
+            const chunk = {
+                type: 'voice',
+                data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
+                chunk: i,
+                total: totalChunks,
+                id: fileId,
+                fileName: 'voice.webm',
+                maxClicks: maxClicks,
+                clicksRemaining: maxClicks
+            };
+            this.dc.send(JSON.stringify(chunk));
+            const progress = ((i + 1) / totalChunks) * 100;
+            ChatSystem.updateProgressBar(progress, 'جاري إرسال البصمة الصوتية...');
+            await new Promise(r => setTimeout(r, 50));
+        }
+        ChatSystem.hideProgressBar();
+        console.log('✅ تم إرسال البصمة الصوتية بنجاح');
+        return true;
+    } catch (e) {
+        console.error('❌ فشل إرسال البصمة:', e);
+        ChatSystem.hideProgressBar();
+        return false;
+    }
+},
+
+handleChunkMessage(msg) {
+    if (!this.incomingChunks[msg.id]) {
+        this.incomingChunks[msg.id] = [];
+        this.incomingFileInfo[msg.id] = {
+            type: msg.type,
+            fileName: msg.fileName,
+            total: msg.total,
+            received: 0,
+            maxClicks: msg.maxClicks,
+            clicksRemaining: msg.clicksRemaining
+        };
+        ChatSystem.showProgressBar('جاري استلام الملف...', 0);
+    }
+    
+    this.incomingChunks[msg.id][msg.chunk] = msg.data;
+    this.incomingFileInfo[msg.id].received++;
+    const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
+    const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : msg.type === 'voice' ? 'البصمة الصوتية' : 'الملف';
+    ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
+    
+    if (this.incomingFileInfo[msg.id].received === msg.total) {
+        const fullData = this.incomingChunks[msg.id].join('');
+        
+        let finalData = fullData;
+        
+        if (msg.type === 'image' && !fullData.startsWith('data:image')) {
+            finalData = 'data:image/jpeg;base64,' + fullData;
+        } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
+            finalData = 'data:video/mp4;base64,' + fullData;
+        } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
+            finalData = 'data:audio/webm;base64,' + fullData;
+        }
+        
+        const displayMsg = {
+            id: msg.id,
+            type: msg.type === 'location' ? 'text' : msg.type,
+            data: finalData,
+            fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : msg.type === 'voice' ? 'بصمة صوتية' : 'ملف'),
+            sender: 'friend',
+            time: new Date().toISOString(),
+            maxClicks: msg.maxClicks || 999999,
+            clicksRemaining: msg.clicksRemaining !== undefined ? msg.clicksRemaining : (msg.maxClicks || 999999)
+        };
+        
+        if (ChatSystem.currentChat) {
+            ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
+            ChatSystem.displayMessage(displayMsg);
+        }
+        ChatSystem.hideProgressBar();
+        delete this.incomingChunks[msg.id];
+        delete this.incomingFileInfo[msg.id];
+    }
+},
+
+compressImage(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width, height = img.height;
+                const maxSize = 800;
+                if (width > height && width > maxSize) {
+                    height = (height * maxSize) / width;
+                    width = maxSize;
+                } else if (height > maxSize) {
+                    width = (width * maxSize) / height;
+                    height = maxSize;
                 }
-                const chunk = {
-                    type: type,
-                    data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
-                    chunk: i,
-                    total: totalChunks,
-                    id: fileId,
-                    fileName: file.name || 'ملف'
-                };
-                this.dc.send(JSON.stringify(chunk));
-                const progress = ((i + 1) / totalChunks) * 100;
-                const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
-                ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-                await new Promise(r => setTimeout(r, 50));
-            }
-            ChatSystem.hideProgressBar();
-            console.log('✅ تم إرسال الملف بنجاح');
-            return true;
-        } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            ChatSystem.hideProgressBar();
-            return false;
-        }
-    },
-    
-    handleChunkMessage(msg) {
-        if (!this.incomingChunks[msg.id]) {
-            this.incomingChunks[msg.id] = [];
-            this.incomingFileInfo[msg.id] = {
-                type: msg.type,
-                fileName: msg.fileName,
-                total: msg.total,
-                received: 0
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
             };
-            ChatSystem.showProgressBar('جاري استلام الملف...', 0);
-        }
-        
-        this.incomingChunks[msg.id][msg.chunk] = msg.data;
-        this.incomingFileInfo[msg.id].received++;
-        const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-        const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
-        ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-        
-        if (this.incomingFileInfo[msg.id].received === msg.total) {
-            const fullData = this.incomingChunks[msg.id].join('');
-            
-            let finalData = fullData;
-            
-            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
-                finalData = 'data:image/jpeg;base64,' + fullData;
-            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
-                finalData = 'data:video/mp4;base64,' + fullData;
-            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
-                finalData = 'data:audio/webm;base64,' + fullData;
-            }
-            
-            const displayMsg = {
-                id: msg.id,
-                type: msg.type === 'location' ? 'text' : msg.type,
-                data: finalData,
-                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
-                sender: 'friend',
-                time: new Date().toISOString()
-            };
-            
-            if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-            ChatSystem.hideProgressBar();
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
-        }
-    },
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+},
+
+fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1] || reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+},
     
-    compressImage(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const maxSize = 800;
-                    if (width > height && width > maxSize) {
-                        height = (height * maxSize) / width;
-                        width = maxSize;
-                    } else if (height > maxSize) {
-                        width = (width * maxSize) / height;
-                        height = maxSize;
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1] || reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    },
     
     // ==================== 14. إنهاء المكالمة ====================
     
