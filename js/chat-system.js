@@ -815,7 +815,6 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-
     // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
@@ -939,9 +938,6 @@ displayMessage(msg) {
         }
         
         const audioId = `audio_${msg.id}`;
-        const maxExpiry = 30; // المهلة الافتراضية 30 ثانية لانتهاء صلاحية البصمة
-        let timeLeft = maxExpiry;
-        let countdownInterval = null;
         let audioDuration = 0;
         
         // ✅ إنشاء عنصر audio مؤقت لمعرفة المدة الإجمالية للبصمة
@@ -956,7 +952,7 @@ displayMessage(msg) {
             }
         });
         
-        // ✅ مشغل مخصص مع عدادين (وقت التشغيل الحالي + المدة الإجمالية)
+        // ✅ مشغل مخصص (تم إزالة عداد المهلة "متبقي")
         div.innerHTML = `
             <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -967,12 +963,10 @@ displayMessage(msg) {
                         <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
                     </button>
                     <div style="text-align: center;">
-                        <div>
-                            <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px; display: inline-block;">0:00</span>
-                            <span style="color: white; font-size: 0.85rem;"> / </span>
-                            <span id="duration_${audioId}" style="color: rgba(255,255,255,0.8); font-size: 0.85rem;">0:00</span>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px;">0:00</span>
+                            <span id="duration_${audioId}" style="color: rgba(255,255,255,0.7); font-size: 0.7rem;">0:00</span>
                         </div>
-                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7); margin-top: 2px;">⏱️ متبقي: <span id="timer_${audioId}">${maxExpiry}</span> ث</div>
                     </div>
                     <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
                         <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
@@ -990,49 +984,13 @@ displayMessage(msg) {
             const muteBtn = div.querySelector('.voice-mute-btn');
             const audioEl = document.getElementById(audioId);
             const timeSpan = document.getElementById(`time_${audioId}`);
-            const timerSpan = document.getElementById(`timer_${audioId}`);
             
             if (playBtn && audioEl) {
                 let isPlaying = false;
                 
-                // دالة تحديث المهلة
-                const updateCountdown = () => {
-                    if (timerSpan && timeLeft >= 0) {
-                        timerSpan.textContent = timeLeft;
-                        if (timeLeft <= 0) {
-                            if (countdownInterval) clearInterval(countdownInterval);
-                            const voiceContainer = div.querySelector('.voice-message');
-                            if (voiceContainer) voiceContainer.style.display = 'none';
-                            if (ChatSystem.currentChat) {
-                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
-                                const newMessages = messages.filter(m => m.id !== msg.id);
-                                ChatSystem.messages[ChatSystem.currentChat] = newMessages;
-                                const key = `chat_${ChatSystem.currentChat}`;
-                                localStorage.setItem(key, JSON.stringify(newMessages));
-                            }
-                        }
-                    }
-                };
-                
-                // بدء عداد المهلة
-                const startCountdown = () => {
-                    if (countdownInterval) clearInterval(countdownInterval);
-                    countdownInterval = setInterval(() => {
-                        if (timeLeft > 0) {
-                            timeLeft--;
-                            updateCountdown();
-                        } else {
-                            clearInterval(countdownInterval);
-                        }
-                    }, 1000);
-                };
-                
-                startCountdown();
-                
                 // زر التشغيل/الإيقاف المؤقت
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (timeLeft <= 0) return;
                     if (isPlaying) {
                         audioEl.pause();
                         playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
@@ -1047,7 +1005,6 @@ displayMessage(msg) {
                 // زر إعادة التشغيل (سهم دائري)
                 replayBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (timeLeft <= 0) return;
                     audioEl.pause();
                     audioEl.currentTime = 0;
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
@@ -1143,9 +1100,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-
-
-
+    
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
