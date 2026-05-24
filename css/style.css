@@ -377,53 +377,104 @@ body:not(.conversation-open) .conversation-page {
 }
 
 
-/* ==================== تنسيق مشغل البصمة الصوتية ==================== */
+/* ==================== تنسيق مشغل البصمة الصوتية المتقدم ==================== */
 
-/* خلفية المشغل */
+/* حاوية مشغل الصوت */
+.voice-message {
+    position: relative;
+    background: #4CAF50;
+    border-radius: 16px;
+    padding: 8px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* مشغل الصوت نفسه */
 .message-audio {
     background: #4CAF50;
     border-radius: 20px;
     height: 40px;
-    min-width: 200px;
+    min-width: 220px;
     outline: none;
 }
 
 /* لوحة التحكم */
 .message-audio::-webkit-media-controls-panel {
     background: #4CAF50;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-/* زر التشغيل */
+/* ✅ زر التشغيل - يتحرك إلى اليسار مع مسافة */
 .message-audio::-webkit-media-controls-play-button {
     background-color: white;
     border-radius: 50%;
-    color: #4CAF50;
+    color: #2196F3 !important;
+    margin-left: 8px;
+    margin-right: 12px;
+    transform: scale(1);
+    transition: transform 0.2s;
 }
 
-/* زر كتم الصوت */
+.message-audio::-webkit-media-controls-play-button:hover {
+    transform: scale(1.05);
+}
+
+/* ✅ زر كتم الصوت - يتحرك إلى اليمين مع مسافة */
 .message-audio::-webkit-media-controls-mute-button {
     background-color: white;
     border-radius: 50%;
-    color: #4CAF50;
+    color: #2196F3 !important;
+    margin-left: 12px;
+    margin-right: 8px;
 }
 
-/* شريط مستوى الصوت */
-.message-audio::-webkit-media-controls-volume-slider {
+/* ✅ إزالة الدائرة السوداء (زر الصورة داخل الصورة) */
+.message-audio::-webkit-media-controls-enter-fullscreen-button,
+.message-audio::-webkit-media-controls-toggle-closed-captions-button {
+    display: none !important;
+}
+
+/* ✅ زر إعادة التشغيل (للبصمات الصوتية) - إضافة زر إعادة */
+.message-audio::-webkit-media-controls-rewind-button {
     background-color: white;
-    border-radius: 10px;
+    border-radius: 50%;
+    color: #2196F3 !important;
+    margin: 0 4px;
 }
 
-/* شريط التقدم (العداد) */
+/* ✅ شريط الوقت (العداد) - مسافة مناسبة */
 .message-audio::-webkit-media-controls-timeline {
     background-color: white;
     border-radius: 10px;
+    margin: 0 8px;
 }
 
-/* الوقت الحالي والوقت المتبقي */
+/* ✅ عرض الوقت (الدقائق/الثواني) */
 .message-audio::-webkit-media-controls-current-time-display,
 .message-audio::-webkit-media-controls-time-remaining-display {
     color: white;
     font-weight: bold;
+    font-size: 0.75rem;
+}
+
+/* ✅ شريط مستوى الصوت */
+.message-audio::-webkit-media-controls-volume-slider {
+    background-color: white;
+    border-radius: 10px;
+    margin-left: 8px;
+}
+
+/* ✅ إخفاء زر التحميل إذا ظهر */
+.message-audio::-internal-media-controls-download-button {
+    display: none !important;
+}
+
+/* ✅ إخفاء الزر الأيمن الزائد */
+.message-audio::-webkit-media-controls-enclosure {
+    overflow: hidden;
 }
 
 /* للمتصفحات التي تعمل بمحرك Firefox */
@@ -439,7 +490,13 @@ body:not(.conversation-open) .conversation-page {
 }
 
 .message-audio::-moz-range-thumb {
-    background: #4CAF50;
+    background: #2196F3;
     border: none;
+    border-radius: 50%;
+}
+
+/* زر التشغيل في Firefox */
+.message-audio::-moz-media-controls-play-button {
+    background-color: white;
     border-radius: 50%;
 }
