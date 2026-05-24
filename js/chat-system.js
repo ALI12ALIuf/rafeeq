@@ -815,7 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-        // ==================== القسم 26: displayMessage ====================
+    // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -838,6 +838,7 @@ displayMessage(msg) {
         div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'location') {
+        // معالجة رسالة الموقع
         let locationData = msg.data;
         let locationUrl = '';
         
@@ -850,9 +851,11 @@ displayMessage(msg) {
             locationUrl = '#';
         }
         
+        // استخراج معلومات الضغطات
         const maxClicks = locationData.maxClicks;
         let clicksRemaining = locationData.clicksRemaining;
         
+        // ✅ إذا كانت الصلاحية انتهت (clicksRemaining <= 0)
         if (clicksRemaining !== undefined && clicksRemaining <= 0) {
             div.innerHTML = `
                 <div class="message-content" style="background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;">
@@ -861,34 +864,42 @@ displayMessage(msg) {
                 <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
             `;
         } else {
+            // ✅ عرض الموقع بدون عداد، فقط أيقونة خريطة
             const locationDiv = document.createElement('div');
             locationDiv.className = 'message-content location-card';
             locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;';
             locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
             
+            // معالج الضغط على الموقع
             locationDiv.onclick = (e) => {
                 e.stopPropagation();
                 
+                // ✅ التحقق من الصلاحية - بدون رسالة تحذير
                 if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                    return;
+                    return; // لا شيء يحدث
                 }
                 
+                // فتح الخريطة
                 window.open(locationUrl, '_blank');
                 
+                // ✅ تقليل عدد الضغطات المتبقية (فقط للمستلم، وليس للمرسل)
                 if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
                     clicksRemaining--;
                     
+                    // تحديث البيانات في كائن الرسالة
                     msg.data.clicksRemaining = clicksRemaining;
                     
+                    // ✅ إذا وصلت إلى الصفر، قفل الموقع (بدون رسالة تحذير)
                     if (clicksRemaining <= 0) {
                         locationDiv.style.background = '#888';
                         locationDiv.style.cursor = 'default';
                         locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
                         locationDiv.onclick = () => {
-                            return;
+                            return; // لا شيء يحدث
                         };
                     }
                     
+                    // تحديث في localStorage
                     if (ChatSystem.currentChat) {
                         const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
                         const msgIndex = messages.findIndex(m => m.id === msg.id);
@@ -928,12 +939,8 @@ displayMessage(msg) {
         
         const audioId = `audio_${msg.id}`;
         let audioDuration = 0;
-        const maxClicks = msg.maxClicks || 999999;
-        let clicksRemaining = msg.clicksRemaining !== undefined ? msg.clicksRemaining : maxClicks;
         
-        const isExpired = (clicksRemaining !== undefined && clicksRemaining <= 0);
-        const isUnlimited = (maxClicks >= 999999);
-        
+        // ✅ الحصول على المدة الإجمالية للبصمة
         const tempAudio = new Audio(audioSrc);
         tempAudio.addEventListener('loadedmetadata', () => {
             audioDuration = tempAudio.duration;
@@ -945,13 +952,14 @@ displayMessage(msg) {
             }
         });
         
+        // ✅ مشغل مخصص مع عدادين (وقت التشغيل الحالي والمدة الإجمالية)
         div.innerHTML = `
-            <div class="message-content voice-message" style="background: ${isExpired ? '#888' : '#4CAF50'}; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <button class="voice-play-btn" data-audio="${audioId}" data-msg-id="${msg.id}" ${isExpired ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-play" style="color: ${isExpired ? '#888' : '#4CAF50'}; font-size: 0.9rem;"></i>
+                    <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>
                     </button>
-                    <button class="voice-replay-btn" data-audio="${audioId}" data-msg-id="${msg.id}" ${isExpired ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <button class="voice-replay-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
                         <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
                     </button>
                     <div style="text-align: center;">
@@ -960,16 +968,16 @@ displayMessage(msg) {
                             <span id="duration_${audioId}" style="color: white; font-size: 0.7rem; opacity: 0.8;">0:00</span>
                         </div>
                     </div>
-                    <button class="voice-mute-btn" data-audio="${audioId}" ${isExpired ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-volume-up" style="color: ${isExpired ? '#888' : '#4CAF50'}; font-size: 0.9rem;"></i>
+                    <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
                     </button>
                 </div>
-                ${!isUnlimited && maxClicks < 999999 ? `<div style="text-align: center; margin-top: 5px;"><span style="color: rgba(255,255,255,0.7); font-size: 0.65rem;">المتبقي: ${clicksRemaining} / ${maxClicks}</span></div>` : ''}
                 <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
             </div>
             <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
         `;
         
+        // إضافة معالج التشغيل بعد إضافة العنصر
         setTimeout(() => {
             const playBtn = div.querySelector('.voice-play-btn');
             const replayBtn = div.querySelector('.voice-replay-btn');
@@ -977,106 +985,40 @@ displayMessage(msg) {
             const audioEl = document.getElementById(audioId);
             const timeSpan = document.getElementById(`time_${audioId}`);
             
-            if (playBtn && audioEl && !isExpired) {
+            if (playBtn && audioEl) {
                 let isPlaying = false;
-                let currentClicksRemaining = clicksRemaining;
                 
-                const updateRemainingDisplay = (remaining) => {
-                    const remainingSpan = div.querySelector('.message-content span');
-                    if (remainingSpan && maxClicks < 999999 && remainingSpan.parentElement === div.querySelector('.message-content > div:last-child')) {
-                        remainingSpan.textContent = `المتبقي: ${remaining} / ${maxClicks}`;
-                    } else if (maxClicks < 999999) {
-                        const container = div.querySelector('.message-content');
-                        if (container && !container.querySelector('.remaining-info')) {
-                            const remainingDiv = document.createElement('div');
-                            remainingDiv.className = 'remaining-info';
-                            remainingDiv.style.cssText = 'text-align: center; margin-top: 5px;';
-                            remainingDiv.innerHTML = `<span style="color: rgba(255,255,255,0.7); font-size: 0.65rem;">المتبقي: ${remaining} / ${maxClicks}</span>`;
-                            container.appendChild(remainingDiv);
-                        } else {
-                            const existingRemaining = div.querySelector('.remaining-info span');
-                            if (existingRemaining) {
-                                existingRemaining.textContent = `المتبقي: ${remaining} / ${maxClicks}`;
-                            }
-                        }
-                    }
-                };
-                
-                const consumeClick = () => {
-                    if (currentClicksRemaining <= 0) return false;
-                    currentClicksRemaining--;
-                    
-                    if (ChatSystem.currentChat) {
-                        const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
-                        const msgIndex = messages.findIndex(m => m.id === msg.id);
-                        if (msgIndex !== -1) {
-                            messages[msgIndex].clicksRemaining = currentClicksRemaining;
-                            ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
-                        }
-                    }
-                    
-                    updateRemainingDisplay(currentClicksRemaining);
-                    
-                    if (currentClicksRemaining <= 0) {
-                        const container = div.querySelector('.message-content');
-                        if (container) {
-                            container.style.background = '#888';
-                            playBtn.disabled = true;
-                            playBtn.style.opacity = '0.5';
-                            playBtn.style.cursor = 'not-allowed';
-                            replayBtn.disabled = true;
-                            replayBtn.style.opacity = '0.5';
-                            replayBtn.style.cursor = 'not-allowed';
-                            muteBtn.disabled = true;
-                            muteBtn.style.opacity = '0.5';
-                            muteBtn.style.cursor = 'not-allowed';
-                            const playIcon = playBtn.querySelector('i');
-                            if (playIcon) playIcon.style.color = '#888';
-                            const muteIcon = muteBtn.querySelector('i');
-                            if (muteIcon) muteIcon.style.color = '#888';
-                        }
-                        return false;
-                    }
-                    return true;
-                };
-                
+                // زر التشغيل/الإيقاف المؤقت
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (currentClicksRemaining <= 0) return;
-                    
                     if (isPlaying) {
                         audioEl.pause();
                         playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isPlaying = false;
                     } else {
-                        if (!consumeClick()) return;
                         audioEl.play();
                         playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isPlaying = true;
                     }
                 };
                 
+                // زر إعادة التشغيل (سهم دائري)
                 replayBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (currentClicksRemaining <= 0) return;
-                    
                     audioEl.pause();
                     audioEl.currentTime = 0;
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = false;
                     if (timeSpan) timeSpan.textContent = '0:00';
-                    
-                    if (consumeClick()) {
-                        audioEl.play();
-                        playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                        isPlaying = true;
-                    }
+                    audioEl.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = true;
                 };
                 
+                // زر كتم الصوت
                 let isMuted = false;
                 muteBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (currentClicksRemaining <= 0) return;
                     if (isMuted) {
                         audioEl.muted = false;
                         muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>';
@@ -1088,6 +1030,7 @@ displayMessage(msg) {
                     }
                 };
                 
+                // ✅ تحديث عداد الوقت الحالي (يتزايد من 0:00 إلى المدة الإجمالية)
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
                     const seconds = Math.floor(audioEl.currentTime % 60);
@@ -1096,6 +1039,7 @@ displayMessage(msg) {
                     }
                 };
                 
+                // ✅ عند انتهاء التشغيل، يعود العداد إلى 0:00
                 audioEl.onended = () => {
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = false;
@@ -1114,8 +1058,10 @@ displayMessage(msg) {
         div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
     } 
     else if (msg.type === 'file') {
+        // ✅ التصميم المطلوب للملفات (بحجم ثابت مع break-all للأسماء الطويلة)
         let fileName = msg.fileName || 'ملف';
         
+        // حساب حجم الملف تقريباً
         let fileSize = '';
         if (msg.data && typeof msg.data === 'string') {
             const sizeInBytes = Math.ceil(msg.data.length * 0.75);
@@ -1124,19 +1070,23 @@ displayMessage(msg) {
             else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
         
+        // عرض اسم الملف كاملاً مع التفاف تلقائي وكسر الكلمات الطويلة
         let displayName = fileName;
         
         div.innerHTML = `
             <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1px solid #4CAF50;">
+                <!-- أيقونة الملف داخل دائرة بيضاء -->
                 <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex-shrink: 0;">
                     <span style="font-size: 1.5rem;">📄</span>
                 </div>
                 
+                <!-- معلومات الملف -->
                 <div style="flex: 1; overflow: hidden; min-width: 0;">
                     <div style="font-weight: bold; font-size: 0.85rem; word-break: break-all; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
                     ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
                 </div>
                 
+                <!-- زر التحميل (أيقونة فقط) -->
                 <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
                      onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
                      onmouseover="this.style.background='rgba(255,255,255,0.3)'"
@@ -1281,320 +1231,32 @@ displayMessage(msg) {
         }
     },
     
-    // ==================== القسم 33: sendVoiceNote ====================
-async sendVoiceNote(audioBlob) { 
-    if (!this.currentChat) return;
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return;
-    }
-    
-    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-    }
-    
-    await new Promise(r => setTimeout(r, 200));
-    
-    if (!(await this._ensureChannelReady())) return;
-    
-    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-        this.showVoiceSwipeModalWithClicks(audioBlob);
-    }
-},
-
-// ==================== نافذة اختيار عدد الضغطات للبصمة الصوتية ====================
-showVoiceSwipeModalWithClicks(audioBlob) {
-    const existing = document.getElementById('voiceSwipeModal');
-    if (existing) existing.remove();
-    
-    const appColor = '#2196F5';
-    
-    const overlay = document.createElement('div');
-    overlay.id = 'voiceSwipeModal';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.85);
-        z-index: 10004;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: system-ui, sans-serif;
-        backdrop-filter: blur(5px);
-    `;
-    
-    overlay.innerHTML = `
-        <style>
-            .toggle-switch {
-                position: relative;
-                display: inline-block;
-                width: 60px;
-                height: 30px;
-            }
-            .toggle-switch input {
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }
-            .toggle-slider {
-                position: absolute;
-                cursor: pointer;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: #555;
-                transition: 0.3s;
-                border-radius: 30px;
-            }
-            .toggle-slider:before {
-                position: absolute;
-                content: "";
-                height: 24px;
-                width: 24px;
-                left: 3px;
-                bottom: 3px;
-                background-color: white;
-                transition: 0.3s;
-                border-radius: 50%;
-            }
-            input:checked + .toggle-slider {
-                background-color: #4CAF50;
-            }
-            input:checked + .toggle-slider:before {
-                transform: translateX(30px);
-            }
-            .click-preset {
-                background: #1a1a2e;
-                color: white;
-                border: 1px solid #4CAF50;
-                padding: 6px 12px;
-                border-radius: 20px;
-                cursor: pointer;
-                transition: all 0.2s;
-                font-size: 0.9rem;
-                min-width: 40px;
-            }
-            .click-preset:hover {
-                background: #4CAF50;
-                border-color: #4CAF50;
-            }
-            .click-preset.selected {
-                background: #4CAF50;
-                border-color: #4CAF50;
-            }
-        </style>
+    // ==================== القسم 32: sendFile ====================
+    async sendFile(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
         
-        <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
-            <div style="font-size: 3rem; margin-bottom: 10px;">🎙️</div>
-            <h3 style="color: white; margin: 0 0 5px;">إرسال بصمة صوتية</h3>
-            <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">اختر عدد مرات الاستماع المسموحة</p>
-            
-            <div style="margin-bottom: 15px;">
-                <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; text-align: center;">عدد مرات فتح البصمة</div>
-                
-                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
-                    <button type="button" class="click-preset" data-clicks="1">1</button>
-                    <button type="button" class="click-preset" data-clicks="2">2</button>
-                    <button type="button" class="click-preset" data-clicks="3">3</button>
-                    <button type="button" class="click-preset" data-clicks="4">4</button>
-                    <button type="button" class="click-preset" data-clicks="5">5</button>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 15px;">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="unlimitedToggle">
-                        <span class="toggle-slider"></span>
-                    </label>
-                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
-                </div>
-            </div>
-            
-            <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">بعد انتهاء العدد، سيقفل الصوت تلقائياً</p>
-            
-            <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
-                <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor};">
-                    <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%);"></div>
-                    <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: ${appColor}; border-radius: 50%; transform: translate(-50%, -50%);"></div>
-                    
-                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #4CAF50, #1b5e2a); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div id="rightThumb" style="position: absolute; top: 8px; right: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #f44336, #8b0000); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: right 0.05s linear; color: white;">
-                        <i class="fas fa-times"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    
-    const button = document.getElementById('swipeButton');
-    const leftThumb = document.getElementById('leftThumb');
-    const rightThumb = document.getElementById('rightThumb');
-    const unlimitedToggle = document.getElementById('unlimitedToggle');
-    
-    let selectedClicks = 1;
-    let selectedButton = null;
-    
-    document.querySelectorAll('#voiceSwipeModal .click-preset').forEach(btn => {
-        btn.onclick = () => {
-            if (selectedButton) {
-                selectedButton.style.background = '#1a1a2e';
-                selectedButton.style.borderColor = '#4CAF50';
-            }
-            selectedButton = btn;
-            selectedButton.style.background = '#4CAF50';
-            selectedButton.style.borderColor = '#4CAF50';
-            selectedClicks = parseInt(btn.dataset.clicks);
-        };
-    });
-    
-    const firstBtn = document.querySelector('#voiceSwipeModal .click-preset[data-clicks="1"]');
-    if (firstBtn) {
-        firstBtn.style.background = '#4CAF50';
-        firstBtn.style.borderColor = '#4CAF50';
-        selectedButton = firstBtn;
-        selectedClicks = 1;
-    }
-    
-    unlimitedToggle.addEventListener('change', () => {
-        if (unlimitedToggle.checked) {
-            document.querySelectorAll('#voiceSwipeModal .click-preset').forEach(btn => {
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-            });
-        } else {
-            document.querySelectorAll('#voiceSwipeModal .click-preset').forEach(btn => {
-                btn.style.opacity = '1';
-                btn.style.pointerEvents = 'auto';
-            });
-            if (selectedButton) {
-                selectedButton.style.background = '#4CAF50';
-            }
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
         }
-    });
-    
-    const buttonWidth = button.clientWidth;
-    const centerPos = buttonWidth / 2;
-    const maxLeftMove = centerPos - 35;
-    const maxRightMove = centerPos - 35;
-    
-    let isDraggingLeft = false, isDraggingRight = false;
-    let leftCurrentPos = 8, rightCurrentPos = 8;
-    
-    const onLeftStart = (e) => {
-        e.preventDefault();
-        isDraggingLeft = true;
-        leftThumb.style.transition = 'none';
-    };
-    
-    const onLeftMove = (e) => {
-        if (!isDraggingLeft) return;
-        e.preventDefault();
-        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-        const rect = button.getBoundingClientRect();
-        let newLeft = clientX - rect.left - 27;
-        newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
-        leftCurrentPos = newLeft;
-        leftThumb.style.left = newLeft + 'px';
-    };
-    
-    const onLeftEnd = () => {
-        if (!isDraggingLeft) return;
-        isDraggingLeft = false;
-        leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-        if (leftCurrentPos >= maxLeftMove - 10) {
-            leftThumb.style.left = maxLeftMove + 'px';
-            
-            let maxClicks;
-            if (unlimitedToggle.checked) {
-                maxClicks = 999999;
-            } else {
-                maxClicks = selectedClicks;
-                if (maxClicks < 1) maxClicks = 1;
-                if (maxClicks > 5) maxClicks = 5;
-            }
-            
-            setTimeout(async () => {
-                const success = await CallSystem.sendVoiceWithClicks(audioBlob, maxClicks);
-                if (success) {
-                    const b64 = await SecureChatSystem.fileToBase64(audioBlob);
-                    const msgId = Date.now().toString();
-                    const voiceMsg = {
-                        id: msgId,
-                        type: 'voice',
-                        data: b64,
-                        sender: 'me',
-                        time: new Date().toISOString(),
-                        status: 'sent',
-                        maxClicks: maxClicks,
-                        clicksRemaining: maxClicks
-                    };
-                    this.saveMessage(this.currentChat, voiceMsg);
-                    this.displayMessage(voiceMsg);
-                } else {
-                    alert('فشل إرسال البصمة الصوتية');
-                }
-                overlay.remove();
-            }, 200);
-        } else {
-            leftThumb.style.left = '8px';
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'file');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(file); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الملف');
         }
-    };
-    
-    const onRightStart = (e) => {
-        e.preventDefault();
-        isDraggingRight = true;
-        rightThumb.style.transition = 'none';
-    };
-    
-    const onRightMove = (e) => {
-        if (!isDraggingRight) return;
-        e.preventDefault();
-        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-        const rect = button.getBoundingClientRect();
-        let newRight = rect.right - clientX - 27;
-        newRight = Math.max(8, Math.min(newRight, maxRightMove));
-        rightCurrentPos = newRight;
-        rightThumb.style.right = newRight + 'px';
-    };
-    
-    const onRightEnd = () => {
-        if (!isDraggingRight) return;
-        isDraggingRight = false;
-        rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-        if (rightCurrentPos >= maxRightMove - 10) {
-            rightThumb.style.right = maxRightMove + 'px';
-            setTimeout(() => {
-                overlay.remove();
-            }, 200);
-        } else {
-            rightThumb.style.right = '8px';
-        }
-    };
-    
-    leftThumb.addEventListener('mousedown', onLeftStart);
-    leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
-    rightThumb.addEventListener('mousedown', onRightStart);
-    rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
-    
-    document.addEventListener('mousemove', (e) => { onLeftMove(e); onRightMove(e); });
-    document.addEventListener('mouseup', () => { onLeftEnd(); onRightEnd(); });
-    document.addEventListener('touchmove', (e) => { onLeftMove(e); onRightMove(e); }, { passive: false });
-    document.addEventListener('touchend', () => { onLeftEnd(); onRightEnd(); });
-    
-    setTimeout(() => {
-        if (document.getElementById('voiceSwipeModal')) overlay.remove();
-    }, 30000);
-},
+    },
     
     // ==================== القسم 33: sendVoiceNote ====================
     async sendVoiceNote(audioBlob) { 
