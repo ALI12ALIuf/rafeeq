@@ -940,7 +940,7 @@ displayMessage(msg) {
         const audioId = `audio_${msg.id}`;
         let audioDuration = 0;
         
-        // ✅ إنشاء عنصر audio مؤقت لمعرفة المدة الإجمالية للبصمة
+        // ✅ الحصول على المدة الإجمالية للبصمة
         const tempAudio = new Audio(audioSrc);
         tempAudio.addEventListener('loadedmetadata', () => {
             audioDuration = tempAudio.duration;
@@ -952,7 +952,7 @@ displayMessage(msg) {
             }
         });
         
-        // ✅ مشغل مخصص (تم إزالة عداد المهلة "متبقي")
+        // ✅ مشغل مخصص مع عدادين (وقت التشغيل الحالي والمدة الإجمالية)
         div.innerHTML = `
             <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -965,7 +965,7 @@ displayMessage(msg) {
                     <div style="text-align: center;">
                         <div style="display: flex; flex-direction: column; align-items: center;">
                             <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px;">0:00</span>
-                            <span id="duration_${audioId}" style="color: rgba(255,255,255,0.7); font-size: 0.7rem;">0:00</span>
+                            <span id="duration_${audioId}" style="color: white; font-size: 0.7rem; opacity: 0.8;">0:00</span>
                         </div>
                     </div>
                     <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
@@ -1030,7 +1030,7 @@ displayMessage(msg) {
                     }
                 };
                 
-                // تحديث عداد الوقت الحالي
+                // ✅ تحديث عداد الوقت الحالي (يتزايد من 0:00 إلى المدة الإجمالية)
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
                     const seconds = Math.floor(audioEl.currentTime % 60);
@@ -1039,10 +1039,11 @@ displayMessage(msg) {
                     }
                 };
                 
-                // عند انتهاء التشغيل
+                // ✅ عند انتهاء التشغيل، يعود العداد إلى 0:00
                 audioEl.onended = () => {
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
                 };
             }
         }, 10);
@@ -1100,6 +1101,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+    
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
