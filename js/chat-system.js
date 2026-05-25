@@ -1368,7 +1368,7 @@ displayMessage(msg) {
 },
     
 
-   // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار ثابت وملء الشاشة) ====================
+  // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
@@ -1404,7 +1404,6 @@ showImagePreview(imageSrc) {
         }
     };
     
-    // دخول ملء الشاشة عند فتح الصورة
     setTimeout(() => {
         requestFullscreen(modal);
     }, 100);
@@ -1413,25 +1412,24 @@ showImagePreview(imageSrc) {
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
-        top: 20px;
-        left: 20px;
-        right: 20px;
-        bottom: 20px;
-        border: 3px solid #4CAF50;
-        border-radius: 20px;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: 4px solid #4CAF50;
         pointer-events: none;
         z-index: 10051;
-        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
+        box-sizing: border-box;
     `;
     
     // ========== حاوية الصورة (تتحرك داخلها) ==========
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
         position: absolute;
-        top: 20px;
-        left: 20px;
-        right: 20px;
-        bottom: 20px;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1447,7 +1445,6 @@ showImagePreview(imageSrc) {
         width: auto;
         height: auto;
         object-fit: contain;
-        border-radius: 12px;
         transition: transform 0.1s ease;
         cursor: default;
         touch-action: none;
@@ -1463,12 +1460,12 @@ showImagePreview(imageSrc) {
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
-        top: 30px;
+        top: 20px;
         left: 0;
         right: 0;
         display: flex;
         justify-content: space-between;
-        padding: 0 35px;
+        padding: 0 20px;
         pointer-events: none;
         z-index: 10052;
     `;
@@ -1495,7 +1492,6 @@ showImagePreview(imageSrc) {
     backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
     backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
     backBtn.onclick = () => {
-        // الخروج من ملء الشاشة أولاً
         if (document.exitFullscreen) {
             document.exitFullscreen();
         } else if (document.webkitExitFullscreen) {
@@ -1623,29 +1619,23 @@ showImagePreview(imageSrc) {
     modal.appendChild(imageContainer);
     modal.appendChild(buttonOverlay);
     
-    // إغلاق بزر ESC (والخروج من ملء الشاشة)
+    // ✅ الخروج فقط من زر الرجوع (وليس بالضغط خارج الصورة)
+    // تم إزالة modal.onclick الذي كان يغلق النافذة
+    
+    // إغلاق بزر ESC (مع الخروج من ملء الشاشة)
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             if (document.exitFullscreen) document.exitFullscreen();
             else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            if (document.getElementById('imagePreviewModal')) modal.remove();
+            modal.remove();
             document.removeEventListener('keydown', escHandler);
         }
     };
     document.addEventListener('keydown', escHandler);
     
-    // إغلاق عند الضغط خارج الصورة
-    modal.onclick = (e) => {
-        if (e.target === modal || e.target === frame || e.target === imageContainer) {
-            if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            modal.remove();
-        }
-    };
-    
     document.body.appendChild(modal);
-},
-
+}, 
+            
 
     
     // ==================== القسم 27: sendMessage ====================
