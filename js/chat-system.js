@@ -1368,7 +1368,7 @@ displayMessage(msg) {
 },
     
 
-  // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
+ // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
@@ -1502,7 +1502,7 @@ showImagePreview(imageSrc) {
         modal.remove();
     };
     
-    // ========== زر التحميل (مباشر بدون نافذة تأكيد) ==========
+    // ========== زر التحميل (يمنع نافذة التأكيد نهائياً باستخدام canvas) ==========
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
@@ -1525,10 +1525,16 @@ showImagePreview(imageSrc) {
     downloadBtn.onclick = (e) => {
         e.stopPropagation();
         
-        // تحميل مباشر باستخدام fetch (لا يظهر نافذة تأكيد)
-        fetch(imageSrc)
-            .then(response => response.blob())
-            .then(blob => {
+        // استخدام canvas لتحويل الصورة إلى blob (يمنع نافذة التأكيد نهائياً)
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const tempImg = new Image();
+        
+        tempImg.onload = () => {
+            canvas.width = tempImg.width;
+            canvas.height = tempImg.height;
+            ctx.drawImage(tempImg, 0, 0);
+            canvas.toBlob((blob) => {
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -1537,8 +1543,10 @@ showImagePreview(imageSrc) {
                 link.click();
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
-            })
-            .catch(error => console.error('خطأ في التحميل:', error));
+            }, 'image/jpeg', 0.95);
+        };
+        
+        tempImg.src = imageSrc;
     };
     
     downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
@@ -1644,8 +1652,7 @@ showImagePreview(imageSrc) {
     document.addEventListener('keydown', escHandler);
     
     document.body.appendChild(modal);
-},
-
+}, 
 
     
     // ==================== القسم 27: sendMessage ====================
