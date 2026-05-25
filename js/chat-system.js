@@ -1317,33 +1317,152 @@ displayMessage(msg) {
             } else alert('فشل إرسال الملف');
         }
     },
+
+   // ==================== القسم 33: sendVoiceNote ====================
+async sendVoiceNote(audioBlob) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
     
-    // ==================== القسم 33: sendVoiceNote ====================
-    async sendVoiceNote(audioBlob) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return;
+    // ✅ عرض نافذة اختيار عدد الضغطات (مثل الموقع)
+    const maxClicks = await this.showVoiceClicksPicker();
+    if (maxClicks === null) return; // المستخدم ألغى
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        // ✅ إضافة maxClicks إلى بيانات الإرسال
+        const success = await this.sendFileWithRetry(audioBlob, 'voice', maxClicks);
+        if (success) {
+            const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
+            const msgId = Date.now().toString();
+            this.saveMessage(this.currentChat, { 
+                id: msgId, 
+                type: 'voice', 
+                data: b64, 
+                sender: 'me', 
+                time: new Date().toISOString(), 
+                status: 'sent',
+                maxClicks: maxClicks,
+                clicksRemaining: maxClicks
+            }); 
+            this.displayMessage({ 
+                id: msgId, 
+                type: 'voice', 
+                data: b64, 
+                sender: 'me', 
+                time: new Date().toISOString(), 
+                status: 'sent',
+                maxClicks: maxClicks,
+                clicksRemaining: maxClicks
+            });
+        } else alert('فشل إرسال البصمة الصوتية');
+    }
+},
+
+// ✅ دالة اختيار عدد الضغطات للبصمة (مثل الموقع)
+async showVoiceClicksPicker() {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 10006;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, sans-serif;
+            backdrop-filter: blur(5px);
+        `;
+        modal.innerHTML = `
+            <div style="background: #0a0e27; border-radius: 40px; width: 320px; max-width: 90%; padding: 25px 20px; text-align: center; color: white;">
+                <div style="font-size: 3rem; margin-bottom: 10px;">🎤</div>
+                <h3 style="margin: 0 0 5px;">عدد مرات تشغيل البصمة</h3>
+                <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">كم مرة يمكن للمستلم تشغيل البصمة؟</p>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 20px 0;">
+                    <button class="voice-clicks-option" data-clicks="1" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">1</button>
+                    <button class="voice-clicks-option" data-clicks="2" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">2</button>
+                    <button class="voice-clicks-option" data-clicks="3" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">3</button>
+                    <button class="voice-clicks-option" data-clicks="4" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">4</button>
+                    <button class="voice-clicks-option" data-clicks="5" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">5</button>
+                </div>
+                <div style="margin: 15px 0;">
+                    <label style="display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="voiceUnlimitedToggle" style="width: 18px; height: 18px;">
+                        <span style="color: white;">بلا حدود</span>
+                    </label>
+                </div>
+                <p style="color: #888; font-size: 0.65rem;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
+                <button id="voiceCancelBtn" style="margin-top: 15px; background: #f44336; color: white; border: none; padding: 8px 20px; border-radius: 30px; cursor: pointer;">إلغاء</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        let selectedClicks = 1;
+        let selectedButton = null;
+        
+        const buttons = modal.querySelectorAll('.voice-clicks-option');
+        buttons.forEach(btn => {
+            btn.onclick = () => {
+                if (selectedButton) {
+                    selectedButton.style.background = '#1a1a2e';
+                }
+                selectedButton = btn;
+                selectedButton.style.background = '#4CAF50';
+                selectedClicks = parseInt(btn.dataset.clicks);
+            };
+        });
+        
+        // تحديد الزر الأول بشكل افتراضي
+        if (buttons[0]) {
+            buttons[0].style.background = '#4CAF50';
+            selectedButton = buttons[0];
+            selectedClicks = 1;
         }
         
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
+        const unlimitedToggle = modal.querySelector('#voiceUnlimitedToggle');
+        unlimitedToggle.onchange = () => {
+            buttons.forEach(btn => {
+                btn.style.opacity = unlimitedToggle.checked ? '0.5' : '1';
+                btn.style.pointerEvents = unlimitedToggle.checked ? 'none' : 'auto';
+            });
+        };
         
-        await new Promise(r => setTimeout(r, 200));
+        modal.querySelector('#voiceCancelBtn').onclick = () => {
+            modal.remove();
+            resolve(null);
+        };
         
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            const success = await this.sendFileWithRetry(audioBlob, 'voice');
-            if (success) {
-                const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
-                const msgId = Date.now().toString();
-                this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-                this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-            } else alert('فشل إرسال البصمة الصوتية');
-        }
-    },
+        // زر إرسال
+        const sendBtn = document.createElement('button');
+        sendBtn.textContent = 'إرسال';
+        sendBtn.style.cssText = 'background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 30px; cursor: pointer; margin-top: 10px; width: 100%;';
+        sendBtn.onclick = () => {
+            let maxClicks;
+            if (unlimitedToggle.checked) {
+                maxClicks = 999999;
+            } else {
+                maxClicks = selectedClicks;
+            }
+            modal.remove();
+            resolve(maxClicks);
+        };
+        modal.querySelector('div > div').appendChild(sendBtn);
+    });
+}, 
+    
     
     // ==================== القسم 34: shareLocationDirect ====================
     
