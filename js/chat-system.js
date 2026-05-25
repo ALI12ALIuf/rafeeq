@@ -206,14 +206,19 @@ setupFeatureButton() {
         // ✅ حفظ المراجع
         window.featureToggleInput = toggleInput;
         
-        // ✅ معالج الضغط
+        // ✅ معالج الضغط (مع دعم الإيقاف)
         toggleInput.onclick = (e) => {
             console.log('🔘 تم الضغط على زر التفعيل');
             
+            // ✅ إذا كانت الميزات مفعلة، قم بإلغائها
+            if (this.featuresEnabled) {
+                console.log('⚠️ الميزات مفعلة، جاري إلغاء التفعيل');
+                this.disableFeatures();
+                return;
+            }
+            
             if (this.featureRequestReceived) {
                 this.acceptFeatureRequest();
-            } else if (this.featuresEnabled) {
-                alert('الميزات مفعلة بالفعل');
             } else if (this.featureRequestPending) {
                 alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
             } else {
