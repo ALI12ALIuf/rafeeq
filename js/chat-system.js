@@ -373,41 +373,72 @@ async acceptFeatureRequest() {
 },
     
     // ==================== القسم 10: handleFeatureResponse ====================
-    handleFeatureResponse(fromId, action) {
-        console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
+handleFeatureResponse(fromId, action) {
+    console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
+    
+    if (action === 'accepted') {
+        this.featuresEnabled = true;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
         
-        if (action === 'accepted') {
-            this.featuresEnabled = true;
-            this.featureRequestPending = false;
-            this.featureRequestReceived = false;
-            
-            if (this.featureBlinkInterval) {
-                clearInterval(this.featureBlinkInterval);
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#4CAF50';
-                btn.title = 'الميزات مفعلة ✅';
-            }
-            
-            this.updateAllButtons();
-            console.log('✅ تم تفعيل الميزات!');
-        } else if (action === 'rejected') {
-            this.featureRequestPending = false;
-            this.featureRequestReceived = false;
-            
-            if (this.featureBlinkInterval) {
-                clearInterval(this.featureBlinkInterval);
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-            }
-            console.log('❌ تم رفض طلب تفعيل الميزات');
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
         }
-    },
+        
+        // ✅ تحديث زر التفعيل المنزلق (Toggle Switch)
+        const toggleInput = document.getElementById('featureToggleInput');
+        const switchLabel = document.getElementById('featureSwitchLabel');
+        
+        if (toggleInput) {
+            toggleInput.checked = true;
+            console.log('✅ تم تفعيل زر التفعيل (ON)');
+        }
+        if (switchLabel) {
+            switchLabel.classList.remove('blinking');
+            console.log('✅ تم إيقاف الرمش');
+        }
+        
+        // ✅ للتوافق مع الزر القديم (إذا وجد)
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#4CAF50';
+            btn.title = 'الميزات مفعلة ✅';
+        }
+        
+        this.updateAllButtons();
+        console.log('✅ تم تفعيل الميزات!');
+        
+    } else if (action === 'rejected') {
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        // ✅ تحديث زر التفعيل المنزلق (إلغاء)
+        const toggleInput = document.getElementById('featureToggleInput');
+        const switchLabel = document.getElementById('featureSwitchLabel');
+        
+        if (toggleInput) {
+            toggleInput.checked = false;
+            console.log('✅ تم إلغاء تفعيل الزر (OFF)');
+        }
+        if (switchLabel) {
+            switchLabel.classList.remove('blinking');
+            console.log('✅ تم إيقاف الرمش');
+        }
+        
+        // ✅ للتوافق مع الزر القديم
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+        }
+        console.log('❌ تم رفض طلب تفعيل الميزات');
+    }
+},
     
     // ==================== القسم 11: sendFeatureCancelImmediately ====================
     async sendFeatureCancelImmediately(chatId) {
