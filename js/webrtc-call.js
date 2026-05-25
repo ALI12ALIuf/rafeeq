@@ -1329,7 +1329,8 @@ const CallSystem = {
             console.error('❌ فشل تبديل الكاميرا:', e);
         }
     },
-    
+
+
     // ==================== 13. إرسال الملفات ====================
     
     async sendFileDirect(file, type) {
@@ -1349,6 +1350,9 @@ const CallSystem = {
             const totalChunks = Math.ceil(b64.length / chunkSize);
             const fileId = Date.now().toString();
             
+            // ✅ استخراج maxClicks إذا موجود (للبصمة الصوتية)
+            const maxClicks = file.maxClicks || null;
+            
             console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
             
             for (let i = 0; i < totalChunks; i++) {
@@ -1362,7 +1366,10 @@ const CallSystem = {
                     chunk: i,
                     total: totalChunks,
                     id: fileId,
-                    fileName: file.name || 'ملف'
+                    fileName: file.name || 'ملف',
+                    // ✅ إضافة maxClicks و clicksRemaining للبصمة الصوتية
+                    maxClicks: maxClicks,
+                    clicksRemaining: maxClicks
                 };
                 this.dc.send(JSON.stringify(chunk));
                 const progress = ((i + 1) / totalChunks) * 100;
@@ -1387,7 +1394,10 @@ const CallSystem = {
                 type: msg.type,
                 fileName: msg.fileName,
                 total: msg.total,
-                received: 0
+                received: 0,
+                // ✅ حفظ maxClicks و clicksRemaining
+                maxClicks: msg.maxClicks,
+                clicksRemaining: msg.clicksRemaining
             };
             ChatSystem.showProgressBar('جاري استلام الملف...', 0);
         }
@@ -1417,7 +1427,10 @@ const CallSystem = {
                 data: finalData,
                 fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
                 sender: 'friend',
-                time: new Date().toISOString()
+                time: new Date().toISOString(),
+                // ✅ إضافة maxClicks و clicksRemaining للبصمة الصوتية
+                maxClicks: this.incomingFileInfo[msg.id].maxClicks,
+                clicksRemaining: this.incomingFileInfo[msg.id].clicksRemaining
             };
             
             if (ChatSystem.currentChat) {
@@ -1466,6 +1479,8 @@ const CallSystem = {
             reader.readAsDataURL(file);
         });
     },
+    
+    
     
     // ==================== 14. إنهاء المكالمة ====================
     
