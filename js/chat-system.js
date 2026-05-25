@@ -334,20 +334,15 @@ async acceptFeatureRequest() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث واجهة زر السحب
-    const container = document.getElementById('featureSwipeContainer');
-    const leftThumb = document.getElementById('featureLeftThumb');
-    const rightThumb = document.getElementById('featureRightThumb');
+    // ✅ تحديث حالة زر التفعيل (Dark Mode Switch)
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (container) {
-        container.classList.remove('blinking');
+    if (toggleInput) {
+        toggleInput.checked = true;
     }
-    if (leftThumb) {
-        leftThumb.style.background = 'linear-gradient(145deg, #4CAF50, #1b5e2a)';
-        leftThumb.style.left = '3px';
-    }
-    if (rightThumb) {
-        rightThumb.style.right = '3px';
+    if (switchLabel) {
+        switchLabel.classList.remove('blinking');
     }
     
     // ✅ للتوافق مع الكود القديم
@@ -461,20 +456,15 @@ resetFeatures() {
         clearInterval(this.featureBlinkInterval);
     }
     
-    // ✅ تحديث واجهة زر السحب
-    const container = document.getElementById('featureSwipeContainer');
-    const leftThumb = document.getElementById('featureLeftThumb');
-    const rightThumb = document.getElementById('featureRightThumb');
+    // ✅ تحديث حالة زر التفعيل (Dark Mode Switch)
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (container) {
-        container.classList.remove('blinking');
+    if (toggleInput) {
+        toggleInput.checked = false;
     }
-    if (leftThumb) {
-        leftThumb.style.left = '3px';
-        leftThumb.style.background = 'linear-gradient(145deg, #4CAF50, #1b5e2a)';
-    }
-    if (rightThumb) {
-        rightThumb.style.right = '3px';
+    if (switchLabel) {
+        switchLabel.classList.remove('blinking');
     }
     
     // ✅ للتوافق مع الكود القديم
@@ -508,20 +498,15 @@ handleFeatureCancel() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث واجهة زر السحب
-    const container = document.getElementById('featureSwipeContainer');
-    const leftThumb = document.getElementById('featureLeftThumb');
-    const rightThumb = document.getElementById('featureRightThumb');
+    // ✅ تحديث حالة زر التفعيل (Dark Mode Switch)
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (container) {
-        container.classList.remove('blinking');
+    if (toggleInput) {
+        toggleInput.checked = false;
     }
-    if (leftThumb) {
-        leftThumb.style.left = '3px';
-        leftThumb.style.background = 'linear-gradient(145deg, #4CAF50, #1b5e2a)';
-    }
-    if (rightThumb) {
-        rightThumb.style.right = '3px';
+    if (switchLabel) {
+        switchLabel.classList.remove('blinking');
     }
     
     // ✅ للتوافق مع الكود القديم
@@ -537,7 +522,8 @@ handleFeatureCancel() {
     this.updateAllButtons();
     console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
     console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
-}, 
+},
+
 
     
     // ==================== القسم 14: updateAllButtons ====================
