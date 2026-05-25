@@ -98,166 +98,92 @@ cleanMediaMessagesOnLoad() {
         }
     },
     
-  // ==================== القسم 5: setupFeatureButton ====================
-setupFeatureButton() {
-    setTimeout(() => {
-        // ✅ إزالة أي أزرار قديمة
-        const oldBtn = document.getElementById('enableFeaturesBtn');
-        if (oldBtn) oldBtn.remove();
-        
-        const oldContainer = document.getElementById('featureToggleContainer');
-        if (oldContainer) oldContainer.remove();
-        
-        const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
-        if (!container) {
-            console.log('⚠️ لم يتم العثور على حاوية للزر');
-            return;
-        }
-        
-        // ✅ إضافة الأنماط
-        if (!document.getElementById('featureToggleStyles')) {
-            const style = document.createElement('style');
-            style.id = 'featureToggleStyles';
-            style.textContent = `
-                .feature-toggle-container {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin: 0 5px;
-                    direction: ltr;
+    // ==================== القسم 5: setupFeatureButton ====================
+    setupFeatureButton() {
+        setTimeout(() => {
+            let btn = document.getElementById('enableFeaturesBtn');
+            if (!btn) {
+                const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
+                if (container) {
+                    btn = document.createElement('button');
+                    btn.id = 'enableFeaturesBtn';
+                    btn.innerHTML = '🔓';
+                    btn.title = 'تفعيل الميزات (اتصال، صور، ملفات)';
+                    btn.style.cssText = `
+                        width: 45px;
+                        height: 45px;
+                        border-radius: 50%;
+                        background: #f44336;
+                        border: none;
+                        cursor: pointer;
+                        margin: 0 5px;
+                        font-size: 1.2rem;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    `;
+                    btn.onclick = () => {
+                        console.log('🔘 تم الضغط على الزر');
+                        console.log('featureRequestReceived:', this.featureRequestReceived);
+                        console.log('featureRequestPending:', this.featureRequestPending);
+                        console.log('featuresEnabled:', this.featuresEnabled);
+                        
+                        if (this.featureRequestReceived) {
+                            console.log('✅ قبول الطلب');
+                            this.acceptFeatureRequest();
+                        } else if (this.featuresEnabled) {
+                            console.log('⚠️ الميزات مفعلة بالفعل');
+                            alert('الميزات مفعلة بالفعل');
+                        } else if (this.featureRequestPending) {
+                            console.log('⏳ طلب قيد الانتظار');
+                            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+                        } else {
+                            console.log('📨 إرسال طلب جديد');
+                            this.requestEnableFeatures();
+                        }
+                    };
+                    container.appendChild(btn);
+                    console.log('✅ تم إضافة زر التفعيل');
+                } else {
+                    console.log('⚠️ لم يتم العثور على حاوية للزر');
                 }
-                .feature-toggle-label {
-                    font-size: 0.7rem;
-                    color: #888;
-                }
-                .feature-switch {
-                    position: relative;
-                    display: inline-block;
-                    width: 52px;
-                    height: 26px;
-                }
-                .feature-switch input {
-                    opacity: 0;
-                    width: 0;
-                    height: 0;
-                }
-                .feature-slider {
-                    position: absolute;
-                    cursor: pointer;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: #f44336;
-                    transition: 0.3s;
-                    border-radius: 26px;
-                }
-                .feature-slider:before {
-                    position: absolute;
-                    content: "";
-                    height: 20px;
-                    width: 20px;
-                    left: 3px;
-                    bottom: 3px;
-                    background-color: white;
-                    transition: 0.3s;
-                    border-radius: 50%;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-                }
-                input:checked + .feature-slider {
-                    background-color: #4CAF50;
-                }
-                input:checked + .feature-slider:before {
-                    transform: translateX(26px);
-                }
-                /* تأثير الرمش */
-                @keyframes featureBlink {
-                    0% { background-color: #f44336; }
-                    50% { background-color: #2196F3; }
-                    100% { background-color: #f44336; }
-                }
-                .feature-switch.blinking .feature-slider {
-                    animation: featureBlink 0.8s ease-in-out infinite;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        // ✅ إنشاء حاوية الزر
-        const toggleContainer = document.createElement('div');
-        toggleContainer.className = 'feature-toggle-container';
-        toggleContainer.id = 'featureToggleContainer';
-        
-        toggleContainer.innerHTML = `
-            <span class="feature-toggle-label" style="color: #f44336;">○</span>
-            <label class="feature-switch" id="featureSwitchLabel">
-                <input type="checkbox" id="featureToggleInput">
-                <span class="feature-slider" id="featureToggleSlider"></span>
-            </label>
-            <span class="feature-toggle-label" style="color: #4CAF50;">●</span>
-        `;
-        
-        container.appendChild(toggleContainer);
-        
-        const toggleInput = document.getElementById('featureToggleInput');
-        
-        if (!toggleInput) return;
-        
-        // ✅ حفظ المراجع
-        window.featureToggleInput = toggleInput;
-        
-        // ✅ معالج الضغط
-        toggleInput.onclick = (e) => {
-            console.log('🔘 تم الضغط على زر التفعيل');
-            
-            if (this.featureRequestReceived) {
-                this.acceptFeatureRequest();
-            } else if (this.featuresEnabled) {
-                alert('الميزات مفعلة بالفعل');
-            } else if (this.featureRequestPending) {
-                alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
-            } else {
-                this.requestEnableFeatures();
             }
-        };
+        }, 1000);
+    },
+    
+    // ==================== القسم 6: startFeatureBlink ====================
+    startFeatureBlink() {
+        if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
         
-        // ✅ إذا كانت الميزات مفعلة مسبقاً
-        if (this.featuresEnabled && toggleInput) {
-            toggleInput.checked = true;
-        }
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (!btn) return;
         
-        console.log('✅ تم إضافة زر التفعيل');
-    }, 1000);
-}, 
-
-    
-   // ==================== القسم 6: startFeatureBlink ====================
-startFeatureBlink() {
-    if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
-    
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    if (!switchLabel) return;
-    
-    switchLabel.classList.add('blinking');
-    
-    let blinkCount = 0;
-    this.featureBlinkInterval = setInterval(() => {
-        if (!this.featureRequestPending && !this.featureRequestReceived) {
-            clearInterval(this.featureBlinkInterval);
-            switchLabel.classList.remove('blinking');
-            return;
-        }
-        
-        blinkCount++;
-        if (blinkCount > 30) {
-            clearInterval(this.featureBlinkInterval);
-            this.featureRequestPending = false;
-            this.featureRequestReceived = false;
-            switchLabel.classList.remove('blinking');
-        }
-    }, 500);
-},
-
+        let blinkCount = 0;
+        this.featureBlinkInterval = setInterval(() => {
+            if (!this.featureRequestPending && !this.featureRequestReceived) {
+                clearInterval(this.featureBlinkInterval);
+                btn.style.background = '#f44336';
+                btn.style.transform = 'scale(1)';
+                return;
+            }
+            
+            blinkCount++;
+            if (blinkCount % 2 === 0) {
+                btn.style.background = '#2196F3';
+                btn.style.transform = 'scale(1.1)';
+            } else {
+                btn.style.background = '#4CAF50';
+                btn.style.transform = 'scale(1)';
+            }
+            
+            if (blinkCount > 30) {
+                clearInterval(this.featureBlinkInterval);
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                btn.style.background = '#f44336';
+                btn.style.transform = 'scale(1)';
+            }
+        }, 500);
+    },
     
     // ==================== القسم 7: requestEnableFeatures ====================
     async requestEnableFeatures() {
@@ -317,62 +243,61 @@ startFeatureBlink() {
         console.log('✅ تم تفعيل وضع الاستقبال');
     },
     
-  // ==================== القسم 9: acceptFeatureRequest ====================
-async acceptFeatureRequest() {
-    console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
-    
-    if (!this.featureRequestReceived && !this.featureRequestPending) {
-        console.log('⚠️ لا يوجد طلب معلق');
-        return;
-    }
-    
-    this.featuresEnabled = true;
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    console.log('✅ featuresEnabled =', this.featuresEnabled);
-    
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-        this.featureBlinkInterval = null;
-    }
-    
-    // ✅ تحديث زر التفعيل
-    const toggleInput = document.getElementById('featureToggleInput');
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) {
-        toggleInput.checked = true;
-    }
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-    }
-    
-    try {
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-            type: 'feature_response',
-            action: 'accepted',
-            timestamp: Date.now()
-        }), sharedKey);
-        await SecureChatSystem.sendToServer(this.currentChat, { 
-            id: Date.now().toString(), 
-            type: 'feature_response', 
-            data: encrypted, 
-            timestamp: Date.now() 
-        });
-        console.log('✅ تم إرسال قبول التفعيل');
-    } catch(e) {
-        console.error('❌ خطأ في إرسال القبول:', e);
-    }
-    
-    this.updateAllButtons();
-    console.log('✅ تم تفعيل الميزات!');
-    console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
-القسم          
+    // ==================== القسم 9: acceptFeatureRequest ====================
+    async acceptFeatureRequest() {
+        console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
+        
+        if (!this.featureRequestReceived && !this.featureRequestPending) {
+            console.log('⚠️ لا يوجد طلب معلق');
+            return;
+        }
+        
+        this.featuresEnabled = true;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        console.log('✅ featuresEnabled =', this.featuresEnabled);
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#4CAF50';
+            btn.style.transform = 'scale(1)';
+            btn.title = 'الميزات مفعلة ✅';
+            console.log('✅ تم تغيير لون الزر إلى الأخضر');
+        } else {
+            console.log('⚠️ لم يتم العثور على الزر');
+        }
+        
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_response',
+                action: 'accepted',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_response', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('✅ تم إرسال قبول التفعيل');
+        } catch(e) {
+            console.error('❌ خطأ في إرسال القبول:', e);
+        }
+        
+        this.updateAllButtons();
+        console.log('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
+        console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
+    },
     
     // ==================== القسم 10: handleFeatureResponse ====================
     handleFeatureResponse(fromId, action) {
@@ -435,71 +360,63 @@ async acceptFeatureRequest() {
         }
     },
     
- // ==================== القسم 12: resetFeatures ====================
-resetFeatures() {
-    console.log('🔄 resetFeatures - إعادة تعيين الميزات');
+    // ==================== القسم 12: resetFeatures ====================
+    resetFeatures() {
+        console.log('🔄 resetFeatures - إعادة تعيين الميزات');
+        
+        const chatId = this.currentChat;
+        
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+        }
+        
+        if (chatId) {
+            console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
+            this.sendFeatureCancelImmediately(chatId);
+        }
+        
+        this.updateAllButtons();
+    },
     
-    const chatId = this.currentChat;
-    
-    this.featuresEnabled = false;
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-    }
-    
-    // ✅ تحديث زر التفعيل
-    const toggleInput = document.getElementById('featureToggleInput');
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) {
-        toggleInput.checked = false;
-    }
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-    }
-    
-    if (chatId) {
-        console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
-        this.sendFeatureCancelImmediately(chatId);
-    }
-    
-    this.updateAllButtons();
-},
-
-// ==================== القسم 13: handleFeatureCancel ====================
-handleFeatureCancel() {
-    console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
-    console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
-    
-    this.featuresEnabled = false;
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    console.log('✅ featuresEnabled بعد الإلغاء:', this.featuresEnabled);
-    
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-        this.featureBlinkInterval = null;
-    }
-    
-    // ✅ تحديث زر التفعيل
-    const toggleInput = document.getElementById('featureToggleInput');
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) {
-        toggleInput.checked = false;
-    }
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-    }
-    
-    this.updateAllButtons();
-    console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
-    console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
-},
-
+    // ==================== القسم 13: handleFeatureCancel ====================
+    handleFeatureCancel() {
+        console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
+        console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
+        
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        console.log('✅ featuresEnabled بعد الإلغاء:', this.featuresEnabled);
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+            console.log('✅ تم تغيير لون الزر إلى الأحمر');
+        } else {
+            console.log('⚠️ لم يتم العثور على الزر');
+        }
+        
+        this.updateAllButtons();
+        console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+        console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
+    },
     
     // ==================== القسم 14: updateAllButtons ====================
     updateAllButtons() {
