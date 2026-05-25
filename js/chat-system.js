@@ -1005,13 +1005,28 @@ displayMessage(msg) {
             if (playBtn && audioEl) {
                 let isPlaying = false;
                 let hasPlayed = false;
+                let localClicksRemaining = clicksRemaining;
+                let localMaxClicks = maxClicks;
+                
+                // ✅ وظيفة قفل البصمة
+                const lockVoice = () => {
+                    const voiceDiv = div.querySelector('.voice-message');
+                    if (voiceDiv) {
+                        voiceDiv.style.background = '#888';
+                        voiceDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center;"><i class="fas fa-lock" style="font-size: 1.5rem; color: white;"></i></div>';
+                    }
+                    if (audioEl) {
+                        audioEl.pause();
+                    }
+                };
                 
                 // ✅ زر التشغيل/الإيقاف المؤقت (يحسب مرة واحدة فقط عند التشغيل لأول مرة)
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
                     
                     // ✅ التحقق من الصلاحية - إذا انتهت لا يحدث شيء
-                    if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                    if (localClicksRemaining !== undefined && localClicksRemaining <= 0) {
+                        lockVoice();
                         return;
                     }
                     
@@ -1025,31 +1040,24 @@ displayMessage(msg) {
                         isPlaying = true;
                         
                         // ✅ تقليل عدد الضغطات المتبقية (مرة واحدة فقط عند التشغيل لأول مرة)
-                        if (!hasPlayed && clicksRemaining !== undefined && maxClicks < 999999 && msg.sender !== 'me') {
+                        if (!hasPlayed && localClicksRemaining !== undefined && localMaxClicks < 999999 && msg.sender !== 'me') {
                             hasPlayed = true;
-                            clicksRemaining--;
-                            msg.clicksRemaining = clicksRemaining;
+                            localClicksRemaining--;
+                            msg.clicksRemaining = localClicksRemaining;
                             
                             // تحديث في localStorage
                             if (ChatSystem.currentChat) {
                                 const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
                                 const msgIndex = messages.findIndex(m => m.id === msg.id);
                                 if (msgIndex !== -1) {
-                                    messages[msgIndex].clicksRemaining = clicksRemaining;
+                                    messages[msgIndex].clicksRemaining = localClicksRemaining;
                                     ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
                                 }
                             }
                             
-                            // ✅ إذا وصلت إلى الصفر، قفل البصمة
-                            if (clicksRemaining <= 0) {
-                                const voiceDiv = div.querySelector('.voice-message');
-                                if (voiceDiv) {
-                                    voiceDiv.style.background = '#888';
-                                    voiceDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center;"><i class="fas fa-lock" style="font-size: 1.5rem; color: white;"></i></div>';
-                                }
-                                if (audioEl) {
-                                    audioEl.pause();
-                                }
+                            // ✅ إذا وصلت إلى الصفر، قفل البصمة فوراً
+                            if (localClicksRemaining <= 0) {
+                                lockVoice();
                                 return;
                             }
                         }
@@ -1061,7 +1069,8 @@ displayMessage(msg) {
                     e.stopPropagation();
                     
                     // ✅ التحقق من الصلاحية
-                    if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                    if (localClicksRemaining !== undefined && localClicksRemaining <= 0) {
+                        lockVoice();
                         return;
                     }
                     
@@ -1073,6 +1082,27 @@ displayMessage(msg) {
                     audioEl.play();
                     playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = true;
+                    
+                    // ✅ إذا كان هذا أول تشغيل (hasPlayed = false) ولم يتم تقليل العدد بعد
+                    if (!hasPlayed && localClicksRemaining !== undefined && localMaxClicks < 999999 && msg.sender !== 'me') {
+                        hasPlayed = true;
+                        localClicksRemaining--;
+                        msg.clicksRemaining = localClicksRemaining;
+                        
+                        if (ChatSystem.currentChat) {
+                            const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                            const msgIndex = messages.findIndex(m => m.id === msg.id);
+                            if (msgIndex !== -1) {
+                                messages[msgIndex].clicksRemaining = localClicksRemaining;
+                                ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                            }
+                        }
+                        
+                        if (localClicksRemaining <= 0) {
+                            lockVoice();
+                            return;
+                        }
+                    }
                 };
                 
                 // زر كتم الصوت
@@ -1090,7 +1120,7 @@ displayMessage(msg) {
                     }
                 };
                 
-                // ✅ تحديث عداد الوقت الحالي (يتزايد من 0:00 إلى المدة الإجمالية)
+                // ✅ تحديث عداد الوقت الحالي
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
                     const seconds = Math.floor(audioEl.currentTime % 60);
@@ -1104,6 +1134,11 @@ displayMessage(msg) {
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = false;
                     if (timeSpan) timeSpan.textContent = '0:00';
+                    
+                    // ✅ التحقق مرة أخرى من الصلاحية بعد انتهاء التشغيل
+                    if (localClicksRemaining !== undefined && localClicksRemaining <= 0) {
+                        lockVoice();
+                    }
                 };
             }
         }, 10);
@@ -1161,6 +1196,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+
     
     
     // ==================== القسم 27: sendMessage ====================
