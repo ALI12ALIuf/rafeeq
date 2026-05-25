@@ -475,15 +475,15 @@ cleanMediaMessagesOnLoad() {
     },
     
     // ==================== القسم 15: setupPageFocusListener ====================
-    setupPageFocusListener() {
-        window.addEventListener('focus', () => {
-            if (this.currentChat && this.friendOnline) {
-                console.log('👁️ الصفحة في المقدمة - تحديث حالة المحادثة');
-                this.sendConversationStatus(true);
-                this.requestConversationStatus();
-            }
-        });
-    },
+setupPageFocusListener() {
+    window.addEventListener('focus', () => {
+        if (this.currentChat && this.friendOnline && this.featuresEnabled) { // ✅ تم إضافة this.featuresEnabled
+            console.log('👁️ الصفحة في المقدمة - تحديث حالة المحادثة');
+            this.sendConversationStatus(true);
+            this.requestConversationStatus();
+        }
+    });
+},
     
     // ==================== القسم 16: requestConversationStatus ====================
     async requestConversationStatus() {
@@ -655,48 +655,50 @@ cleanMediaMessagesOnLoad() {
         
         this.updateAllButtons();
     },
+
+   // ==================== القسم 23: openChat ====================
+openChat(friendId, friendName, friendAvatar) {
+    this.currentChat = friendId;
     
-    // ==================== القسم 23: openChat ====================
-    openChat(friendId, friendName, friendAvatar) {
-        this.currentChat = friendId;
-        
-        if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
-            this.friendInConversation = this._pendingConversationStatus[friendId];
-            console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
-            delete this._pendingConversationStatus[friendId];
-        } else {
-            this.friendInConversation = false;
-        }
-        
-        this.resetFeatures();
-        document.body.classList.add('conversation-open');
-        const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
-        if (nameEl) nameEl.textContent = friendName;
-        if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
-        document.querySelector('.chat-page').style.display = 'none'; 
-        document.getElementById('conversationPage').style.display = 'flex';
-        this.displayMessages(friendId);
-        PresenceSystem.watchFriend(friendId);
-        
-        setTimeout(() => {
-            this.sendConversationStatus(true);
-        }, 500);
-        
-        setTimeout(() => {
-            this.requestConversationStatus();
-        }, 1000);
-        
-        setTimeout(() => { 
-            if (this.friendOnline) {
-                CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
-            }
-        }, 500);
-        
-        setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
-        setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
-        
-        setTimeout(() => this.setupFeatureButton(), 500);
-    },
+    if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
+        this.friendInConversation = this._pendingConversationStatus[friendId];
+        console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
+        delete this._pendingConversationStatus[friendId];
+    } else {
+        this.friendInConversation = false;
+    }
+    
+    this.resetFeatures();
+    document.body.classList.add('conversation-open');
+    const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
+    if (nameEl) nameEl.textContent = friendName;
+    if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
+    document.querySelector('.chat-page').style.display = 'none'; 
+    document.getElementById('conversationPage').style.display = 'flex';
+    this.displayMessages(friendId);
+    PresenceSystem.watchFriend(friendId);
+    
+    setTimeout(() => {
+        this.sendConversationStatus(true);
+    }, 500);
+    
+    setTimeout(() => {
+        this.requestConversationStatus();
+    }, 1000);
+    
+    // ✅ تم إزالة استدعاء ensureDataChannelOnly (لن يتم فتح Data Channel إلا بعد تفعيل الميزات)
+    // setTimeout(() => { 
+    //     if (this.friendOnline) {
+    //         CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
+    //     }
+    // }, 500);
+    
+    setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
+    setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+    
+    setTimeout(() => this.setupFeatureButton(), 500);
+}, 
+    
     
     // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
     updateFriendStatus(friendId, isOnline, userData = null) {
