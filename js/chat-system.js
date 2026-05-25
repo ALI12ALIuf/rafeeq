@@ -316,60 +316,61 @@ startFeatureBlink() {
     },
     
     // ==================== القسم 9: acceptFeatureRequest ====================
-    async acceptFeatureRequest() {
-        console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
-        
-        if (!this.featureRequestReceived && !this.featureRequestPending) {
-            console.log('⚠️ لا يوجد طلب معلق');
-            return;
-        }
-        
-        this.featuresEnabled = true;
-        this.featureRequestPending = false;
-        this.featureRequestReceived = false;
-        
-        console.log('✅ featuresEnabled =', this.featuresEnabled);
-        
-        if (this.featureBlinkInterval) {
-            clearInterval(this.featureBlinkInterval);
-            this.featureBlinkInterval = null;
-        }
-        
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) {
-            btn.style.background = '#4CAF50';
-            btn.style.transform = 'scale(1)';
-            btn.title = 'الميزات مفعلة ✅';
-            console.log('✅ تم تغيير لون الزر إلى الأخضر');
-        } else {
-            console.log('⚠️ لم يتم العثور على الزر');
-        }
-        
-        try {
-            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!myPrivateKey || !receiverPublicKey) return;
-            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-                type: 'feature_response',
-                action: 'accepted',
-                timestamp: Date.now()
-            }), sharedKey);
-            await SecureChatSystem.sendToServer(this.currentChat, { 
-                id: Date.now().toString(), 
-                type: 'feature_response', 
-                data: encrypted, 
-                timestamp: Date.now() 
-            });
-            console.log('✅ تم إرسال قبول التفعيل');
-        } catch(e) {
-            console.error('❌ خطأ في إرسال القبول:', e);
-        }
-        
-        this.updateAllButtons();
-        console.log('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
-        console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
-    },
+async acceptFeatureRequest() {
+    console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
+    
+    if (!this.featureRequestReceived && !this.featureRequestPending) {
+        console.log('⚠️ لا يوجد طلب معلق');
+        return;
+    }
+    
+    this.featuresEnabled = true;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    console.log('✅ featuresEnabled =', this.featuresEnabled);
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    // ✅ تحديث زر التفعيل
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) {
+        toggleInput.checked = true;
+    }
+    if (switchLabel) {
+        switchLabel.classList.remove('blinking');
+    }
+    
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+            type: 'feature_response',
+            action: 'accepted',
+            timestamp: Date.now()
+        }), sharedKey);
+        await SecureChatSystem.sendToServer(this.currentChat, { 
+            id: Date.now().toString(), 
+            type: 'feature_response', 
+            data: encrypted, 
+            timestamp: Date.now() 
+        });
+        console.log('✅ تم إرسال قبول التفعيل');
+    } catch(e) {
+        console.error('❌ خطأ في إرسال القبول:', e);
+    }
+    
+    this.updateAllButtons();
+    console.log('✅ تم تفعيل الميزات!');
+    console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
+},
     
     // ==================== القسم 10: handleFeatureResponse ====================
     handleFeatureResponse(fromId, action) {
