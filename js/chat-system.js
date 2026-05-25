@@ -815,7 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-   // ==================== القسم 26: displayMessage ====================
+    // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -940,176 +940,113 @@ displayMessage(msg) {
         const audioId = `audio_${msg.id}`;
         let audioDuration = 0;
         
-        // ✅ استخراج معلومات الضغطات للبصمة
-        const maxClicks = msg.maxClicks;
-        let clicksRemaining = msg.clicksRemaining;
+        // ✅ الحصول على المدة الإجمالية للبصمة
+        const tempAudio = new Audio(audioSrc);
+        tempAudio.addEventListener('loadedmetadata', () => {
+            audioDuration = tempAudio.duration;
+            const durationSpan = document.getElementById(`duration_${audioId}`);
+            if (durationSpan && !isNaN(audioDuration)) {
+                const minutes = Math.floor(audioDuration / 60);
+                const seconds = Math.floor(audioDuration % 60);
+                durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        });
         
-        // ✅ إذا كانت الصلاحية انتهت (clicksRemaining !== undefined && clicksRemaining <= 0)
-        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-            div.innerHTML = `
-                <div class="message-content" style="background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>
-                </div>
-                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
-            `;
-        } else {
-            // ✅ الحصول على المدة الإجمالية للبصمة
-            const tempAudio = new Audio(audioSrc);
-            tempAudio.addEventListener('loadedmetadata', () => {
-                audioDuration = tempAudio.duration;
-                const durationSpan = document.getElementById(`duration_${audioId}`);
-                if (durationSpan && !isNaN(audioDuration)) {
-                    const minutes = Math.floor(audioDuration / 60);
-                    const seconds = Math.floor(audioDuration % 60);
-                    durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                }
-            });
-            
-            // ✅ عرض البصمة مع مشغل مخصص ونظام الضغطات
-            div.innerHTML = `
-                <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <button class="voice-play-btn" data-audio="${audioId}" data-msgid="${msg.id}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                            <i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>
-                        </button>
-                        <button class="voice-replay-btn" data-audio="${audioId}" data-msgid="${msg.id}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                            <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
-                        </button>
-                        <div style="text-align: center;">
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px;">0:00</span>
-                                <span id="duration_${audioId}" style="color: white; font-size: 0.7rem; opacity: 0.8;">0:00</span>
-                            </div>
+        // ✅ مشغل مخصص مع عدادين (وقت التشغيل الحالي والمدة الإجمالية)
+        div.innerHTML = `
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>
+                    </button>
+                    <button class="voice-replay-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
+                    </button>
+                    <div style="text-align: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px;">0:00</span>
+                            <span id="duration_${audioId}" style="color: white; font-size: 0.7rem; opacity: 0.8;">0:00</span>
                         </div>
-                        <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                            <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
-                        </button>
                     </div>
-                    <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
+                    <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
+                    </button>
                 </div>
-                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
-            `;
+                <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
+            </div>
+            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+        `;
+        
+        // إضافة معالج التشغيل بعد إضافة العنصر
+        setTimeout(() => {
+            const playBtn = div.querySelector('.voice-play-btn');
+            const replayBtn = div.querySelector('.voice-replay-btn');
+            const muteBtn = div.querySelector('.voice-mute-btn');
+            const audioEl = document.getElementById(audioId);
+            const timeSpan = document.getElementById(`time_${audioId}`);
             
-            // إضافة معالج التشغيل بعد إضافة العنصر
-            setTimeout(() => {
-                const playBtn = div.querySelector('.voice-play-btn');
-                const replayBtn = div.querySelector('.voice-replay-btn');
-                const muteBtn = div.querySelector('.voice-mute-btn');
-                const audioEl = document.getElementById(audioId);
-                const timeSpan = document.getElementById(`time_${audioId}`);
-                const msgId = msg.id;
+            if (playBtn && audioEl) {
+                let isPlaying = false;
                 
-                if (playBtn && audioEl) {
-                    let isPlaying = false;
-                    let hasPlayedOnce = false;
-                    
-                    // دالة لتقليل عدد الضغطات المتبقية
-                    const decrementClicks = () => {
-                        if (clicksRemaining !== undefined && maxClicks < 999999 && msg.sender !== 'me') {
-                            clicksRemaining--;
-                            msg.clicksRemaining = clicksRemaining;
-                            
-                            // تحديث في localStorage
-                            if (ChatSystem.currentChat) {
-                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
-                                const msgIndex = messages.findIndex(m => m.id === msgId);
-                                if (msgIndex !== -1) {
-                                    messages[msgIndex].clicksRemaining = clicksRemaining;
-                                    ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
-                                }
-                            }
-                            
-                            // ✅ إذا وصلت إلى الصفر، قفل البصمة
-                            if (clicksRemaining <= 0) {
-                                const voiceContainer = div.querySelector('.voice-message');
-                                if (voiceContainer) {
-                                    voiceContainer.innerHTML = `
-                                        <div style="background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;">
-                                            <i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>
-                                        </div>
-                                    `;
-                                }
-                            }
-                        }
-                    };
-                    
-                    // زر التشغيل/الإيقاف المؤقت
-                    playBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        
-                        // ✅ التحقق من الصلاحية
-                        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                            return;
-                        }
-                        
-                        if (isPlaying) {
-                            audioEl.pause();
-                            playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                            isPlaying = false;
-                        } else {
-                            // ✅ في أول مرة تشغيل، ننقص العدد
-                            if (!hasPlayedOnce && msg.sender !== 'me') {
-                                decrementClicks();
-                                hasPlayedOnce = true;
-                            }
-                            audioEl.play();
-                            playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                            isPlaying = true;
-                        }
-                    };
-                    
-                    // زر إعادة التشغيل (سهم دائري)
-                    replayBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        
-                        // ✅ التحقق من الصلاحية
-                        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                            return;
-                        }
-                        
+                // زر التشغيل/الإيقاف المؤقت
+                playBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isPlaying) {
                         audioEl.pause();
-                        audioEl.currentTime = 0;
                         playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isPlaying = false;
-                        if (timeSpan) timeSpan.textContent = '0:00';
+                    } else {
                         audioEl.play();
                         playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isPlaying = true;
-                    };
-                    
-                    // زر كتم الصوت
-                    let isMuted = false;
-                    muteBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        if (isMuted) {
-                            audioEl.muted = false;
-                            muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                            isMuted = false;
-                        } else {
-                            audioEl.muted = true;
-                            muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #f44336; font-size: 0.9rem;"></i>';
-                            isMuted = true;
-                        }
-                    };
-                    
-                    // تحديث عداد الوقت الحالي
-                    audioEl.ontimeupdate = () => {
-                        const minutes = Math.floor(audioEl.currentTime / 60);
-                        const seconds = Math.floor(audioEl.currentTime % 60);
-                        if (timeSpan) {
-                            timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                        }
-                    };
-                    
-                    // عند انتهاء التشغيل
-                    audioEl.onended = () => {
-                        playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                        isPlaying = false;
-                        if (timeSpan) timeSpan.textContent = '0:00';
-                    };
-                }
-            }, 10);
-        }
+                    }
+                };
+                
+                // زر إعادة التشغيل (سهم دائري)
+                replayBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    audioEl.pause();
+                    audioEl.currentTime = 0;
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
+                    audioEl.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = true;
+                };
+                
+                // زر كتم الصوت
+                let isMuted = false;
+                muteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isMuted) {
+                        audioEl.muted = false;
+                        muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                        isMuted = false;
+                    } else {
+                        audioEl.muted = true;
+                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #f44336; font-size: 0.9rem;"></i>';
+                        isMuted = true;
+                    }
+                };
+                
+                // ✅ تحديث عداد الوقت الحالي (يتزايد من 0:00 إلى المدة الإجمالية)
+                audioEl.ontimeupdate = () => {
+                    const minutes = Math.floor(audioEl.currentTime / 60);
+                    const seconds = Math.floor(audioEl.currentTime % 60);
+                    if (timeSpan) {
+                        timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                };
+                
+                // ✅ عند انتهاء التشغيل، يعود العداد إلى 0:00
+                audioEl.onended = () => {
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
+                };
+            }
+        }, 10);
     } 
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
@@ -1163,8 +1100,7 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-}, 
-    
+},
     
     
     // ==================== القسم 27: sendMessage ====================
@@ -1321,108 +1257,33 @@ displayMessage(msg) {
             } else alert('فشل إرسال الملف');
         }
     },
-
-
+    
     // ==================== القسم 33: sendVoiceNote ====================
-async sendVoiceNote(audioBlob) { 
-    if (!this.currentChat) return;
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return;
-    }
-    
-    // ✅ عرض نافذة اختيار عدد مرات الاستماع
-    const maxClicks = await this.showVoiceClicksPicker();
-    if (maxClicks === null) return; // المستخدم ألغى
-    
-    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-    }
-    
-    await new Promise(r => setTimeout(r, 200));
-    
-    if (!(await this._ensureChannelReady())) return;
-    
-    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-        // ✅ إضافة maxClicks إلى بيانات البصمة
-        audioBlob.maxClicks = maxClicks;
-        const success = await this.sendFileWithRetry(audioBlob, 'voice');
-        if (success) {
-            const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
-            const msgId = Date.now().toString();
-            this.saveMessage(this.currentChat, { 
-                id: msgId, 
-                type: 'voice', 
-                data: b64, 
-                sender: 'me', 
-                time: new Date().toISOString(), 
-                status: 'sent',
-                maxClicks: maxClicks,
-                clicksRemaining: maxClicks
-            }); 
-            this.displayMessage({ 
-                id: msgId, 
-                type: 'voice', 
-                data: b64, 
-                sender: 'me', 
-                time: new Date().toISOString(), 
-                status: 'sent',
-                maxClicks: maxClicks,
-                clicksRemaining: maxClicks
-            });
-        } else alert('فشل إرسال البصمة الصوتية');
-    }
-},
-
-// ✅ دالة اختيار عدد مرات الاستماع للبصمة الصوتية
-showVoiceClicksPicker() {
-    return new Promise((resolve) => {
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.7);
-            z-index: 10005;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        modal.innerHTML = `
-            <div style="background: #0a0e27; border-radius: 40px; width: 300px; max-width: 90%; padding: 25px 20px; text-align: center; color: white;">
-                <div style="font-size: 3rem; margin-bottom: 10px;">🎤</div>
-                <h3 style="margin: 0 0 5px;">عدد مرات الاستماع</h3>
-                <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">كم مرة يمكن للمستلم سماع البصمة؟</p>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <button class="clicks-option" data-clicks="1" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🎧 مرة واحدة</button>
-                    <button class="clicks-option" data-clicks="2" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🎧 مرتين</button>
-                    <button class="clicks-option" data-clicks="3" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🎧 3 مرات</button>
-                    <button class="clicks-option" data-clicks="4" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🎧 4 مرات</button>
-                    <button class="clicks-option" data-clicks="5" style="background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 30px; cursor: pointer; font-size: 1rem;">🎧 5 مرات</button>
-                </div>
-                <button id="cancelClicks" style="margin-top: 20px; background: #f44336; color: white; border: none; padding: 10px 25px; border-radius: 30px; cursor: pointer; font-size: 0.9rem;">❌ إلغاء</button>
-            </div>
-        `;
-        document.body.appendChild(modal);
+    async sendVoiceNote(audioBlob) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
         
-        const buttons = modal.querySelectorAll('.clicks-option');
-        buttons.forEach(btn => {
-            btn.onclick = () => {
-                const clicks = parseInt(btn.dataset.clicks);
-                modal.remove();
-                resolve(clicks);
-            };
-        });
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
         
-        document.getElementById('cancelClicks').onclick = () => {
-            modal.remove();
-            resolve(null);
-        };
-    });
-},
-    
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(audioBlob, 'voice');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال البصمة الصوتية');
+        }
+    },
     
     // ==================== القسم 34: shareLocationDirect ====================
     
