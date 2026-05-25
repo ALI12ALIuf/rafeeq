@@ -231,39 +231,31 @@ setupFeatureButton() {
 },
     
     // ==================== القسم 6: startFeatureBlink ====================
-    startFeatureBlink() {
-        if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
+startFeatureBlink() {
+    if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
+    
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    if (!switchLabel) return;
+    
+    switchLabel.classList.add('blinking');
+    
+    let blinkCount = 0;
+    this.featureBlinkInterval = setInterval(() => {
+        if (!this.featureRequestPending && !this.featureRequestReceived) {
+            clearInterval(this.featureBlinkInterval);
+            switchLabel.classList.remove('blinking');
+            return;
+        }
         
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (!btn) return;
-        
-        let blinkCount = 0;
-        this.featureBlinkInterval = setInterval(() => {
-            if (!this.featureRequestPending && !this.featureRequestReceived) {
-                clearInterval(this.featureBlinkInterval);
-                btn.style.background = '#f44336';
-                btn.style.transform = 'scale(1)';
-                return;
-            }
-            
-            blinkCount++;
-            if (blinkCount % 2 === 0) {
-                btn.style.background = '#2196F3';
-                btn.style.transform = 'scale(1.1)';
-            } else {
-                btn.style.background = '#4CAF50';
-                btn.style.transform = 'scale(1)';
-            }
-            
-            if (blinkCount > 30) {
-                clearInterval(this.featureBlinkInterval);
-                this.featureRequestPending = false;
-                this.featureRequestReceived = false;
-                btn.style.background = '#f44336';
-                btn.style.transform = 'scale(1)';
-            }
-        }, 500);
-    },
+        blinkCount++;
+        if (blinkCount > 30) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            switchLabel.classList.remove('blinking');
+        }
+    }, 500);
+},
     
     // ==================== القسم 7: requestEnableFeatures ====================
     async requestEnableFeatures() {
