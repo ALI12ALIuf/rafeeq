@@ -1,1598 +1,1705 @@
-// ========== 1. webrtc-call.js - النسخة النهائية المتكاملة ==========
-// جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
+// ========== chat-system.js ==========
+// نظام الدردشة E2EE + نظام الحضور Presence
 
-const CallSystem = {
-    pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
-    incomingChunks: {}, incomingFileInfo: {},
-    reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
-    callTimerInterval: null, keepAliveInterval: null,
-    isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
-    remoteAudioElement: null,
-    servers: { 
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-        ] 
-    },
-    
-    // ==================== 2. التنظيف التلقائي ====================
-    
-    async autoCleanupOnLoad() {
-        console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.currentCallId = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
-        }
-        
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
-        }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        if (typeof PresenceSystem !== 'undefined' && window.auth?.currentUser) {
-            try {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    online: true,
-                    inCall: false,
-                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                console.log('✅ تم تنظيف حالة المستخدم في قاعدة البيانات');
-            } catch(e) {
-                console.warn('⚠️ فشل تنظيف قاعدة البيانات:', e.message);
-            }
-        }
-        
-        console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
-    },
-    
-    // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
-    
-    async ensureDataChannelOnly(calleeId) {
-        if (!calleeId) return false;
-        
-        if (this.dc && this.dc.readyState === 'open') {
-            console.log('✅ Data Channel موجود ومفتوح');
-            return true;
-        }
-        
-        if (this.dc && this.dc.readyState === 'connecting') {
-            console.log('⏳ Data Channel في طور الاتصال...');
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => resolve(false), 10000);
-                const check = setInterval(() => {
-                    if (this.dc && this.dc.readyState === 'open') {
-                        clearInterval(check);
-                        clearTimeout(timeout);
-                        resolve(true);
-                    } else if (this.dc && (this.dc.readyState === 'failed' || this.dc.readyState === 'closed')) {
-                        clearInterval(check);
-                        clearTimeout(timeout);
-                        this.createDataChannelOnly(calleeId).then(resolve);
-                    }
-                }, 500);
-            });
-        }
-        
-        return this.createDataChannelOnly(calleeId);
-    },
-    
-    async createDataChannelOnly(calleeId) {
-        this.cleanupConnections();
-        try {
-            console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
-            
-            this.pc = new RTCPeerConnection(this.servers);
-            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
-            };
-            
-            this.pc.ondatachannel = e => { 
-                this.setupDataChannel(e.channel); 
-                this.dc = e.channel; 
-            };
-            
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
-            
-            console.log('✅ تم إرسال طلب فتح Data Channel');
-            return true;
-        } catch (error) {
-            console.error('❌ فشل إنشاء Data Channel:', error);
-            return false;
-        }
-    },
-    
-    // ==================== 4. المكالمة الصوتية ====================
+// ==================== القسم 1: تعريف PresenceSystem ====================
+const PresenceSystem = {
+    listeners: {}, heartbeatInterval: null,
+    async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
+    async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
+    startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
+    stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
+    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data()); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
+    stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
+};
 
-    async startAudioCall(calleeId) {
-        if (!ChatSystem.friendOnline) {
-            console.log('❌ لا يمكن بدء المكالمة: المستخدم غير متصل');
-            return;
-        }
-        
-        if (!ChatSystem.friendInConversation) {
-            console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
-            return;
-        }
-        
-        if (!window.auth?.currentUser) {
-            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-            return;
-        }
-        if (this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            return;
-        }
-        
-        this.isInCall = true;
-        this.callType = 'audio';
-        this.currentCallId = calleeId;
-        
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: 'audio'
-                }).catch(() => {});
-            }
-            
-            this.showCallUI('audio');
-            
-            const silentAudio = new Audio();
-            silentAudio.volume = 0;
-            silentAudio.play().catch(() => {});
-            
-            console.log('🎤 طلب الوصول إلى الميكروفون...');
-            const constraints = { audio: true, video: false };
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            const audioTracks = this.localStream.getAudioTracks();
-            if (audioTracks.length === 0) {
-                this.endCall();
-                return;
-            }
-            console.log('✅ تم الحصول على الميكروفون');
-            
-            this.pc = new RTCPeerConnection(this.servers);
-            
-            this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
-            });
-            
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) {
-                    console.log('📡 إرسال ICE candidate');
-                    this.sendSignal(calleeId, { candidate: e.candidate });
-                }
-            };
-            
-            this.pc.ontrack = e => {
-                console.log(`📞 استقبال مسار ${e.track.kind}`);
-                if (e.track.kind === 'audio') {
-                    this.setupRemoteAudio(e.streams[0]);
-                }
-            };
-            
-            this.pc.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
-                    this.endCall();
-                }
-            };
-            
-            console.log('📞 إنشاء عرض مكالمة صوتية...');
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
-            console.log('✅ تم إرسال العرض');
-            
-        } catch (e) { 
-            console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
-            this.endCall(); 
-        }
-    },
-
-    // ==================== 5. المكالمة المرئية ====================
-
-    async startVideoCall(calleeId) {
-        if (!ChatSystem.friendOnline) {
-            console.log('❌ لا يمكن بدء المكالمة: المستخدم غير متصل');
-            return;
-        }
-        
-        if (!ChatSystem.friendInConversation) {
-            console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
-            return;
-        }
-        
-        if (!window.auth?.currentUser) {
-            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-            return;
-        }
-        if (this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            return;
-        }
-        
-        this.isInCall = true;
-        this.callType = 'video';
-        this.currentCallId = calleeId;
-        
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: 'video'
-                }).catch(() => {});
-            }
-            
-            const constraints = { 
-                audio: true, 
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
-            };
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
-                return;
-            }
-            
-            this.showCallUI('video');
-            this.pc = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => {
-                const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) rv.srcObject = e.streams[0];
-            };
-            this.pc.onconnectionstatechange = () => {
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
-            };
-            
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
-            
-        } catch (e) { 
-            this.endCall(); 
-        }
+// ==================== القسم 2: تعريف ChatSystem ====================
+const ChatSystem = {
+    currentChat: null, messages: {}, friendOnline: false,
+    friendInConversation: false,
+    _pendingConversationStatus: {},
+    
+    featuresEnabled: false,
+    featureRequestPending: false,
+    featureRequestReceived: false,
+    featureBlinkInterval: null,
+    
+    // ✅ متغيرات المؤقت 120 ثانية
+    offlineStartTime: null,
+    offlineTimer: null,
+    offlineCountdownInterval: null,
+    
+    // ==================== القسم 3: init ====================
+    init() { 
+        this.loadAllChats(); 
+        this.setupPageFocusListener();
+        this.setupFeatureButton();
+        this.setupBeforeUnloadListener();
     },
     
-    // ==================== 6. إعداد الصوت عن بعد ====================
-    
-    setupRemoteAudio(stream) {
-        console.log('🔊 إعداد الصوت عن بعد...');
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-        }
-        
-        this.remoteAudioElement = new Audio();
-        this.remoteAudioElement.srcObject = stream;
-        this.remoteAudioElement.autoplay = true;
-        
-        this.applySpeakerSettings();
-        
-        this.remoteAudioElement.play().then(() => {
-            console.log('✅ بدء تشغيل الصوت عن بعد');
-        }).catch(e => {
-            console.log('❌ فشل تشغيل الصوت:', e);
+    // ==================== القسم 4: setupBeforeUnloadListener و sendFeatureCancelBeforeUnload ====================
+    setupBeforeUnloadListener() {
+        window.addEventListener('beforeunload', () => {
+            if (this.currentChat && this.featuresEnabled) {
+                console.log('🚪 الصفحة تغلق - إرسال إشارة إلغاء إلى:', this.currentChat);
+                this.sendFeatureCancelBeforeUnload(this.currentChat);
+            }
         });
     },
     
-    applySpeakerSettings() {
-        if (!this.remoteAudioElement) return;
-        
-        if (this.remoteAudioElement.setSinkId) {
-            if (this.isSpeakerEnabled) {
-                this.remoteAudioElement.setSinkId('speaker').then(() => {
-                    console.log('✅ تم التبديل إلى السماعة الخارجية');
-                }).catch(e => console.log('❌ فشل التبديل إلى السماعة:', e));
-            } else {
-                this.remoteAudioElement.setSinkId('default').then(() => {
-                    console.log('✅ تم التبديل إلى السماعة الداخلية');
-                }).catch(e => console.log('❌ فشل التبديل:', e));
-            }
-        }
-    },
-
-    
-    // ==================== 7. استقبال المكالمات ====================
-
-    async receiveCall(callerId, callData) {
-        if (this.isInCall) {
-            console.log('❌ مكالمة نشطة بالفعل');
-            this.sendSignal(callerId, { type: 'reject' });
-            return;
-        }
-        
-        this.isInCall = true;
-        this.callType = callData.type || 'audio';
-        this.currentCallId = callerId;
-        console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
-        
+    async sendFeatureCancelBeforeUnload(chatId) {
         try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: this.callType
-                }).catch(() => {});
-            }
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_cancel',
+                timestamp: Date.now()
+            }), sharedKey);
             
-            const silentAudio = new Audio();
-            silentAudio.volume = 0;
-            silentAudio.play().catch(() => {});
-            
-            const constraints = { 
-                audio: true, 
-                video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } : false
+            const messageData = {
+                to: chatId,
+                from: window.auth?.currentUser?.uid,
+                package: { 
+                    id: Date.now().toString(), 
+                    type: 'feature_cancel', 
+                    data: encrypted, 
+                    timestamp: Date.now() 
+                },
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + SecureChatSystem.MESSAGE_EXPIRY_HOURS * 3600000))
             };
             
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
-                return;
-            }
-            
-            if (this.callType === 'video') {
-                const videoTrack = this.localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    videoTrack.enabled = false;
-                    this.isVideoMuted = true;
-                    console.log('✅ تم إيقاف الكاميرا بشكل افتراضي');
-                }
-            }
-            
-            this.showCallUI(this.callType);
-            
-            this.pc = new RTCPeerConnection(this.servers);
-            
-            this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
-            });
-            
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
-            };
-            
-            this.pc.ontrack = e => {
-                console.log('📞 استقبال مسار:', e.track.kind);
-                
-                if (e.track.kind === 'video') {
-                    console.log('✅ تم استقبال فيديو بعيد');
-                    const rv = document.getElementById('remoteVideo');
-                    if (rv) {
-                        rv.srcObject = e.streams[0];
-                        rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
-                        console.log('✅ تم ربط الفيديو البعيد');
-                    } else {
-                        console.log('⚠️ عنصر remoteVideo غير موجود');
-                        setTimeout(() => {
-                            const rv2 = document.getElementById('remoteVideo');
-                            if (rv2) {
-                                rv2.srcObject = e.streams[0];
-                                console.log('✅ تم ربط الفيديو البعيد (بعد التأخير)');
-                            }
-                        }, 500);
-                    }
-                } else if (e.track.kind === 'audio') {
-                    this.setupRemoteAudio(e.streams[0]);
-                }
-            };
-            
-            this.pc.ondatachannel = e => {
-                console.log('📡 استقبال Data Channel');
-                this.setupDataChannel(e.channel);
-                this.dc = e.channel;
-            };
-            
-            this.pc.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
-                    this.endCall();
-                }
-            };
-            
-            if (callData.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
-                const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
-                const answer = await this.pc.createAnswer(answerOptions);
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
-                console.log('✅ تم إرسال الرد');
-            }
-            
-            if (this.callType === 'video') {
-                setTimeout(() => {
-                    const lv = document.getElementById('localVideo');
-                    if (lv && this.localStream) {
-                        lv.srcObject = this.localStream;
-                        console.log('✅ تم ربط الفيديو المحلي');
-                    }
-                }, 500);
-            }
-            
-        } catch (e) { 
-            console.error('❌ خطأ في استقبال المكالمة:', e);
-            this.sendSignal(callerId, { type: 'reject' });
-            this.endCall(); 
+            await window.db.collection('secure_messages').add(messageData);
+            console.log('✅ تم إرسال إشارة الإلغاء قبل إغلاق الصفحة');
+        } catch(e) {
+            console.error('❌ فشل إرسال إشارة الإلغاء قبل الإغلاق:', e);
         }
     },
-
     
-    // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
-
-    showIncomingCall(callerId, callData) {
-        if (callData.type === 'datachannel') {
-            console.log('📡 استلام طلب فتح Data Channel - لا حاجة لعرض شاشة');
-            this.handleSignaling(callData);
-            return;
-        }
-        
-        console.log('🔔 عرض شاشة المكالمة الواردة...');
-        this.currentCallId = callerId;
-        
-        const callType = callData.type === 'video' ? 'video' : 'audio';
-        const appColor = '#2196F3';
-        const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
-        
-        const fetchUserName = async () => {
-            try {
-                const userDoc = await window.db.collection('users').doc(callerId).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    return userData.name || 'مستخدم';
-                }
-            } catch (e) {}
-            return 'مستخدم';
-        };
-        
-        const fetchUserAvatar = async () => {
-            try {
-                const userDoc = await window.db.collection('users').doc(callerId).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
-                    return emojiMap[userData.avatarType] || '👤';
-                }
-            } catch (e) {}
-            return '👤';
-        };
-        
-        Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
-            const existingOverlay = document.getElementById('incomingCall');
-            if (existingOverlay) existingOverlay.remove();
-            
-            const overlay = document.createElement('div');
-            overlay.id = 'incomingCall';
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: #0a0e27;
-                z-index: 9999;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-            `;
-            
-            overlay.innerHTML = `
-                <style>
-                    @keyframes float {
-                        0%, 100% { transform: translateY(0px); }
-                        50% { transform: translateY(-15px); }
-                    }
-                    @keyframes ring {
-                        0% { transform: rotate(0deg); }
-                        25% { transform: rotate(6deg); }
-                        50% { transform: rotate(0deg); }
-                        75% { transform: rotate(-6deg); }
-                        100% { transform: rotate(0deg); }
-                    }
-                    .avatar-float {
-                        animation: float 2.5s ease-in-out infinite;
-                    }
-                    .ring-animation {
-                        animation: ring 1.2s ease-in-out infinite;
-                        transform-origin: center;
-                    }
-                    .swipe-container {
-                        width: 360px;
-                        margin: 30px auto;
-                        position: relative;
-                    }
-                    .swipe-button {
-                        width: 100%;
-                        height: 80px;
-                        border-radius: 50px;
-                        position: relative;
-                        overflow: hidden;
-                        cursor: grab;
-                        user-select: none;
-                        touch-action: none;
-                        background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
-                        border: 2px solid ${appColor};
-                        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-                    }
-                    .swipe-button:active {
-                        cursor: grabbing;
-                    }
-                    .divider-line {
-                        position: absolute;
-                        top: 10px;
-                        bottom: 10px;
-                        left: 50%;
-                        width: 2px;
-                        background: ${appColor};
-                        transform: translateX(-50%);
-                        pointer-events: none;
-                        z-index: 5;
-                        border-radius: 2px;
-                        box-shadow: 0 0 8px ${appColor};
-                    }
-                    .swipe-thumb {
-                        position: absolute;
-                        top: 8px;
-                        width: 64px;
-                        height: 64px;
+    // ==================== القسم 5: setupFeatureButton ====================
+    setupFeatureButton() {
+        setTimeout(() => {
+            let btn = document.getElementById('enableFeaturesBtn');
+            if (!btn) {
+                const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
+                if (container) {
+                    btn = document.createElement('button');
+                    btn.id = 'enableFeaturesBtn';
+                    btn.innerHTML = '🔓';
+                    btn.title = 'تفعيل الميزات (اتصال، صور، ملفات)';
+                    btn.style.cssText = `
+                        width: 45px;
+                        height: 45px;
                         border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 1.8rem;
-                        box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-                        transition: left 0.1s linear, right 0.1s linear;
-                        cursor: grab;
-                        z-index: 30;
-                        backdrop-filter: blur(5px);
-                        border: 2px solid ${appColor};
-                    }
-                    .swipe-thumb:active {
-                        cursor: grabbing;
-                        transform: scale(0.96);
-                    }
-                    .thumb-left {
-                        left: 8px;
-                        background: linear-gradient(145deg, #4CAF50, #1b5e2a);
-                        color: white;
-                    }
-                    .thumb-right {
-                        right: 8px;
-                        left: auto;
-                        background: linear-gradient(145deg, #f44336, #8b0000);
-                        color: white;
-                    }
-                    .center-dot {
-                        position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        width: 14px;
-                        height: 14px;
-                        background: ${appColor};
-                        border-radius: 50%;
-                        pointer-events: none;
-                        z-index: 20;
-                        box-shadow: 0 0 12px ${appColor};
-                    }
-                </style>
-                
-                <div style="text-align: center; margin-bottom: 50px;">
-                    <div class="avatar-float ring-animation" style="font-size: 5.5rem; margin-bottom: 15px; filter: drop-shadow(0 10px 25px rgba(0,0,0,0.4));">${contactAvatar}</div>
-                    <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 8px; letter-spacing: -0.5px;">${contactName}</div>
-                </div>
-                
-                <div class="swipe-container">
-                    <div id="swipeButton" class="swipe-button">
-                        <div class="divider-line"></div>
-                        <div class="center-dot"></div>
+                        background: #f44336;
+                        border: none;
+                        cursor: pointer;
+                        margin: 0 5px;
+                        font-size: 1.2rem;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    `;
+                    btn.onclick = () => {
+                        console.log('🔘 تم الضغط على الزر');
+                        console.log('featureRequestReceived:', this.featureRequestReceived);
+                        console.log('featureRequestPending:', this.featureRequestPending);
+                        console.log('featuresEnabled:', this.featuresEnabled);
                         
-                        <div id="leftThumb" class="swipe-thumb thumb-left">
-                            <i class="fas ${acceptIcon}"></i>
-                        </div>
-                        <div id="rightThumb" class="swipe-thumb thumb-right">
-                            <i class="fas fa-phone-slash"></i>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(overlay);
-            
-            const button = document.getElementById('swipeButton');
-            const leftThumb = document.getElementById('leftThumb');
-            const rightThumb = document.getElementById('rightThumb');
-            
-            let isDraggingLeft = false;
-            let isDraggingRight = false;
-            let leftStartX = 0;
-            let rightStartX = 0;
-            let leftCurrentPos = 8;
-            let rightCurrentPos = 8;
-            const buttonWidth = button.clientWidth;
-            const centerPos = buttonWidth / 2;
-            const maxLeftMove = centerPos - 40;
-            const maxRightMove = centerPos - 40;
-            
-            const onLeftStart = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                isDraggingLeft = true;
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const rect = leftThumb.getBoundingClientRect();
-                leftStartX = clientX - (rect.left - button.getBoundingClientRect().left);
-                leftThumb.style.transition = 'none';
-            };
-            
-            const onLeftMove = (e) => {
-                if (!isDraggingLeft) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
-                newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
-                leftCurrentPos = newLeft;
-                leftThumb.style.left = newLeft + 'px';
-            };
-            
-            const onLeftEnd = () => {
-                if (!isDraggingLeft) return;
-                isDraggingLeft = false;
-                leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                
-                if (leftCurrentPos >= maxLeftMove - 10) {
-                    leftThumb.style.left = maxLeftMove + 'px';
-                    setTimeout(() => {
-                        overlay.remove();
-                        this.receiveCall(callerId, callData);
-                    }, 200);
+                        if (this.featureRequestReceived) {
+                            console.log('✅ قبول الطلب');
+                            this.acceptFeatureRequest();
+                        } else if (this.featuresEnabled) {
+                            console.log('⚠️ الميزات مفعلة بالفعل');
+                            alert('الميزات مفعلة بالفعل');
+                        } else if (this.featureRequestPending) {
+                            console.log('⏳ طلب قيد الانتظار');
+                            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+                        } else {
+                            console.log('📨 إرسال طلب جديد');
+                            this.requestEnableFeatures();
+                        }
+                    };
+                    container.appendChild(btn);
+                    console.log('✅ تم إضافة زر التفعيل');
                 } else {
-                    leftThumb.style.left = '8px';
+                    console.log('⚠️ لم يتم العثور على حاوية للزر');
                 }
-            };
-            
-            const onRightStart = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                isDraggingRight = true;
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const rect = rightThumb.getBoundingClientRect();
-                rightStartX = (rect.right - clientX);
-                rightThumb.style.transition = 'none';
-            };
-            
-            const onRightMove = (e) => {
-                if (!isDraggingRight) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const containerRect = button.getBoundingClientRect();
-                let newRight = (containerRect.right - clientX) - rightStartX;
-                newRight = Math.max(8, Math.min(newRight, maxRightMove));
-                rightCurrentPos = newRight;
-                rightThumb.style.right = newRight + 'px';
-            };
-            
-            const onRightEnd = () => {
-                if (!isDraggingRight) return;
-                isDraggingRight = false;
-                rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                
-                if (rightCurrentPos >= maxRightMove - 10) {
-                    rightThumb.style.right = maxRightMove + 'px';
-                    setTimeout(() => {
-                        overlay.remove();
-                        this.sendSignal(callerId, { type: 'reject' });
-                    }, 200);
-                } else {
-                    rightThumb.style.right = '8px';
-                }
-            };
-            
-            leftThumb.addEventListener('mousedown', onLeftStart);
-            leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
-            
-            rightThumb.addEventListener('mousedown', onRightStart);
-            rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
-            
-            document.addEventListener('mousemove', (e) => {
-                onLeftMove(e);
-                onRightMove(e);
-            });
-            document.addEventListener('mouseup', () => {
-                onLeftEnd();
-                onRightEnd();
-            });
-            document.addEventListener('touchmove', (e) => {
-                onLeftMove(e);
-                onRightMove(e);
-            }, { passive: false });
-            document.addEventListener('touchend', () => {
-                onLeftEnd();
-                onRightEnd();
-            });
-            
-            overlay._cleanup = () => {
-                document.removeEventListener('mousemove', onLeftMove);
-                document.removeEventListener('mouseup', onLeftEnd);
-                document.removeEventListener('mousemove', onRightMove);
-                document.removeEventListener('mouseup', onRightEnd);
-            };
-            
-            setTimeout(() => {
-                const stillThere = document.getElementById('incomingCall');
-                if (stillThere) {
-                    if (stillThere._cleanup) stillThere._cleanup();
-                    stillThere.remove();
-                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
-                    this.sendSignal(callerId, { type: 'reject' });
-                }
-            }, 30000);
-        });
+            }
+        }, 1000);
     },
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
-
-    setupDataChannel(channel) {
-        if (!channel) return;
-        console.log('📡 إعداد Data Channel');
+    // ==================== القسم 6: startFeatureBlink ====================
+    startFeatureBlink() {
+        if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
         
-        channel.onmessage = e => {
-            try {
-                const msg = JSON.parse(e.data);
-                if (msg.type === 'ping') return;
-                if (msg.type === 'call_status') {
-                    this.handleCallStatus(msg);
-                    return;
-                }
-                if (msg.chunk !== undefined) {
-                    this.handleChunkMessage(msg);
-                    return;
-                }
-                const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
-                if (ChatSystem.currentChat) {
-                    ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                    ChatSystem.displayMessage(displayMsg);
-                }
-            } catch (error) {
-                console.error('خطأ في معالجة الرسالة:', error);
-            }
-        };
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (!btn) return;
         
-        channel.onopen = () => {
-            console.log('✅ Data Channel مفتوح');
-            if (this.reconnectTimer) {
-                clearTimeout(this.reconnectTimer);
-                this.reconnectTimer = null;
-            }
-            this.reconnectAttempts = 0;
-            this.sendCallStatus('connected');
-            
-            if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = setInterval(() => {
-                if (this.dc && this.dc.readyState === 'open') {
-                    this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-                }
-            }, 2000);
-        };
-        
-        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند انقطاع القناة
-        channel.onclose = () => {
-            console.log('❌ Data Channel مغلق');
-            this.sendCallStatus('disconnected');
-            if (this.keepAliveInterval) {
-                clearInterval(this.keepAliveInterval);
-                this.keepAliveInterval = null;
-            }
-            this.scheduleReconnect();
-            
-            // ✅ إلغاء تفعيل الميزات عند انقطاع القناة (الطرف الآخر أغلق المتصفح)
-            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-                ChatSystem.featuresEnabled = false;
-                ChatSystem.featureRequestPending = false;
-                ChatSystem.featureRequestReceived = false;
-                
-                if (ChatSystem.featureBlinkInterval) {
-                    clearInterval(ChatSystem.featureBlinkInterval);
-                    ChatSystem.featureBlinkInterval = null;
-                }
-                
-                const btn = document.getElementById('enableFeaturesBtn');
-                if (btn) {
-                    btn.style.background = '#f44336';
-                    btn.title = 'تفعيل الميزات';
-                }
-                
-                ChatSystem.updateAllButtons();
-                console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-            }
-        };
-        
-        // ✅✅✅ التعديل المطلوب: إضافة إلغاء تفعيل الميزات عند خطأ القناة
-        channel.onerror = (e) => {
-            console.error('❌ خطأ في Data Channel:', e);
-            this.scheduleReconnect();
-            
-            // ✅ إلغاء تفعيل الميزات عند خطأ القناة
-            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-                ChatSystem.featuresEnabled = false;
-                ChatSystem.featureRequestPending = false;
-                ChatSystem.featureRequestReceived = false;
-                
-                if (ChatSystem.featureBlinkInterval) {
-                    clearInterval(ChatSystem.featureBlinkInterval);
-                    ChatSystem.featureBlinkInterval = null;
-                }
-                
-                const btn = document.getElementById('enableFeaturesBtn');
-                if (btn) {
-                    btn.style.background = '#f44336';
-                    btn.title = 'تفعيل الميزات';
-                }
-                
-                ChatSystem.updateAllButtons();
-                console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-            }
-        };
-    },
-
-    handleCallStatus(msg) {
-        if (msg.status === 'connected') {
-            console.log('📞 الطرف الآخر متصل');
-        } else if (msg.status === 'disconnected') {
-            console.log('📞 الطرف الآخر قطع الاتصال');
-            if (this.isInCall) {
-                this.endCall();
-            }
-        }
-    },
-
-    sendCallStatus(status) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
-        }
-    },
-
-    scheduleReconnect() {
-        if (!ChatSystem.currentChat || !ChatSystem.friendOnline) return;
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
-        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
-        this.reconnectTimer = setTimeout(async () => {
-            try {
-                if (ChatSystem.currentChat && ChatSystem.friendOnline) {
-                    await this.ensureDataChannelOnly(ChatSystem.currentChat);
-                }
-            } catch (error) {}
-            this.reconnectTimer = null;
-        }, delay);
-    },
-
-    async ensureDataChannel(calleeId) {
-        if (!calleeId) return;
-        if (this.dc && this.dc.readyState === 'open') return;
-        if (this.dc && this.dc.readyState === 'connecting') {
-            return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    clearInterval(checkInterval);
-                    reject(new Error('انتهت مهلة انتظار القناة'));
-                }, 10000);
-                const checkInterval = setInterval(() => {
-                    if (!this.dc) {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                    } else if (this.dc.readyState === 'open') {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        resolve();
-                    } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
-                        clearInterval(checkInterval);
-                        clearTimeout(timeout);
-                        this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                    }
-                }, 500);
-            });
-        }
-        return this.createNewDataChannel(calleeId);
-    },
-
-    async createNewDataChannel(calleeId) {
-        this.reconnectAttempts = 0;
-        this.cleanupConnections();
-        try {
-            this.pc = new RTCPeerConnection(this.servers);
-            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-            this.setupDataChannel(this.dc);
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
-            this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
-            this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-            this.pc.onconnectionstatechange = () => {
-                switch(this.pc?.connectionState) {
-                    case 'connected': this.reconnectAttempts = 0; break;
-                    case 'failed': case 'disconnected': this.scheduleReconnect(); break;
-                }
-            };
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-        } catch (error) {
-            throw error;
-        }
-    },
-
-    async handleSignaling(data) {
-        try {
-            if (data.type === 'reject') {
-                console.log('📞 الطرف الآخر رفض المكالمة');
-                const inc = document.getElementById('incomingCall');
-                if (inc) inc.remove();
-                this.endCall();
+        let blinkCount = 0;
+        this.featureBlinkInterval = setInterval(() => {
+            if (!this.featureRequestPending && !this.featureRequestReceived) {
+                clearInterval(this.featureBlinkInterval);
+                btn.style.background = '#f44336';
+                btn.style.transform = 'scale(1)';
                 return;
             }
             
-            if (data.type === 'call_ended') {
-                console.log('📞 المتصل أنهى المكالمة قبل الرد');
-                const inc = document.getElementById('incomingCall');
-                if (inc) inc.remove();
-                this.endCall();
-                return;
+            blinkCount++;
+            if (blinkCount % 2 === 0) {
+                btn.style.background = '#2196F3';
+                btn.style.transform = 'scale(1.1)';
+            } else {
+                btn.style.background = '#4CAF50';
+                btn.style.transform = 'scale(1)';
             }
             
-            if (!this.pc) {
-                this.pc = new RTCPeerConnection(this.servers);
-                this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
-                this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
+            if (blinkCount > 30) {
+                clearInterval(this.featureBlinkInterval);
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                btn.style.background = '#f44336';
+                btn.style.transform = 'scale(1)';
             }
-            if (data.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                if (data.sdp.type === 'offer') {
-                    const answer = await this.pc.createAnswer();
-                    await this.pc.setLocalDescription(answer);
-                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
-                }
-            } else if (data.candidate) {
-                if (this.pc && data.candidate) {
-                    await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            }
-        } catch (e) {
-            console.warn('Signaling error:', e);
-        }
+        }, 500);
     },
-
-    async sendSignal(calleeId, data) {
-        if (!ChatSystem.friendOnline) {
-            console.log('❌ المستخدم غير متصل، تم إلغاء إرسال الإشارة');
+    
+    // ==================== القسم 7: requestEnableFeatures ====================
+    async requestEnableFeatures() {
+        if (!this.currentChat) {
+            alert('الرجاء اختيار محادثة أولاً');
             return;
+        }
+        if (this.featuresEnabled) {
+            alert('الميزات مفعلة بالفعل');
+            return;
+        }
+        if (this.featureRequestPending) {
+            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+            return;
+        }
+        
+        this.featureRequestPending = true;
+        this.startFeatureBlink();
+        
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_request',
+                action: 'enable',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_request', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('📨 تم إرسال طلب تفعيل الميزات إلى الطرف الآخر');
+        } catch(e) {
+            this.featureRequestPending = false;
+            this.startFeatureBlink();
+            console.log('❌ فشل إرسال الطلب');
+        }
+    },
+    
+    // ==================== القسم 8: handleFeatureRequest ====================
+    async handleFeatureRequest(fromId) {
+        console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
+        
+        if (this.featuresEnabled) {
+            console.log('الميزات مفعلة بالفعل، قبول تلقائي');
+            await this.acceptFeatureRequest();
+            return;
+        }
+        
+        this.featureRequestReceived = true;
+        this.startFeatureBlink();
+        console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
+        console.log('✅ تم تفعيل وضع الاستقبال');
+    },
+    
+    // ==================== القسم 9: acceptFeatureRequest ====================
+    async acceptFeatureRequest() {
+        console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
+        
+        if (!this.featureRequestReceived && !this.featureRequestPending) {
+            console.log('⚠️ لا يوجد طلب معلق');
+            return;
+        }
+        
+        this.featuresEnabled = true;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        console.log('✅ featuresEnabled =', this.featuresEnabled);
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#4CAF50';
+            btn.style.transform = 'scale(1)';
+            btn.title = 'الميزات مفعلة ✅';
+            console.log('✅ تم تغيير لون الزر إلى الأخضر');
+        } else {
+            console.log('⚠️ لم يتم العثور على الزر');
         }
         
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
             if (!myPrivateKey || !receiverPublicKey) return;
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-            await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        } catch (error) {
-            console.error('خطأ في إرسال الإشارة:', error);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_response',
+                action: 'accepted',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_response', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('✅ تم إرسال قبول التفعيل');
+        } catch(e) {
+            console.error('❌ خطأ في إرسال القبول:', e);
+        }
+        
+        this.updateAllButtons();
+        console.log('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
+        console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
+    },
+    
+    // ==================== القسم 10: handleFeatureResponse ====================
+    handleFeatureResponse(fromId, action) {
+        console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
+        
+        if (action === 'accepted') {
+            this.featuresEnabled = true;
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            if (this.featureBlinkInterval) {
+                clearInterval(this.featureBlinkInterval);
+            }
+            
+            const btn = document.getElementById('enableFeaturesBtn');
+            if (btn) {
+                btn.style.background = '#4CAF50';
+                btn.title = 'الميزات مفعلة ✅';
+            }
+            
+            this.updateAllButtons();
+            console.log('✅ تم تفعيل الميزات!');
+        } else if (action === 'rejected') {
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            if (this.featureBlinkInterval) {
+                clearInterval(this.featureBlinkInterval);
+            }
+            
+            const btn = document.getElementById('enableFeaturesBtn');
+            if (btn) {
+                btn.style.background = '#f44336';
+            }
+            console.log('❌ تم رفض طلب تفعيل الميزات');
         }
     },
     
-    // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
-
-    showCallUI(type) {
-        document.body.classList.add('in-call');
-        const existingUi = document.getElementById('callUI');
-        if (existingUi) existingUi.remove();
-        
-        const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
-        const appColor = '#2196F3';
-        const bgColor = '#0a0e27';
-        
-        let uiHTML = '';
-        if (type === 'video') {
-            uiHTML = `
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .local-video {
-                        border: 3px solid rgba(255,255,255,0.3);
-                        transition: all 0.3s ease;
-                        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-                    }
-                </style>
-                <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
-                <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
-                <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا">
-                        <i class="fas fa-video"></i>
-                    </button>
-                </div>`;
-        } else {
-            uiHTML = `
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .avatar-animation {
-                        animation: float 3s ease-in-out infinite;
-                    }
-                    @keyframes float {
-                        0% { transform: translateY(0px); }
-                        50% { transform: translateY(-10px); }
-                        100% { transform: translateY(0px); }
-                    }
-                </style>
-                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
-                <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
-                    <div class="avatar-animation" style="font-size:6rem;margin-bottom:15px;filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">${contactAvatar}</div>
-                    <div style="font-size:1.8rem;color:white;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
-                    <div style="margin-top:8px;color:#4CAF50;font-size:0.9rem;background:rgba(76,175,80,0.2);padding:5px 15px;border-radius:20px;display:inline-block;">
-                        <i class="fas fa-phone-alt" style="margin-left:5px;"></i> <span id="callTimer">00:00</span>
-                    </div>
-                </div>
-                <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                </div>`;
-        }
-        
-        const ui = document.createElement('div');
-        ui.id = 'callUI';
-        ui.innerHTML = uiHTML;
-        document.body.appendChild(ui);
-        
-        document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
-        
-        if (type === 'video') {
-            const lv = document.getElementById('localVideo');
-            if (lv && this.localStream) lv.srcObject = this.localStream;
-            document.getElementById('switchCameraBtn')?.addEventListener('click', () => this.switchCamera());
-            
-            const muteAudioBtn = document.getElementById('muteAudioBtn');
-            muteAudioBtn?.addEventListener('click', () => {
-                this.toggleAudio();
-                const icon = muteAudioBtn.querySelector('i');
-                if (icon) {
-                    if (this.isAudioMuted) {
-                        icon.className = 'fas fa-microphone-slash';
-                        muteAudioBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-microphone';
-                        muteAudioBtn.style.color = appColor;
-                    }
-                }
+    // ==================== القسم 11: sendFeatureCancelImmediately ====================
+    async sendFeatureCancelImmediately(chatId) {
+        console.log('📤 sendFeatureCancelImmediately - إرسال إلغاء إلى:', chatId);
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_cancel',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(chatId, { 
+                id: Date.now().toString(), 
+                type: 'feature_cancel', 
+                data: encrypted, 
+                timestamp: Date.now() 
             });
-            
-            const muteVideoBtn = document.getElementById('muteVideoBtn');
-            muteVideoBtn?.addEventListener('click', () => {
-                this.toggleVideo();
-                const icon = muteVideoBtn.querySelector('i');
-                if (icon) {
-                    if (this.isVideoMuted) {
-                        icon.className = 'fas fa-video-slash';
-                        muteVideoBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-video';
-                        muteVideoBtn.style.color = appColor;
-                    }
-                }
-            });
-            
-            setTimeout(() => {
-                const rv = document.getElementById('remoteVideo');
-                if (rv) {
-                    rv.srcObject = null;
-                    console.log('✅ تم إعادة تعيين remoteVideo');
-                }
-            }, 100);
-            
-            if (this.isVideoMuted) {
-                const muteVideoBtn = document.getElementById('muteVideoBtn');
-                if (muteVideoBtn) {
-                    const icon = muteVideoBtn.querySelector('i');
-                    if (icon) {
-                        icon.className = 'fas fa-video-slash';
-                        muteVideoBtn.style.color = '#f44336';
-                    }
-                }
-            }
-            
-        } else {
-            const speakerBtn = document.getElementById('speakerBtn');
-            speakerBtn?.addEventListener('click', () => {
-                this.toggleSpeaker();
-                const icon = speakerBtn.querySelector('i');
-                if (icon) {
-                    if (this.isSpeakerEnabled) {
-                        icon.className = 'fas fa-volume-up';
-                    } else {
-                        icon.className = 'fas fa-volume-mute';
-                    }
-                }
-            });
-            
-            const muteBtn = document.getElementById('muteBtn');
-            muteBtn?.addEventListener('click', () => {
-                this.toggleMute();
-                const icon = muteBtn.querySelector('i');
-                if (icon) {
-                    if (this.isAudioMuted) {
-                        icon.className = 'fas fa-microphone-slash';
-                        muteBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-microphone';
-                        muteBtn.style.color = appColor;
-                    }
-                }
-            });
-            
-            this.startCallTimer();
+            console.log('✅ تم إرسال إشارة الإلغاء بنجاح إلى:', chatId);
+        } catch(e) {
+            console.error('❌ خطأ في إرسال الإلغاء:', e);
         }
     },
-
-    // ==================== 11. مؤقت المكالمة ====================
-
-    startCallTimer() {
-        if (this.callTimerInterval) clearInterval(this.callTimerInterval);
-        let seconds = 0;
-        this.callTimerInterval = setInterval(() => {
-            if (!this.isInCall) {
-                clearInterval(this.callTimerInterval);
+    
+    // ==================== القسم 12: resetFeatures ====================
+    resetFeatures() {
+        console.log('🔄 resetFeatures - إعادة تعيين الميزات');
+        
+        const chatId = this.currentChat;
+        
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+        }
+        
+        if (chatId) {
+            console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
+            this.sendFeatureCancelImmediately(chatId);
+        }
+        
+        this.updateAllButtons();
+    },
+    
+    // ==================== القسم 13: handleFeatureCancel ====================
+    handleFeatureCancel() {
+        console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
+        console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
+        
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        console.log('✅ featuresEnabled بعد الإلغاء:', this.featuresEnabled);
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+            console.log('✅ تم تغيير لون الزر إلى الأحمر');
+        } else {
+            console.log('⚠️ لم يتم العثور على الزر');
+        }
+        
+        this.updateAllButtons();
+        console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+        console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
+    },
+    
+    // ==================== القسم 14: updateAllButtons ====================
+    updateAllButtons() {
+        const canUse = (this.friendInConversation && this.featuresEnabled);
+        
+        const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
+        btns.forEach(btn => { 
+            if (canUse) { 
+                btn.classList.remove('locked'); 
+                btn.title = ''; 
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            } else { 
+                btn.classList.add('locked'); 
+                btn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            } 
+        });
+        
+        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
+                             document.querySelector('.audio-call-btn') ||
+                             document.querySelector('#audioCallBtn') ||
+                             document.querySelector('button[data-call="audio"]');
+        
+        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
+                             document.querySelector('.video-call-btn') ||
+                             document.querySelector('#videoCallBtn') ||
+                             document.querySelector('button[data-call="video"]');
+        
+        if (audioCallBtn) {
+            if (canUse) {
+                audioCallBtn.style.opacity = '1';
+                audioCallBtn.style.pointerEvents = 'auto';
+                audioCallBtn.title = 'مكالمة صوتية';
+            } else {
+                audioCallBtn.style.opacity = '0.5';
+                audioCallBtn.style.pointerEvents = 'none';
+                audioCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            }
+        }
+        
+        if (videoCallBtn) {
+            if (canUse) {
+                videoCallBtn.style.opacity = '1';
+                videoCallBtn.style.pointerEvents = 'auto';
+                videoCallBtn.title = 'مكالمة فيديو';
+            } else {
+                videoCallBtn.style.opacity = '0.5';
+                videoCallBtn.style.pointerEvents = 'none';
+                videoCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            }
+        }
+        
+        console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
+    },
+    
+    // ==================== القسم 15: setupPageFocusListener ====================
+    setupPageFocusListener() {
+        window.addEventListener('focus', () => {
+            if (this.currentChat && this.friendOnline) {
+                console.log('👁️ الصفحة في المقدمة - تحديث حالة المحادثة');
+                this.sendConversationStatus(true);
+                this.requestConversationStatus();
+            }
+        });
+    },
+    
+    // ==================== القسم 16: requestConversationStatus ====================
+    async requestConversationStatus() {
+        if (!this.currentChat) return;
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'conversation_status_request',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'conversation_status_request', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('📤 تم إرسال طلب حالة المحادثة إلى:', this.currentChat);
+        } catch(e) {
+            console.error('خطأ في طلب حالة المحادثة:', e);
+        }
+    },
+    
+    // ==================== القسم 17: loadAllChats ====================
+    loadAllChats() { 
+        for (let i = 0; i < localStorage.length; i++) { 
+            const k = localStorage.key(i); 
+            if (k && k.startsWith('chat_')) { 
+                const fid = k.replace('chat_', ''); 
+                try { this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[fid] = []; } 
+            } 
+        } 
+    },
+    
+    // ==================== القسم 18: showProgressBar ====================
+    showProgressBar(message, percent) {
+        let bar = document.getElementById('progressBar');
+        if (!bar) {
+            bar = document.createElement('div'); bar.id = 'progressBar';
+            bar.style.cssText = `
+                position: fixed;
+                top: 70px;
+                left: 0;
+                right: 0;
+                height: 22px;
+                background: rgba(0,0,0,0.3);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            bar.innerHTML = `
+                <div id="progressFill" style="
+                    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+                    height: 100%;
+                    width: 0%;
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    transition: width 0.3s;
+                    border-radius: 0 2px 2px 0;
+                "></div>
+                <span id="progressPercent" style="
+                    position: relative;
+                    z-index: 2;
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: white;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                ">0%</span>
+            `;
+            document.body.appendChild(bar);
+        }
+    },
+    
+    // ==================== القسم 19: updateProgressBar ====================
+    updateProgressBar(percent, message) {
+        const fill = document.getElementById('progressFill');
+        const perc = document.getElementById('progressPercent');
+        if (fill) fill.style.width = Math.min(percent, 100) + '%';
+        if (perc) perc.textContent = Math.round(percent) + '%';
+    },
+    
+    // ==================== القسم 20: hideProgressBar ====================
+    hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
+    
+    // ==================== القسم 21: sendConversationStatus ====================
+    async sendConversationStatus(isOpen) {
+        if (!this.currentChat) return;
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'conversation_status', 
+                isOpen: isOpen,
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'conversation_status', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log(`📬 تم إرسال حالة المحادثة: ${isOpen ? 'مفتوحة' : 'مغلقة'}`);
+        } catch(e) {
+            console.error('خطأ في إرسال حالة المحادثة:', e);
+        }
+    },
+    
+    // ==================== القسم 22: updateFriendConversationStatus ====================
+    updateFriendConversationStatus(friendId, isInConversation) {
+        console.log(`👥 استلام تحديث حالة المحادثة من: ${friendId}, في المحادثة: ${isInConversation}`);
+        console.log('currentChat الحالي:', this.currentChat);
+        
+        if (this.currentChat === friendId) {
+            this.friendInConversation = isInConversation;
+            console.log(`✅ تحديث friendInConversation إلى: ${isInConversation}`);
+            
+            if (!isInConversation) {
+                console.log('⚠️ الطرف الآخر خرج من المحادثة - إلغاء تفعيل الميزات');
+                this.featuresEnabled = false;
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                
+                if (this.featureBlinkInterval) {
+                    clearInterval(this.featureBlinkInterval);
+                    this.featureBlinkInterval = null;
+                }
+                
+                const btn = document.getElementById('enableFeaturesBtn');
+                if (btn) {
+                    btn.style.background = '#f44336';
+                    btn.title = 'تفعيل الميزات';
+                    console.log('✅ تم تغيير لون الزر إلى الأحمر');
+                }
+                
+                this.updateAllButtons();
+                console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+            }
+        } 
+        else {
+            this._pendingConversationStatus[friendId] = isInConversation;
+            console.log(`💾 تم تخزين حالة المحادثة لـ ${friendId}: ${isInConversation ? 'مفتوحة' : 'مغلقة'}`);
+            
+            if (!isInConversation && this.featuresEnabled) {
+                console.log(`⚠️ المستخدم ${friendId} خرج من المحادثة - إلغاء تفعيل الميزات`);
+                this.featuresEnabled = false;
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                
+                if (this.featureBlinkInterval) {
+                    clearInterval(this.featureBlinkInterval);
+                }
+                
+                const btn = document.getElementById('enableFeaturesBtn');
+                if (btn) {
+                    btn.style.background = '#f44336';
+                    btn.title = 'تفعيل الميزات';
+                }
+                
+                this.updateAllButtons();
+                console.log(`⚠️ ${friendId} خرج من المحادثة، تم إلغاء تفعيل الميزات`);
+            }
+        }
+        
+        this.updateAllButtons();
+    },
+    
+    // ==================== القسم 23: openChat ====================
+    openChat(friendId, friendName, friendAvatar) {
+        this.currentChat = friendId;
+        
+        if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
+            this.friendInConversation = this._pendingConversationStatus[friendId];
+            console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
+            delete this._pendingConversationStatus[friendId];
+        } else {
+            this.friendInConversation = false;
+        }
+        
+        this.resetFeatures();
+        document.body.classList.add('conversation-open');
+        const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
+        if (nameEl) nameEl.textContent = friendName;
+        if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
+        document.querySelector('.chat-page').style.display = 'none'; 
+        document.getElementById('conversationPage').style.display = 'flex';
+        this.displayMessages(friendId);
+        PresenceSystem.watchFriend(friendId);
+        
+        setTimeout(() => {
+            this.sendConversationStatus(true);
+        }, 500);
+        
+        setTimeout(() => {
+            this.requestConversationStatus();
+        }, 1000);
+        
+        setTimeout(() => { 
+            if (this.friendOnline) {
+                CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
+            }
+        }, 500);
+        
+        setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
+        setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+        
+        setTimeout(() => this.setupFeatureButton(), 500);
+    },
+    
+    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+    updateFriendStatus(friendId, isOnline, userData = null) {
+        if (this.currentChat !== friendId) return;
+        
+        // الحالة 1: الشخص غير متصل
+        if (!isOnline) {
+            // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة) → أحمر مباشر
+            if (!this.featuresEnabled) {
+                this.friendOnline = false;
+                const statusEl = document.getElementById('conversationStatus');
+                if (statusEl) {
+                    statusEl.innerHTML = '🔴 غير متصل';
+                    statusEl.className = 'conversation-status offline';
+                }
                 return;
             }
-            seconds++;
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            const timerEl = document.getElementById('callTimer');
-            if (timerEl) timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }, 1000);
-    },
-
-    // ==================== 12. التحكم بالمكالمة ====================
-
-    toggleMute() {
-        this.isAudioMuted = !this.isAudioMuted;
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) audioTrack.enabled = !this.isAudioMuted;
-        }
-        console.log(`🎤 كتم الصوت: ${this.isAudioMuted ? 'مفعل' : 'ملغي'}`);
-    },
-
-    toggleAudio() {
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                console.log(`🎤 كتم الصوت: ${!audioTrack.enabled ? 'مفعل' : 'ملغي'}`);
-            }
-        }
-        this.isAudioMuted = this.localStream?.getAudioTracks()[0]?.enabled === false;
-    },
-
-    toggleVideo() {
-        if (this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                console.log(`📹 كتم الفيديو: ${!videoTrack.enabled ? 'مفعل' : 'ملغي'}`);
-            }
-        }
-        this.isVideoMuted = this.localStream?.getVideoTracks()[0]?.enabled === false;
-    },
-
-    toggleSpeaker() {
-        this.isSpeakerEnabled = !this.isSpeakerEnabled;
-        this.applySpeakerSettings();
-        console.log(`🔊 وضع السماعة: ${this.isSpeakerEnabled ? 'خارجية' : 'داخلية'}`);
-    },
-
-    async switchCamera() {
-        if (!this.localStream) return;
-        const videoTrack = this.localStream.getVideoTracks()[0];
-        if (!videoTrack) return;
-        
-        const currentFacing = videoTrack.getSettings().facingMode;
-        const newFacing = currentFacing === 'user' ? 'environment' : 'user';
-        videoTrack.stop();
-        
-        try {
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
-            });
-            const newVideoTrack = newStream.getVideoTracks()[0];
-            if (this.pc) {
-                const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) await sender.replaceTrack(newVideoTrack);
-            }
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
-            const lv = document.getElementById('localVideo');
-            if (lv) lv.srcObject = this.localStream;
-            console.log(`🔄 تبديل الكاميرا إلى ${newFacing === 'user' ? 'أمامية' : 'خلفية'}`);
-        } catch (e) {
-            console.error('❌ فشل تبديل الكاميرا:', e);
-        }
-    },
-    
-    // ==================== 13. إرسال الملفات ====================
-    
-    async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
-            return false;
-        }
-        
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
-            }
             
-            const b64 = await this.fileToBase64(blobToSend);
-            const chunkSize = 16000;
-            const totalChunks = Math.ceil(b64.length / chunkSize);
-            const fileId = Date.now().toString();
+            // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
+            // نبدأ العداد الأصفر 120 ثانية
+            if (this.offlineTimer) clearTimeout(this.offlineTimer);
+            if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
             
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
+            this.offlineStartTime = Date.now();
+            this.friendOnline = false;
             
-            for (let i = 0; i < totalChunks; i++) {
-                if (this.dc.readyState !== 'open') {
-                    ChatSystem.hideProgressBar();
-                    return false;
+            let secondsLeft = 120;
+            const statusEl = document.getElementById('conversationStatus');
+            
+            const updateCountdown = () => {
+                if (statusEl) {
+                    statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
+                    statusEl.className = 'conversation-status offline-temp';
                 }
-                const chunk = {
-                    type: type,
-                    data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
-                    chunk: i,
-                    total: totalChunks,
-                    id: fileId,
-                    fileName: file.name || 'ملف'
-                };
-                this.dc.send(JSON.stringify(chunk));
-                const progress = ((i + 1) / totalChunks) * 100;
-                const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
-                ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-                await new Promise(r => setTimeout(r, 50));
+                secondsLeft--;
+                if (secondsLeft < 0) {
+                    clearInterval(this.offlineCountdownInterval);
+                    this.offlineCountdownInterval = null;
+                }
+            };
+            
+            updateCountdown();
+            this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
+            
+            this.offlineTimer = setTimeout(() => {
+                if (!this.friendOnline && this.featuresEnabled) {
+                    console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى المرسل');
+                    
+                    if (this.currentChat) {
+                        this.sendFeatureCancelImmediately(this.currentChat);
+                    }
+                    
+                    this.featuresEnabled = false;
+                    this.featureRequestPending = false;
+                    this.featureRequestReceived = false;
+                    
+                    if (this.featureBlinkInterval) {
+                        clearInterval(this.featureBlinkInterval);
+                        this.featureBlinkInterval = null;
+                    }
+                    
+                    const btn = document.getElementById('enableFeaturesBtn');
+                    if (btn) {
+                        btn.style.background = '#f44336';
+                        btn.title = 'تفعيل الميزات';
+                    }
+                    
+                    this.updateAllButtons();
+                }
+                
+                if (this.offlineCountdownInterval) {
+                    clearInterval(this.offlineCountdownInterval);
+                    this.offlineCountdownInterval = null;
+                }
+                
+                if (statusEl && !this.friendOnline) {
+                    statusEl.innerHTML = '🔴 غير متصل';
+                    statusEl.className = 'conversation-status offline';
+                }
+                
+                this.offlineTimer = null;
+            }, 120000);
+            
+            return;
+        }
+        
+        // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
+        if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {
+            console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
+            
+            if (this.offlineTimer) clearTimeout(this.offlineTimer);
+            if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
+            
+            this.offlineTimer = null;
+            this.offlineStartTime = null;
+            this.friendOnline = true;
+            
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '🟢 متصل';
+                statusEl.className = 'conversation-status online';
             }
-            ChatSystem.hideProgressBar();
-            console.log('✅ تم إرسال الملف بنجاح');
+            return;
+        }
+        
+        // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
+        this.friendOnline = isOnline;
+        
+        if (!userData && window.auth?.currentUser) {
+            window.db.collection('users').doc(friendId).get().then(doc => {
+                if (doc.exists) this.updateFriendStatus(friendId, isOnline, doc.data());
+            }).catch(() => {});
+            return;
+        }
+        
+        const statusEl = document.getElementById('conversationStatus');
+        if (!statusEl) return;
+        
+        let statusHtml = '';
+        let statusClass = '';
+        
+        if (isOnline) {
+            statusHtml = '🟢 متصل';
+            statusClass = 'conversation-status online';
+        } else {
+            statusHtml = '🔴 غير متصل';
+            statusClass = 'conversation-status offline';
+        }
+        
+        statusEl.innerHTML = statusHtml;
+        statusEl.className = statusClass;
+        
+        this.updateAllButtons();
+    },
+    
+    // ==================== القسم 25: displayMessages ====================
+    displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
+
+
+    // ==================== القسم 26: displayMessage ====================
+displayMessage(msg) {
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return;
+    const div = document.createElement('div'); 
+    div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
+    div.id = `msg-${msg.id}`;
+    const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    let statusHtml = ''; 
+    if (msg.sender === 'me') { 
+        let icon = '✓', cls = 'sent'; 
+        if (msg.status === 'delivered') { 
+            icon = '✓✓'; cls = 'delivered'; 
+        } else if (msg.status === 'read') { 
+            icon = '✓✓'; cls = 'read'; 
+        } 
+        statusHtml = `<span class="message-status ${cls}">${icon}</span>`;
+    }
+    
+    if (msg.type === 'text') {
+        div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+    } 
+    else if (msg.type === 'location') {
+        // معالجة رسالة الموقع
+        let locationData = msg.data;
+        let locationUrl = '';
+        
+        if (typeof locationData === 'object' && locationData.url) {
+            locationUrl = locationData.url;
+        } else if (typeof locationData === 'string') {
+            const match = locationData.match(/https?:\/\/[^\s]+/);
+            locationUrl = match ? match[0] : locationData;
+        } else {
+            locationUrl = '#';
+        }
+        
+        // استخراج معلومات الضغطات
+        const maxClicks = locationData.maxClicks;
+        let clicksRemaining = locationData.clicksRemaining;
+        
+        // ✅ إذا كانت الصلاحية انتهت (clicksRemaining <= 0)
+        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+            div.innerHTML = `
+                <div class="message-content" style="background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>
+                </div>
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+        } else {
+            // ✅ عرض الموقع بدون عداد، فقط أيقونة خريطة
+            const locationDiv = document.createElement('div');
+            locationDiv.className = 'message-content location-card';
+            locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;';
+            locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
+            
+            // معالج الضغط على الموقع
+            locationDiv.onclick = (e) => {
+                e.stopPropagation();
+                
+                // ✅ التحقق من الصلاحية - بدون رسالة تحذير
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                    return; // لا شيء يحدث
+                }
+                
+                // فتح الخريطة
+                window.open(locationUrl, '_blank');
+                
+                // ✅ تقليل عدد الضغطات المتبقية (فقط للمستلم، وليس للمرسل)
+                if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                    clicksRemaining--;
+                    
+                    // تحديث البيانات في كائن الرسالة
+                    msg.data.clicksRemaining = clicksRemaining;
+                    
+                    // ✅ إذا وصلت إلى الصفر، قفل الموقع (بدون رسالة تحذير)
+                    if (clicksRemaining <= 0) {
+                        locationDiv.style.background = '#888';
+                        locationDiv.style.cursor = 'default';
+                        locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                        locationDiv.onclick = () => {
+                            return; // لا شيء يحدث
+                        };
+                    }
+                    
+                    // تحديث في localStorage
+                    if (ChatSystem.currentChat) {
+                        const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                        const msgIndex = messages.findIndex(m => m.id === msg.id);
+                        if (msgIndex !== -1) {
+                            messages[msgIndex].data.clicksRemaining = clicksRemaining;
+                            ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                        }
+                    }
+                }
+            };
+            
+            div.appendChild(locationDiv);
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'message-info';
+            infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
+            div.appendChild(infoDiv);
+            
+            c.appendChild(div);
+            c.scrollTop = c.scrollHeight;
+            return;
+        }
+    }
+    else if (msg.type === 'image') {
+        let imageSrc = msg.data;
+        if (imageSrc && typeof imageSrc === 'string') {
+            if (!imageSrc.startsWith('data:image') && !imageSrc.startsWith('http')) {
+                imageSrc = 'data:image/jpeg;base64,' + imageSrc;
+            }
+        }
+        div.innerHTML = `<img src="${imageSrc}" class="message-image" onclick="window.openImage('${imageSrc}')" loading="lazy" style="max-width:100%;border-radius:12px;max-height:300px;cursor:pointer;"><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+    } 
+    else if (msg.type === 'voice') {
+        let audioSrc = msg.data;
+        if (audioSrc && typeof audioSrc === 'string' && !audioSrc.startsWith('data:audio')) {
+            audioSrc = 'data:audio/webm;base64,' + audioSrc;
+        }
+        
+        const audioId = `audio_${msg.id}`;
+        let audioDuration = 0;
+        
+        // ✅ الحصول على المدة الإجمالية للبصمة
+        const tempAudio = new Audio(audioSrc);
+        tempAudio.addEventListener('loadedmetadata', () => {
+            audioDuration = tempAudio.duration;
+            const durationSpan = document.getElementById(`duration_${audioId}`);
+            if (durationSpan && !isNaN(audioDuration)) {
+                const minutes = Math.floor(audioDuration / 60);
+                const seconds = Math.floor(audioDuration % 60);
+                durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        });
+        
+        // ✅ مشغل مخصص مع عدادين (وقت التشغيل الحالي والمدة الإجمالية)
+        div.innerHTML = `
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>
+                    </button>
+                    <button class="voice-replay-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
+                    </button>
+                    <div style="text-align: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px;">0:00</span>
+                            <span id="duration_${audioId}" style="color: white; font-size: 0.7rem; opacity: 0.8;">0:00</span>
+                        </div>
+                    </div>
+                    <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
+                    </button>
+                </div>
+                <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
+            </div>
+            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+        `;
+        
+        // إضافة معالج التشغيل بعد إضافة العنصر
+        setTimeout(() => {
+            const playBtn = div.querySelector('.voice-play-btn');
+            const replayBtn = div.querySelector('.voice-replay-btn');
+            const muteBtn = div.querySelector('.voice-mute-btn');
+            const audioEl = document.getElementById(audioId);
+            const timeSpan = document.getElementById(`time_${audioId}`);
+            
+            if (playBtn && audioEl) {
+                let isPlaying = false;
+                
+                // زر التشغيل/الإيقاف المؤقت
+                playBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isPlaying) {
+                        audioEl.pause();
+                        playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                        isPlaying = false;
+                    } else {
+                        audioEl.play();
+                        playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                        isPlaying = true;
+                    }
+                };
+                
+                // زر إعادة التشغيل (سهم دائري)
+                replayBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    audioEl.pause();
+                    audioEl.currentTime = 0;
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
+                    audioEl.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = true;
+                };
+                
+                // زر كتم الصوت
+                let isMuted = false;
+                muteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isMuted) {
+                        audioEl.muted = false;
+                        muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                        isMuted = false;
+                    } else {
+                        audioEl.muted = true;
+                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #f44336; font-size: 0.9rem;"></i>';
+                        isMuted = true;
+                    }
+                };
+                
+                // ✅ تحديث عداد الوقت الحالي (يتزايد من 0:00 إلى المدة الإجمالية)
+                audioEl.ontimeupdate = () => {
+                    const minutes = Math.floor(audioEl.currentTime / 60);
+                    const seconds = Math.floor(audioEl.currentTime % 60);
+                    if (timeSpan) {
+                        timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                };
+                
+                // ✅ عند انتهاء التشغيل، يعود العداد إلى 0:00
+                audioEl.onended = () => {
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
+                };
+            }
+        }, 10);
+    } 
+    else if (msg.type === 'video') {
+        let videoSrc = msg.data;
+        if (videoSrc && typeof videoSrc === 'string') {
+            if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
+                videoSrc = 'data:video/mp4;base64,' + videoSrc;
+            }
+        }
+        div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+    } 
+    else if (msg.type === 'file') {
+        // ✅ التصميم المطلوب للملفات (بحجم ثابت مع break-all للأسماء الطويلة)
+        let fileName = msg.fileName || 'ملف';
+        
+        // حساب حجم الملف تقريباً
+        let fileSize = '';
+        if (msg.data && typeof msg.data === 'string') {
+            const sizeInBytes = Math.ceil(msg.data.length * 0.75);
+            if (sizeInBytes < 1024) fileSize = sizeInBytes + ' B';
+            else if (sizeInBytes < 1024 * 1024) fileSize = (sizeInBytes / 1024).toFixed(1) + ' KB';
+            else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        // عرض اسم الملف كاملاً مع التفاف تلقائي وكسر الكلمات الطويلة
+        let displayName = fileName;
+        
+        div.innerHTML = `
+            <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1px solid #4CAF50;">
+                <!-- أيقونة الملف داخل دائرة بيضاء -->
+                <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex-shrink: 0;">
+                    <span style="font-size: 1.5rem;">📄</span>
+                </div>
+                
+                <!-- معلومات الملف -->
+                <div style="flex: 1; overflow: hidden; min-width: 0;">
+                    <div style="font-weight: bold; font-size: 0.85rem; word-break: break-all; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
+                    ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
+                </div>
+                
+                <!-- زر التحميل (أيقونة فقط) -->
+                <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
+                     onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
+                     onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                     onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                    <i class="fas fa-download" style="font-size: 1rem; pointer-events: none;"></i>
+                </div>
+            </div>
+            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+        `;
+    }
+    
+    c.appendChild(div); 
+    c.scrollTop = c.scrollHeight;
+},
+    
+    
+    // ==================== القسم 27: sendMessage ====================
+    async sendMessage(text) { 
+        if (!this.currentChat || !text.trim()) return false; 
+        const mid = Date.now().toString(); 
+        try { 
+            const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
+            if (!pr || !pu) return false;
+            const sk = await SecureChatSystem.deriveSharedKey(pr, pu), enc = await SecureChatSystem.encryptData(text.trim(), sk); 
+            await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
+            this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            return true; 
+        } catch (e) { return false; } 
+    },
+    
+    // ==================== القسم 28: sendFileWithRetry ====================
+    async sendFileWithRetry(file, type, maxRetries = 3) {
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return false;
+        }
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+                const success = await CallSystem.sendFileDirect(file, type);
+                if (success) { this.hideProgressBar(); return true; }
+                if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
+            } catch (error) {}
+        }
+        this.hideProgressBar(); return false;
+    },
+    
+    // ==================== القسم 29: _ensureChannelReady ====================
+    async _ensureChannelReady() {
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
+            return false;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             return true;
+        }
+        
+        try {
+            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+            
+            if (success) {
+                await new Promise(r => setTimeout(r, 1000));
+                return true;
+            }
+            
+            alert('تعذر فتح قناة الاتصال لإرسال الملفات');
+            return false;
         } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            ChatSystem.hideProgressBar();
+            alert('فشل الاتصال. حاول مرة أخرى.');
             return false;
         }
     },
     
-    handleChunkMessage(msg) {
-        if (!this.incomingChunks[msg.id]) {
-            this.incomingChunks[msg.id] = [];
-            this.incomingFileInfo[msg.id] = {
-                type: msg.type,
-                fileName: msg.fileName,
-                total: msg.total,
-                received: 0
-            };
-            ChatSystem.showProgressBar('جاري استلام الملف...', 0);
+    // ==================== القسم 30: sendImage ====================
+    async sendImage(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
         }
         
-        this.incomingChunks[msg.id][msg.chunk] = msg.data;
-        this.incomingFileInfo[msg.id].received++;
-        const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-        const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
-        ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
         
-        if (this.incomingFileInfo[msg.id].received === msg.total) {
-            const fullData = this.incomingChunks[msg.id].join('');
-            
-            let finalData = fullData;
-            
-            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
-                finalData = 'data:image/jpeg;base64,' + fullData;
-            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
-                finalData = 'data:video/mp4;base64,' + fullData;
-            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
-                finalData = 'data:audio/webm;base64,' + fullData;
-            }
-            
-            const displayMsg = {
-                id: msg.id,
-                type: msg.type === 'location' ? 'text' : msg.type,
-                data: finalData,
-                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
-                sender: 'friend',
-                time: new Date().toISOString()
-            };
-            
-            if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-            ChatSystem.hideProgressBar();
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'image');
+            if (success) {
+                const comp = await SecureChatSystem.compressImage(file); 
+                const b64 = await SecureChatSystem.fileToBase64(comp); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الصورة');
         }
     },
     
-    compressImage(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const maxSize = 800;
-                    if (width > height && width > maxSize) {
-                        height = (height * maxSize) / width;
-                        width = maxSize;
-                    } else if (height > maxSize) {
-                        width = (width * maxSize) / height;
-                        height = maxSize;
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
+    // ==================== القسم 31: sendVideoFile ====================
+    async sendVideoFile(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        try {
+            await SecureChatSystem.validateVideo(file);
+        } catch (error) {
+            alert(error.message);
+            return;
+        }
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            const success = await this.sendFileWithRetry(file, 'video');
+            if (success) {
+                try {
+                    const b64 = await SecureChatSystem.fileToBase64(file); 
+                    const msgId = Date.now().toString();
+                    
+                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
+                    this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
+                } catch (error) { alert('فشل معالجة الفيديو'); }
+            } else alert('فشل إرسال الفيديو');
+        }
     },
     
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1] || reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
+    // ==================== القسم 32: sendFile ====================
+    async sendFile(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'file');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(file); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الملف');
+        }
     },
     
-    // ==================== 14. إنهاء المكالمة ====================
-    
-    endCall() {
-        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
-        
-        if (this.currentCallId && ChatSystem.currentChat) {
-            this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
-        }
-        this.currentCallId = null;
-        
-        this.sendCallStatus('disconnected');
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
+    // ==================== القسم 33: sendVoiceNote ====================
+    async sendVoiceNote(audioBlob) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
         }
         
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
         }
         
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(audioBlob, 'voice');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال البصمة الصوتية');
         }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        this.reconnectAttempts = 0;
-        
-        if (window.auth?.currentUser) {
-            window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                inCall: false,
-                callType: null,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            }).catch(() => {});
-        }
-        
-        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
     },
     
-    cleanupConnections() {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
-        }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
-        }
-        this.incomingChunks = {};
-        this.incomingFileInfo = {};
-    }
-};
-
-// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            if (typeof CallSystem !== 'undefined') {
-                CallSystem.autoCleanupOnLoad();
-            }
-        }, 1500);
-    });
-}
-
-// ==================== 16. التنظيف قبل إغلاق الصفحة ====================
-if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', () => {
-        if (CallSystem.isInCall) {
-            CallSystem.endCall();
-        }
-    });
-}
-
-// ==================== 17. الدوال العامة ====================
-window.startAudioCall = async () => {
-    if (!ChatSystem.currentChat) {
-        alert('الرجاء اختيار محادثة أولاً');
+    // ==================== القسم 34: shareLocationDirect ====================
+    
+   async shareLocationDirect() { 
+    if (!this.currentChat) return; 
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
         return;
     }
-    await CallSystem.startAudioCall(ChatSystem.currentChat);
-};
-
-window.startVideoCall = async () => {
-    if (!ChatSystem.currentChat) {
-        alert('الرجاء اختيار محادثة أولاً');
-        return;
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
+        
+        navigator.geolocation.getCurrentPosition(p => { 
+            const lat = p.coords.latitude.toFixed(6);
+            const lng = p.coords.longitude.toFixed(6);
+            const locationData = {
+                lat: parseFloat(lat),
+                lng: parseFloat(lng),
+                url: `https://www.google.com/maps?q=${lat},${lng}`
+            };
+            
+            this.showLocationSwipeModalWithClicks(locationData);
+            
+        }, () => { 
+            alert('❌ فشل تحديد موقعك');
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     }
-    await CallSystem.startVideoCall(ChatSystem.currentChat);
+},
+
+showLocationSwipeModalWithClicks(locationData) {
+    const existing = document.getElementById('locationSwipeModal');
+    if (existing) existing.remove();
+    
+    const appColor = '#2196F3';
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'locationSwipeModal';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 10003;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+        backdrop-filter: blur(5px);
+    `;
+    
+    overlay.innerHTML = `
+        <style>
+            .toggle-switch {
+                position: relative;
+                display: inline-block;
+                width: 60px;
+                height: 30px;
+            }
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #555;
+                transition: 0.3s;
+                border-radius: 30px;
+            }
+            .toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 24px;
+                width: 24px;
+                left: 3px;
+                bottom: 3px;
+                background-color: white;
+                transition: 0.3s;
+                border-radius: 50%;
+            }
+            input:checked + .toggle-slider {
+                background-color: #4CAF50;
+            }
+            input:checked + .toggle-slider:before {
+                transform: translateX(30px);
+            }
+            .click-preset {
+                background: #1a1a2e;
+                color: white;
+                border: 1px solid #4CAF50;
+                padding: 6px 12px;
+                border-radius: 20px;
+                cursor: pointer;
+                transition: all 0.2s;
+                font-size: 0.9rem;
+                min-width: 40px;
+            }
+            .click-preset:hover {
+                background: #4CAF50;
+                border-color: #4CAF50;
+            }
+            .click-preset.selected {
+                background: #4CAF50;
+                border-color: #4CAF50;
+            }
+        </style>
+        
+        <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
+            <div style="font-size: 3rem; margin-bottom: 10px;">🗺️</div>
+            <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
+            <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي</p>
+            
+            <!-- الإحداثيات -->
+            <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 20px;">
+                <div style="color: #4CAF50; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px;">الإحداثيات</div>
+                <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
+            </div>
+            
+            <!-- عدد مرات فتح الموقع -->
+            <div style="margin-bottom: 15px;">
+                <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; text-align: center;">عدد مرات فتح الموقع</div>
+                
+                <!-- ✅ أزرار اختيار من 1 إلى 5 فقط (في المنتصف) -->
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
+                    <button type="button" class="click-preset" data-clicks="1">1</button>
+                    <button type="button" class="click-preset" data-clicks="2">2</button>
+                    <button type="button" class="click-preset" data-clicks="3">3</button>
+                    <button type="button" class="click-preset" data-clicks="4">4</button>
+                    <button type="button" class="click-preset" data-clicks="5">5</button>
+                </div>
+            </div>
+            
+            <!-- زر السحب -->
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="unlimitedToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
+                </div>
+            </div>
+            
+            <!-- نص توضيحي -->
+            <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
+            
+            <!-- شريط السحب -->
+            <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
+                <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor};">
+                    <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%);"></div>
+                    <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: ${appColor}; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+                    
+                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #4CAF50, #1b5e2a); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div id="rightThumb" style="position: absolute; top: 8px; right: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #f44336, #8b0000); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: right 0.05s linear; color: white;">
+                        <i class="fas fa-times"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const button = document.getElementById('swipeButton');
+    const leftThumb = document.getElementById('leftThumb');
+    const rightThumb = document.getElementById('rightThumb');
+    const unlimitedToggle = document.getElementById('unlimitedToggle');
+    
+    let selectedClicks = 1;
+    let selectedButton = null;
+    
+    // معالج أزرار الاختيار
+    document.querySelectorAll('.click-preset').forEach(btn => {
+        btn.onclick = () => {
+            if (selectedButton) {
+                selectedButton.style.background = '#1a1a2e';
+                selectedButton.style.borderColor = '#4CAF50';
+            }
+            selectedButton = btn;
+            selectedButton.style.background = '#4CAF50';
+            selectedButton.style.borderColor = '#4CAF50';
+            selectedClicks = parseInt(btn.dataset.clicks);
+        };
+    });
+    
+    // تحديد الزر الأول (1) بشكل افتراضي
+    const firstBtn = document.querySelector('.click-preset[data-clicks="1"]');
+    if (firstBtn) {
+        firstBtn.style.background = '#4CAF50';
+        firstBtn.style.borderColor = '#4CAF50';
+        selectedButton = firstBtn;
+        selectedClicks = 1;
+    }
+    
+    unlimitedToggle.addEventListener('change', () => {
+        if (unlimitedToggle.checked) {
+            document.querySelectorAll('.click-preset').forEach(btn => {
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            });
+        } else {
+            document.querySelectorAll('.click-preset').forEach(btn => {
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            });
+            if (selectedButton) {
+                selectedButton.style.background = '#4CAF50';
+            }
+        }
+    });
+    
+    const buttonWidth = button.clientWidth;
+    const centerPos = buttonWidth / 2;
+    const maxLeftMove = centerPos - 35;
+    const maxRightMove = centerPos - 35;
+    
+    let isDraggingLeft = false, isDraggingRight = false;
+    let leftCurrentPos = 8, rightCurrentPos = 8;
+    
+    const onLeftStart = (e) => {
+        e.preventDefault();
+        isDraggingLeft = true;
+        leftThumb.style.transition = 'none';
+    };
+    
+    const onLeftMove = (e) => {
+        if (!isDraggingLeft) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newLeft = clientX - rect.left - 27;
+        newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
+        leftCurrentPos = newLeft;
+        leftThumb.style.left = newLeft + 'px';
+    };
+    
+    const onLeftEnd = () => {
+        if (!isDraggingLeft) return;
+        isDraggingLeft = false;
+        leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (leftCurrentPos >= maxLeftMove - 10) {
+            leftThumb.style.left = maxLeftMove + 'px';
+            
+            let maxClicks;
+            if (unlimitedToggle.checked) {
+                maxClicks = 999999;
+            } else {
+                maxClicks = selectedClicks;
+                if (maxClicks < 1) maxClicks = 1;
+                if (maxClicks > 5) maxClicks = 5;
+            }
+            
+            locationData.maxClicks = maxClicks;
+            locationData.clicksRemaining = maxClicks;
+            
+            setTimeout(() => {
+                CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                overlay.remove();
+            }, 200);
+        } else {
+            leftThumb.style.left = '8px';
+        }
+    };
+    
+    const onRightStart = (e) => {
+        e.preventDefault();
+        isDraggingRight = true;
+        rightThumb.style.transition = 'none';
+    };
+    
+    const onRightMove = (e) => {
+        if (!isDraggingRight) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newRight = rect.right - clientX - 27;
+        newRight = Math.max(8, Math.min(newRight, maxRightMove));
+        rightCurrentPos = newRight;
+        rightThumb.style.right = newRight + 'px';
+    };
+    
+    const onRightEnd = () => {
+        if (!isDraggingRight) return;
+        isDraggingRight = false;
+        rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (rightCurrentPos >= maxRightMove - 10) {
+            rightThumb.style.right = maxRightMove + 'px';
+            setTimeout(() => {
+                overlay.remove();
+            }, 200);
+        } else {
+            rightThumb.style.right = '8px';
+        }
+    };
+    
+    leftThumb.addEventListener('mousedown', onLeftStart);
+    leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+    rightThumb.addEventListener('mousedown', onRightStart);
+    rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+    
+    document.addEventListener('mousemove', (e) => { onLeftMove(e); onRightMove(e); });
+    document.addEventListener('mouseup', () => { onLeftEnd(); onRightEnd(); });
+    document.addEventListener('touchmove', (e) => { onLeftMove(e); onRightMove(e); }, { passive: false });
+    document.addEventListener('touchend', () => { onLeftEnd(); onRightEnd(); });
+    
+    setTimeout(() => {
+        if (document.getElementById('locationSwipeModal')) overlay.remove();
+    }, 30000);
+}, 
+    
+    
+    
+    // ==================== القسم 35: saveMessage ====================
+    saveMessage(friendId, message) { 
+        const key = `chat_${friendId}`; 
+        let h = []; 
+        try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
+        h.push(message); 
+        let serialized = JSON.stringify(h);
+        while (serialized.length > 4000000) {
+            let removed = false;
+            for (let i = 0; i < h.length; i++) {
+                if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') { h.splice(i, 1); removed = true; break; }
+            }
+            if (!removed) h.splice(0, 1);
+            serialized = JSON.stringify(h);
+        }
+        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
+            h = h.slice(Math.floor(h.length * 0.2));
+            try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
+        }
+        this.messages[friendId] = h; 
+    },
+
+   // ==================== القسم 36: updateLastMessage ====================
+updateLastMessage(friendId, lastMessage) { 
+    document.querySelectorAll('.chat-item').forEach(item => { 
+        if (item.getAttribute('onclick')?.includes(friendId)) { 
+            const lm = item.querySelector('.last-message'), tm = item.querySelector('.chat-time'); 
+            if (lm) lm.textContent = lastMessage; 
+            if (tm) tm.textContent = 'الآن'; 
+        } 
+    }); 
+},
+
+// ==================== القسم 37: closeChat ====================
+closeChat() {
+    console.log('🔴 closeChat - بدء إغلاق المحادثة');
+    console.log('currentChat:', this.currentChat);
+    console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
+    
+    const chatId = this.currentChat;
+    
+    if (chatId) {
+        console.log('📤 إرسال إشارة إلغاء إلى:', chatId);
+        this.sendFeatureCancelImmediately(chatId);
+        this.sendConversationStatus(false);
+        
+        // ✅ حذف جميع الملفات والوسائط (صور، فيديو، بصمات، ملفات) عند إغلاق المحادثة
+        const key = `chat_${chatId}`;
+        const messages = this.messages[chatId] || [];
+        // إبقاء النصوص فقط، حذف كل ما هو ليس نصاً
+        const filteredMessages = messages.filter(msg => msg.type === 'text');
+        this.messages[chatId] = filteredMessages;
+        localStorage.setItem(key, JSON.stringify(filteredMessages));
+        console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
+    }
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const btn = document.getElementById('enableFeaturesBtn');
+    if (btn) {
+        btn.style.background = '#f44336';
+        btn.title = 'تفعيل الميزات';
+    }
+    
+    this.updateAllButtons();
+    
+    document.body.classList.remove('conversation-open');
+    document.getElementById('conversationPage').style.display = 'none';
+    document.querySelector('.chat-page').style.display = 'block';
+    PresenceSystem.stopAll();
+    if (!CallSystem.isInCall) CallSystem.cleanupConnections();
+    this.currentChat = null;
+    this.friendOnline = false;
+    this.friendInConversation = false;
+    
+    console.log('✅ closeChat - انتهى');
+}, 
+    
+    
+    // ==================== القسم 38: escapeHtml ====================
+    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 
-window.cleanupCallState = async () => {
-    await CallSystem.autoCleanupOnLoad();
-    console.log('✅ تم تنظيف حالة المكالمات يدوياً');
-};
-
-console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
+// ==================== القسم 39: تشغيل النظام ====================
+ChatSystem.init();
