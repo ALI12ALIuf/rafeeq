@@ -815,7 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-   // ==================== القسم 26: displayMessage ====================
+    // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -937,23 +937,6 @@ displayMessage(msg) {
             audioSrc = 'data:audio/webm;base64,' + audioSrc;
         }
         
-        // ✅ استخراج معلومات الضغطات (إذا وجدت)
-        const maxClicks = msg.maxClicks;
-        let clicksRemaining = msg.clicksRemaining;
-        
-        // ✅ إذا انتهت الصلاحية (clicksRemaining <= 0)
-        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-            div.innerHTML = `
-                <div class="message-content" style="background: #888; border-radius: 16px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>
-                </div>
-                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
-            `;
-            c.appendChild(div);
-            c.scrollTop = c.scrollHeight;
-            return;
-        }
-        
         const audioId = `audio_${msg.id}`;
         let audioDuration = 0;
         
@@ -1004,17 +987,10 @@ displayMessage(msg) {
             
             if (playBtn && audioEl) {
                 let isPlaying = false;
-                let hasPlayed = false;
                 
-                // ✅ زر التشغيل/الإيقاف المؤقت (يحسب مرة واحدة فقط عند التشغيل لأول مرة)
+                // زر التشغيل/الإيقاف المؤقت
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
-                    
-                    // ✅ التحقق من الصلاحية - إذا انتهت لا يحدث شيء
-                    if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                        return;
-                    }
-                    
                     if (isPlaying) {
                         audioEl.pause();
                         playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
@@ -1023,48 +999,12 @@ displayMessage(msg) {
                         audioEl.play();
                         playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isPlaying = true;
-                        
-                        // ✅ تقليل عدد الضغطات المتبقية (مرة واحدة فقط عند التشغيل لأول مرة)
-                        if (!hasPlayed && clicksRemaining !== undefined && maxClicks < 999999 && msg.sender !== 'me') {
-                            hasPlayed = true;
-                            clicksRemaining--;
-                            msg.clicksRemaining = clicksRemaining;
-                            
-                            // تحديث في localStorage
-                            if (ChatSystem.currentChat) {
-                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
-                                const msgIndex = messages.findIndex(m => m.id === msg.id);
-                                if (msgIndex !== -1) {
-                                    messages[msgIndex].clicksRemaining = clicksRemaining;
-                                    ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
-                                }
-                            }
-                            
-                            // ✅ إذا وصلت إلى الصفر، قفل البصمة
-                            if (clicksRemaining <= 0) {
-                                const voiceDiv = div.querySelector('.voice-message');
-                                if (voiceDiv) {
-                                    voiceDiv.style.background = '#888';
-                                    voiceDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center;"><i class="fas fa-lock" style="font-size: 1.5rem; color: white;"></i></div>';
-                                }
-                                if (audioEl) {
-                                    audioEl.pause();
-                                }
-                                return;
-                            }
-                        }
                     }
                 };
                 
                 // زر إعادة التشغيل (سهم دائري)
                 replayBtn.onclick = (e) => {
                     e.stopPropagation();
-                    
-                    // ✅ التحقق من الصلاحية
-                    if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                        return;
-                    }
-                    
                     audioEl.pause();
                     audioEl.currentTime = 0;
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
@@ -1160,7 +1100,7 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-}file   
+},
     
     
     // ==================== القسم 27: sendMessage ====================
@@ -1179,23 +1119,22 @@ displayMessage(msg) {
     },
     
     // ==================== القسم 28: sendFileWithRetry ====================
-async sendFileWithRetry(file, type, maxClicks = null, maxRetries = 3) {
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return false;
-    }
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
-            // ✅ تمرير maxClicks إلى CallSystem.sendFileDirect
-            const success = await CallSystem.sendFileDirect(file, type, maxClicks);
-            if (success) { this.hideProgressBar(); return true; }
-            if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
-        } catch (error) {}
-    }
-    this.hideProgressBar(); return false;
-},
+    async sendFileWithRetry(file, type, maxRetries = 3) {
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return false;
+        }
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+                const success = await CallSystem.sendFileDirect(file, type);
+                if (success) { this.hideProgressBar(); return true; }
+                if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
+            } catch (error) {}
+        }
+        this.hideProgressBar(); return false;
+    },
     
     // ==================== القسم 29: _ensureChannelReady ====================
     async _ensureChannelReady() {
@@ -1291,152 +1230,33 @@ async sendFileWithRetry(file, type, maxClicks = null, maxRetries = 3) {
             } else alert('فشل إرسال الفيديو');
         }
     },
-
-    // ==================== القسم 33: sendVoiceNote ====================
-async sendVoiceNote(audioBlob) { 
-    if (!this.currentChat) return;
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return;
-    }
     
-    // ✅ عرض نافذة اختيار عدد الضغطات (مثل الموقع)
-    const maxClicks = await this.showVoiceClicksPicker();
-    if (maxClicks === null) return; // المستخدم ألغى
-    
-    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-    }
-    
-    await new Promise(r => setTimeout(r, 200));
-    
-    if (!(await this._ensureChannelReady())) return;
-    
-    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-        // ✅ إضافة maxClicks إلى بيانات الإرسال
-        const success = await this.sendFileWithRetry(audioBlob, 'voice', maxClicks);
-        if (success) {
-            const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
-            const msgId = Date.now().toString();
-            this.saveMessage(this.currentChat, { 
-                id: msgId, 
-                type: 'voice', 
-                data: b64, 
-                sender: 'me', 
-                time: new Date().toISOString(), 
-                status: 'sent',
-                maxClicks: maxClicks,
-                clicksRemaining: maxClicks
-            }); 
-            this.displayMessage({ 
-                id: msgId, 
-                type: 'voice', 
-                data: b64, 
-                sender: 'me', 
-                time: new Date().toISOString(), 
-                status: 'sent',
-                maxClicks: maxClicks,
-                clicksRemaining: maxClicks
-            });
-        } else alert('فشل إرسال البصمة الصوتية');
-    }
-},
-
-// ✅ دالة اختيار عدد الضغطات للبصمة (مثل الموقع)
-async showVoiceClicksPicker() {
-    return new Promise((resolve) => {
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.85);
-            z-index: 10006;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: system-ui, sans-serif;
-            backdrop-filter: blur(5px);
-        `;
-        modal.innerHTML = `
-            <div style="background: #0a0e27; border-radius: 40px; width: 320px; max-width: 90%; padding: 25px 20px; text-align: center; color: white;">
-                <div style="font-size: 3rem; margin-bottom: 10px;">🎤</div>
-                <h3 style="margin: 0 0 5px;">عدد مرات تشغيل البصمة</h3>
-                <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">كم مرة يمكن للمستلم تشغيل البصمة؟</p>
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 20px 0;">
-                    <button class="voice-clicks-option" data-clicks="1" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">1</button>
-                    <button class="voice-clicks-option" data-clicks="2" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">2</button>
-                    <button class="voice-clicks-option" data-clicks="3" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">3</button>
-                    <button class="voice-clicks-option" data-clicks="4" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">4</button>
-                    <button class="voice-clicks-option" data-clicks="5" style="background: #1a1a2e; border: 1px solid #4CAF50; color: white; padding: 10px 18px; border-radius: 30px; cursor: pointer;">5</button>
-                </div>
-                <div style="margin: 15px 0;">
-                    <label style="display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" id="voiceUnlimitedToggle" style="width: 18px; height: 18px;">
-                        <span style="color: white;">بلا حدود</span>
-                    </label>
-                </div>
-                <p style="color: #888; font-size: 0.65rem;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
-                <button id="voiceCancelBtn" style="margin-top: 15px; background: #f44336; color: white; border: none; padding: 8px 20px; border-radius: 30px; cursor: pointer;">إلغاء</button>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        
-        let selectedClicks = 1;
-        let selectedButton = null;
-        
-        const buttons = modal.querySelectorAll('.voice-clicks-option');
-        buttons.forEach(btn => {
-            btn.onclick = () => {
-                if (selectedButton) {
-                    selectedButton.style.background = '#1a1a2e';
-                }
-                selectedButton = btn;
-                selectedButton.style.background = '#4CAF50';
-                selectedClicks = parseInt(btn.dataset.clicks);
-            };
-        });
-        
-        // تحديد الزر الأول بشكل افتراضي
-        if (buttons[0]) {
-            buttons[0].style.background = '#4CAF50';
-            selectedButton = buttons[0];
-            selectedClicks = 1;
+    // ==================== القسم 32: sendFile ====================
+    async sendFile(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
         }
         
-        const unlimitedToggle = modal.querySelector('#voiceUnlimitedToggle');
-        unlimitedToggle.onchange = () => {
-            buttons.forEach(btn => {
-                btn.style.opacity = unlimitedToggle.checked ? '0.5' : '1';
-                btn.style.pointerEvents = unlimitedToggle.checked ? 'none' : 'auto';
-            });
-        };
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
         
-        modal.querySelector('#voiceCancelBtn').onclick = () => {
-            modal.remove();
-            resolve(null);
-        };
+        await new Promise(r => setTimeout(r, 200));
         
-        // زر إرسال
-        const sendBtn = document.createElement('button');
-        sendBtn.textContent = 'إرسال';
-        sendBtn.style.cssText = 'background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 30px; cursor: pointer; margin-top: 10px; width: 100%;';
-        sendBtn.onclick = () => {
-            let maxClicks;
-            if (unlimitedToggle.checked) {
-                maxClicks = 999999;
-            } else {
-                maxClicks = selectedClicks;
-            }
-            modal.remove();
-            resolve(maxClicks);
-        };
-        modal.querySelector('div > div').appendChild(sendBtn);
-    });
-},
-
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'file');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(file); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الملف');
+        }
+    },
     
     // ==================== القسم 33: sendVoiceNote ====================
     async sendVoiceNote(audioBlob) { 
