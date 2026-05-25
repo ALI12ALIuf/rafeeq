@@ -1502,7 +1502,7 @@ showImagePreview(imageSrc) {
         modal.remove();
     };
     
-    // ========== زر التحميل (مباشر بدون نافذة تأكيد، مع مؤشر دوران) ==========
+    // ========== زر التحميل (مباشر بدون نافذة تأكيد) ==========
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
@@ -1522,32 +1522,23 @@ showImagePreview(imageSrc) {
         justify-content: center;
     `;
     
-    let isDownloading = false;
-    
     downloadBtn.onclick = (e) => {
         e.stopPropagation();
-        if (isDownloading) return;
         
-        isDownloading = true;
-        
-        // تغيير الزر إلى دائرة تدور
-        downloadBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
-        downloadBtn.style.opacity = '0.7';
-        
-        // تحميل مباشر بدون نافذة تأكيد
-        const link = document.createElement('a');
-        link.href = imageSrc;
-        link.download = 'image.jpg';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // إعادة الزر بعد نصف ثانية
-        setTimeout(() => {
-            downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-            downloadBtn.style.opacity = '1';
-            isDownloading = false;
-        }, 500);
+        // تحميل مباشر باستخدام fetch (لا يظهر نافذة تأكيد)
+        fetch(imageSrc)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'image.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            })
+            .catch(error => console.error('خطأ في التحميل:', error));
     };
     
     downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
@@ -1654,6 +1645,7 @@ showImagePreview(imageSrc) {
     
     document.body.appendChild(modal);
 },
+
 
     
     // ==================== القسم 27: sendMessage ====================
