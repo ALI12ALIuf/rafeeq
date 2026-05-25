@@ -815,7 +815,7 @@ const ChatSystem = {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-    // ==================== القسم 26: displayMessage ====================
+   // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1007,9 +1007,12 @@ displayMessage(msg) {
                 let hasPlayed = false;
                 let localClicksRemaining = clicksRemaining;
                 let localMaxClicks = maxClicks;
+                let isLocked = false;
                 
                 // ✅ وظيفة قفل البصمة
                 const lockVoice = () => {
+                    if (isLocked) return;
+                    isLocked = true;
                     const voiceDiv = div.querySelector('.voice-message');
                     if (voiceDiv) {
                         voiceDiv.style.background = '#888';
@@ -1017,6 +1020,10 @@ displayMessage(msg) {
                     }
                     if (audioEl) {
                         audioEl.pause();
+                    }
+                    // تحديث الصفحة
+                    if (ChatSystem.currentChat) {
+                        ChatSystem.displayMessages(ChatSystem.currentChat);
                     }
                 };
                 
@@ -1135,9 +1142,16 @@ displayMessage(msg) {
                     isPlaying = false;
                     if (timeSpan) timeSpan.textContent = '0:00';
                     
-                    // ✅ التحقق مرة أخرى من الصلاحية بعد انتهاء التشغيل
-                    if (localClicksRemaining !== undefined && localClicksRemaining <= 0) {
-                        lockVoice();
+                    // ✅ إعادة قراءة القيمة من localStorage للتأكد
+                    if (ChatSystem.currentChat) {
+                        const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                        const msgIndex = messages.findIndex(m => m.id === msg.id);
+                        if (msgIndex !== -1) {
+                            const updatedClicksRemaining = messages[msgIndex].clicksRemaining;
+                            if (updatedClicksRemaining !== undefined && updatedClicksRemaining <= 0) {
+                                lockVoice();
+                            }
+                        }
                     }
                 };
             }
@@ -1195,7 +1209,7 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},
+}, 
 
     
     
