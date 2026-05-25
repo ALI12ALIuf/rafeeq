@@ -101,113 +101,131 @@ cleanMediaMessagesOnLoad() {
    // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
     setTimeout(() => {
-        let existingBtn = document.getElementById('enableFeaturesBtn');
-        if (!existingBtn) {
-            const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
-            if (container) {
-                // ✅ إنشاء حاوية للزر المنزلق
-                const toggleContainer = document.createElement('div');
-                toggleContainer.style.cssText = 'display: inline-flex; align-items: center; margin: 0 5px;';
-                
-                // ✅ إضافة الأنماط المطلوبة
-                const style = document.createElement('style');
-                style.textContent = `
-                    .feature-toggle-switch {
-                        position: relative;
-                        display: inline-block;
-                        width: 55px;
-                        height: 28px;
-                    }
-                    .feature-toggle-switch input {
-                        opacity: 0;
-                        width: 0;
-                        height: 0;
-                    }
-                    .feature-toggle-slider {
-                        position: absolute;
-                        cursor: pointer;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background-color: #f44336;
-                        transition: 0.3s;
-                        border-radius: 28px;
-                        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                    }
-                    .feature-toggle-slider:before {
-                        position: absolute;
-                        content: "";
-                        height: 22px;
-                        width: 22px;
-                        left: 3px;
-                        bottom: 3px;
-                        background-color: white;
-                        transition: 0.3s;
-                        border-radius: 50%;
-                    }
-                    input:checked + .feature-toggle-slider {
-                        background-color: #4CAF50;
-                    }
-                    input:checked + .feature-toggle-slider:before {
-                        transform: translateX(27px);
-                    }
-                    /* تأثير الرمش */
-                    @keyframes featureBlink {
-                        0% { background-color: #f44336; }
-                        50% { background-color: #ff9800; }
-                        100% { background-color: #f44336; }
-                    }
-                    .feature-toggle-slider.blinking {
-                        animation: featureBlink 0.8s ease-in-out infinite;
-                    }
-                `;
-                document.head.appendChild(style);
-                
-                toggleContainer.innerHTML = `
-                    <label class="feature-toggle-switch">
-                        <input type="checkbox" id="featureToggleInput">
-                        <span class="feature-toggle-slider" id="featureToggleSlider"></span>
-                    </label>
-                `;
-                
-                const toggleInput = toggleContainer.querySelector('#featureToggleInput');
-                const toggleSlider = toggleContainer.querySelector('#featureToggleSlider');
-                
-                // حفظ المراجع للاستخدام لاحقاً
-                window.featureToggleInput = toggleInput;
-                window.featureToggleSlider = toggleSlider;
-                
-                toggleInput.onclick = (e) => {
-                    e.preventDefault();
-                    console.log('🔘 تم الضغط على زر التفعيل');
-                    console.log('featureRequestReceived:', this.featureRequestReceived);
-                    console.log('featureRequestPending:', this.featureRequestPending);
-                    console.log('featuresEnabled:', this.featuresEnabled);
-                    
-                    if (this.featureRequestReceived) {
-                        console.log('✅ قبول الطلب');
-                        this.acceptFeatureRequest();
-                    } else if (this.featuresEnabled) {
-                        console.log('⚠️ الميزات مفعلة بالفعل');
-                        alert('الميزات مفعلة بالفعل');
-                    } else if (this.featureRequestPending) {
-                        console.log('⏳ طلب قيد الانتظار');
-                        alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
-                    } else {
-                        console.log('📨 إرسال طلب جديد');
-                        this.requestEnableFeatures();
-                    }
-                };
-                
-                container.appendChild(toggleContainer);
-                console.log('✅ تم إضافة زر التفعيل المنزلق (Toggle Switch)');
-            } else {
-                console.log('⚠️ لم يتم العثور على حاوية للزر');
-            }
+        // ✅ إزالة أي أزرار قديمة لتجنب التكرار
+        const oldBtn = document.getElementById('enableFeaturesBtn');
+        if (oldBtn) oldBtn.remove();
+        
+        const oldToggleContainer = document.getElementById('featureToggleContainer');
+        if (oldToggleContainer) oldToggleContainer.remove();
+        
+        const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
+        if (!container) {
+            console.log('⚠️ لم يتم العثور على حاوية للزر');
+            return;
         }
+        
+        // ✅ إنشاء حاوية للزر المنزلق
+        const toggleContainer = document.createElement('div');
+        toggleContainer.id = 'featureToggleContainer';
+        toggleContainer.style.cssText = 'display: inline-flex; align-items: center; margin: 0 5px;';
+        
+        // ✅ إضافة الأنماط المطلوبة (مرة واحدة فقط)
+        if (!document.getElementById('featureToggleStyles')) {
+            const style = document.createElement('style');
+            style.id = 'featureToggleStyles';
+            style.textContent = `
+                .feature-toggle-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 55px;
+                    height: 28px;
+                }
+                .feature-toggle-switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                .feature-toggle-slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: #f44336;
+                    transition: 0.3s;
+                    border-radius: 28px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                }
+                .feature-toggle-slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 22px;
+                    width: 22px;
+                    left: 3px;
+                    bottom: 3px;
+                    background-color: white;
+                    transition: 0.3s;
+                    border-radius: 50%;
+                }
+                input:checked + .feature-toggle-slider {
+                    background-color: #4CAF50;
+                }
+                input:checked + .feature-toggle-slider:before {
+                    transform: translateX(27px);
+                }
+                /* تأثير الرمش */
+                @keyframes featureBlink {
+                    0% { background-color: #f44336; }
+                    50% { background-color: #ff9800; }
+                    100% { background-color: #f44336; }
+                }
+                .feature-toggle-slider.blinking {
+                    animation: featureBlink 0.8s ease-in-out infinite;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        toggleContainer.innerHTML = `
+            <label class="feature-toggle-switch">
+                <input type="checkbox" id="featureToggleInput">
+                <span class="feature-toggle-slider" id="featureToggleSlider"></span>
+            </label>
+        `;
+        
+        const toggleInput = toggleContainer.querySelector('#featureToggleInput');
+        const toggleSlider = toggleContainer.querySelector('#featureToggleSlider');
+        
+        // حفظ المراجع للاستخدام لاحقاً
+        window.featureToggleInput = toggleInput;
+        window.featureToggleSlider = toggleSlider;
+        
+        // ✅ معالج الضغط على الزر المنزلق
+        toggleInput.onclick = (e) => {
+            e.preventDefault();
+            console.log('🔘 تم الضغط على زر التفعيل');
+            console.log('featureRequestReceived:', this.featureRequestReceived);
+            console.log('featureRequestPending:', this.featureRequestPending);
+            console.log('featuresEnabled:', this.featuresEnabled);
+            
+            if (this.featureRequestReceived) {
+                console.log('✅ قبول الطلب');
+                this.acceptFeatureRequest();
+            } else if (this.featuresEnabled) {
+                console.log('⚠️ الميزات مفعلة بالفعل');
+                alert('الميزات مفعلة بالفعل');
+            } else if (this.featureRequestPending) {
+                console.log('⏳ طلب قيد الانتظار');
+                alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+            } else {
+                console.log('📨 إرسال طلب جديد');
+                this.requestEnableFeatures();
+            }
+        };
+        
+        container.appendChild(toggleContainer);
+        
+        // ✅ تحديث حالة الزر إذا كانت الميزات مفعلة مسبقاً
+        if (this.featuresEnabled && toggleInput) {
+            toggleInput.checked = true;
+            if (toggleSlider) toggleSlider.style.backgroundColor = '#4CAF50';
+        }
+        
+        console.log('✅ تم إضافة زر التفعيل المنزلق (Toggle Switch)');
     }, 1000);
-}, 
+},
+    
     
     // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
