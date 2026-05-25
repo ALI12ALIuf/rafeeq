@@ -1368,13 +1368,13 @@ displayMessage(msg) {
 },
     
 
-   // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع تحكم باللمس) ====================
+   // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار ثابت) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء النافذة المنبثقة
+    // إنشاء النافذة المنبثقة (الإطار الخارجي الثابت)
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
     modal.style.cssText = `
@@ -1386,21 +1386,39 @@ showImagePreview(imageSrc) {
         background: rgba(0,0,0,0.95);
         z-index: 10050;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         overflow: hidden;
         touch-action: pan-x pan-y;
     `;
     
-    // ========== حاوية الصورة (للتحكم باللمس) ==========
+    // ========== الإطار الثابت (يغطي كامل الشاشة) ==========
+    const frame = document.createElement('div');
+    frame.style.cssText = `
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        border: 3px solid #4CAF50;
+        border-radius: 20px;
+        pointer-events: none;
+        z-index: 10051;
+        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
+    `;
+    
+    // ========== حاوية الصورة (تتحرك داخلها) ==========
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
-        position: relative;
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 100%;
-        height: 100%;
         overflow: hidden;
         touch-action: none;
     `;
@@ -1408,12 +1426,12 @@ showImagePreview(imageSrc) {
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
-        border: 3px solid #4CAF50;
-        border-radius: 16px;
-        max-width: 90%;
-        max-height: 85%;
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
         object-fit: contain;
-        box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        border-radius: 12px;
         transition: transform 0.1s ease;
         cursor: default;
         touch-action: none;
@@ -1425,16 +1443,16 @@ showImagePreview(imageSrc) {
         return false;
     };
     
-    // ========== أزرار داخل إطار الصورة (فوق الصورة) ==========
+    // ========== الأزرار (داخل الإطار، فوق الصورة) ==========
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
-        top: 10px;
+        top: 30px;
         left: 0;
         right: 0;
         display: flex;
         justify-content: space-between;
-        padding: 0 15px;
+        padding: 0 35px;
         pointer-events: none;
         z-index: 10052;
     `;
@@ -1443,13 +1461,13 @@ showImagePreview(imageSrc) {
     const backBtn = document.createElement('button');
     backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
     backBtn.style.cssText = `
-        background: rgba(0,0,0,0.6);
+        background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         cursor: pointer;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1459,20 +1477,20 @@ showImagePreview(imageSrc) {
         justify-content: center;
     `;
     backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
-    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.6)'; };
+    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
     backBtn.onclick = () => { modal.remove(); };
     
     // زر التحميل - داخل الإطار
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
-        background: rgba(0,0,0,0.6);
+        background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         cursor: pointer;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1482,7 +1500,7 @@ showImagePreview(imageSrc) {
         justify-content: center;
     `;
     downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.6)'; };
+    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
     downloadBtn.onclick = (e) => {
         e.stopPropagation();
         const link = document.createElement('a');
@@ -1506,6 +1524,12 @@ showImagePreview(imageSrc) {
     const minScale = 0.8;
     const maxScale = 3;
     
+    // الحصول على أبعاد الإطار
+    const getContainerBounds = () => {
+        const rect = imageContainer.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+    };
+    
     const updateTransform = () => {
         img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
     };
@@ -1516,14 +1540,12 @@ showImagePreview(imageSrc) {
         const touches = e.touches;
         
         if (touches.length === 2) {
-            // لمسة ثنائية للتكبير
             const dx = touches[0].clientX - touches[1].clientX;
             const dy = touches[0].clientY - touches[1].clientY;
             initialDistance = Math.hypot(dx, dy);
             initialScale = currentScale;
             isTouching = false;
         } else if (touches.length === 1) {
-            // لمسة واحدة للسحب
             startX = touches[0].clientX - translateX;
             startY = touches[0].clientY - translateY;
             isTouching = true;
@@ -1535,7 +1557,6 @@ showImagePreview(imageSrc) {
         const touches = e.touches;
         
         if (touches.length === 2 && initialDistance > 0) {
-            // تكبير/تصغير باللمسة الثنائية
             const dx = touches[0].clientX - touches[1].clientX;
             const dy = touches[0].clientY - touches[1].clientY;
             const newDistance = Math.hypot(dx, dy);
@@ -1547,13 +1568,17 @@ showImagePreview(imageSrc) {
                 updateTransform();
             }
         } else if (touches.length === 1 && isTouching && currentScale > 1) {
-            // سحب الصورة (فقط عندما تكون مكبرة)
             translateX = touches[0].clientX - startX;
             translateY = touches[0].clientY - startY;
             
-            // حدود السحب لمنع خروج الصورة عن الشاشة
-            const maxTranslateX = (currentScale - 1) * 150;
-            const maxTranslateY = (currentScale - 1) * 150;
+            // حدود السحب بناءً على حجم الصورة
+            const imgWidth = img.clientWidth;
+            const imgHeight = img.clientHeight;
+            const containerBounds = getContainerBounds();
+            
+            const maxTranslateX = Math.max(0, (imgWidth * currentScale - containerBounds.width) / 2);
+            const maxTranslateY = Math.max(0, (imgHeight * currentScale - containerBounds.height) / 2);
+            
             translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
             translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
             
@@ -1566,7 +1591,6 @@ showImagePreview(imageSrc) {
         initialDistance = 0;
         isTouching = false;
         
-        // إذا كان التكبير أقل من 1، أعده إلى 1
         if (currentScale < 0.95) {
             currentScale = 1;
             translateX = 0;
@@ -1575,7 +1599,7 @@ showImagePreview(imageSrc) {
         }
     });
     
-    // منع تمرير الصفحة الخلفية عند لمس الصورة
+    // منع تمرير الصفحة الخلفية
     modal.addEventListener('touchmove', (e) => {
         if (e.target === img || imageContainer.contains(e.target)) {
             e.preventDefault();
@@ -1583,8 +1607,9 @@ showImagePreview(imageSrc) {
     }, { passive: false });
     
     imageContainer.appendChild(img);
-    modal.appendChild(buttonOverlay);
+    modal.appendChild(frame);
     modal.appendChild(imageContainer);
+    modal.appendChild(buttonOverlay);
     
     // إغلاق بزر ESC
     const escHandler = (e) => {
@@ -1595,9 +1620,9 @@ showImagePreview(imageSrc) {
     };
     document.addEventListener('keydown', escHandler);
     
-    // إغلاق عند الضغط خارج الصورة
+    // إغلاق عند الضغط خارج الصورة (على الإطار)
     modal.onclick = (e) => {
-        if (e.target === modal || e.target === imageContainer) {
+        if (e.target === modal || e.target === frame || e.target === imageContainer) {
             modal.remove();
         }
     };
