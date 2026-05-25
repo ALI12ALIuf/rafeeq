@@ -27,14 +27,35 @@ const ChatSystem = {
     offlineStartTime: null,
     offlineTimer: null,
     offlineCountdownInterval: null,
-    
+
     // ==================== القسم 3: init ====================
-    init() { 
-        this.loadAllChats(); 
-        this.setupPageFocusListener();
-        this.setupFeatureButton();
-        this.setupBeforeUnloadListener();
-    },
+init() { 
+    this.loadAllChats(); 
+    this.setupPageFocusListener();
+    this.setupFeatureButton();
+    this.setupBeforeUnloadListener();
+    
+    // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
+    this.cleanMediaMessagesOnLoad();
+},
+
+// ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
+cleanMediaMessagesOnLoad() {
+    // تنظيف جميع المحادثات من الملفات والوسائط (صور، فيديو، بصمات، ملفات)
+    // بحيث يبقى فقط النصوص
+    for (const friendId in this.messages) {
+        const messages = this.messages[friendId] || [];
+        const filteredMessages = messages.filter(msg => msg.type === 'text');
+        if (filteredMessages.length !== messages.length) {
+            this.messages[friendId] = filteredMessages;
+            const key = `chat_${friendId}`;
+            localStorage.setItem(key, JSON.stringify(filteredMessages));
+            console.log(`✅ تم تنظيف الوسائط من محادثة ${friendId}`);
+        }
+    }
+    console.log('🧹 تم تنظيف جميع الملفات والوسائط من localStorage');
+},
+    
     
     // ==================== القسم 4: setupBeforeUnloadListener و sendFeatureCancelBeforeUnload ====================
     setupBeforeUnloadListener() {
