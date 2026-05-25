@@ -442,6 +442,52 @@ handleFeatureResponse(fromId, action) {
             btn.style.background = '#f44336';
         }
         console.log('❌ تم رفض طلب تفعيل الميزات');
+        
+    // ✅✅✅ إضافة معالجة إشارة الإيقاف من الطرف الآخر
+    } else if (action === 'disable') {
+        console.log('🔴 استلام إشارة إيقاف من الطرف الآخر');
+        
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        // ✅ تحديث زر التفعيل إلى اللون الأحمر
+        const toggleInput = document.getElementById('featureToggleInput');
+        const switchLabel = document.getElementById('featureSwitchLabel');
+        
+        if (toggleInput) {
+            toggleInput.checked = false;
+            console.log('✅ تم إلغاء تفعيل الزر (OFF)');
+        }
+        if (switchLabel) {
+            switchLabel.classList.remove('blinking');
+            console.log('✅ تم إيقاف الرمش');
+        }
+        
+        // ✅ للتوافق مع الزر القديم
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+        }
+        
+        // ✅ إغلاق Data Channel
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
+        }
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
+        }
+        
+        this.updateAllButtons();
+        console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
     }
 },
     
