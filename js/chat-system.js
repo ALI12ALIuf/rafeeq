@@ -257,7 +257,7 @@ startFeatureBlink() {
         }
     }, 500);
 },
-    
+
     
     // ==================== القسم 7: requestEnableFeatures ====================
     async requestEnableFeatures() {
@@ -337,7 +337,7 @@ async acceptFeatureRequest() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث حالة زر التفعيل (Dark Mode Switch)
+    // ✅ تحديث زر التفعيل
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
@@ -346,15 +346,6 @@ async acceptFeatureRequest() {
     }
     if (switchLabel) {
         switchLabel.classList.remove('blinking');
-    }
-    
-    // ✅ للتوافق مع الكود القديم
-    const btn = document.getElementById('enableFeaturesBtn');
-    if (btn) {
-        btn.style.background = '#4CAF50';
-        btn.style.transform = 'scale(1)';
-        btn.title = 'الميزات مفعلة ✅';
-        console.log('✅ تم تغيير لون الزر إلى الأخضر');
     }
     
     try {
@@ -379,10 +370,9 @@ async acceptFeatureRequest() {
     }
     
     this.updateAllButtons();
-    console.log('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
+    console.log('✅ تم تفعيل الميزات!');
     console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
-},
-            
+القسم          
     
     // ==================== القسم 10: handleFeatureResponse ====================
     handleFeatureResponse(fromId, action) {
@@ -445,7 +435,7 @@ async acceptFeatureRequest() {
         }
     },
     
-    // ==================== القسم 12: resetFeatures ====================
+ // ==================== القسم 12: resetFeatures ====================
 resetFeatures() {
     console.log('🔄 resetFeatures - إعادة تعيين الميزات');
     
@@ -459,7 +449,7 @@ resetFeatures() {
         clearInterval(this.featureBlinkInterval);
     }
     
-    // ✅ تحديث حالة زر التفعيل (Dark Mode Switch)
+    // ✅ تحديث زر التفعيل
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
@@ -470,13 +460,6 @@ resetFeatures() {
         switchLabel.classList.remove('blinking');
     }
     
-    // ✅ للتوافق مع الكود القديم
-    const btn = document.getElementById('enableFeaturesBtn');
-    if (btn) {
-        btn.style.background = '#f44336';
-        btn.title = 'تفعيل الميزات';
-    }
-    
     if (chatId) {
         console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
         this.sendFeatureCancelImmediately(chatId);
@@ -485,7 +468,7 @@ resetFeatures() {
     this.updateAllButtons();
 },
 
-   // ==================== القسم 13: handleFeatureCancel ====================
+// ==================== القسم 13: handleFeatureCancel ====================
 handleFeatureCancel() {
     console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
     console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
@@ -501,7 +484,7 @@ handleFeatureCancel() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث حالة زر التفعيل (Dark Mode Switch)
+    // ✅ تحديث زر التفعيل
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
@@ -512,21 +495,10 @@ handleFeatureCancel() {
         switchLabel.classList.remove('blinking');
     }
     
-    // ✅ للتوافق مع الكود القديم
-    const btn = document.getElementById('enableFeaturesBtn');
-    if (btn) {
-        btn.style.background = '#f44336';
-        btn.title = 'تفعيل الميزات';
-        console.log('✅ تم تغيير لون الزر إلى الأحمر');
-    } else {
-        console.log('⚠️ لم يتم العثور على الزر');
-    }
-    
     this.updateAllButtons();
     console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
     console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
 },
-
 
     
     // ==================== القسم 14: updateAllButtons ====================
