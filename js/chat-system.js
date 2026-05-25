@@ -1368,14 +1368,10 @@ displayMessage(msg) {
 },
     
 
-    // ==================== القسم 26.1: showImagePreview ====================
+   // ==================== القسم 26.1: showImagePreview (ملء شاشة إجباري) ====================
 showImagePreview(imageSrc) {
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
-    
-    if (document.fullscreenElement) {
-        document.exitFullscreen();
-    }
     
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
@@ -1401,10 +1397,24 @@ showImagePreview(imageSrc) {
         else if (element.msRequestFullscreen) element.msRequestFullscreen();
     };
     
+    // دخول ملء الشاشة فوراً
     setTimeout(() => {
         requestFullscreen(modal);
     }, 100);
     
+    // ✅ منع الخروج من ملء الشاشة (إعادة الدخول تلقائياً)
+    const fullscreenHandler = () => {
+        if (!document.fullscreenElement && modal && modal.parentNode) {
+            setTimeout(() => {
+                if (modal && modal.parentNode && !document.fullscreenElement) {
+                    requestFullscreen(modal);
+                }
+            }, 100);
+        }
+    };
+    document.addEventListener('fullscreenchange', fullscreenHandler);
+    
+    // الإطار
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1450,6 +1460,7 @@ showImagePreview(imageSrc) {
         return false;
     };
     
+    // الأزرار
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
@@ -1484,8 +1495,8 @@ showImagePreview(imageSrc) {
     backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
     backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
     backBtn.onclick = () => {
+        document.removeEventListener('fullscreenchange', fullscreenHandler);
         if (document.exitFullscreen) document.exitFullscreen();
-        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
         modal.remove();
     };
     
@@ -1509,8 +1520,6 @@ showImagePreview(imageSrc) {
     `;
     downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
     downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    
-    // ✅ زر التحميل مع إعادة تفعيل ملء الشاشة
     downloadBtn.onclick = async (e) => {
         e.stopPropagation();
         try {
@@ -1530,18 +1539,12 @@ showImagePreview(imageSrc) {
             link.download = 'image.jpg';
             link.click();
         }
-        
-        // ✅ إعادة تفعيل ملء الشاشة بعد التنزيل
-        setTimeout(() => {
-            if (modal && !document.fullscreenElement) {
-                requestFullscreen(modal);
-            }
-        }, 500);
     };
     
     buttonOverlay.appendChild(backBtn);
     buttonOverlay.appendChild(downloadBtn);
     
+    // تكبير/تصغير باللمس
     let currentScale = 1;
     let initialDistance = 0;
     let initialScale = 1;
@@ -1619,10 +1622,11 @@ showImagePreview(imageSrc) {
     modal.appendChild(imageContainer);
     modal.appendChild(buttonOverlay);
     
+    // إغلاق بزر ESC (مع إزالة المستمع)
     const escHandler = (e) => {
         if (e.key === 'Escape') {
+            document.removeEventListener('fullscreenchange', fullscreenHandler);
             if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             modal.remove();
             document.removeEventListener('keydown', escHandler);
         }
@@ -1630,7 +1634,7 @@ showImagePreview(imageSrc) {
     document.addEventListener('keydown', escHandler);
     
     document.body.appendChild(modal);
-},
+}, 
 
     
     // ==================== القسم 27: sendMessage ====================
