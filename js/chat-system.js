@@ -1366,13 +1366,15 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+    
 
-    // ==================== القسم 26.1: showImagePreview ====================
-
-    showImagePreview(imageSrc) {
+  // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
+showImagePreview(imageSrc) {
+    // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
-
+    
+    // إنشاء النافذة المنبثقة (الإطار الخارجي الثابت)
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
     modal.style.cssText = `
@@ -1384,21 +1386,29 @@ displayMessage(msg) {
         background: rgba(0,0,0,0.95);
         z-index: 10050;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         overflow: hidden;
         touch-action: pan-x pan-y;
     `;
-
-    const requestFullscreen = (el) => {
-        if (el.requestFullscreen) el.requestFullscreen();
-        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-        else if (el.msRequestFullscreen) el.msRequestFullscreen();
+    
+    // ========== طلب ملء الشاشة ==========
+    const requestFullscreen = (element) => {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
     };
-
-    setTimeout(() => requestFullscreen(modal), 100);
-
-    // إطار أخضر
+    
+    setTimeout(() => {
+        requestFullscreen(modal);
+    }, 100);
+    
+    // ========== الإطار الثابت (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1411,7 +1421,8 @@ displayMessage(msg) {
         z-index: 10051;
         box-sizing: border-box;
     `;
-
+    
+    // ========== حاوية الصورة (تتحرك داخلها) ==========
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
         position: absolute;
@@ -1425,7 +1436,7 @@ displayMessage(msg) {
         overflow: hidden;
         touch-action: none;
     `;
-
+    
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
@@ -1438,9 +1449,14 @@ displayMessage(msg) {
         cursor: default;
         touch-action: none;
     `;
-    img.oncontextmenu = (e) => e.preventDefault();
-
-    // الأزرار
+    
+    // منع القائمة المنبثقة عند الضغط المطول
+    img.oncontextmenu = (e) => {
+        e.preventDefault();
+        return false;
+    };
+    
+    // ========== الأزرار (داخل الإطار، فوق الصورة) ==========
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
@@ -1453,8 +1469,8 @@ displayMessage(msg) {
         pointer-events: none;
         z-index: 10052;
     `;
-
-    // زر الرجوع (يغلق النافذة ويعود للمحادثة)
+    
+    // زر الرجوع (سهم) - داخل الإطار
     const backBtn = document.createElement('button');
     backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
     backBtn.style.cssText = `
@@ -1466,18 +1482,27 @@ displayMessage(msg) {
         cursor: pointer;
         font-size: 1.2rem;
         backdrop-filter: blur(5px);
+        transition: all 0.2s;
         color: white;
         pointer-events: auto;
         display: flex;
         align-items: center;
         justify-content: center;
     `;
+    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
+    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
     backBtn.onclick = () => {
-        if (document.exitFullscreen) document.exitFullscreen();
-        modal.remove();  // يعود إلى المحادثة
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        modal.remove();
     };
-
-    // زر التحميل
+    
+    // زر التحميل - داخل الإطار
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
@@ -1489,12 +1514,15 @@ displayMessage(msg) {
         cursor: pointer;
         font-size: 1.2rem;
         backdrop-filter: blur(5px);
+        transition: all 0.2s;
         color: white;
         pointer-events: auto;
         display: flex;
         align-items: center;
         justify-content: center;
     `;
+    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
+    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
     downloadBtn.onclick = (e) => {
         e.stopPropagation();
         const link = document.createElement('a');
@@ -1502,26 +1530,30 @@ displayMessage(msg) {
         link.download = 'image.jpg';
         link.click();
     };
-
+    
     buttonOverlay.appendChild(backBtn);
     buttonOverlay.appendChild(downloadBtn);
-
-    // تكبير/تصغير باللمس
+    
+    // ========== متغيرات للتكبير والتصغير باللمس ==========
     let currentScale = 1;
     let initialDistance = 0;
     let initialScale = 1;
     let startX = 0, startY = 0;
     let translateX = 0, translateY = 0;
     let isTouching = false;
-    const minScale = 0.8, maxScale = 3;
-
+    
+    const minScale = 0.8;
+    const maxScale = 3;
+    
     const updateTransform = () => {
         img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
     };
-
+    
+    // معالج اللمس للتكبير والتصغير
     img.addEventListener('touchstart', (e) => {
         e.preventDefault();
         const touches = e.touches;
+        
         if (touches.length === 2) {
             const dx = touches[0].clientX - touches[1].clientX;
             const dy = touches[0].clientY - touches[1].clientY;
@@ -1534,14 +1566,18 @@ displayMessage(msg) {
             isTouching = true;
         }
     });
-
+    
     img.addEventListener('touchmove', (e) => {
         e.preventDefault();
         const touches = e.touches;
+        
         if (touches.length === 2 && initialDistance > 0) {
-            const newDistance = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            const newDistance = Math.hypot(dx, dy);
             let newScale = initialScale * (newDistance / initialDistance);
             newScale = Math.min(maxScale, Math.max(minScale, newScale));
+            
             if (newScale !== currentScale) {
                 currentScale = newScale;
                 updateTransform();
@@ -1549,17 +1585,21 @@ displayMessage(msg) {
         } else if (touches.length === 1 && isTouching && currentScale > 1) {
             translateX = touches[0].clientX - startX;
             translateY = touches[0].clientY - startY;
-            const limit = (currentScale - 1) * 150;
-            translateX = Math.min(limit, Math.max(-limit, translateX));
-            translateY = Math.min(limit, Math.max(-limit, translateY));
+            
+            const maxTranslateX = (currentScale - 1) * 150;
+            const maxTranslateY = (currentScale - 1) * 150;
+            translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
+            translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
+            
             updateTransform();
         }
     });
-
+    
     img.addEventListener('touchend', (e) => {
         e.preventDefault();
         initialDistance = 0;
         isTouching = false;
+        
         if (currentScale < 0.95) {
             currentScale = 1;
             translateX = 0;
@@ -1567,28 +1607,36 @@ displayMessage(msg) {
             updateTransform();
         }
     });
-
+    
     modal.addEventListener('touchmove', (e) => {
-        if (e.target === img || imageContainer.contains(e.target)) e.preventDefault();
+        if (e.target === img || imageContainer.contains(e.target)) {
+            e.preventDefault();
+        }
     }, { passive: false });
-
+    
     imageContainer.appendChild(img);
     modal.appendChild(frame);
     modal.appendChild(imageContainer);
     modal.appendChild(buttonOverlay);
-
-    // إغلاق بزر ESC (مثل زر الرجوع)
+    
+    // ✅ الخروج فقط من زر الرجوع (وليس بالضغط خارج الصورة)
+    // تم إزالة modal.onclick الذي كان يغلق النافذة
+    
+    // إغلاق بزر ESC (مع الخروج من ملء الشاشة)
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             modal.remove();
             document.removeEventListener('keydown', escHandler);
         }
     };
     document.addEventListener('keydown', escHandler);
-
+    
     document.body.appendChild(modal);
-},
+}, 
+            
+
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
