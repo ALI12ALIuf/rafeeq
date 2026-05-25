@@ -1044,7 +1044,7 @@ openChat(friendId, friendName, friendAvatar) {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-     // ==================== القسم 26: displayMessage ====================
+    // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1151,7 +1151,7 @@ displayMessage(msg) {
             return;
         }
     }
-    // ✅✅✅ قسم الصور المعدل (مع زر تحميل + منع قائمة المتصفح)
+    // ✅✅✅ قسم الصور المعدل (زر تحميل أخضر + أيقونة بيضاء)
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1194,16 +1194,15 @@ displayMessage(msg) {
         imageDiv.appendChild(img);
         imageContainer.appendChild(imageDiv);
         
-        // ✅ زر التحميل في أسفل يمين الصورة
+        // ✅ زر التحميل (خلفية خضراء، أيقونة بيضاء)
         const downloadBtn = document.createElement('button');
         downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
         downloadBtn.style.cssText = `
             position: absolute;
             bottom: 10px;
             right: 10px;
-            background: rgba(0,0,0,0.7);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: #4CAF50;
+            border: none;
             border-radius: 30px;
             width: 36px;
             height: 36px;
@@ -1215,9 +1214,10 @@ displayMessage(msg) {
             font-size: 1rem;
             transition: all 0.2s;
             z-index: 5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         `;
-        downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-        downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
+        downloadBtn.onmouseover = () => { downloadBtn.style.background = '#2E7D32'; };
+        downloadBtn.onmouseout = () => { downloadBtn.style.background = '#4CAF50'; };
         downloadBtn.onclick = (e) => {
             e.stopPropagation();
             const link = document.createElement('a');
@@ -1448,6 +1448,7 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
+
 // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
@@ -1466,11 +1467,9 @@ showImagePreview(imageSrc) {
         background: rgba(0,0,0,0.95);
         z-index: 10050;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        touch-action: pan-x pan-y;
     `;
     
     // ========== طلب ملء الشاشة ==========
@@ -1488,46 +1487,33 @@ showImagePreview(imageSrc) {
         requestFullscreen(modal);
     }, 100);
     
-    // ========== الإطار الثابت (يغطي كامل الشاشة) ==========
+    // ========== الإطار الثابت (مسافة 20px من كل جهة) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
         border: 4px solid #4CAF50;
+        border-radius: 20px;
         pointer-events: none;
         z-index: 10051;
         box-sizing: border-box;
     `;
     
-    // ========== حاوية الصورة (تتحرك داخلها) ==========
-    const imageContainer = document.createElement('div');
-    imageContainer.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        touch-action: none;
-    `;
-    
+    // الصورة
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
-        max-width: 100%;
-        max-height: 100%;
+        max-width: calc(100% - 40px);
+        max-height: calc(100% - 40px);
         width: auto;
         height: auto;
         object-fit: contain;
-        transition: transform 0.1s ease;
+        border-radius: 12px;
         cursor: default;
-        touch-action: none;
+        box-shadow: 0 0 30px rgba(0,0,0,0.5);
     `;
     
     // منع القائمة المنبثقة عند الضغط المطول
@@ -1536,13 +1522,13 @@ showImagePreview(imageSrc) {
         return false;
     };
     
-    // ========== زر الرجوع فقط (بدون زر تحميل) ==========
+    // ========== زر الرجوع (على اليمين) ==========
     const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i>';
     backBtn.style.cssText = `
         position: absolute;
         top: 20px;
-        left: 20px;
+        right: 20px;
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
@@ -1571,99 +1557,14 @@ showImagePreview(imageSrc) {
         modal.remove();
     };
     
-    // ========== متغيرات للتكبير والتصغير باللمس ==========
-    let currentScale = 1;
-    let initialDistance = 0;
-    let initialScale = 1;
-    let startX = 0, startY = 0;
-    let translateX = 0, translateY = 0;
-    let isTouching = false;
-    
-    const minScale = 0.8;
-    const maxScale = 3;
-    
-    const updateTransform = () => {
-        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
-    };
-    
-    // معالج اللمس للتكبير والتصغير
-    img.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const touches = e.touches;
-        
-        if (touches.length === 2) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            initialDistance = Math.hypot(dx, dy);
-            initialScale = currentScale;
-            isTouching = false;
-        } else if (touches.length === 1) {
-            startX = touches[0].clientX - translateX;
-            startY = touches[0].clientY - translateY;
-            isTouching = true;
-        }
-    });
-    
-    img.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        const touches = e.touches;
-        
-        if (touches.length === 2 && initialDistance > 0) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            const newDistance = Math.hypot(dx, dy);
-            let newScale = initialScale * (newDistance / initialDistance);
-            newScale = Math.min(maxScale, Math.max(minScale, newScale));
-            
-            if (newScale !== currentScale) {
-                currentScale = newScale;
-                updateTransform();
-            }
-        } else if (touches.length === 1 && isTouching && currentScale > 1) {
-            translateX = touches[0].clientX - startX;
-            translateY = touches[0].clientY - startY;
-            
-            const maxTranslateX = (currentScale - 1) * 150;
-            const maxTranslateY = (currentScale - 1) * 150;
-            translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
-            translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
-            
-            updateTransform();
-        }
-    });
-    
-    img.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        initialDistance = 0;
-        isTouching = false;
-        
-        if (currentScale < 0.95) {
-            currentScale = 1;
-            translateX = 0;
-            translateY = 0;
-            updateTransform();
-        }
-    });
-    
-    modal.addEventListener('touchmove', (e) => {
-        if (e.target === img || imageContainer.contains(e.target)) {
-            e.preventDefault();
-        }
-    }, { passive: false });
-    
-    imageContainer.appendChild(img);
     modal.appendChild(frame);
-    modal.appendChild(imageContainer);
     modal.appendChild(backBtn);
+    modal.appendChild(img);
     
-    // ✅ الخروج فقط من زر الرجوع (وليس بالضغط خارج الصورة)
-    // تم إزالة modal.onclick الذي كان يغلق النافذة
-    
-    // إغلاق بزر ESC (مع الخروج من ملء الشاشة)
+    // إغلاق بزر ESC
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             modal.remove();
             document.removeEventListener('keydown', escHandler);
         }
@@ -1672,7 +1573,7 @@ showImagePreview(imageSrc) {
     
     document.body.appendChild(modal);
 },
-            
+    
 
     
     // ==================== القسم 27: sendMessage ====================
