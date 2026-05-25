@@ -1366,13 +1366,13 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-    
 
-   // ==================== القسم 26.1: showImagePreview ====================
-showImagePreview(imageSrc) {
+    // ==================== القسم 26.1: showImagePreview ====================
+
+    showImagePreview(imageSrc) {
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
-    
+
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
     modal.style.cssText = `
@@ -1384,25 +1384,21 @@ showImagePreview(imageSrc) {
         background: rgba(0,0,0,0.95);
         z-index: 10050;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
         overflow: hidden;
         touch-action: pan-x pan-y;
     `;
-    
-    const requestFullscreen = (element) => {
-        if (element.requestFullscreen) element.requestFullscreen();
-        else if (element.webkitRequestFullscreen) element.webkitRequestFullscreen();
-        else if (element.msRequestFullscreen) element.msRequestFullscreen();
+
+    const requestFullscreen = (el) => {
+        if (el.requestFullscreen) el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        else if (el.msRequestFullscreen) el.msRequestFullscreen();
     };
-    
-    // دخول ملء الشاشة فوراً
-    setTimeout(() => {
-        requestFullscreen(modal);
-    }, 100);
-    
-    // الإطار الأخضر الثابت
+
+    setTimeout(() => requestFullscreen(modal), 100);
+
+    // إطار أخضر
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1415,8 +1411,7 @@ showImagePreview(imageSrc) {
         z-index: 10051;
         box-sizing: border-box;
     `;
-    
-    // حاوية الصورة
+
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
         position: absolute;
@@ -1430,7 +1425,7 @@ showImagePreview(imageSrc) {
         overflow: hidden;
         touch-action: none;
     `;
-    
+
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
@@ -1443,13 +1438,9 @@ showImagePreview(imageSrc) {
         cursor: default;
         touch-action: none;
     `;
-    
-    img.oncontextmenu = (e) => {
-        e.preventDefault();
-        return false;
-    };
-    
-    // الأزرار داخل الإطار
+    img.oncontextmenu = (e) => e.preventDefault();
+
+    // الأزرار
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
@@ -1462,8 +1453,8 @@ showImagePreview(imageSrc) {
         pointer-events: none;
         z-index: 10052;
     `;
-    
-    // زر الرجوع
+
+    // زر الرجوع (يغلق النافذة ويعود للمحادثة)
     const backBtn = document.createElement('button');
     backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
     backBtn.style.cssText = `
@@ -1475,21 +1466,18 @@ showImagePreview(imageSrc) {
         cursor: pointer;
         font-size: 1.2rem;
         backdrop-filter: blur(5px);
-        transition: all 0.2s;
         color: white;
         pointer-events: auto;
         display: flex;
         align-items: center;
         justify-content: center;
     `;
-    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
-    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
     backBtn.onclick = () => {
         if (document.exitFullscreen) document.exitFullscreen();
-        modal.remove();
+        modal.remove();  // يعود إلى المحادثة
     };
-    
-    // ✅ زر التحميل (تحميل مباشر بدون مغادرة ملء الشاشة)
+
+    // زر التحميل
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
@@ -1501,68 +1489,36 @@ showImagePreview(imageSrc) {
         cursor: pointer;
         font-size: 1.2rem;
         backdrop-filter: blur(5px);
-        transition: all 0.2s;
         color: white;
         pointer-events: auto;
         display: flex;
         align-items: center;
         justify-content: center;
     `;
-    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    
-    // تحميل باستخدام iframe مخفي (بدون مغادرة ملء الشاشة)
     downloadBtn.onclick = (e) => {
         e.stopPropagation();
-        
-        // طريقة تحميل لا تخرج من ملء الشاشة
         const link = document.createElement('a');
         link.href = imageSrc;
         link.download = 'image.jpg';
-        link.target = '_blank';
-        link.style.display = 'none';
-        document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
-        
-        // إشعار صغير غير مزعج
-        const toast = document.createElement('div');
-        toast.textContent = '✅ جاري تحميل الصورة...';
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 30px;
-            font-size: 0.8rem;
-            z-index: 10060;
-            pointer-events: none;
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 1500);
     };
-    
+
     buttonOverlay.appendChild(backBtn);
     buttonOverlay.appendChild(downloadBtn);
-    
-    // متغيرات التكبير والتصغير باللمس
+
+    // تكبير/تصغير باللمس
     let currentScale = 1;
     let initialDistance = 0;
     let initialScale = 1;
     let startX = 0, startY = 0;
     let translateX = 0, translateY = 0;
     let isTouching = false;
-    
-    const minScale = 0.8;
-    const maxScale = 3;
-    
+    const minScale = 0.8, maxScale = 3;
+
     const updateTransform = () => {
         img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
     };
-    
+
     img.addEventListener('touchstart', (e) => {
         e.preventDefault();
         const touches = e.touches;
@@ -1578,14 +1534,12 @@ showImagePreview(imageSrc) {
             isTouching = true;
         }
     });
-    
+
     img.addEventListener('touchmove', (e) => {
         e.preventDefault();
         const touches = e.touches;
         if (touches.length === 2 && initialDistance > 0) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            const newDistance = Math.hypot(dx, dy);
+            const newDistance = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
             let newScale = initialScale * (newDistance / initialDistance);
             newScale = Math.min(maxScale, Math.max(minScale, newScale));
             if (newScale !== currentScale) {
@@ -1595,14 +1549,13 @@ showImagePreview(imageSrc) {
         } else if (touches.length === 1 && isTouching && currentScale > 1) {
             translateX = touches[0].clientX - startX;
             translateY = touches[0].clientY - startY;
-            const maxTranslateX = (currentScale - 1) * 150;
-            const maxTranslateY = (currentScale - 1) * 150;
-            translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
-            translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
+            const limit = (currentScale - 1) * 150;
+            translateX = Math.min(limit, Math.max(-limit, translateX));
+            translateY = Math.min(limit, Math.max(-limit, translateY));
             updateTransform();
         }
     });
-    
+
     img.addEventListener('touchend', (e) => {
         e.preventDefault();
         initialDistance = 0;
@@ -1614,19 +1567,17 @@ showImagePreview(imageSrc) {
             updateTransform();
         }
     });
-    
+
     modal.addEventListener('touchmove', (e) => {
-        if (e.target === img || imageContainer.contains(e.target)) {
-            e.preventDefault();
-        }
+        if (e.target === img || imageContainer.contains(e.target)) e.preventDefault();
     }, { passive: false });
-    
+
     imageContainer.appendChild(img);
     modal.appendChild(frame);
     modal.appendChild(imageContainer);
     modal.appendChild(buttonOverlay);
-    
-    // إغلاق بزر ESC
+
+    // إغلاق بزر ESC (مثل زر الرجوع)
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             if (document.exitFullscreen) document.exitFullscreen();
@@ -1635,10 +1586,9 @@ showImagePreview(imageSrc) {
         }
     };
     document.addEventListener('keydown', escHandler);
-    
+
     document.body.appendChild(modal);
 },
-
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
