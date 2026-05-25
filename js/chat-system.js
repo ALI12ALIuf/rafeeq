@@ -1393,7 +1393,7 @@ showImagePreview(imageSrc) {
         touch-action: pan-x pan-y;
     `;
     
-    // ========== طلب ملء الشاشة ==========
+    // طلب ملء الشاشة
     const requestFullscreen = (element) => {
         if (element.requestFullscreen) {
             element.requestFullscreen();
@@ -1408,7 +1408,7 @@ showImagePreview(imageSrc) {
         requestFullscreen(modal);
     }, 100);
     
-    // ========== الإطار الثابت (يغطي كامل الشاشة) ==========
+    // الإطار الثابت (يغطي كامل الشاشة)
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1422,7 +1422,7 @@ showImagePreview(imageSrc) {
         box-sizing: border-box;
     `;
     
-    // ========== حاوية الصورة (تتحرك داخلها) ==========
+    // حاوية الصورة
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
         position: absolute;
@@ -1450,13 +1450,13 @@ showImagePreview(imageSrc) {
         touch-action: none;
     `;
     
-    // منع القائمة المنبثقة عند الضغط المطول
+    // منع القائمة المنبثقة
     img.oncontextmenu = (e) => {
         e.preventDefault();
         return false;
     };
     
-    // ========== الأزرار (داخل الإطار، فوق الصورة) ==========
+    // الأزرار (داخل الإطار)
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
@@ -1470,7 +1470,7 @@ showImagePreview(imageSrc) {
         z-index: 10052;
     `;
     
-    // زر الرجوع (سهم) - داخل الإطار
+    // زر الرجوع
     const backBtn = document.createElement('button');
     backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
     backBtn.style.cssText = `
@@ -1502,7 +1502,7 @@ showImagePreview(imageSrc) {
         modal.remove();
     };
     
-    // زر التحميل - داخل الإطار
+    // ========== زر التحميل (مباشر بدون نافذة تأكيد، مع مؤشر دوران) ==========
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
@@ -1521,15 +1521,37 @@ showImagePreview(imageSrc) {
         align-items: center;
         justify-content: center;
     `;
-    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
+    
+    let isDownloading = false;
+    
     downloadBtn.onclick = (e) => {
         e.stopPropagation();
+        if (isDownloading) return;
+        
+        isDownloading = true;
+        
+        // تغيير الزر إلى دائرة تدور
+        downloadBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+        downloadBtn.style.opacity = '0.7';
+        
+        // تحميل مباشر بدون نافذة تأكيد
         const link = document.createElement('a');
         link.href = imageSrc;
         link.download = 'image.jpg';
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        
+        // إعادة الزر بعد نصف ثانية
+        setTimeout(() => {
+            downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+            downloadBtn.style.opacity = '1';
+            isDownloading = false;
+        }, 500);
     };
+    
+    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
+    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
     
     buttonOverlay.appendChild(backBtn);
     buttonOverlay.appendChild(downloadBtn);
@@ -1619,10 +1641,7 @@ showImagePreview(imageSrc) {
     modal.appendChild(imageContainer);
     modal.appendChild(buttonOverlay);
     
-    // ✅ الخروج فقط من زر الرجوع (وليس بالضغط خارج الصورة)
-    // تم إزالة modal.onclick الذي كان يغلق النافذة
-    
-    // إغلاق بزر ESC (مع الخروج من ملء الشاشة)
+    // الخروج فقط من زر الرجوع أو ESC
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             if (document.exitFullscreen) document.exitFullscreen();
@@ -1634,8 +1653,7 @@ showImagePreview(imageSrc) {
     document.addEventListener('keydown', escHandler);
     
     document.body.appendChild(modal);
-}, 
-            
+},
 
     
     // ==================== القسم 27: sendMessage ====================
