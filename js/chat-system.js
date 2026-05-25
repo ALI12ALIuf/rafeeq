@@ -434,32 +434,37 @@ async acceptFeatureRequest() {
     },
     
     // ==================== القسم 12: resetFeatures ====================
-    resetFeatures() {
-        console.log('🔄 resetFeatures - إعادة تعيين الميزات');
-        
-        const chatId = this.currentChat;
-        
-        this.featuresEnabled = false;
-        this.featureRequestPending = false;
-        this.featureRequestReceived = false;
-        
-        if (this.featureBlinkInterval) {
-            clearInterval(this.featureBlinkInterval);
-        }
-        
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) {
-            btn.style.background = '#f44336';
-            btn.title = 'تفعيل الميزات';
-        }
-        
-        if (chatId) {
-            console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
-            this.sendFeatureCancelImmediately(chatId);
-        }
-        
-        this.updateAllButtons();
-    },
+resetFeatures() {
+    console.log('🔄 resetFeatures - إعادة تعيين الميزات');
+    
+    const chatId = this.currentChat;
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+    }
+    
+    // ✅ تحديث زر التفعيل
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) {
+        toggleInput.checked = false;
+    }
+    if (switchLabel) {
+        switchLabel.classList.remove('blinking');
+    }
+    
+    if (chatId) {
+        console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
+        this.sendFeatureCancelImmediately(chatId);
+    }
+    
+    this.updateAllButtons();
+},
     
     // ==================== القسم 13: handleFeatureCancel ====================
     handleFeatureCancel() {
