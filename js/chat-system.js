@@ -1368,13 +1368,13 @@ displayMessage(msg) {
 },
     
 
-    // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر) ====================
+   // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع تحكم كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء نافذة منبثقة لعرض الصورة
+    // إنشاء النافذة المنبثقة
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
     modal.style.cssText = `
@@ -1383,31 +1383,240 @@ showImagePreview(imageSrc) {
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0,0,0,0.9);
+        background: rgba(0,0,0,0.95);
         z-index: 10050;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+    `;
+    
+    // ========== شريط الأزرار العلوي ==========
+    const topBar = document.createElement('div');
+    topBar.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 10051;
+    `;
+    
+    // زر الرجوع (سهم للخلف)
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i> رجوع';
+    backBtn.style.cssText = `
+        background: rgba(0,0,0,0.6);
+        border: 2px solid #4CAF50;
+        border-radius: 30px;
+        color: white;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+    `;
+    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
+    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.6)'; };
+    backBtn.onclick = () => { modal.remove(); };
+    
+    // زر التحميل
+    const downloadBtn = document.createElement('button');
+    downloadBtn.innerHTML = '<i class="fas fa-download"></i> تحميل';
+    downloadBtn.style.cssText = `
+        background: rgba(0,0,0,0.6);
+        border: 2px solid #4CAF50;
+        border-radius: 30px;
+        color: white;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+    `;
+    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
+    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.6)'; };
+    downloadBtn.onclick = (e) => {
+        e.stopPropagation();
+        const link = document.createElement('a');
+        link.href = imageSrc;
+        link.download = 'image.jpg';
+        link.click();
+    };
+    
+    topBar.appendChild(backBtn);
+    topBar.appendChild(downloadBtn);
+    
+    // ========== حاوية الصورة ==========
+    const imageContainer = document.createElement('div');
+    imageContainer.style.cssText = `
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: pointer;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        cursor: default;
     `;
     
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
+        border: 3px solid #4CAF50;
+        border-radius: 16px;
         max-width: 90%;
-        max-height: 90%;
+        max-height: 80%;
         object-fit: contain;
-        border-radius: 12px;
-        box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        transition: transform 0.2s ease;
+        cursor: default;
     `;
     
-    modal.appendChild(img);
+    // منع القائمة المنبثقة عند الضغط المطول (contextmenu)
+    img.oncontextmenu = (e) => {
+        e.preventDefault();
+        return false;
+    };
     
-    // إغلاق عند الضغط على الصورة أو خارجها
-    modal.onclick = () => modal.remove();
+    // منع أي تفاعل آخر على الصورة (لا تكبير بالضغط، لا شيء)
+    img.onclick = (e) => {
+        e.stopPropagation();
+        // لا شيء يحدث
+    };
+    
+    imageContainer.appendChild(img);
+    
+    // ========== أزرار التحكم في التكبير ==========
+    const controlsBar = document.createElement('div');
+    controlsBar.style.cssText = `
+        position: fixed;
+        bottom: 30px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        z-index: 10051;
+    `;
+    
+    // زر تكبير (+)
+    const zoomInBtn = document.createElement('button');
+    zoomInBtn.innerHTML = '<i class="fas fa-search-plus"></i> تكبير';
+    zoomInBtn.style.cssText = `
+        background: rgba(0,0,0,0.6);
+        border: 2px solid #4CAF50;
+        border-radius: 30px;
+        color: white;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+    `;
+    
+    // زر تصغير (-)
+    const zoomOutBtn = document.createElement('button');
+    zoomOutBtn.innerHTML = '<i class="fas fa-search-minus"></i> تصغير';
+    zoomOutBtn.style.cssText = `
+        background: rgba(0,0,0,0.6);
+        border: 2px solid #4CAF50;
+        border-radius: 30px;
+        color: white;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+    `;
+    
+    // إعادة تعيين التكبير
+    const resetBtn = document.createElement('button');
+    resetBtn.innerHTML = '<i class="fas fa-sync-alt"></i> افتراضي';
+    resetBtn.style.cssText = `
+        background: rgba(0,0,0,0.6);
+        border: 2px solid #4CAF50;
+        border-radius: 30px;
+        color: white;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+    `;
+    
+    let currentScale = 1;
+    const minScale = 0.5;
+    const maxScale = 3;
+    
+    const updateZoom = () => {
+        img.style.transform = `scale(${currentScale})`;
+        img.style.transition = 'transform 0.2s ease';
+    };
+    
+    zoomInBtn.onmouseover = () => { zoomInBtn.style.background = '#4CAF50'; };
+    zoomInBtn.onmouseout = () => { zoomInBtn.style.background = 'rgba(0,0,0,0.6)'; };
+    zoomInBtn.onclick = () => {
+        if (currentScale < maxScale) {
+            currentScale = Math.min(currentScale + 0.25, maxScale);
+            updateZoom();
+        }
+    };
+    
+    zoomOutBtn.onmouseover = () => { zoomOutBtn.style.background = '#4CAF50'; };
+    zoomOutBtn.onmouseout = () => { zoomOutBtn.style.background = 'rgba(0,0,0,0.6)'; };
+    zoomOutBtn.onclick = () => {
+        if (currentScale > minScale) {
+            currentScale = Math.max(currentScale - 0.25, minScale);
+            updateZoom();
+        }
+    };
+    
+    resetBtn.onmouseover = () => { resetBtn.style.background = '#4CAF50'; };
+    resetBtn.onmouseout = () => { resetBtn.style.background = 'rgba(0,0,0,0.6)'; };
+    resetBtn.onclick = () => {
+        currentScale = 1;
+        updateZoom();
+    };
+    
+    controlsBar.appendChild(zoomInBtn);
+    controlsBar.appendChild(zoomOutBtn);
+    controlsBar.appendChild(resetBtn);
+    
+    // إضافة العناصر إلى النافذة
+    modal.appendChild(topBar);
+    modal.appendChild(imageContainer);
+    modal.appendChild(controlsBar);
+    
+    // إغلاق بزر ESC
+    const escHandler = (e) => {
+        if (e.key === 'Escape' && document.getElementById('imagePreviewModal')) {
+            modal.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
     
     document.body.appendChild(modal);
-},
+}, 
 
     
     // ==================== القسم 27: sendMessage ====================
