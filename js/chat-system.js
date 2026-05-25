@@ -114,7 +114,7 @@ setupFeatureButton() {
             return;
         }
         
-        // ✅ إضافة الأنماط (مثل Dark Mode Switch تماماً)
+        // ✅ إضافة الأنماط
         if (!document.getElementById('featureToggleStyles')) {
             const style = document.createElement('style');
             style.id = 'featureToggleStyles';
@@ -172,9 +172,9 @@ setupFeatureButton() {
                 }
                 /* تأثير الرمش */
                 @keyframes featureBlink {
-                    0% { opacity: 1; }
-                    50% { opacity: 0.5; }
-                    100% { opacity: 1; }
+                    0% { background-color: #f44336; }
+                    50% { background-color: #2196F3; }
+                    100% { background-color: #f44336; }
                 }
                 .feature-switch.blinking .feature-slider {
                     animation: featureBlink 0.8s ease-in-out infinite;
@@ -183,7 +183,7 @@ setupFeatureButton() {
             document.head.appendChild(style);
         }
         
-        // ✅ إنشاء حاوية الزر (نفس تصميم Dark Mode)
+        // ✅ إنشاء حاوية الزر
         const toggleContainer = document.createElement('div');
         toggleContainer.className = 'feature-toggle-container';
         toggleContainer.id = 'featureToggleContainer';
@@ -200,16 +200,13 @@ setupFeatureButton() {
         container.appendChild(toggleContainer);
         
         const toggleInput = document.getElementById('featureToggleInput');
-        const toggleSlider = document.getElementById('featureToggleSlider');
-        const switchLabel = document.getElementById('featureSwitchLabel');
         
-        if (!toggleInput || !toggleSlider) return;
+        if (!toggleInput) return;
         
         // ✅ حفظ المراجع
         window.featureToggleInput = toggleInput;
-        window.featureToggleSlider = toggleSlider;
         
-        // ✅ معالج الضغط (مباشر بدون سحب - للتبسيط)
+        // ✅ معالج الضغط
         toggleInput.onclick = (e) => {
             console.log('🔘 تم الضغط على زر التفعيل');
             
@@ -224,9 +221,15 @@ setupFeatureButton() {
             }
         };
         
-        console.log('✅ تم إضافة زر التفعيل (مثل Dark Mode Switch)');
+        // ✅ إذا كانت الميزات مفعلة مسبقاً
+        if (this.featuresEnabled && toggleInput) {
+            toggleInput.checked = true;
+        }
+        
+        console.log('✅ تم إضافة زر التفعيل');
     }, 1000);
 }, 
+
     
    // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
