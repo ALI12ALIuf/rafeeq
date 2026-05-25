@@ -937,6 +937,23 @@ displayMessage(msg) {
             audioSrc = 'data:audio/webm;base64,' + audioSrc;
         }
         
+        // ✅ استخراج معلومات الضغطات (إذا وجدت)
+        const maxClicks = msg.maxClicks;
+        let clicksRemaining = msg.clicksRemaining;
+        
+        // ✅ إذا انتهت الصلاحية (clicksRemaining <= 0)
+        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+            div.innerHTML = `
+                <div class="message-content" style="background: #888; border-radius: 16px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>
+                </div>
+                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+            `;
+            c.appendChild(div);
+            c.scrollTop = c.scrollHeight;
+            return;
+        }
+        
         const audioId = `audio_${msg.id}`;
         let audioDuration = 0;
         
@@ -987,10 +1004,17 @@ displayMessage(msg) {
             
             if (playBtn && audioEl) {
                 let isPlaying = false;
+                let hasPlayed = false;
                 
-                // زر التشغيل/الإيقاف المؤقت
+                // ✅ زر التشغيل/الإيقاف المؤقت (يحسب مرة واحدة فقط عند التشغيل لأول مرة)
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
+                    
+                    // ✅ التحقق من الصلاحية - إذا انتهت لا يحدث شيء
+                    if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                        return;
+                    }
+                    
                     if (isPlaying) {
                         audioEl.pause();
                         playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
@@ -999,12 +1023,48 @@ displayMessage(msg) {
                         audioEl.play();
                         playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                         isPlaying = true;
+                        
+                        // ✅ تقليل عدد الضغطات المتبقية (مرة واحدة فقط عند التشغيل لأول مرة)
+                        if (!hasPlayed && clicksRemaining !== undefined && maxClicks < 999999 && msg.sender !== 'me') {
+                            hasPlayed = true;
+                            clicksRemaining--;
+                            msg.clicksRemaining = clicksRemaining;
+                            
+                            // تحديث في localStorage
+                            if (ChatSystem.currentChat) {
+                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                                const msgIndex = messages.findIndex(m => m.id === msg.id);
+                                if (msgIndex !== -1) {
+                                    messages[msgIndex].clicksRemaining = clicksRemaining;
+                                    ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                                }
+                            }
+                            
+                            // ✅ إذا وصلت إلى الصفر، قفل البصمة
+                            if (clicksRemaining <= 0) {
+                                const voiceDiv = div.querySelector('.voice-message');
+                                if (voiceDiv) {
+                                    voiceDiv.style.background = '#888';
+                                    voiceDiv.innerHTML = '<div style="display: flex; align-items: center; justify-content: center;"><i class="fas fa-lock" style="font-size: 1.5rem; color: white;"></i></div>';
+                                }
+                                if (audioEl) {
+                                    audioEl.pause();
+                                }
+                                return;
+                            }
+                        }
                     }
                 };
                 
                 // زر إعادة التشغيل (سهم دائري)
                 replayBtn.onclick = (e) => {
                     e.stopPropagation();
+                    
+                    // ✅ التحقق من الصلاحية
+                    if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                        return;
+                    }
+                    
                     audioEl.pause();
                     audioEl.currentTime = 0;
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
