@@ -1044,7 +1044,7 @@ openChat(friendId, friendName, friendAvatar) {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-    // ==================== القسم 26: displayMessage ====================
+     // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1151,6 +1151,7 @@ displayMessage(msg) {
             return;
         }
     }
+    // ✅✅✅ قسم الصور المعدل (حجم موحد + إطار أخضر + فتح داخل المحادثة)
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1158,7 +1159,34 @@ displayMessage(msg) {
                 imageSrc = 'data:image/jpeg;base64,' + imageSrc;
             }
         }
-        div.innerHTML = `<img src="${imageSrc}" class="message-image" onclick="window.openImage('${imageSrc}')" loading="lazy" style="max-width:100%;border-radius:12px;max-height:300px;cursor:pointer;"><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        
+        // إنشاء div لعرض الصورة داخل المحادثة بحجم موحد
+        const imageDiv = document.createElement('div');
+        imageDiv.className = 'message-image-wrapper';
+        imageDiv.style.cssText = 'cursor: pointer; display: inline-block; border: 2px solid #4CAF50; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;';
+        
+        const img = document.createElement('img');
+        img.src = imageSrc;
+        img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
+        img.loading = 'lazy';
+        
+        // فتح الصورة داخل المحادثة (نافذة منبثقة)
+        img.onclick = () => {
+            this.showImagePreview(imageSrc);
+        };
+        
+        imageDiv.appendChild(img);
+        div.appendChild(imageDiv);
+        
+        // إضافة معلومات الوقت والحالة
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'message-info';
+        infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
+        div.appendChild(infoDiv);
+        
+        c.appendChild(div);
+        c.scrollTop = c.scrollHeight;
+        return;
     } 
     else if (msg.type === 'voice') {
         let audioSrc = msg.data;
@@ -1277,6 +1305,7 @@ displayMessage(msg) {
             }
         }, 10);
     } 
+    // ✅✅✅ قسم الفيديو المعدل (حجم موحد + إطار أخضر)
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
         if (videoSrc && typeof videoSrc === 'string') {
@@ -1284,7 +1313,14 @@ displayMessage(msg) {
                 videoSrc = 'data:video/mp4;base64,' + videoSrc;
             }
         }
-        div.innerHTML = `<div style="position:relative;max-width:280px;border-radius:12px;overflow:hidden;background:#000;"><video controls preload="metadata" playsinline style="width:100%;max-height:250px;display:block;"><source src="${videoSrc}" type="video/mp4"></video></div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        div.innerHTML = `
+            <div style="position:relative; width: 250px; border-radius: 12px; overflow: hidden; background:#000; border: 2px solid #4CAF50;">
+                <video controls preload="metadata" playsinline style="width:100%; height: auto; max-height: 200px; display:block;">
+                    <source src="${videoSrc}" type="video/mp4">
+                </video>
+            </div>
+            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+        `;
     } 
     else if (msg.type === 'file') {
         // ✅ التصميم المطلوب للملفات (بحجم ثابت مع break-all للأسماء الطويلة)
@@ -1331,6 +1367,48 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
     
+
+    // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر) ====================
+showImagePreview(imageSrc) {
+    // إزالة أي نافذة سابقة
+    const existingPreview = document.getElementById('imagePreviewModal');
+    if (existingPreview) existingPreview.remove();
+    
+    // إنشاء نافذة منبثقة لعرض الصورة
+    const modal = document.createElement('div');
+    modal.id = 'imagePreviewModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.9);
+        z-index: 10050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    `;
+    
+    const img = document.createElement('img');
+    img.src = imageSrc;
+    img.style.cssText = `
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+        border-radius: 12px;
+        box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    `;
+    
+    modal.appendChild(img);
+    
+    // إغلاق عند الضغط على الصورة أو خارجها
+    modal.onclick = () => modal.remove();
+    
+    document.body.appendChild(modal);
+},
+
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
