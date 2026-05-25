@@ -424,7 +424,7 @@ startFeatureBlink() {
         console.log('✅ تم تفعيل وضع الاستقبال');
     },
     
-   // ==================== القسم 9: acceptFeatureRequest ====================
+  // ==================== القسم 9: acceptFeatureRequest ====================
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
     
@@ -444,27 +444,29 @@ async acceptFeatureRequest() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث حالة الزر المنزلق (Toggle Switch)
-    const toggleInput = document.getElementById('featureToggleInput');
-    const toggleSlider = document.getElementById('featureToggleSlider');
+    // ✅ تحديث واجهة زر السحب
+    const container = document.getElementById('featureSwipeContainer');
+    const leftThumb = document.getElementById('featureLeftThumb');
+    const rightThumb = document.getElementById('featureRightThumb');
     
-    if (toggleInput) {
-        toggleInput.checked = true;
-        console.log('✅ تم تفعيل زر التفعيل');
+    if (container) {
+        container.classList.remove('blinking');
     }
-    if (toggleSlider) {
-        toggleSlider.classList.remove('blinking');
-        toggleSlider.style.backgroundColor = '#4CAF50';
-        console.log('✅ تم تغيير لون الزر إلى الأخضر');
+    if (leftThumb) {
+        leftThumb.style.background = 'linear-gradient(145deg, #4CAF50, #1b5e2a)';
+        leftThumb.style.left = '3px';
+    }
+    if (rightThumb) {
+        rightThumb.style.right = '3px';
     }
     
-    // ✅ للتوافق مع الكود القديم (إذا وجد الزر القديم)
+    // ✅ للتوافق مع الكود القديم
     const btn = document.getElementById('enableFeaturesBtn');
     if (btn) {
         btn.style.background = '#4CAF50';
         btn.style.transform = 'scale(1)';
         btn.title = 'الميزات مفعلة ✅';
-        console.log('✅ تم تغيير لون الزر القديم إلى الأخضر');
+        console.log('✅ تم تغيير لون الزر إلى الأخضر');
     }
     
     try {
@@ -491,7 +493,7 @@ async acceptFeatureRequest() {
     this.updateAllButtons();
     console.log('✅ تم تفعيل الميزات! يمكنك الآن استخدام الاتصال وإرسال الملفات');
     console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
-}, 
+},
             
     
     // ==================== القسم 10: handleFeatureResponse ====================
@@ -569,19 +571,23 @@ resetFeatures() {
         clearInterval(this.featureBlinkInterval);
     }
     
-    // ✅ تحديث حالة الزر المنزلق (Toggle Switch)
-    const toggleInput = document.getElementById('featureToggleInput');
-    const toggleSlider = document.getElementById('featureToggleSlider');
+    // ✅ تحديث واجهة زر السحب
+    const container = document.getElementById('featureSwipeContainer');
+    const leftThumb = document.getElementById('featureLeftThumb');
+    const rightThumb = document.getElementById('featureRightThumb');
     
-    if (toggleInput) {
-        toggleInput.checked = false;
+    if (container) {
+        container.classList.remove('blinking');
     }
-    if (toggleSlider) {
-        toggleSlider.classList.remove('blinking');
-        toggleSlider.style.backgroundColor = '#f44336';
+    if (leftThumb) {
+        leftThumb.style.left = '3px';
+        leftThumb.style.background = 'linear-gradient(145deg, #4CAF50, #1b5e2a)';
+    }
+    if (rightThumb) {
+        rightThumb.style.right = '3px';
     }
     
-    // ✅ للتوافق مع الكود القديم (إذا وجد الزر القديم)
+    // ✅ للتوافق مع الكود القديم
     const btn = document.getElementById('enableFeaturesBtn');
     if (btn) {
         btn.style.background = '#f44336';
@@ -595,8 +601,8 @@ resetFeatures() {
     
     this.updateAllButtons();
 },
-    
-    // ==================== القسم 13: handleFeatureCancel ====================
+
+   // ==================== القسم 13: handleFeatureCancel ====================
 handleFeatureCancel() {
     console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
     console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
@@ -612,33 +618,37 @@ handleFeatureCancel() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث حالة الزر المنزلق (Toggle Switch)
-    const toggleInput = document.getElementById('featureToggleInput');
-    const toggleSlider = document.getElementById('featureToggleSlider');
+    // ✅ تحديث واجهة زر السحب
+    const container = document.getElementById('featureSwipeContainer');
+    const leftThumb = document.getElementById('featureLeftThumb');
+    const rightThumb = document.getElementById('featureRightThumb');
     
-    if (toggleInput) {
-        toggleInput.checked = false;
+    if (container) {
+        container.classList.remove('blinking');
     }
-    if (toggleSlider) {
-        toggleSlider.classList.remove('blinking');
-        toggleSlider.style.backgroundColor = '#f44336';
-        console.log('✅ تم تغيير لون الزر المنزلق إلى الأحمر');
+    if (leftThumb) {
+        leftThumb.style.left = '3px';
+        leftThumb.style.background = 'linear-gradient(145deg, #4CAF50, #1b5e2a)';
+    }
+    if (rightThumb) {
+        rightThumb.style.right = '3px';
     }
     
-    // ✅ للتوافق مع الكود القديم (إذا وجد الزر القديم)
+    // ✅ للتوافق مع الكود القديم
     const btn = document.getElementById('enableFeaturesBtn');
     if (btn) {
         btn.style.background = '#f44336';
         btn.title = 'تفعيل الميزات';
-        console.log('✅ تم تغيير لون الزر القديم إلى الأحمر');
+        console.log('✅ تم تغيير لون الزر إلى الأحمر');
     } else {
-        console.log('⚠️ لم يتم العثور على الزر القديم');
+        console.log('⚠️ لم يتم العثور على الزر');
     }
     
     this.updateAllButtons();
     console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
     console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
-},
+}, 
+
     
     // ==================== القسم 14: updateAllButtons ====================
     updateAllButtons() {
