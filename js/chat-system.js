@@ -1368,7 +1368,7 @@ displayMessage(msg) {
 },
     
 
-   // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار ثابت) ====================
+   // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار ثابت وملء الشاشة) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
@@ -1392,6 +1392,22 @@ showImagePreview(imageSrc) {
         overflow: hidden;
         touch-action: pan-x pan-y;
     `;
+    
+    // ========== طلب ملء الشاشة ==========
+    const requestFullscreen = (element) => {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
+    };
+    
+    // دخول ملء الشاشة عند فتح الصورة
+    setTimeout(() => {
+        requestFullscreen(modal);
+    }, 100);
     
     // ========== الإطار الثابت (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
@@ -1478,7 +1494,17 @@ showImagePreview(imageSrc) {
     `;
     backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
     backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    backBtn.onclick = () => { modal.remove(); };
+    backBtn.onclick = () => {
+        // الخروج من ملء الشاشة أولاً
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        modal.remove();
+    };
     
     // زر التحميل - داخل الإطار
     const downloadBtn = document.createElement('button');
@@ -1518,23 +1544,16 @@ showImagePreview(imageSrc) {
     let initialScale = 1;
     let startX = 0, startY = 0;
     let translateX = 0, translateY = 0;
-    let initialTranslateX = 0, initialTranslateY = 0;
     let isTouching = false;
     
     const minScale = 0.8;
     const maxScale = 3;
     
-    // الحصول على أبعاد الإطار
-    const getContainerBounds = () => {
-        const rect = imageContainer.getBoundingClientRect();
-        return { width: rect.width, height: rect.height };
-    };
-    
     const updateTransform = () => {
         img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
     };
     
-    // ========== معالج اللمس للتكبير والتصغير ==========
+    // معالج اللمس للتكبير والتصغير
     img.addEventListener('touchstart', (e) => {
         e.preventDefault();
         const touches = e.touches;
@@ -1571,14 +1590,8 @@ showImagePreview(imageSrc) {
             translateX = touches[0].clientX - startX;
             translateY = touches[0].clientY - startY;
             
-            // حدود السحب بناءً على حجم الصورة
-            const imgWidth = img.clientWidth;
-            const imgHeight = img.clientHeight;
-            const containerBounds = getContainerBounds();
-            
-            const maxTranslateX = Math.max(0, (imgWidth * currentScale - containerBounds.width) / 2);
-            const maxTranslateY = Math.max(0, (imgHeight * currentScale - containerBounds.height) / 2);
-            
+            const maxTranslateX = (currentScale - 1) * 150;
+            const maxTranslateY = (currentScale - 1) * 150;
             translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
             translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
             
@@ -1599,7 +1612,6 @@ showImagePreview(imageSrc) {
         }
     });
     
-    // منع تمرير الصفحة الخلفية
     modal.addEventListener('touchmove', (e) => {
         if (e.target === img || imageContainer.contains(e.target)) {
             e.preventDefault();
@@ -1611,18 +1623,22 @@ showImagePreview(imageSrc) {
     modal.appendChild(imageContainer);
     modal.appendChild(buttonOverlay);
     
-    // إغلاق بزر ESC
+    // إغلاق بزر ESC (والخروج من ملء الشاشة)
     const escHandler = (e) => {
-        if (e.key === 'Escape' && document.getElementById('imagePreviewModal')) {
-            modal.remove();
+        if (e.key === 'Escape') {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            if (document.getElementById('imagePreviewModal')) modal.remove();
             document.removeEventListener('keydown', escHandler);
         }
     };
     document.addEventListener('keydown', escHandler);
     
-    // إغلاق عند الضغط خارج الصورة (على الإطار)
+    // إغلاق عند الضغط خارج الصورة
     modal.onclick = (e) => {
         if (e.target === modal || e.target === frame || e.target === imageContainer) {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             modal.remove();
         }
     };
