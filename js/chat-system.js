@@ -105,8 +105,8 @@ setupFeatureButton() {
         const oldBtn = document.getElementById('enableFeaturesBtn');
         if (oldBtn) oldBtn.remove();
         
-        const oldToggleContainer = document.getElementById('featureToggleContainer');
-        if (oldToggleContainer) oldToggleContainer.remove();
+        const oldContainer = document.getElementById('featureSwipeContainer');
+        if (oldContainer) oldContainer.remove();
         
         const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
         if (!container) {
@@ -114,137 +114,244 @@ setupFeatureButton() {
             return;
         }
         
-        // ✅ إنشاء حاوية للزر المنزلق
-        const toggleContainer = document.createElement('div');
-        toggleContainer.id = 'featureToggleContainer';
-        toggleContainer.style.cssText = 'display: inline-flex; align-items: center; margin: 0 5px;';
-        
         // ✅ إضافة الأنماط المطلوبة (مرة واحدة فقط)
-        if (!document.getElementById('featureToggleStyles')) {
+        if (!document.getElementById('featureSwipeStyles')) {
             const style = document.createElement('style');
-            style.id = 'featureToggleStyles';
+            style.id = 'featureSwipeStyles';
             style.textContent = `
-                .feature-toggle-switch {
+                .feature-swipe-container {
+                    width: 100px;
+                    margin: 0 5px;
                     position: relative;
-                    display: inline-block;
-                    width: 55px;
-                    height: 28px;
                 }
-                .feature-toggle-switch input {
-                    opacity: 0;
-                    width: 0;
-                    height: 0;
-                }
-                .feature-toggle-slider {
-                    position: absolute;
-                    cursor: pointer;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: #f44336;
-                    transition: 0.3s;
-                    border-radius: 28px;
+                .feature-swipe-button {
+                    width: 100%;
+                    height: 36px;
+                    border-radius: 50px;
+                    position: relative;
+                    overflow: hidden;
+                    cursor: grab;
+                    user-select: none;
+                    touch-action: none;
+                    background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
+                    border: 2px solid #2196F3;
                     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                 }
-                .feature-toggle-slider:before {
+                .feature-swipe-button:active {
+                    cursor: grabbing;
+                }
+                .feature-divider-line {
                     position: absolute;
-                    content: "";
-                    height: 22px;
-                    width: 22px;
-                    left: 3px;
-                    bottom: 3px;
-                    background-color: white;
-                    transition: 0.3s;
+                    top: 5px;
+                    bottom: 5px;
+                    left: 50%;
+                    width: 2px;
+                    background: #2196F3;
+                    transform: translateX(-50%);
+                    pointer-events: none;
+                    z-index: 5;
+                    border-radius: 2px;
+                }
+                .feature-swipe-thumb {
+                    position: absolute;
+                    top: 3px;
+                    width: 30px;
+                    height: 30px;
                     border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                    transition: left 0.05s linear, right 0.05s linear;
+                    cursor: grab;
+                    z-index: 30;
+                    backdrop-filter: blur(5px);
+                    border: 2px solid #2196F3;
                 }
-                input:checked + .feature-toggle-slider {
-                    background-color: #4CAF50;
+                .feature-swipe-thumb:active {
+                    cursor: grabbing;
+                    transform: scale(0.96);
                 }
-                input:checked + .feature-toggle-slider:before {
-                    transform: translateX(27px);
+                .feature-thumb-left {
+                    left: 3px;
+                    background: linear-gradient(145deg, #4CAF50, #1b5e2a);
+                    color: white;
+                }
+                .feature-thumb-right {
+                    right: 3px;
+                    left: auto;
+                    background: linear-gradient(145deg, #f44336, #8b0000);
+                    color: white;
+                }
+                .feature-center-dot {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 8px;
+                    height: 8px;
+                    background: #2196F3;
+                    border-radius: 50%;
+                    pointer-events: none;
+                    z-index: 20;
                 }
                 /* تأثير الرمش */
                 @keyframes featureBlink {
-                    0% { background-color: #f44336; }
-                    50% { background-color: #ff9800; }
-                    100% { background-color: #f44336; }
+                    0% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    100% { opacity: 1; }
                 }
-                .feature-toggle-slider.blinking {
+                .feature-swipe-container.blinking .feature-swipe-button {
                     animation: featureBlink 0.8s ease-in-out infinite;
                 }
             `;
             document.head.appendChild(style);
         }
         
-        toggleContainer.innerHTML = `
-            <label class="feature-toggle-switch">
-                <input type="checkbox" id="featureToggleInput">
-                <span class="feature-toggle-slider" id="featureToggleSlider"></span>
-            </label>
+        // ✅ إنشاء حاوية الزر المنزلق القابل للسحب
+        const swipeContainer = document.createElement('div');
+        swipeContainer.id = 'featureSwipeContainer';
+        swipeContainer.className = 'feature-swipe-container';
+        
+        swipeContainer.innerHTML = `
+            <div id="featureSwipeButton" class="feature-swipe-button">
+                <div class="feature-divider-line"></div>
+                <div class="feature-center-dot"></div>
+                <div id="featureLeftThumb" class="feature-swipe-thumb feature-thumb-left">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div id="featureRightThumb" class="feature-swipe-thumb feature-thumb-right">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
         `;
         
-        const toggleInput = toggleContainer.querySelector('#featureToggleInput');
-        const toggleSlider = toggleContainer.querySelector('#featureToggleSlider');
+        container.appendChild(swipeContainer);
         
-        // حفظ المراجع للاستخدام لاحقاً
-        window.featureToggleInput = toggleInput;
-        window.featureToggleSlider = toggleSlider;
+        // ✅ إعداد أحداث السحب
+        const button = document.getElementById('featureSwipeButton');
+        const leftThumb = document.getElementById('featureLeftThumb');
+        const rightThumb = document.getElementById('featureRightThumb');
         
-        // ✅ معالج الضغط على الزر المنزلق
-        toggleInput.onclick = (e) => {
+        if (!button || !leftThumb || !rightThumb) return;
+        
+        const buttonWidth = button.clientWidth;
+        const centerPos = buttonWidth / 2;
+        const maxLeftMove = centerPos - 20;
+        const maxRightMove = centerPos - 20;
+        
+        let isDraggingLeft = false;
+        let isDraggingRight = false;
+        let leftCurrentPos = 3;
+        let rightCurrentPos = 3;
+        
+        const onLeftStart = (e) => {
             e.preventDefault();
-            console.log('🔘 تم الضغط على زر التفعيل');
-            console.log('featureRequestReceived:', this.featureRequestReceived);
-            console.log('featureRequestPending:', this.featureRequestPending);
-            console.log('featuresEnabled:', this.featuresEnabled);
+            e.stopPropagation();
+            isDraggingLeft = true;
+            leftThumb.style.transition = 'none';
+        };
+        
+        const onLeftMove = (e) => {
+            if (!isDraggingLeft) return;
+            e.preventDefault();
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const rect = button.getBoundingClientRect();
+            let newLeft = clientX - rect.left - 15;
+            newLeft = Math.max(3, Math.min(newLeft, maxLeftMove));
+            leftCurrentPos = newLeft;
+            leftThumb.style.left = newLeft + 'px';
+        };
+        
+        const onLeftEnd = () => {
+            if (!isDraggingLeft) return;
+            isDraggingLeft = false;
+            leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
             
-            if (this.featureRequestReceived) {
-                console.log('✅ قبول الطلب');
-                this.acceptFeatureRequest();
-            } else if (this.featuresEnabled) {
-                console.log('⚠️ الميزات مفعلة بالفعل');
-                alert('الميزات مفعلة بالفعل');
-            } else if (this.featureRequestPending) {
-                console.log('⏳ طلب قيد الانتظار');
-                alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+            if (leftCurrentPos >= maxLeftMove - 8) {
+                leftThumb.style.left = maxLeftMove + 'px';
+                setTimeout(() => {
+                    if (this.featureRequestReceived) {
+                        this.acceptFeatureRequest();
+                    } else if (!this.featuresEnabled && !this.featureRequestPending) {
+                        this.requestEnableFeatures();
+                    }
+                }, 200);
             } else {
-                console.log('📨 إرسال طلب جديد');
-                this.requestEnableFeatures();
+                leftThumb.style.left = '3px';
             }
         };
         
-        container.appendChild(toggleContainer);
+        const onRightStart = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isDraggingRight = true;
+            rightThumb.style.transition = 'none';
+        };
         
-        // ✅ تحديث حالة الزر إذا كانت الميزات مفعلة مسبقاً
-        if (this.featuresEnabled && toggleInput) {
-            toggleInput.checked = true;
-            if (toggleSlider) toggleSlider.style.backgroundColor = '#4CAF50';
-        }
+        const onRightMove = (e) => {
+            if (!isDraggingRight) return;
+            e.preventDefault();
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const rect = button.getBoundingClientRect();
+            let newRight = rect.right - clientX - 15;
+            newRight = Math.max(3, Math.min(newRight, maxRightMove));
+            rightCurrentPos = newRight;
+            rightThumb.style.right = newRight + 'px';
+        };
         
-        console.log('✅ تم إضافة زر التفعيل المنزلق (Toggle Switch)');
+        const onRightEnd = () => {
+            if (!isDraggingRight) return;
+            isDraggingRight = false;
+            rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+            
+            if (rightCurrentPos >= maxRightMove - 8) {
+                rightThumb.style.right = maxRightMove + 'px';
+                setTimeout(() => {
+                    // رفض الطلب إذا كان هناك طلب وارد
+                    if (this.featureRequestReceived) {
+                        // يمكن إضافة دالة رفض هنا
+                    }
+                }, 200);
+            } else {
+                rightThumb.style.right = '3px';
+            }
+        };
+        
+        leftThumb.addEventListener('mousedown', onLeftStart);
+        leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+        rightThumb.addEventListener('mousedown', onRightStart);
+        rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+        
+        document.addEventListener('mousemove', (e) => { onLeftMove(e); onRightMove(e); });
+        document.addEventListener('mouseup', () => { onLeftEnd(); onRightEnd(); });
+        document.addEventListener('touchmove', (e) => { onLeftMove(e); onRightMove(e); }, { passive: false });
+        document.addEventListener('touchend', () => { onLeftEnd(); onRightEnd(); });
+        
+        // حفظ المراجع للتحديث لاحقاً
+        window.featureSwipeContainer = swipeContainer;
+        window.featureLeftThumb = leftThumb;
+        window.featureRightThumb = rightThumb;
+        
+        console.log('✅ تم إضافة زر التفعيل القابل للسحب (Swipe Button)');
     }, 1000);
 },
     
-    
-    // ==================== القسم 6: startFeatureBlink ====================
+   // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
     if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
     
-    const toggleSlider = document.getElementById('featureToggleSlider');
-    if (!toggleSlider) return;
+    const container = document.getElementById('featureSwipeContainer');
+    if (!container) return;
     
-    // ✅ إضافة تأثير الرمش
-    toggleSlider.classList.add('blinking');
+    container.classList.add('blinking');
     
     let blinkCount = 0;
     this.featureBlinkInterval = setInterval(() => {
         if (!this.featureRequestPending && !this.featureRequestReceived) {
             clearInterval(this.featureBlinkInterval);
-            toggleSlider.classList.remove('blinking');
-            if (!this.featuresEnabled) {
-                toggleSlider.style.backgroundColor = '#f44336';
-            }
+            container.classList.remove('blinking');
             return;
         }
         
@@ -253,13 +360,11 @@ startFeatureBlink() {
             clearInterval(this.featureBlinkInterval);
             this.featureRequestPending = false;
             this.featureRequestReceived = false;
-            toggleSlider.classList.remove('blinking');
-            if (!this.featuresEnabled) {
-                toggleSlider.style.backgroundColor = '#f44336';
-            }
+            container.classList.remove('blinking');
         }
     }, 500);
-},
+}, 
+    
     
     // ==================== القسم 7: requestEnableFeatures ====================
     async requestEnableFeatures() {
