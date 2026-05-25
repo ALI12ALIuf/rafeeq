@@ -1179,22 +1179,23 @@ displayMessage(msg) {
     },
     
     // ==================== القسم 28: sendFileWithRetry ====================
-    async sendFileWithRetry(file, type, maxRetries = 3) {
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return false;
-        }
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
-                const success = await CallSystem.sendFileDirect(file, type);
-                if (success) { this.hideProgressBar(); return true; }
-                if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
-            } catch (error) {}
-        }
-        this.hideProgressBar(); return false;
-    },
+async sendFileWithRetry(file, type, maxClicks = null, maxRetries = 3) {
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return false;
+    }
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+            // ✅ تمرير maxClicks إلى CallSystem.sendFileDirect
+            const success = await CallSystem.sendFileDirect(file, type, maxClicks);
+            if (success) { this.hideProgressBar(); return true; }
+            if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
+        } catch (error) {}
+    }
+    this.hideProgressBar(); return false;
+},
     
     // ==================== القسم 29: _ensureChannelReady ====================
     async _ensureChannelReady() {
