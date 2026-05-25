@@ -467,34 +467,36 @@ resetFeatures() {
 },
     
     // ==================== القسم 13: handleFeatureCancel ====================
-    handleFeatureCancel() {
-        console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
-        console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
-        
-        this.featuresEnabled = false;
-        this.featureRequestPending = false;
-        this.featureRequestReceived = false;
-        
-        console.log('✅ featuresEnabled بعد الإلغاء:', this.featuresEnabled);
-        
-        if (this.featureBlinkInterval) {
-            clearInterval(this.featureBlinkInterval);
-            this.featureBlinkInterval = null;
-        }
-        
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) {
-            btn.style.background = '#f44336';
-            btn.title = 'تفعيل الميزات';
-            console.log('✅ تم تغيير لون الزر إلى الأحمر');
-        } else {
-            console.log('⚠️ لم يتم العثور على الزر');
-        }
-        
-        this.updateAllButtons();
-        console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
-        console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
-    },
+handleFeatureCancel() {
+    console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
+    console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    console.log('✅ featuresEnabled بعد الإلغاء:', this.featuresEnabled);
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    // ✅ تحديث زر التفعيل
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) {
+        toggleInput.checked = false;
+    }
+    if (switchLabel) {
+        switchLabel.classList.remove('blinking');
+    }
+    
+    this.updateAllButtons();
+    console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+    console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
+},
     
     // ==================== القسم 14: updateAllButtons ====================
     updateAllButtons() {
