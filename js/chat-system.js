@@ -1057,50 +1057,69 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
     div.id = `msg-${msg.id}`;
     
-    // ✅ الوقت باللغة الإنجليزية (مثال: 6:39 PM)
-    const time = new Date(msg.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    // ✅ الوقت بالعربية (مثال: ٦:٣٩ م)
+    const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     
-    // ✅ إلغاء علامات الصح نهائياً (statusHtml محذوف)
-    
-    // ✅ دالة مساعدة لإنشاء الوقت فقط (بدون علامات صح)
-    const createTimeSpan = () => {
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'message-time-inline';
-        timeSpan.style.cssText = 'display: block; text-align: center; font-size: 0.7rem; margin-top: 6px; opacity: 0.7;';
-        timeSpan.textContent = time;
-        return timeSpan;
-    };
+    // ✅ إلغاء علامات الصح نهائياً
     
     if (msg.type === 'text') {
-        // ✅ النص: خلفية زرقاء للمرسل، رمادية للمستلم
+        // ✅ النص: الخلفية كما كانت (var(--card-bg))، الإطار مثل لون الزر
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         
         if (msg.sender === 'me') {
-            // ✅ المرسلة: لون أزرق (#2196F3) - نفس لون زر الإرسال
-            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: #2196F3; color: white; border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word;';
+            // ✅ المرسلة: إطار أزرق (#2196F3) مثل لون زر الإرسال
+            contentDiv.style.cssText = 'border: 1.5px solid #2196F3; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
         } else {
-            // ✅ المستلمة: لون رمادي فاتح مع إطار أخضر
-            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word;';
+            // ✅ المستلمة: إطار أخضر (#4CAF50)
+            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
         }
         
-        // ✅ النص بحجم أكبر قليلاً للقراءة الواضحة
+        // النص
         const textSpan = document.createElement('span');
         textSpan.style.cssText = 'font-size: 1rem; line-height: 1.4; display: block;';
         textSpan.innerHTML = this.escapeHtml(msg.text);
         contentDiv.appendChild(textSpan);
         
-        // ✅ الوقت في الأسفل بالمنتصف
-        const timeSpan = createTimeSpan();
-        if (msg.sender === 'me') {
-            timeSpan.style.color = 'rgba(255,255,255,0.8)';
-        }
-        contentDiv.appendChild(timeSpan);
-        
         div.appendChild(contentDiv);
+        
+        // ✅ الوقت في بداية كل محادثة أو كل 10 رسائل (نضيفه كعنصر منفصل)
+        // نتحقق إذا كانت هذه أول رسالة في المحادثة أو if the previous message was sent more than 10 minutes ago or every 10 messages
+        const messages = this.messages[this.currentChat] || [];
+        const currentIndex = messages.findIndex(m => m.id === msg.id);
+        const prevMsg = currentIndex > 0 ? messages[currentIndex - 1] : null;
+        
+        let showTimeSeparator = false;
+        
+        if (!prevMsg) {
+            // أول رسالة في المحادثة
+            showTimeSeparator = true;
+        } else {
+            // كل 10 رسائل
+            if (currentIndex % 10 === 0) {
+                showTimeSeparator = true;
+            } else {
+                // أو إذا مر أكثر من 10 دقائق
+                const prevTime = new Date(prevMsg.time).getTime();
+                const currTime = new Date(msg.time).getTime();
+                const diffMinutes = (currTime - prevTime) / (1000 * 60);
+                if (diffMinutes > 10) {
+                    showTimeSeparator = true;
+                }
+            }
+        }
+        
+        if (showTimeSeparator) {
+            const timeSeparator = document.createElement('div');
+            timeSeparator.className = 'time-separator';
+            timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
+            timeSeparator.textContent = time;
+            // نضيف الفاصل قبل الرسالة
+            c.appendChild(timeSeparator);
+        }
     } 
     else if (msg.type === 'location') {
-        // معالجة رسالة الموقع
+        // معالجة رسالة الموقع (بدون وقت)
         let locationData = msg.data;
         let locationUrl = '';
         
@@ -1113,11 +1132,9 @@ displayMessage(msg) {
             locationUrl = '#';
         }
         
-        // استخراج معلومات الضغطات
         const maxClicks = locationData.maxClicks;
         let clicksRemaining = locationData.clicksRemaining;
         
-        // ✅ إذا كانت الصلاحية انتهت (clicksRemaining <= 0)
         if (clicksRemaining !== undefined && clicksRemaining <= 0) {
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
@@ -1125,33 +1142,25 @@ displayMessage(msg) {
             contentDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
             div.appendChild(contentDiv);
         } else {
-            // ✅ عرض الموقع بدون وقت
             const locationDiv = document.createElement('div');
             locationDiv.className = 'message-content location-card';
-            locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: none;';
+            const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+            locationDiv.style.cssText = `cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid ${borderColor};`;
             locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
             
-            // معالج الضغط على الموقع
             locationDiv.onclick = (e) => {
                 e.stopPropagation();
-                
-                if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                    return;
-                }
-                
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
                 window.open(locationUrl, '_blank');
-                
                 if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
                     clicksRemaining--;
                     msg.data.clicksRemaining = clicksRemaining;
-                    
                     if (clicksRemaining <= 0) {
                         locationDiv.style.background = '#888';
                         locationDiv.style.cursor = 'default';
                         locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
                         locationDiv.onclick = () => {};
                     }
-                    
                     if (ChatSystem.currentChat) {
                         const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
                         const msgIndex = messages.findIndex(m => m.id === msg.id);
@@ -1162,11 +1171,10 @@ displayMessage(msg) {
                     }
                 }
             };
-            
             div.appendChild(locationDiv);
         }
     }
-    // ✅ قسم الصور - بدون وقت
+    // ✅ قسم الصور
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1313,7 +1321,7 @@ displayMessage(msg) {
             }
         }, 10);
     } 
-    // ✅ قسم الفيديو - بدون وقت
+    // ✅ قسم الفيديو
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
         if (videoSrc && typeof videoSrc === 'string') {
@@ -1385,6 +1393,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+    
      
 
     // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
