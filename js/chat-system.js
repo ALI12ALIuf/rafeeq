@@ -1056,38 +1056,47 @@ displayMessage(msg) {
     const div = document.createElement('div'); 
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
     div.id = `msg-${msg.id}`;
-    const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-    let statusHtml = ''; 
-    if (msg.sender === 'me') { 
-        let icon = '✓', cls = 'sent'; 
-        if (msg.status === 'delivered') { 
-            icon = '✓✓'; cls = 'delivered'; 
-        } else if (msg.status === 'read') { 
-            icon = '✓✓'; cls = 'read'; 
-        } 
-        statusHtml = `<span class="message-status ${cls}">${icon}</span>`;
-    }
     
-    // ✅ دالة مساعدة لإنشاء شريط المعلومات (الوقت + الحالة) داخل الفقاعة
-    const createInfoSpan = () => {
-        const infoSpan = document.createElement('span');
-        infoSpan.className = 'message-info-inline';
-        infoSpan.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 0.65rem; margin-right: 8px; opacity: 0.7;';
-        infoSpan.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
-        return infoSpan;
+    // ✅ الوقت باللغة الإنجليزية (مثال: 6:39 PM)
+    const time = new Date(msg.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    
+    // ✅ إلغاء علامات الصح نهائياً (statusHtml محذوف)
+    
+    // ✅ دالة مساعدة لإنشاء الوقت فقط (بدون علامات صح)
+    const createTimeSpan = () => {
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'message-time-inline';
+        timeSpan.style.cssText = 'display: block; text-align: center; font-size: 0.7rem; margin-top: 6px; opacity: 0.7;';
+        timeSpan.textContent = time;
+        return timeSpan;
     };
     
     if (msg.type === 'text') {
-        // ✅ النص: الوقت داخل الفقاعة مع الإطار المناسب
+        // ✅ النص: خلفية زرقاء للمرسل، رمادية للمستلم
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
-        contentDiv.style.cssText = msg.sender === 'me' 
-            ? 'border: 1.5px solid #2196F3; background: var(--card-bg); color: var(--text);' 
-            : 'border: 1.5px solid #4CAF50; background: var(--card-bg); color: var(--text);';
-        contentDiv.innerHTML = `<span>${this.escapeHtml(msg.text)}</span>`;
         
-        const infoSpan = createInfoSpan();
-        contentDiv.appendChild(infoSpan);
+        if (msg.sender === 'me') {
+            // ✅ المرسلة: لون أزرق (#2196F3) - نفس لون زر الإرسال
+            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: #2196F3; color: white; border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word;';
+        } else {
+            // ✅ المستلمة: لون رمادي فاتح مع إطار أخضر
+            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word;';
+        }
+        
+        // ✅ النص بحجم أكبر قليلاً للقراءة الواضحة
+        const textSpan = document.createElement('span');
+        textSpan.style.cssText = 'font-size: 1rem; line-height: 1.4; display: block;';
+        textSpan.innerHTML = this.escapeHtml(msg.text);
+        contentDiv.appendChild(textSpan);
+        
+        // ✅ الوقت في الأسفل بالمنتصف
+        const timeSpan = createTimeSpan();
+        if (msg.sender === 'me') {
+            timeSpan.style.color = 'rgba(255,255,255,0.8)';
+        }
+        contentDiv.appendChild(timeSpan);
+        
         div.appendChild(contentDiv);
     } 
     else if (msg.type === 'location') {
@@ -1116,7 +1125,7 @@ displayMessage(msg) {
             contentDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
             div.appendChild(contentDiv);
         } else {
-            // ✅ عرض الموقع بدون وقت (الوقت محذوف للموقع)
+            // ✅ عرض الموقع بدون وقت
             const locationDiv = document.createElement('div');
             locationDiv.className = 'message-content location-card';
             locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: none;';
@@ -1157,7 +1166,7 @@ displayMessage(msg) {
             div.appendChild(locationDiv);
         }
     }
-    // ✅ قسم الصور - بدون وقت، مع الإطار المناسب
+    // ✅ قسم الصور - بدون وقت
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1168,9 +1177,8 @@ displayMessage(msg) {
         
         const imageDiv = document.createElement('div');
         imageDiv.className = 'message-image-wrapper';
-        imageDiv.style.cssText = msg.sender === 'me'
-            ? 'cursor: pointer; display: inline-block; border: 2px solid #2196F3; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;'
-            : 'cursor: pointer; display: inline-block; border: 2px solid #4CAF50; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;';
+        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+        imageDiv.style.cssText = `cursor: pointer; display: inline-block; border: 2px solid ${borderColor}; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;`;
         
         const img = document.createElement('img');
         img.src = imageSrc;
@@ -1194,7 +1202,6 @@ displayMessage(msg) {
         
         imageDiv.appendChild(img);
         div.appendChild(imageDiv);
-        // ✅ لا نضيف وقت للصور
     } 
     else if (msg.type === 'voice') {
         let audioSrc = msg.data;
@@ -1240,8 +1247,6 @@ displayMessage(msg) {
                 <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
             </div>
         `;
-        
-        // ✅ لا نضيف وقت منفصل للبصمة
         
         setTimeout(() => {
             const playBtn = div.querySelector('.voice-play-btn');
@@ -1375,7 +1380,6 @@ displayMessage(msg) {
                 </div>
             </div>
         `;
-        // ✅ لا نضيف وقت للملفات
     }
     
     c.appendChild(div); 
