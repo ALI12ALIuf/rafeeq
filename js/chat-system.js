@@ -1379,24 +1379,27 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
             
-    
 
-  // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
+    // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر بدون ملء الشاشة) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء النافذة المنبثقة (الإطار الخارجي الثابت)
+    // إنشاء النافذة المنبثقة (بحجم مناسب، وليس ملء الشاشة)
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
     modal.style.cssText = `
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 800px;
+        height: auto;
+        max-height: 90vh;
         background: rgba(0,0,0,0.95);
+        border-radius: 20px;
         z-index: 10050;
         display: flex;
         flex-direction: column;
@@ -1404,72 +1407,58 @@ showImagePreview(imageSrc) {
         justify-content: center;
         overflow: hidden;
         touch-action: pan-x pan-y;
+        box-shadow: 0 0 50px rgba(0,0,0,0.5);
     `;
     
-    // ========== طلب ملء الشاشة ==========
-    const requestFullscreen = (element) => {
-        if (element.requestFullscreen) {
-            element.requestFullscreen();
-        } else if (element.webkitRequestFullscreen) {
-            element.webkitRequestFullscreen();
-        } else if (element.msRequestFullscreen) {
-            element.msRequestFullscreen();
-        }
-    };
-    
-    setTimeout(() => {
-        requestFullscreen(modal);
-    }, 100);
-    
-    // ========== الإطار الثابت (يغطي كامل الشاشة) ==========
+    // ========== الإطار الثابت الأخضر ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        border: 4px solid #4CAF50;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        border: 3px solid #4CAF50;
+        border-radius: 16px;
         pointer-events: none;
         z-index: 10051;
-        box-sizing: border-box;
     `;
     
-    // ========== حاوية الصورة (تتحرك داخلها) ==========
+    // ========== حاوية الصورة ==========
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        width: 100%;
+        height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
         touch-action: none;
+        padding: 20px;
+        box-sizing: border-box;
     `;
     
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
         max-width: 100%;
-        max-height: 100%;
+        max-height: 85vh;
         width: auto;
         height: auto;
         object-fit: contain;
         transition: transform 0.1s ease;
         cursor: default;
         touch-action: none;
+        border-radius: 12px;
     `;
     
-    // منع القائمة المنبثقة عند الضغط المطول
+    // منع القائمة المنبثقة
     img.oncontextmenu = (e) => {
         e.preventDefault();
         return false;
     };
     
-    // ========== الأزرار (داخل الإطار، فوق الصورة) ==========
+    // ========== الأزرار ==========
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
@@ -1478,22 +1467,22 @@ showImagePreview(imageSrc) {
         right: 0;
         display: flex;
         justify-content: space-between;
-        padding: 0 20px;
+        padding: 0 25px;
         pointer-events: none;
         z-index: 10052;
     `;
     
-    // زر الرجوع (سهم) - داخل الإطار
+    // زر الرجوع
     const backBtn = document.createElement('button');
     backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
     backBtn.style.cssText = `
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 45px;
-        height: 45px;
+        width: 40px;
+        height: 40px;
         cursor: pointer;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1505,27 +1494,20 @@ showImagePreview(imageSrc) {
     backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
     backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
     backBtn.onclick = () => {
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-        } else if (document.msExitFullscreen) {
-            document.msExitFullscreen();
-        }
         modal.remove();
     };
     
-    // زر التحميل - داخل الإطار
+    // زر التحميل
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 45px;
-        height: 45px;
+        width: 40px;
+        height: 40px;
         cursor: pointer;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1547,7 +1529,7 @@ showImagePreview(imageSrc) {
     buttonOverlay.appendChild(backBtn);
     buttonOverlay.appendChild(downloadBtn);
     
-    // ========== متغيرات للتكبير والتصغير باللمس ==========
+    // ========== التكبير والتصغير باللمس ==========
     let currentScale = 1;
     let initialDistance = 0;
     let initialScale = 1;
@@ -1562,7 +1544,6 @@ showImagePreview(imageSrc) {
         img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
     };
     
-    // معالج اللمس للتكبير والتصغير
     img.addEventListener('touchstart', (e) => {
         e.preventDefault();
         const touches = e.touches;
@@ -1621,25 +1602,14 @@ showImagePreview(imageSrc) {
         }
     });
     
-    modal.addEventListener('touchmove', (e) => {
-        if (e.target === img || imageContainer.contains(e.target)) {
-            e.preventDefault();
-        }
-    }, { passive: false });
-    
     imageContainer.appendChild(img);
     modal.appendChild(frame);
     modal.appendChild(imageContainer);
     modal.appendChild(buttonOverlay);
     
-    // ✅ الخروج فقط من زر الرجوع (وليس بالضغط خارج الصورة)
-    // تم إزالة modal.onclick الذي كان يغلق النافذة
-    
-    // إغلاق بزر ESC (مع الخروج من ملء الشاشة)
+    // إغلاق بزر ESC
     const escHandler = (e) => {
-        if (e.key === 'Escape') {
-            if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        if (e.key === 'Escape' && document.getElementById('imagePreviewModal')) {
             modal.remove();
             document.removeEventListener('keydown', escHandler);
         }
@@ -1647,66 +1617,63 @@ showImagePreview(imageSrc) {
     document.addEventListener('keydown', escHandler);
     
     document.body.appendChild(modal);
-}, 
+},
 
 
-   // ==================== القسم 26.2: showVideoPreview (عرض الفيديو بملء الشاشة مع إطار كامل) ====================
+// ==================== القسم 26.2: showVideoPreview (عرض الفيديو بشكل مكبر بدون ملء الشاشة) ====================
 showVideoPreview(videoSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('videoPreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء النافذة المنبثقة (ملء الشاشة)
+    // إنشاء النافذة المنبثقة (بحجم مناسب، وليس ملء الشاشة)
     const modal = document.createElement('div');
     modal.id = 'videoPreviewModal';
     modal.style.cssText = `
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 800px;
+        height: auto;
+        max-height: 90vh;
         background: rgba(0,0,0,0.95);
+        border-radius: 20px;
         z-index: 10060;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: center;
         overflow: hidden;
+        box-shadow: 0 0 50px rgba(0,0,0,0.5);
     `;
     
-    // ========== الإطار الثابت الأخضر (يغطي كامل الشاشة) ==========
+    // ========== الإطار الثابت الأخضر ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
         border: 3px solid #4CAF50;
-        border-radius: 20px;
+        border-radius: 16px;
         pointer-events: none;
         z-index: 10061;
-        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
     `;
     
     // ========== المحتوى داخل الإطار ==========
     const contentContainer = document.createElement('div');
     contentContainer.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
+        width: 100%;
+        height: 100%;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: center;
         background: #000;
         border-radius: 16px;
         overflow: hidden;
     `;
     
-    // حاوية الفيديو (الجزء العلوي)
+    // حاوية الفيديو
     const videoWrapper = document.createElement('div');
     videoWrapper.style.cssText = `
         flex: 1;
@@ -1714,31 +1681,35 @@ showVideoPreview(videoSrc) {
         align-items: center;
         justify-content: center;
         width: 100%;
+        min-height: 300px;
         overflow: hidden;
+        padding: 20px;
+        box-sizing: border-box;
     `;
     
     const video = document.createElement('video');
     video.src = videoSrc;
     video.style.cssText = `
         max-width: 100%;
-        max-height: 100%;
+        max-height: 60vh;
         width: auto;
         height: auto;
         object-fit: contain;
+        border-radius: 12px;
     `;
     video.controls = false;
     video.playsinline = true;
     
-    // ========== أزرار علوية (داخل الإطار) ==========
+    // ========== أزرار علوية ==========
     const topButtons = document.createElement('div');
     topButtons.style.cssText = `
         position: absolute;
-        top: 30px;
+        top: 20px;
         left: 0;
         right: 0;
         display: flex;
         justify-content: space-between;
-        padding: 0 35px;
+        padding: 0 25px;
         pointer-events: none;
         z-index: 10062;
     `;
@@ -1750,10 +1721,10 @@ showVideoPreview(videoSrc) {
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 45px;
-        height: 45px;
+        width: 40px;
+        height: 40px;
         cursor: pointer;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1776,10 +1747,10 @@ showVideoPreview(videoSrc) {
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 45px;
-        height: 45px;
+        width: 40px;
+        height: 40px;
         cursor: pointer;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1801,17 +1772,17 @@ showVideoPreview(videoSrc) {
     topButtons.appendChild(backBtn);
     topButtons.appendChild(downloadBtn);
     
-    // ========== شريط التحكم السفلي (داخل الإطار، أسفل الفيديو) ==========
+    // ========== شريط التحكم السفلي ==========
     const controlsBar = document.createElement('div');
     controlsBar.style.cssText = `
         width: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 20px;
+        gap: 15px;
         background: rgba(0,0,0,0.8);
         backdrop-filter: blur(10px);
-        padding: 15px 20px;
+        padding: 12px 20px;
         border-top: 1px solid #4CAF50;
         z-index: 10062;
     `;
@@ -1823,10 +1794,10 @@ showVideoPreview(videoSrc) {
         background: #4CAF50;
         border: none;
         border-radius: 50%;
-        width: 45px;
-        height: 45px;
+        width: 40px;
+        height: 40px;
         cursor: pointer;
-        font-size: 1.1rem;
+        font-size: 1rem;
         color: white;
         display: flex;
         align-items: center;
@@ -1837,13 +1808,13 @@ showVideoPreview(videoSrc) {
     // وقت الفيديو الحالي
     const currentTimeSpan = document.createElement('span');
     currentTimeSpan.textContent = '0:00';
-    currentTimeSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
+    currentTimeSpan.style.cssText = `color: white; font-size: 0.85rem; min-width: 40px; text-align: center; font-family: monospace;`;
     
     // شريط التقدم
     const progressBar = document.createElement('div');
     progressBar.style.cssText = `
         flex: 1;
-        max-width: 300px;
+        max-width: 250px;
         height: 4px;
         background: rgba(255,255,255,0.3);
         border-radius: 2px;
@@ -1863,7 +1834,7 @@ showVideoPreview(videoSrc) {
     // المدة الإجمالية
     const durationSpan = document.createElement('span');
     durationSpan.textContent = '0:00';
-    durationSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
+    durationSpan.style.cssText = `color: white; font-size: 0.85rem; min-width: 40px; text-align: center; font-family: monospace;`;
     
     controlsBar.appendChild(playPauseBtn);
     controlsBar.appendChild(currentTimeSpan);
@@ -1948,8 +1919,9 @@ showVideoPreview(videoSrc) {
         playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
         isPlaying = true;
     }).catch(() => {});
-}, 
-    
+},
+
+
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
