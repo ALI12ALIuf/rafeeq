@@ -1044,7 +1044,7 @@ openChat(friendId, friendName, friendAvatar) {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-     // ==================== القسم 26: displayMessage ====================
+         // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1305,7 +1305,7 @@ displayMessage(msg) {
             }
         }, 10);
     } 
-    // ✅✅✅ قسم الفيديو المعدل (حجم موحد + إطار أخضر)
+    // ✅✅✅ قسم الفيديو المعدل (صورة مصغرة مع زر تكبير)
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
         if (videoSrc && typeof videoSrc === 'string') {
@@ -1313,14 +1313,26 @@ displayMessage(msg) {
                 videoSrc = 'data:video/mp4;base64,' + videoSrc;
             }
         }
+        
+        // عرض الفيديو في المحادثة (صورة مصغرة مع زر تكبير)
         div.innerHTML = `
-            <div style="position:relative; width: 250px; border-radius: 12px; overflow: hidden; background:#000; border: 2px solid #4CAF50;">
-                <video controls preload="metadata" playsinline style="width:100%; height: auto; max-height: 200px; display:block;">
+            <div class="message-content video-thumbnail" style="position: relative; width: 250px; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #4CAF50; cursor: pointer;">
+                <video style="width: 100%; height: auto; max-height: 200px; display: block; pointer-events: none;" preload="metadata">
                     <source src="${videoSrc}" type="video/mp4">
                 </video>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+                    <i class="fas fa-expand" style="color: white; font-size: 1.5rem;"></i>
+                </div>
             </div>
             <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
         `;
+        
+        // إضافة حدث التكبير
+        const videoContainer = div.querySelector('.video-thumbnail');
+        videoContainer.onclick = (e) => {
+            e.stopPropagation();
+            this.showVideoPreview(videoSrc);
+        };
     } 
     else if (msg.type === 'file') {
         // ✅ التصميم المطلوب للملفات (بحجم ثابت مع break-all للأسماء الطويلة)
@@ -1366,6 +1378,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+            
     
 
   // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
