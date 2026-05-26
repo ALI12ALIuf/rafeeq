@@ -1380,26 +1380,22 @@ displayMessage(msg) {
 },
             
 
-    // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر بدون ملء الشاشة) ====================
+    // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء النافذة المنبثقة (بحجم مناسب، وليس ملء الشاشة)
+    // إنشاء النافذة المنبثقة (ملء الشاشة)
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
     modal.style.cssText = `
         position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 90%;
-        max-width: 800px;
-        height: auto;
-        max-height: 90vh;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         background: rgba(0,0,0,0.95);
-        border-radius: 20px;
         z-index: 10050;
         display: flex;
         flex-direction: column;
@@ -1407,49 +1403,50 @@ showImagePreview(imageSrc) {
         justify-content: center;
         overflow: hidden;
         touch-action: pan-x pan-y;
-        box-shadow: 0 0 50px rgba(0,0,0,0.5);
     `;
     
-    // ========== الإطار الثابت الأخضر ==========
+    // ========== الإطار الثابت الأخضر (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
-        top: 10px;
-        left: 10px;
-        right: 10px;
-        bottom: 10px;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
         border: 3px solid #4CAF50;
-        border-radius: 16px;
+        border-radius: 20px;
         pointer-events: none;
         z-index: 10051;
+        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
     `;
     
     // ========== حاوية الصورة ==========
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
-        width: 100%;
-        height: 100%;
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
         touch-action: none;
-        padding: 20px;
-        box-sizing: border-box;
+        border-radius: 16px;
     `;
     
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
         max-width: 100%;
-        max-height: 85vh;
+        max-height: 100%;
         width: auto;
         height: auto;
         object-fit: contain;
         transition: transform 0.1s ease;
         cursor: default;
         touch-action: none;
-        border-radius: 12px;
     `;
     
     // منع القائمة المنبثقة
@@ -1462,12 +1459,12 @@ showImagePreview(imageSrc) {
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
-        top: 20px;
+        top: 30px;
         left: 0;
         right: 0;
         display: flex;
         justify-content: space-between;
-        padding: 0 25px;
+        padding: 0 30px;
         pointer-events: none;
         z-index: 10052;
     `;
@@ -1479,10 +1476,10 @@ showImagePreview(imageSrc) {
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         cursor: pointer;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1504,10 +1501,10 @@ showImagePreview(imageSrc) {
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         cursor: pointer;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1580,8 +1577,8 @@ showImagePreview(imageSrc) {
             translateX = touches[0].clientX - startX;
             translateY = touches[0].clientY - startY;
             
-            const maxTranslateX = (currentScale - 1) * 150;
-            const maxTranslateY = (currentScale - 1) * 150;
+            const maxTranslateX = (currentScale - 1) * 200;
+            const maxTranslateY = (currentScale - 1) * 200;
             translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
             translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
             
@@ -1620,52 +1617,53 @@ showImagePreview(imageSrc) {
 },
 
 
-// ==================== القسم 26.2: showVideoPreview (عرض الفيديو بشكل مكبر بدون ملء الشاشة) ====================
+// ==================== القسم 26.2: showVideoPreview (عرض الفيديو بملء الشاشة مع إطار كامل) ====================
 showVideoPreview(videoSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('videoPreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء النافذة المنبثقة (بحجم مناسب، وليس ملء الشاشة)
+    // إنشاء النافذة المنبثقة (ملء الشاشة)
     const modal = document.createElement('div');
     modal.id = 'videoPreviewModal';
     modal.style.cssText = `
         position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 90%;
-        max-width: 800px;
-        height: auto;
-        max-height: 90vh;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         background: rgba(0,0,0,0.95);
-        border-radius: 20px;
         z-index: 10060;
         display: flex;
         flex-direction: column;
+        align-items: center;
+        justify-content: center;
         overflow: hidden;
-        box-shadow: 0 0 50px rgba(0,0,0,0.5);
     `;
     
-    // ========== الإطار الثابت الأخضر ==========
+    // ========== الإطار الثابت الأخضر (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
-        top: 10px;
-        left: 10px;
-        right: 10px;
-        bottom: 10px;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
         border: 3px solid #4CAF50;
-        border-radius: 16px;
+        border-radius: 20px;
         pointer-events: none;
         z-index: 10061;
+        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
     `;
     
     // ========== المحتوى داخل الإطار ==========
     const contentContainer = document.createElement('div');
     contentContainer.style.cssText = `
-        width: 100%;
-        height: 100%;
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
         display: flex;
         flex-direction: column;
         background: #000;
@@ -1681,21 +1679,17 @@ showVideoPreview(videoSrc) {
         align-items: center;
         justify-content: center;
         width: 100%;
-        min-height: 300px;
         overflow: hidden;
-        padding: 20px;
-        box-sizing: border-box;
     `;
     
     const video = document.createElement('video');
     video.src = videoSrc;
     video.style.cssText = `
         max-width: 100%;
-        max-height: 60vh;
+        max-height: 100%;
         width: auto;
         height: auto;
         object-fit: contain;
-        border-radius: 12px;
     `;
     video.controls = false;
     video.playsinline = true;
@@ -1704,12 +1698,12 @@ showVideoPreview(videoSrc) {
     const topButtons = document.createElement('div');
     topButtons.style.cssText = `
         position: absolute;
-        top: 20px;
+        top: 30px;
         left: 0;
         right: 0;
         display: flex;
         justify-content: space-between;
-        padding: 0 25px;
+        padding: 0 35px;
         pointer-events: none;
         z-index: 10062;
     `;
@@ -1721,10 +1715,10 @@ showVideoPreview(videoSrc) {
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         cursor: pointer;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1747,10 +1741,10 @@ showVideoPreview(videoSrc) {
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         cursor: pointer;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
@@ -1779,10 +1773,10 @@ showVideoPreview(videoSrc) {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 15px;
+        gap: 20px;
         background: rgba(0,0,0,0.8);
         backdrop-filter: blur(10px);
-        padding: 12px 20px;
+        padding: 15px 20px;
         border-top: 1px solid #4CAF50;
         z-index: 10062;
     `;
@@ -1794,10 +1788,10 @@ showVideoPreview(videoSrc) {
         background: #4CAF50;
         border: none;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         cursor: pointer;
-        font-size: 1rem;
+        font-size: 1.1rem;
         color: white;
         display: flex;
         align-items: center;
@@ -1808,13 +1802,13 @@ showVideoPreview(videoSrc) {
     // وقت الفيديو الحالي
     const currentTimeSpan = document.createElement('span');
     currentTimeSpan.textContent = '0:00';
-    currentTimeSpan.style.cssText = `color: white; font-size: 0.85rem; min-width: 40px; text-align: center; font-family: monospace;`;
+    currentTimeSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
     
     // شريط التقدم
     const progressBar = document.createElement('div');
     progressBar.style.cssText = `
         flex: 1;
-        max-width: 250px;
+        max-width: 300px;
         height: 4px;
         background: rgba(255,255,255,0.3);
         border-radius: 2px;
@@ -1834,7 +1828,7 @@ showVideoPreview(videoSrc) {
     // المدة الإجمالية
     const durationSpan = document.createElement('span');
     durationSpan.textContent = '0:00';
-    durationSpan.style.cssText = `color: white; font-size: 0.85rem; min-width: 40px; text-align: center; font-family: monospace;`;
+    durationSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
     
     controlsBar.appendChild(playPauseBtn);
     controlsBar.appendChild(currentTimeSpan);
@@ -1921,6 +1915,8 @@ showVideoPreview(videoSrc) {
     }).catch(() => {});
 },
 
+
+    
 
     
     // ==================== القسم 27: sendMessage ====================
