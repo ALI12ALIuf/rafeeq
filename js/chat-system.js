@@ -1637,6 +1637,286 @@ showImagePreview(imageSrc) {
 }, 
             
 
+   // ==================== القسم 26.2: showVideoPreview (عرض الفيديو بشكل مكبر مع إطار ثابت) ====================
+showVideoPreview(videoSrc) {
+    // إزالة أي نافذة سابقة
+    const existingPreview = document.getElementById('videoPreviewModal');
+    if (existingPreview) existingPreview.remove();
+    
+    // إنشاء النافذة المنبثقة
+    const modal = document.createElement('div');
+    modal.id = 'videoPreviewModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.95);
+        z-index: 10060;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    `;
+    
+    // الإطار الثابت
+    const frame = document.createElement('div');
+    frame.style.cssText = `
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        border: 3px solid #4CAF50;
+        border-radius: 20px;
+        pointer-events: none;
+        z-index: 10061;
+        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
+    `;
+    
+    // حاوية الفيديو
+    const videoContainer = document.createElement('div');
+    videoContainer.style.cssText = `
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+    `;
+    
+    const video = document.createElement('video');
+    video.src = videoSrc;
+    video.style.cssText = `
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        border-radius: 12px;
+    `;
+    video.controls = false;
+    video.playsinline = true;
+    
+    // ========== الأزرار داخل الإطار ==========
+    const buttonOverlay = document.createElement('div');
+    buttonOverlay.style.cssText = `
+        position: absolute;
+        top: 30px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        padding: 0 35px;
+        pointer-events: none;
+        z-index: 10062;
+    `;
+    
+    // زر الرجوع
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+    backBtn.style.cssText = `
+        background: rgba(0,0,0,0.7);
+        border: 2px solid #4CAF50;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+        color: white;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
+    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
+    backBtn.onclick = () => {
+        if (video) video.pause();
+        modal.remove();
+    };
+    
+    // زر التحميل
+    const downloadBtn = document.createElement('button');
+    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+    downloadBtn.style.cssText = `
+        background: rgba(0,0,0,0.7);
+        border: 2px solid #4CAF50;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+        color: white;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
+    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
+    downloadBtn.onclick = (e) => {
+        e.stopPropagation();
+        const link = document.createElement('a');
+        link.href = videoSrc;
+        link.download = 'video.mp4';
+        link.click();
+    };
+    
+    buttonOverlay.appendChild(backBtn);
+    buttonOverlay.appendChild(downloadBtn);
+    
+    // ========== أزرار التحكم في الفيديو ==========
+    const controlsBar = document.createElement('div');
+    controlsBar.style.cssText = `
+        position: absolute;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(10px);
+        padding: 12px 25px;
+        border-radius: 50px;
+        border: 1px solid #4CAF50;
+        z-index: 10062;
+    `;
+    
+    // زر تشغيل/إيقاف
+    const playPauseBtn = document.createElement('button');
+    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+    playPauseBtn.style.cssText = `
+        background: #4CAF50;
+        border: none;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.1rem;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    `;
+    
+    // وقت الفيديو الحالي
+    const currentTimeSpan = document.createElement('span');
+    currentTimeSpan.textContent = '0:00';
+    currentTimeSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center;`;
+    
+    // شريط التقدم
+    const progressBar = document.createElement('div');
+    progressBar.style.cssText = `
+        width: 200px;
+        height: 4px;
+        background: rgba(255,255,255,0.3);
+        border-radius: 2px;
+        cursor: pointer;
+        position: relative;
+    `;
+    
+    const progressFill = document.createElement('div');
+    progressFill.style.cssText = `
+        width: 0%;
+        height: 100%;
+        background: #4CAF50;
+        border-radius: 2px;
+    `;
+    progressBar.appendChild(progressFill);
+    
+    // المدة الإجمالية
+    const durationSpan = document.createElement('span');
+    durationSpan.textContent = '0:00';
+    durationSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center;`;
+    
+    controlsBar.appendChild(playPauseBtn);
+    controlsBar.appendChild(currentTimeSpan);
+    controlsBar.appendChild(progressBar);
+    controlsBar.appendChild(durationSpan);
+    
+    // الحصول على مدة الفيديو
+    video.addEventListener('loadedmetadata', () => {
+        const minutes = Math.floor(video.duration / 60);
+        const seconds = Math.floor(video.duration % 60);
+        durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    });
+    
+    // تحديث الوقت والتقدم أثناء التشغيل
+    video.addEventListener('timeupdate', () => {
+        const minutes = Math.floor(video.currentTime / 60);
+        const seconds = Math.floor(video.currentTime % 60);
+        currentTimeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        const percent = (video.currentTime / video.duration) * 100;
+        progressFill.style.width = percent + '%';
+    });
+    
+    // تشغيل/إيقاف
+    let isPlaying = false;
+    playPauseBtn.onclick = () => {
+        if (isPlaying) {
+            video.pause();
+            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            isPlaying = false;
+        } else {
+            video.play();
+            playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            isPlaying = true;
+        }
+    };
+    
+    // عند انتهاء الفيديو
+    video.onended = () => {
+        playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+        isPlaying = false;
+    };
+    
+    // التقدم بالضغط على شريط التقدم
+    progressBar.onclick = (e) => {
+        const rect = progressBar.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const percent = clickX / rect.width;
+        video.currentTime = percent * video.duration;
+    };
+    
+    videoContainer.appendChild(video);
+    modal.appendChild(frame);
+    modal.appendChild(videoContainer);
+    modal.appendChild(buttonOverlay);
+    modal.appendChild(controlsBar);
+    
+    // إغلاق بزر ESC
+    const escHandler = (e) => {
+        if (e.key === 'Escape' && document.getElementById('videoPreviewModal')) {
+            if (video) video.pause();
+            modal.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+    
+    // إغلاق عند الضغط خارج الفيديو
+    modal.onclick = (e) => {
+        if (e.target === modal || e.target === frame || e.target === videoContainer) {
+            if (video) video.pause();
+            modal.remove();
+        }
+    };
+    
+    document.body.appendChild(modal);
+}, 
+    
     
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
