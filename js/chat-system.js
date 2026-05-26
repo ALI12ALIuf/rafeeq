@@ -1448,7 +1448,6 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-
 // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
@@ -1467,9 +1466,11 @@ showImagePreview(imageSrc) {
         background: rgba(0,0,0,0.95);
         z-index: 10050;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        touch-action: pan-x pan-y;
     `;
     
     // ========== طلب ملء الشاشة ==========
@@ -1487,7 +1488,7 @@ showImagePreview(imageSrc) {
         requestFullscreen(modal);
     }, 100);
     
-    // ========== الإطار الثابت (مسافة 20px من كل جهة) ==========
+    // ========== الإطار الثابت (مع مسافة من الأطراف) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1502,7 +1503,21 @@ showImagePreview(imageSrc) {
         box-sizing: border-box;
     `;
     
-    // الصورة
+    // ========== حاوية الصورة (تتحرك داخلها) ==========
+    const imageContainer = document.createElement('div');
+    imageContainer.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        touch-action: none;
+    `;
+    
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
@@ -1511,9 +1526,9 @@ showImagePreview(imageSrc) {
         width: auto;
         height: auto;
         object-fit: contain;
-        border-radius: 12px;
+        transition: transform 0.1s ease;
         cursor: default;
-        box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        touch-action: none;
     `;
     
     // منع القائمة المنبثقة عند الضغط المطول
@@ -1557,14 +1572,99 @@ showImagePreview(imageSrc) {
         modal.remove();
     };
     
-    modal.appendChild(frame);
-    modal.appendChild(backBtn);
-    modal.appendChild(img);
+    // ========== متغيرات للتكبير والتصغير باللمس ==========
+    let currentScale = 1;
+    let initialDistance = 0;
+    let initialScale = 1;
+    let startX = 0, startY = 0;
+    let translateX = 0, translateY = 0;
+    let isTouching = false;
     
-    // إغلاق بزر ESC
+    const minScale = 0.8;
+    const maxScale = 3;
+    
+    const updateTransform = () => {
+        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+    };
+    
+    // معالج اللمس للتكبير والتصغير
+    img.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touches = e.touches;
+        
+        if (touches.length === 2) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            initialDistance = Math.hypot(dx, dy);
+            initialScale = currentScale;
+            isTouching = false;
+        } else if (touches.length === 1) {
+            startX = touches[0].clientX - translateX;
+            startY = touches[0].clientY - translateY;
+            isTouching = true;
+        }
+    });
+    
+    img.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const touches = e.touches;
+        
+        if (touches.length === 2 && initialDistance > 0) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            const newDistance = Math.hypot(dx, dy);
+            let newScale = initialScale * (newDistance / initialDistance);
+            newScale = Math.min(maxScale, Math.max(minScale, newScale));
+            
+            if (newScale !== currentScale) {
+                currentScale = newScale;
+                updateTransform();
+            }
+        } else if (touches.length === 1 && isTouching && currentScale > 1) {
+            translateX = touches[0].clientX - startX;
+            translateY = touches[0].clientY - startY;
+            
+            const maxTranslateX = (currentScale - 1) * 150;
+            const maxTranslateY = (currentScale - 1) * 150;
+            translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
+            translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
+            
+            updateTransform();
+        }
+    });
+    
+    img.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        initialDistance = 0;
+        isTouching = false;
+        
+        if (currentScale < 0.95) {
+            currentScale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+        }
+    });
+    
+    modal.addEventListener('touchmove', (e) => {
+        if (e.target === img || imageContainer.contains(e.target)) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    imageContainer.appendChild(img);
+    modal.appendChild(frame);
+    modal.appendChild(imageContainer);
+    modal.appendChild(backBtn);
+    
+    // ✅ الخروج فقط من زر الرجوع (وليس بالضغط خارج الصورة)
+    // تم إزالة modal.onclick الذي كان يغلق النافذة
+    
+    // إغلاق بزر ESC (مع الخروج من ملء الشاشة)
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             modal.remove();
             document.removeEventListener('keydown', escHandler);
         }
@@ -1573,7 +1673,6 @@ showImagePreview(imageSrc) {
     
     document.body.appendChild(modal);
 },
-    
 
     
     // ==================== القسم 27: sendMessage ====================
