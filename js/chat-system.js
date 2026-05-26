@@ -1044,7 +1044,8 @@ openChat(friendId, friendName, friendAvatar) {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-         // ==================== القسم 26: displayMessage ====================
+
+    // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1151,7 +1152,7 @@ displayMessage(msg) {
             return;
         }
     }
-    // ✅✅✅ قسم الصور المعدل (حجم موحد + إطار أخضر + فتح داخل المحادثة)
+    // ✅✅✅ قسم الصور المعدل (مع منع القوائم)
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1169,6 +1170,18 @@ displayMessage(msg) {
         img.src = imageSrc;
         img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
         img.loading = 'lazy';
+        
+        // ✅ منع القائمة المنبثقة على الصورة المصغرة
+        img.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        };
+        img.ondragstart = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        };
         
         // فتح الصورة داخل المحادثة (نافذة منبثقة)
         img.onclick = () => {
@@ -1305,7 +1318,7 @@ displayMessage(msg) {
             }
         }, 10);
     } 
-    // ✅✅✅ قسم الفيديو المعدل (صورة مصغرة مع زر تكبير)
+    // ✅✅✅ قسم الفيديو المعدل (مع منع القوائم على الصورة المصغرة)
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
         if (videoSrc && typeof videoSrc === 'string') {
@@ -1327,8 +1340,15 @@ displayMessage(msg) {
             <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
         `;
         
-        // إضافة حدث التكبير
+        // ✅ منع القائمة المنبثقة على الفيديو المصغر
         const videoContainer = div.querySelector('.video-thumbnail');
+        videoContainer.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        };
+        
+        // إضافة حدث التكبير
         videoContainer.onclick = (e) => {
             e.stopPropagation();
             this.showVideoPreview(videoSrc);
@@ -1378,6 +1398,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+
             
 
     // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
