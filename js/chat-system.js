@@ -1044,7 +1044,7 @@ openChat(friendId, friendName, friendAvatar) {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-    // ==================== القسم 26: displayMessage ====================
+     // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1151,7 +1151,7 @@ displayMessage(msg) {
             return;
         }
     }
-    // ✅✅✅ قسم الصور المعدل (زر تحميل أخضر + أيقونة بيضاء)
+    // ✅✅✅ قسم الصور المعدل (حجم موحد + إطار أخضر + فتح داخل المحادثة)
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1160,17 +1160,7 @@ displayMessage(msg) {
             }
         }
         
-        // حاوية الصورة مع زر التحميل في الأسفل
-        const imageContainer = document.createElement('div');
-        imageContainer.style.cssText = `
-            display: inline-block;
-            position: relative;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        `;
-        
-        // الصورة المصغرة
+        // إنشاء div لعرض الصورة داخل المحادثة بحجم موحد
         const imageDiv = document.createElement('div');
         imageDiv.className = 'message-image-wrapper';
         imageDiv.style.cssText = 'cursor: pointer; display: inline-block; border: 2px solid #4CAF50; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;';
@@ -1180,58 +1170,13 @@ displayMessage(msg) {
         img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
         img.loading = 'lazy';
         
-        // ✅ منع قائمة المتصفح (الضغط المطول / زر الفأرة الأيمن)
-        img.oncontextmenu = (e) => {
-            e.preventDefault();
-            return false;
-        };
-        
-        // فتح الصورة بشكل مكبر عند الضغط العادي
+        // فتح الصورة داخل المحادثة (نافذة منبثقة)
         img.onclick = () => {
             this.showImagePreview(imageSrc);
         };
         
         imageDiv.appendChild(img);
-        imageContainer.appendChild(imageDiv);
-        
-        // ✅ زر التحميل (خلفية خضراء، أيقونة بيضاء)
-        const downloadBtn = document.createElement('button');
-        downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-        downloadBtn.style.cssText = `
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: #4CAF50;
-            border: none;
-            border-radius: 30px;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            transition: all 0.2s;
-            z-index: 5;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        `;
-        downloadBtn.onmouseover = () => { downloadBtn.style.background = '#2E7D32'; };
-        downloadBtn.onmouseout = () => { downloadBtn.style.background = '#4CAF50'; };
-        downloadBtn.onclick = (e) => {
-            e.stopPropagation();
-            const link = document.createElement('a');
-            link.href = imageSrc;
-            link.download = 'image.jpg';
-            link.click();
-            
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.showNotification) {
-                ChatSystem.showNotification('📸 تم تحميل الصورة');
-            }
-        };
-        
-        imageContainer.appendChild(downloadBtn);
-        div.appendChild(imageContainer);
+        div.appendChild(imageDiv);
         
         // إضافة معلومات الوقت والحالة
         const infoDiv = document.createElement('div');
@@ -1342,7 +1287,7 @@ displayMessage(msg) {
                     }
                 };
                 
-                // ✅ تحديث عداد الوقت الحالي
+                // ✅ تحديث عداد الوقت الحالي (يتزايد من 0:00 إلى المدة الإجمالية)
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
                     const seconds = Math.floor(audioEl.currentTime % 60);
@@ -1360,7 +1305,7 @@ displayMessage(msg) {
             }
         }, 10);
     } 
-    // ✅✅✅ قسم الفيديو المعدل (مع منع قائمة المتصفح)
+    // ✅✅✅ قسم الفيديو المعدل (حجم موحد + إطار أخضر)
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
         if (videoSrc && typeof videoSrc === 'string') {
@@ -1368,46 +1313,17 @@ displayMessage(msg) {
                 videoSrc = 'data:video/mp4;base64,' + videoSrc;
             }
         }
-        
-        const videoContainer = document.createElement('div');
-        videoContainer.style.cssText = `
-            display: inline-block;
-            position: relative;
-            border-radius: 16px;
-            overflow: hidden;
-            width: 250px;
-            border-radius: 12px;
-            background: #000;
-            border: 2px solid #4CAF50;
+        div.innerHTML = `
+            <div style="position:relative; width: 250px; border-radius: 12px; overflow: hidden; background:#000; border: 2px solid #4CAF50;">
+                <video controls preload="metadata" playsinline style="width:100%; height: auto; max-height: 200px; display:block;">
+                    <source src="${videoSrc}" type="video/mp4">
+                </video>
+            </div>
+            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
         `;
-        
-        const video = document.createElement('video');
-        video.src = videoSrc;
-        video.controls = true;
-        video.preload = 'metadata';
-        video.playsinline = true;
-        video.style.cssText = 'width: 100%; height: auto; max-height: 200px; display: block;';
-        
-        // ✅ منع قائمة المتصفح على الفيديو
-        video.oncontextmenu = (e) => {
-            e.preventDefault();
-            return false;
-        };
-        
-        videoContainer.appendChild(video);
-        div.appendChild(videoContainer);
-        
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'message-info';
-        infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
-        div.appendChild(infoDiv);
-        
-        c.appendChild(div);
-        c.scrollTop = c.scrollHeight;
-        return;
     } 
     else if (msg.type === 'file') {
-        // ✅ التصميم المطلوب للملفات
+        // ✅ التصميم المطلوب للملفات (بحجم ثابت مع break-all للأسماء الطويلة)
         let fileName = msg.fileName || 'ملف';
         
         // حساب حجم الملف تقريباً
@@ -1419,20 +1335,23 @@ displayMessage(msg) {
             else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
         
-        // عرض اسم الملف كاملاً
+        // عرض اسم الملف كاملاً مع التفاف تلقائي وكسر الكلمات الطويلة
         let displayName = fileName;
         
         div.innerHTML = `
             <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1px solid #4CAF50;">
+                <!-- أيقونة الملف داخل دائرة بيضاء -->
                 <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex-shrink: 0;">
                     <span style="font-size: 1.5rem;">📄</span>
                 </div>
                 
+                <!-- معلومات الملف -->
                 <div style="flex: 1; overflow: hidden; min-width: 0;">
                     <div style="font-weight: bold; font-size: 0.85rem; word-break: break-all; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
                     ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
                 </div>
                 
+                <!-- زر التحميل (أيقونة فقط) -->
                 <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
                      onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
                      onmouseover="this.style.background='rgba(255,255,255,0.3)'"
@@ -1447,8 +1366,9 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+    
 
-// ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
+  // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
@@ -1488,16 +1408,15 @@ showImagePreview(imageSrc) {
         requestFullscreen(modal);
     }, 100);
     
-    // ========== الإطار الثابت (مع مسافة من الأطراف) ==========
+    // ========== الإطار الثابت (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
-        top: 20px;
-        left: 20px;
-        right: 20px;
-        bottom: 20px;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         border: 4px solid #4CAF50;
-        border-radius: 20px;
         pointer-events: none;
         z-index: 10051;
         box-sizing: border-box;
@@ -1521,8 +1440,8 @@ showImagePreview(imageSrc) {
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
-        max-width: calc(100% - 40px);
-        max-height: calc(100% - 40px);
+        max-width: 100%;
+        max-height: 100%;
         width: auto;
         height: auto;
         object-fit: contain;
@@ -1537,13 +1456,24 @@ showImagePreview(imageSrc) {
         return false;
     };
     
-    // ========== زر الرجوع (على اليمين) ==========
-    const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i>';
-    backBtn.style.cssText = `
+    // ========== الأزرار (داخل الإطار، فوق الصورة) ==========
+    const buttonOverlay = document.createElement('div');
+    buttonOverlay.style.cssText = `
         position: absolute;
         top: 20px;
-        right: 20px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        padding: 0 20px;
+        pointer-events: none;
+        z-index: 10052;
+    `;
+    
+    // زر الرجوع (سهم) - داخل الإطار
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+    backBtn.style.cssText = `
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
@@ -1554,7 +1484,7 @@ showImagePreview(imageSrc) {
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
-        z-index: 10052;
+        pointer-events: auto;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1571,6 +1501,38 @@ showImagePreview(imageSrc) {
         }
         modal.remove();
     };
+    
+    // زر التحميل - داخل الإطار
+    const downloadBtn = document.createElement('button');
+    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+    downloadBtn.style.cssText = `
+        background: rgba(0,0,0,0.7);
+        border: 2px solid #4CAF50;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+        color: white;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
+    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
+    downloadBtn.onclick = (e) => {
+        e.stopPropagation();
+        const link = document.createElement('a');
+        link.href = imageSrc;
+        link.download = 'image.jpg';
+        link.click();
+    };
+    
+    buttonOverlay.appendChild(backBtn);
+    buttonOverlay.appendChild(downloadBtn);
     
     // ========== متغيرات للتكبير والتصغير باللمس ==========
     let currentScale = 1;
@@ -1655,7 +1617,7 @@ showImagePreview(imageSrc) {
     imageContainer.appendChild(img);
     modal.appendChild(frame);
     modal.appendChild(imageContainer);
-    modal.appendChild(backBtn);
+    modal.appendChild(buttonOverlay);
     
     // ✅ الخروج فقط من زر الرجوع (وليس بالضغط خارج الصورة)
     // تم إزالة modal.onclick الذي كان يغلق النافذة
@@ -1672,7 +1634,8 @@ showImagePreview(imageSrc) {
     document.addEventListener('keydown', escHandler);
     
     document.body.appendChild(modal);
-},
+}, 
+            
 
     
     // ==================== القسم 27: sendMessage ====================
