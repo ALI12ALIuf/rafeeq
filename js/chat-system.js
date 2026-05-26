@@ -1057,8 +1057,20 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
     div.id = `msg-${msg.id}`;
     
-    // ✅ الوقت بالعربية (مثال: ٦:٣٩ م)
-    const time = new Date(msg.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    // ✅ الوقت بالتنسيق المطلوب: 2026-05-23 08:04 AM
+    const formatDateTime = (dateObj) => {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        let hours = dateObj.getHours();
+        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        const formattedHours = String(hours).padStart(2, '0');
+        return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
+    };
+    
+    const dateTime = formatDateTime(new Date(msg.time));
     
     // ✅ إلغاء علامات الصح نهائياً
     
@@ -1083,38 +1095,16 @@ displayMessage(msg) {
         
         div.appendChild(contentDiv);
         
-        // ✅ الوقت في بداية كل محادثة أو كل 10 رسائل (نضيفه كعنصر منفصل)
-        // نتحقق إذا كانت هذه أول رسالة في المحادثة أو if the previous message was sent more than 10 minutes ago or every 10 messages
+        // ✅ الوقت يظهر مرة واحدة فقط في بداية المحادثة (أول رسالة فقط)
         const messages = this.messages[this.currentChat] || [];
         const currentIndex = messages.findIndex(m => m.id === msg.id);
-        const prevMsg = currentIndex > 0 ? messages[currentIndex - 1] : null;
         
-        let showTimeSeparator = false;
-        
-        if (!prevMsg) {
-            // أول رسالة في المحادثة
-            showTimeSeparator = true;
-        } else {
-            // كل 10 رسائل
-            if (currentIndex % 10 === 0) {
-                showTimeSeparator = true;
-            } else {
-                // أو إذا مر أكثر من 10 دقائق
-                const prevTime = new Date(prevMsg.time).getTime();
-                const currTime = new Date(msg.time).getTime();
-                const diffMinutes = (currTime - prevTime) / (1000 * 60);
-                if (diffMinutes > 10) {
-                    showTimeSeparator = true;
-                }
-            }
-        }
-        
-        if (showTimeSeparator) {
+        // فقط أول رسالة في المحادثة تظهر الوقت
+        if (currentIndex === 0) {
             const timeSeparator = document.createElement('div');
             timeSeparator.className = 'time-separator';
             timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
-            timeSeparator.textContent = time;
-            // نضيف الفاصل قبل الرسالة
+            timeSeparator.textContent = dateTime;
             c.appendChild(timeSeparator);
         }
     } 
