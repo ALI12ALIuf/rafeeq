@@ -1397,17 +1397,13 @@ showImagePreview(imageSrc) {
         bottom: 0;
         background: rgba(0,0,0,0.95);
         z-index: 10050;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         overflow: hidden;
-        touch-action: pan-x pan-y;
     `;
     
     // ========== الإطار الأخضر الثابت (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
-        position: fixed;
+        position: absolute;
         top: 15px;
         left: 15px;
         right: 15px;
@@ -1416,20 +1412,23 @@ showImagePreview(imageSrc) {
         border-radius: 20px;
         pointer-events: none;
         z-index: 10051;
-        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
         box-sizing: border-box;
     `;
     
-    // ========== حاوية الصورة ==========
+    // ========== حاوية الصورة (تقتطع أي جزء خارج الإطار) ==========
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
-        width: 100%;
-        height: 100%;
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        touch-action: none;
+        border-radius: 16px;
+        z-index: 10052;
     `;
     
     const img = document.createElement('img');
@@ -1442,7 +1441,6 @@ showImagePreview(imageSrc) {
         object-fit: contain;
         transition: transform 0.1s ease;
         cursor: default;
-        touch-action: none;
     `;
     
     // منع القائمة المنبثقة
@@ -1451,18 +1449,18 @@ showImagePreview(imageSrc) {
         return false;
     };
     
-    // ========== الأزرار ==========
+    // ========== الأزرار (فوق الإطار) ==========
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
-        position: fixed;
+        position: absolute;
         top: 30px;
         left: 0;
         right: 0;
         display: flex;
         justify-content: space-between;
-        padding: 0 30px;
+        padding: 0 35px;
         pointer-events: none;
-        z-index: 10052;
+        z-index: 10053;
     `;
     
     // زر الرجوع
@@ -1608,8 +1606,6 @@ showImagePreview(imageSrc) {
         }
     };
     document.addEventListener('keydown', escHandler);
-    
-    // ✅ لا يوجد إغلاق بالضغط على الشاشة (الخروج فقط بزر الرجوع أو ESC)
     
     document.body.appendChild(modal);
 },
