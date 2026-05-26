@@ -1380,7 +1380,7 @@ displayMessage(msg) {
 },
             
 
-  // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
+    // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
@@ -1404,6 +1404,12 @@ showImagePreview(imageSrc) {
         overflow: hidden;
         touch-action: pan-x pan-y;
     `;
+    
+    // منع القوائم الافتراضية على النافذة بأكملها
+    modal.oncontextmenu = (e) => {
+        e.preventDefault();
+        return false;
+    };
     
     // ========== الإطار الثابت الأخضر (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
@@ -1449,9 +1455,30 @@ showImagePreview(imageSrc) {
         touch-action: none;
     `;
     
-    // منع القائمة المنبثقة
+    // ✅ منع القوائم الافتراضية نهائياً (Context Menu, Drag, Copy, Save)
     img.oncontextmenu = (e) => {
         e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    img.ondragstart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    img.oncopy = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    img.oncut = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    img.onselectstart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         return false;
     };
     
@@ -1640,6 +1667,12 @@ showVideoPreview(videoSrc) {
         overflow: hidden;
     `;
     
+    // منع القوائم الافتراضية على النافذة بأكملها
+    modal.oncontextmenu = (e) => {
+        e.preventDefault();
+        return false;
+    };
+    
     // الإطار الثابت الأخضر
     const frame = document.createElement('div');
     frame.style.cssText = `
@@ -1692,6 +1725,18 @@ showVideoPreview(videoSrc) {
     `;
     video.controls = false;
     video.playsinline = true;
+    
+    // ✅ منع القوائم الافتراضية على الفيديو (Context Menu, Drag, Save)
+    video.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    video.ondragstart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
     
     // أزرار علوية
     const topButtons = document.createElement('div');
@@ -1897,8 +1942,6 @@ showVideoPreview(videoSrc) {
     };
     document.addEventListener('keydown', escHandler);
     
-    // ✅ لا توجد خاصية إغلاق بالضغط على الشاشة
-    
     document.body.appendChild(modal);
     
     // بدء التشغيل تلقائياً
@@ -1906,7 +1949,10 @@ showVideoPreview(videoSrc) {
         playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
         isPlaying = true;
     }).catch(() => {});
-}, 
+},
+
+
+    
 
     
     // ==================== القسم 27: sendMessage ====================
