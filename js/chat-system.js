@@ -1049,7 +1049,6 @@ openChat(friendId, friendName, friendAvatar) {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-
     // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
@@ -1069,8 +1068,27 @@ displayMessage(msg) {
         statusHtml = `<span class="message-status ${cls}">${icon}</span>`;
     }
     
+    // ✅ دالة مساعدة لإنشاء شريط المعلومات (الوقت + الحالة) داخل الفقاعة
+    const createInfoSpan = () => {
+        const infoSpan = document.createElement('span');
+        infoSpan.className = 'message-info-inline';
+        infoSpan.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 0.65rem; margin-right: 8px; opacity: 0.7;';
+        infoSpan.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
+        return infoSpan;
+    };
+    
     if (msg.type === 'text') {
-        div.innerHTML = `<div class="message-content">${this.escapeHtml(msg.text)}</div><div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>`;
+        // ✅ النص: الوقت داخل الفقاعة مع الإطار المناسب
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        contentDiv.style.cssText = msg.sender === 'me' 
+            ? 'border: 1.5px solid #2196F3; background: var(--card-bg); color: var(--text);' 
+            : 'border: 1.5px solid #4CAF50; background: var(--card-bg); color: var(--text);';
+        contentDiv.innerHTML = `<span>${this.escapeHtml(msg.text)}</span>`;
+        
+        const infoSpan = createInfoSpan();
+        contentDiv.appendChild(infoSpan);
+        div.appendChild(contentDiv);
     } 
     else if (msg.type === 'location') {
         // معالجة رسالة الموقع
@@ -1092,49 +1110,39 @@ displayMessage(msg) {
         
         // ✅ إذا كانت الصلاحية انتهت (clicksRemaining <= 0)
         if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-            div.innerHTML = `
-                <div class="message-content" style="background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>
-                </div>
-                <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
-            `;
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.style.cssText = 'background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: none;';
+            contentDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+            div.appendChild(contentDiv);
         } else {
-            // ✅ عرض الموقع بدون عداد، فقط أيقونة خريطة
+            // ✅ عرض الموقع بدون وقت (الوقت محذوف للموقع)
             const locationDiv = document.createElement('div');
             locationDiv.className = 'message-content location-card';
-            locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center;';
+            locationDiv.style.cssText = 'cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: none;';
             locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
             
             // معالج الضغط على الموقع
             locationDiv.onclick = (e) => {
                 e.stopPropagation();
                 
-                // ✅ التحقق من الصلاحية - بدون رسالة تحذير
                 if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                    return; // لا شيء يحدث
+                    return;
                 }
                 
-                // فتح الخريطة
                 window.open(locationUrl, '_blank');
                 
-                // ✅ تقليل عدد الضغطات المتبقية (فقط للمستلم، وليس للمرسل)
                 if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
                     clicksRemaining--;
-                    
-                    // تحديث البيانات في كائن الرسالة
                     msg.data.clicksRemaining = clicksRemaining;
                     
-                    // ✅ إذا وصلت إلى الصفر، قفل الموقع (بدون رسالة تحذير)
                     if (clicksRemaining <= 0) {
                         locationDiv.style.background = '#888';
                         locationDiv.style.cursor = 'default';
                         locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
-                        locationDiv.onclick = () => {
-                            return; // لا شيء يحدث
-                        };
+                        locationDiv.onclick = () => {};
                     }
                     
-                    // تحديث في localStorage
                     if (ChatSystem.currentChat) {
                         const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
                         const msgIndex = messages.findIndex(m => m.id === msg.id);
@@ -1147,17 +1155,9 @@ displayMessage(msg) {
             };
             
             div.appendChild(locationDiv);
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'message-info';
-            infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
-            div.appendChild(infoDiv);
-            
-            c.appendChild(div);
-            c.scrollTop = c.scrollHeight;
-            return;
         }
     }
-    // ✅✅✅ قسم الصور المعدل (مع منع القوائم)
+    // ✅ قسم الصور - بدون وقت، مع الإطار المناسب
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1166,17 +1166,17 @@ displayMessage(msg) {
             }
         }
         
-        // إنشاء div لعرض الصورة داخل المحادثة بحجم موحد
         const imageDiv = document.createElement('div');
         imageDiv.className = 'message-image-wrapper';
-        imageDiv.style.cssText = 'cursor: pointer; display: inline-block; border: 2px solid #4CAF50; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;';
+        imageDiv.style.cssText = msg.sender === 'me'
+            ? 'cursor: pointer; display: inline-block; border: 2px solid #2196F3; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;'
+            : 'cursor: pointer; display: inline-block; border: 2px solid #4CAF50; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;';
         
         const img = document.createElement('img');
         img.src = imageSrc;
         img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
         img.loading = 'lazy';
         
-        // ✅ منع القائمة المنبثقة على الصورة المصغرة
         img.oncontextmenu = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1188,23 +1188,13 @@ displayMessage(msg) {
             return false;
         };
         
-        // فتح الصورة داخل المحادثة (نافذة منبثقة)
         img.onclick = () => {
             this.showImagePreview(imageSrc);
         };
         
         imageDiv.appendChild(img);
         div.appendChild(imageDiv);
-        
-        // إضافة معلومات الوقت والحالة
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'message-info';
-        infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
-        div.appendChild(infoDiv);
-        
-        c.appendChild(div);
-        c.scrollTop = c.scrollHeight;
-        return;
+        // ✅ لا نضيف وقت للصور
     } 
     else if (msg.type === 'voice') {
         let audioSrc = msg.data;
@@ -1215,7 +1205,6 @@ displayMessage(msg) {
         const audioId = `audio_${msg.id}`;
         let audioDuration = 0;
         
-        // ✅ الحصول على المدة الإجمالية للبصمة
         const tempAudio = new Audio(audioSrc);
         tempAudio.addEventListener('loadedmetadata', () => {
             audioDuration = tempAudio.duration;
@@ -1227,9 +1216,10 @@ displayMessage(msg) {
             }
         });
         
-        // ✅ مشغل مخصص مع عدادين (وقت التشغيل الحالي والمدة الإجمالية)
+        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+        
         div.innerHTML = `
-            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr;">
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr; border: 1.5px solid ${borderColor};">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
                         <i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>
@@ -1249,10 +1239,10 @@ displayMessage(msg) {
                 </div>
                 <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
             </div>
-            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
         `;
         
-        // إضافة معالج التشغيل بعد إضافة العنصر
+        // ✅ لا نضيف وقت منفصل للبصمة
+        
         setTimeout(() => {
             const playBtn = div.querySelector('.voice-play-btn');
             const replayBtn = div.querySelector('.voice-replay-btn');
@@ -1263,7 +1253,6 @@ displayMessage(msg) {
             if (playBtn && audioEl) {
                 let isPlaying = false;
                 
-                // زر التشغيل/الإيقاف المؤقت
                 playBtn.onclick = (e) => {
                     e.stopPropagation();
                     if (isPlaying) {
@@ -1277,7 +1266,6 @@ displayMessage(msg) {
                     }
                 };
                 
-                // زر إعادة التشغيل (سهم دائري)
                 replayBtn.onclick = (e) => {
                     e.stopPropagation();
                     audioEl.pause();
@@ -1290,7 +1278,6 @@ displayMessage(msg) {
                     isPlaying = true;
                 };
                 
-                // زر كتم الصوت
                 let isMuted = false;
                 muteBtn.onclick = (e) => {
                     e.stopPropagation();
@@ -1305,7 +1292,6 @@ displayMessage(msg) {
                     }
                 };
                 
-                // ✅ تحديث عداد الوقت الحالي (يتزايد من 0:00 إلى المدة الإجمالية)
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
                     const seconds = Math.floor(audioEl.currentTime % 60);
@@ -1314,7 +1300,6 @@ displayMessage(msg) {
                     }
                 };
                 
-                // ✅ عند انتهاء التشغيل، يعود العداد إلى 0:00
                 audioEl.onended = () => {
                     playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
                     isPlaying = false;
@@ -1323,7 +1308,7 @@ displayMessage(msg) {
             }
         }, 10);
     } 
-    // ✅✅✅ قسم الفيديو المعدل (مع منع القوائم على الصورة المصغرة)
+    // ✅ قسم الفيديو - بدون وقت
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
         if (videoSrc && typeof videoSrc === 'string') {
@@ -1332,9 +1317,10 @@ displayMessage(msg) {
             }
         }
         
-        // عرض الفيديو في المحادثة (صورة مصغرة مع زر تكبير)
+        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+        
         div.innerHTML = `
-            <div class="message-content video-thumbnail" style="position: relative; width: 250px; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #4CAF50; cursor: pointer;">
+            <div class="message-content video-thumbnail" style="position: relative; width: 250px; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid ${borderColor}; cursor: pointer;">
                 <video style="width: 100%; height: auto; max-height: 200px; display: block; pointer-events: none;" preload="metadata">
                     <source src="${videoSrc}" type="video/mp4">
                 </video>
@@ -1342,10 +1328,8 @@ displayMessage(msg) {
                     <i class="fas fa-expand" style="color: white; font-size: 1.5rem;"></i>
                 </div>
             </div>
-            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
         `;
         
-        // ✅ منع القائمة المنبثقة على الفيديو المصغر
         const videoContainer = div.querySelector('.video-thumbnail');
         videoContainer.oncontextmenu = (e) => {
             e.preventDefault();
@@ -1353,17 +1337,14 @@ displayMessage(msg) {
             return false;
         };
         
-        // إضافة حدث التكبير
         videoContainer.onclick = (e) => {
             e.stopPropagation();
             this.showVideoPreview(videoSrc);
         };
     } 
     else if (msg.type === 'file') {
-        // ✅ التصميم المطلوب للملفات (بحجم ثابت مع break-all للأسماء الطويلة)
         let fileName = msg.fileName || 'ملف';
         
-        // حساب حجم الملف تقريباً
         let fileSize = '';
         if (msg.data && typeof msg.data === 'string') {
             const sizeInBytes = Math.ceil(msg.data.length * 0.75);
@@ -1372,23 +1353,20 @@ displayMessage(msg) {
             else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
         
-        // عرض اسم الملف كاملاً مع التفاف تلقائي وكسر الكلمات الطويلة
         let displayName = fileName;
+        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
         
         div.innerHTML = `
-            <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1px solid #4CAF50;">
-                <!-- أيقونة الملف داخل دائرة بيضاء -->
+            <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1.5px solid ${borderColor};">
                 <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex-shrink: 0;">
                     <span style="font-size: 1.5rem;">📄</span>
                 </div>
                 
-                <!-- معلومات الملف -->
                 <div style="flex: 1; overflow: hidden; min-width: 0;">
                     <div style="font-weight: bold; font-size: 0.85rem; word-break: break-all; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
                     ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
                 </div>
                 
-                <!-- زر التحميل (أيقونة فقط) -->
                 <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
                      onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
                      onmouseover="this.style.background='rgba(255,255,255,0.3)'"
@@ -1396,15 +1374,14 @@ displayMessage(msg) {
                     <i class="fas fa-download" style="font-size: 1rem; pointer-events: none;"></i>
                 </div>
             </div>
-            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
         `;
+        // ✅ لا نضيف وقت للملفات
     }
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-
-            
+     
 
     // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
 showImagePreview(imageSrc) {
