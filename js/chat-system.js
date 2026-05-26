@@ -495,6 +495,11 @@ handleFeatureResponse(fromId, action) {
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
+    // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
+    if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
+        await CallSystem.deleteAllWebRTCSignals(this.currentChat);
+    }
+    
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
@@ -2529,6 +2534,11 @@ closeChat() {
         console.log('📤 إرسال إشارة إلغاء إلى:', chatId);
         this.sendFeatureCancelImmediately(chatId);
         this.sendConversationStatus(false);
+        
+        // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
+        if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
+            CallSystem.deleteAllWebRTCSignals(chatId);
+        }
         
         // ✅ حذف جميع الملفات والوسائط (صور، فيديو، بصمات، ملفات) عند إغلاق المحادثة
         const key = `chat_${chatId}`;
