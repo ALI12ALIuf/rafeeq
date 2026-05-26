@@ -1380,7 +1380,7 @@ displayMessage(msg) {
 },
             
 
-   // ==================== القسم 26.1: showImagePreview (عرض الصورة بإطار أخضر كامل على الشاشة) ====================
+  // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
@@ -1397,10 +1397,15 @@ showImagePreview(imageSrc) {
         bottom: 0;
         background: rgba(0,0,0,0.95);
         z-index: 10050;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         overflow: hidden;
+        touch-action: pan-x pan-y;
     `;
     
-    // ========== الإطار الأخضر الثابت (يغطي كامل الشاشة) ==========
+    // ========== الإطار الثابت الأخضر (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1412,10 +1417,10 @@ showImagePreview(imageSrc) {
         border-radius: 20px;
         pointer-events: none;
         z-index: 10051;
-        box-sizing: border-box;
+        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
     `;
     
-    // ========== حاوية الصورة (تقتطع أي جزء خارج الإطار) ==========
+    // ========== حاوية الصورة ==========
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
         position: absolute;
@@ -1427,8 +1432,8 @@ showImagePreview(imageSrc) {
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        touch-action: none;
         border-radius: 16px;
-        z-index: 10052;
     `;
     
     const img = document.createElement('img');
@@ -1441,6 +1446,7 @@ showImagePreview(imageSrc) {
         object-fit: contain;
         transition: transform 0.1s ease;
         cursor: default;
+        touch-action: none;
     `;
     
     // منع القائمة المنبثقة
@@ -1449,7 +1455,7 @@ showImagePreview(imageSrc) {
         return false;
     };
     
-    // ========== الأزرار (فوق الإطار) ==========
+    // ========== الأزرار ==========
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
@@ -1458,9 +1464,9 @@ showImagePreview(imageSrc) {
         right: 0;
         display: flex;
         justify-content: space-between;
-        padding: 0 35px;
+        padding: 0 30px;
         pointer-events: none;
-        z-index: 10053;
+        z-index: 10052;
     `;
     
     // زر الرجوع
@@ -1610,11 +1616,13 @@ showImagePreview(imageSrc) {
     document.body.appendChild(modal);
 },
 
-// ==================== القسم 26.2: showVideoPreview ====================
+// ==================== القسم 26.2: showVideoPreview (عرض الفيديو بملء الشاشة - خروج فقط بزر الرجوع) ====================
 showVideoPreview(videoSrc) {
+    // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('videoPreviewModal');
     if (existingPreview) existingPreview.remove();
     
+    // إنشاء النافذة المنبثقة (ملء الشاشة)
     const modal = document.createElement('div');
     modal.id = 'videoPreviewModal';
     modal.style.cssText = `
@@ -1632,7 +1640,7 @@ showVideoPreview(videoSrc) {
         overflow: hidden;
     `;
     
-    // ✅ الإطار الأخضر (يغطي كامل الشاشة مثل الصورة)
+    // الإطار الثابت الأخضر
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1662,6 +1670,7 @@ showVideoPreview(videoSrc) {
         overflow: hidden;
     `;
     
+    // حاوية الفيديو
     const videoWrapper = document.createElement('div');
     videoWrapper.style.cssText = `
         flex: 1;
@@ -1698,6 +1707,7 @@ showVideoPreview(videoSrc) {
         z-index: 10062;
     `;
     
+    // زر الرجوع (الطريقة الوحيدة للخروج)
     const backBtn = document.createElement('button');
     backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
     backBtn.style.cssText = `
@@ -1723,6 +1733,7 @@ showVideoPreview(videoSrc) {
         modal.remove();
     };
     
+    // زر التحميل
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
@@ -1769,6 +1780,7 @@ showVideoPreview(videoSrc) {
         z-index: 10062;
     `;
     
+    // زر تشغيل/إيقاف
     const playPauseBtn = document.createElement('button');
     playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
     playPauseBtn.style.cssText = `
@@ -1786,10 +1798,12 @@ showVideoPreview(videoSrc) {
         transition: all 0.2s;
     `;
     
+    // وقت الفيديو الحالي
     const currentTimeSpan = document.createElement('span');
     currentTimeSpan.textContent = '0:00';
     currentTimeSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
     
+    // شريط التقدم
     const progressBar = document.createElement('div');
     progressBar.style.cssText = `
         flex: 1;
@@ -1810,6 +1824,7 @@ showVideoPreview(videoSrc) {
     `;
     progressBar.appendChild(progressFill);
     
+    // المدة الإجمالية
     const durationSpan = document.createElement('span');
     durationSpan.textContent = '0:00';
     durationSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
@@ -1819,6 +1834,7 @@ showVideoPreview(videoSrc) {
     controlsBar.appendChild(progressBar);
     controlsBar.appendChild(durationSpan);
     
+    // ترتيب العناصر
     videoWrapper.appendChild(video);
     contentContainer.appendChild(videoWrapper);
     contentContainer.appendChild(controlsBar);
@@ -1827,12 +1843,14 @@ showVideoPreview(videoSrc) {
     modal.appendChild(contentContainer);
     modal.appendChild(topButtons);
     
+    // الحصول على مدة الفيديو
     video.addEventListener('loadedmetadata', () => {
         const minutes = Math.floor(video.duration / 60);
         const seconds = Math.floor(video.duration % 60);
         durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     });
     
+    // تحديث الوقت والتقدم أثناء التشغيل
     video.addEventListener('timeupdate', () => {
         const minutes = Math.floor(video.currentTime / 60);
         const seconds = Math.floor(video.currentTime % 60);
@@ -1841,6 +1859,7 @@ showVideoPreview(videoSrc) {
         progressFill.style.width = percent + '%';
     });
     
+    // تشغيل/إيقاف
     let isPlaying = false;
     playPauseBtn.onclick = () => {
         if (isPlaying) {
@@ -1854,11 +1873,13 @@ showVideoPreview(videoSrc) {
         }
     };
     
+    // عند انتهاء الفيديو
     video.onended = () => {
         playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
         isPlaying = false;
     };
     
+    // التقدم بالضغط على شريط التقدم
     progressBar.onclick = (e) => {
         const rect = progressBar.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -1866,6 +1887,7 @@ showVideoPreview(videoSrc) {
         video.currentTime = percent * video.duration;
     };
     
+    // إغلاق بزر ESC
     const escHandler = (e) => {
         if (e.key === 'Escape' && document.getElementById('videoPreviewModal')) {
             if (video) video.pause();
@@ -1875,8 +1897,11 @@ showVideoPreview(videoSrc) {
     };
     document.addEventListener('keydown', escHandler);
     
+    // ✅ لا توجد خاصية إغلاق بالضغط على الشاشة
+    
     document.body.appendChild(modal);
     
+    // بدء التشغيل تلقائياً
     video.play().then(() => {
         playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
         isPlaying = true;
