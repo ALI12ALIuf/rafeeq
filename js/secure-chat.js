@@ -227,7 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (مع إزالة alert) ==========
+    // ========== الدالة المعدلة (مع إضافة شرط منع الإشارات) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -242,6 +242,12 @@ const SecureChatSystem = {
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
             else if (msg.package.type === 'webrtc') { 
+                // ✅ تجاهل إشارات WebRTC إذا الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة
+                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
+                    console.log('📞 تجاهل إشارة WebRTC واردة - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+                    return;
+                }
+                
                 const signalData = await this.decryptData(msg.package.data, sharedKey);
                 const parsedData = JSON.parse(signalData);
                 
