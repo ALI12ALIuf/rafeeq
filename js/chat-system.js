@@ -1151,7 +1151,7 @@ displayMessage(msg) {
             return;
         }
     }
-    // ✅✅✅ قسم الصور المعدل (حجم موحد + إطار أخضر + فتح داخل المحادثة)
+    // ✅✅✅ قسم الصور المعدل (مع زر تحميل + تحميل مباشر بدون تأكيد)
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1160,7 +1160,17 @@ displayMessage(msg) {
             }
         }
         
-        // إنشاء div لعرض الصورة داخل المحادثة بحجم موحد
+        // حاوية الصورة مع زر التحميل
+        const imageContainer = document.createElement('div');
+        imageContainer.style.cssText = `
+            display: inline-block;
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        `;
+        
+        // الصورة المصغرة
         const imageDiv = document.createElement('div');
         imageDiv.className = 'message-image-wrapper';
         imageDiv.style.cssText = 'cursor: pointer; display: inline-block; border: 2px solid #4CAF50; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;';
@@ -1170,13 +1180,75 @@ displayMessage(msg) {
         img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
         img.loading = 'lazy';
         
-        // فتح الصورة داخل المحادثة (نافذة منبثقة)
+        // منع قائمة المتصفح
+        img.oncontextmenu = (e) => {
+            e.preventDefault();
+            return false;
+        };
+        
+        // فتح الصورة بشكل مكبر عند الضغط العادي
         img.onclick = () => {
             this.showImagePreview(imageSrc);
         };
         
         imageDiv.appendChild(img);
-        div.appendChild(imageDiv);
+        imageContainer.appendChild(imageDiv);
+        
+        // ✅ زر التحميل (خلفية خضراء، أيقونة بيضاء، تحميل مباشر بدون تأكيد)
+        const downloadBtn = document.createElement('button');
+        downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+        downloadBtn.style.cssText = `
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: #4CAF50;
+            border: none;
+            border-radius: 30px;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: all 0.2s;
+            z-index: 5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        `;
+        downloadBtn.onmouseover = () => { downloadBtn.style.background = '#2E7D32'; };
+        downloadBtn.onmouseout = () => { downloadBtn.style.background = '#4CAF50'; };
+        
+        // ✅ تحميل مباشر بدون نافذة تأكيد (مثل الفيديو)
+        downloadBtn.onclick = async (e) => {
+            e.stopPropagation();
+            try {
+                // محاولة التحميل عبر fetch (بدون نافذة تأكيد)
+                const response = await fetch(imageSrc);
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'image.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                // طريقة بديلة إذا فشل fetch
+                const link = document.createElement('a');
+                link.href = imageSrc;
+                link.download = 'image.jpg';
+                link.click();
+            }
+            
+            if (typeof ChatSystem !== 'undefined' && ChatSystem.showNotification) {
+                ChatSystem.showNotification('📸 تم تحميل الصورة');
+            }
+        };
+        
+        imageContainer.appendChild(downloadBtn);
+        div.appendChild(imageContainer);
         
         // إضافة معلومات الوقت والحالة
         const infoDiv = document.createElement('div');
@@ -1287,7 +1359,7 @@ displayMessage(msg) {
                     }
                 };
                 
-                // ✅ تحديث عداد الوقت الحالي (يتزايد من 0:00 إلى المدة الإجمالية)
+                // ✅ تحديث عداد الوقت الحالي
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
                     const seconds = Math.floor(audioEl.currentTime % 60);
@@ -1305,7 +1377,7 @@ displayMessage(msg) {
             }
         }, 10);
     } 
-    // ✅✅✅ قسم الفيديو المعدل (حجم موحد + إطار أخضر)
+    // ✅✅✅ قسم الفيديو المعدل (مع إضافة زر تحميل)
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
         if (videoSrc && typeof videoSrc === 'string') {
@@ -1313,17 +1385,98 @@ displayMessage(msg) {
                 videoSrc = 'data:video/mp4;base64,' + videoSrc;
             }
         }
-        div.innerHTML = `
-            <div style="position:relative; width: 250px; border-radius: 12px; overflow: hidden; background:#000; border: 2px solid #4CAF50;">
-                <video controls preload="metadata" playsinline style="width:100%; height: auto; max-height: 200px; display:block;">
-                    <source src="${videoSrc}" type="video/mp4">
-                </video>
-            </div>
-            <div class="message-info"><span class="message-time">${time}</span>${statusHtml}</div>
+        
+        // حاوية الفيديو مع زر التحميل
+        const videoContainer = document.createElement('div');
+        videoContainer.style.cssText = `
+            display: inline-block;
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            width: 250px;
+            background: #000;
+            border: 2px solid #4CAF50;
+            border-radius: 12px;
         `;
+        
+        const video = document.createElement('video');
+        video.src = videoSrc;
+        video.controls = true;
+        video.preload = 'metadata';
+        video.playsinline = true;
+        video.style.cssText = 'width: 100%; height: auto; max-height: 200px; display: block;';
+        
+        // منع قائمة المتصفح
+        video.oncontextmenu = (e) => {
+            e.preventDefault();
+            return false;
+        };
+        
+        videoContainer.appendChild(video);
+        
+        // ✅ زر تحميل للفيديو
+        const downloadBtn = document.createElement('button');
+        downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+        downloadBtn.style.cssText = `
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: #4CAF50;
+            border: none;
+            border-radius: 30px;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: all 0.2s;
+            z-index: 5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        `;
+        downloadBtn.onmouseover = () => { downloadBtn.style.background = '#2E7D32'; };
+        downloadBtn.onmouseout = () => { downloadBtn.style.background = '#4CAF50'; };
+        downloadBtn.onclick = async (e) => {
+            e.stopPropagation();
+            try {
+                const response = await fetch(videoSrc);
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'video.mp4';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                const link = document.createElement('a');
+                link.href = videoSrc;
+                link.download = 'video.mp4';
+                link.click();
+            }
+            
+            if (typeof ChatSystem !== 'undefined' && ChatSystem.showNotification) {
+                ChatSystem.showNotification('🎬 تم تحميل الفيديو');
+            }
+        };
+        
+        videoContainer.appendChild(downloadBtn);
+        div.appendChild(videoContainer);
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'message-info';
+        infoDiv.innerHTML = `<span class="message-time">${time}</span>${statusHtml}`;
+        div.appendChild(infoDiv);
+        
+        c.appendChild(div);
+        c.scrollTop = c.scrollHeight;
+        return;
     } 
     else if (msg.type === 'file') {
-        // ✅ التصميم المطلوب للملفات (بحجم ثابت مع break-all للأسماء الطويلة)
+        // ✅ التصميم المطلوب للملفات
         let fileName = msg.fileName || 'ملف';
         
         // حساب حجم الملف تقريباً
@@ -1335,23 +1488,19 @@ displayMessage(msg) {
             else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
         
-        // عرض اسم الملف كاملاً مع التفاف تلقائي وكسر الكلمات الطويلة
         let displayName = fileName;
         
         div.innerHTML = `
             <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1px solid #4CAF50;">
-                <!-- أيقونة الملف داخل دائرة بيضاء -->
                 <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex-shrink: 0;">
                     <span style="font-size: 1.5rem;">📄</span>
                 </div>
                 
-                <!-- معلومات الملف -->
                 <div style="flex: 1; overflow: hidden; min-width: 0;">
                     <div style="font-weight: bold; font-size: 0.85rem; word-break: break-all; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
                     ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
                 </div>
                 
-                <!-- زر التحميل (أيقونة فقط) -->
                 <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
                      onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
                      onmouseover="this.style.background='rgba(255,255,255,0.3)'"
@@ -1366,15 +1515,15 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-    
 
-  // ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
+
+// ==================== القسم 26.1: showImagePreview (عرض الصورة بشكل مكبر مع إطار كامل) ====================
 showImagePreview(imageSrc) {
     // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء النافذة المنبثقة (الإطار الخارجي الثابت)
+    // إنشاء النافذة المنبثقة
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
     modal.style.cssText = `
@@ -1386,94 +1535,57 @@ showImagePreview(imageSrc) {
         background: rgba(0,0,0,0.95);
         z-index: 10050;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        touch-action: pan-x pan-y;
     `;
     
-    // ========== طلب ملء الشاشة ==========
+    // طلب ملء الشاشة
     const requestFullscreen = (element) => {
-        if (element.requestFullscreen) {
-            element.requestFullscreen();
-        } else if (element.webkitRequestFullscreen) {
-            element.webkitRequestFullscreen();
-        } else if (element.msRequestFullscreen) {
-            element.msRequestFullscreen();
-        }
+        if (element.requestFullscreen) element.requestFullscreen();
+        else if (element.webkitRequestFullscreen) element.webkitRequestFullscreen();
+        else if (element.msRequestFullscreen) element.msRequestFullscreen();
     };
+    setTimeout(() => requestFullscreen(modal), 100);
     
-    setTimeout(() => {
-        requestFullscreen(modal);
-    }, 100);
-    
-    // ========== الإطار الثابت (يغطي كامل الشاشة) ==========
+    // الإطار الثابت مع مسافة من الأطراف
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
         border: 4px solid #4CAF50;
+        border-radius: 20px;
         pointer-events: none;
         z-index: 10051;
         box-sizing: border-box;
     `;
     
-    // ========== حاوية الصورة (تتحرك داخلها) ==========
-    const imageContainer = document.createElement('div');
-    imageContainer.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        touch-action: none;
-    `;
-    
     const img = document.createElement('img');
     img.src = imageSrc;
     img.style.cssText = `
-        max-width: 100%;
-        max-height: 100%;
+        max-width: calc(100% - 40px);
+        max-height: calc(100% - 40px);
         width: auto;
         height: auto;
         object-fit: contain;
-        transition: transform 0.1s ease;
+        border-radius: 12px;
         cursor: default;
-        touch-action: none;
+        box-shadow: 0 0 30px rgba(0,0,0,0.5);
     `;
     
-    // منع القائمة المنبثقة عند الضغط المطول
-    img.oncontextmenu = (e) => {
-        e.preventDefault();
-        return false;
-    };
+    // منع القائمة المنبثقة
+    img.oncontextmenu = (e) => e.preventDefault();
     
-    // ========== الأزرار (داخل الإطار، فوق الصورة) ==========
-    const buttonOverlay = document.createElement('div');
-    buttonOverlay.style.cssText = `
+    // زر الرجوع على اليمين
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i>';
+    backBtn.style.cssText = `
         position: absolute;
         top: 20px;
-        left: 0;
-        right: 0;
-        display: flex;
-        justify-content: space-between;
-        padding: 0 20px;
-        pointer-events: none;
-        z-index: 10052;
-    `;
-    
-    // زر الرجوع (سهم) - داخل الإطار
-    const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
-    backBtn.style.cssText = `
+        right: 20px;
         background: rgba(0,0,0,0.7);
         border: 2px solid #4CAF50;
         border-radius: 50%;
@@ -1484,7 +1596,7 @@ showImagePreview(imageSrc) {
         backdrop-filter: blur(5px);
         transition: all 0.2s;
         color: white;
-        pointer-events: auto;
+        z-index: 10052;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1492,141 +1604,18 @@ showImagePreview(imageSrc) {
     backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
     backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
     backBtn.onclick = () => {
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-        } else if (document.msExitFullscreen) {
-            document.msExitFullscreen();
-        }
+        if (document.exitFullscreen) document.exitFullscreen();
         modal.remove();
     };
     
-    // زر التحميل - داخل الإطار
-    const downloadBtn = document.createElement('button');
-    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-    downloadBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    downloadBtn.onclick = (e) => {
-        e.stopPropagation();
-        const link = document.createElement('a');
-        link.href = imageSrc;
-        link.download = 'image.jpg';
-        link.click();
-    };
-    
-    buttonOverlay.appendChild(backBtn);
-    buttonOverlay.appendChild(downloadBtn);
-    
-    // ========== متغيرات للتكبير والتصغير باللمس ==========
-    let currentScale = 1;
-    let initialDistance = 0;
-    let initialScale = 1;
-    let startX = 0, startY = 0;
-    let translateX = 0, translateY = 0;
-    let isTouching = false;
-    
-    const minScale = 0.8;
-    const maxScale = 3;
-    
-    const updateTransform = () => {
-        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
-    };
-    
-    // معالج اللمس للتكبير والتصغير
-    img.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const touches = e.touches;
-        
-        if (touches.length === 2) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            initialDistance = Math.hypot(dx, dy);
-            initialScale = currentScale;
-            isTouching = false;
-        } else if (touches.length === 1) {
-            startX = touches[0].clientX - translateX;
-            startY = touches[0].clientY - translateY;
-            isTouching = true;
-        }
-    });
-    
-    img.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        const touches = e.touches;
-        
-        if (touches.length === 2 && initialDistance > 0) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            const newDistance = Math.hypot(dx, dy);
-            let newScale = initialScale * (newDistance / initialDistance);
-            newScale = Math.min(maxScale, Math.max(minScale, newScale));
-            
-            if (newScale !== currentScale) {
-                currentScale = newScale;
-                updateTransform();
-            }
-        } else if (touches.length === 1 && isTouching && currentScale > 1) {
-            translateX = touches[0].clientX - startX;
-            translateY = touches[0].clientY - startY;
-            
-            const maxTranslateX = (currentScale - 1) * 150;
-            const maxTranslateY = (currentScale - 1) * 150;
-            translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
-            translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
-            
-            updateTransform();
-        }
-    });
-    
-    img.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        initialDistance = 0;
-        isTouching = false;
-        
-        if (currentScale < 0.95) {
-            currentScale = 1;
-            translateX = 0;
-            translateY = 0;
-            updateTransform();
-        }
-    });
-    
-    modal.addEventListener('touchmove', (e) => {
-        if (e.target === img || imageContainer.contains(e.target)) {
-            e.preventDefault();
-        }
-    }, { passive: false });
-    
-    imageContainer.appendChild(img);
     modal.appendChild(frame);
-    modal.appendChild(imageContainer);
-    modal.appendChild(buttonOverlay);
+    modal.appendChild(backBtn);
+    modal.appendChild(img);
     
-    // ✅ الخروج فقط من زر الرجوع (وليس بالضغط خارج الصورة)
-    // تم إزالة modal.onclick الذي كان يغلق النافذة
-    
-    // إغلاق بزر ESC (مع الخروج من ملء الشاشة)
+    // إغلاق بزر ESC
     const escHandler = (e) => {
         if (e.key === 'Escape') {
             if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             modal.remove();
             document.removeEventListener('keydown', escHandler);
         }
@@ -1634,10 +1623,9 @@ showImagePreview(imageSrc) {
     document.addEventListener('keydown', escHandler);
     
     document.body.appendChild(modal);
-}, 
-            
+},
 
-    
+
     // ==================== القسم 27: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
