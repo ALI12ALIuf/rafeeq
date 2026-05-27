@@ -98,7 +98,8 @@ cleanMediaMessagesOnLoad() {
             console.error('❌ فشل إرسال إشارة الإلغاء قبل الإغلاق:', e);
         }
     },
-    
+
+
     // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
     setTimeout(() => {
@@ -108,6 +109,9 @@ setupFeatureButton() {
         
         const oldContainer = document.getElementById('featureToggleContainer');
         if (oldContainer) oldContainer.remove();
+        
+        const oldKickBtn = document.getElementById('kickBtn');
+        if (oldKickBtn) oldKickBtn.remove();
         
         const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
         if (!container) {
@@ -180,6 +184,35 @@ setupFeatureButton() {
                 .feature-switch.blinking .feature-slider {
                     animation: featureBlink 0.8s ease-in-out infinite;
                 }
+                /* زر الطرد */
+                .kick-btn {
+                    background: none;
+                    border: none;
+                    color: #f44336;
+                    font-size: 1.1rem;
+                    cursor: pointer;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s ease;
+                    margin-right: 5px;
+                    opacity: 0.5;
+                    pointer-events: none;
+                }
+                .kick-btn.active {
+                    opacity: 1;
+                    pointer-events: auto;
+                }
+                .kick-btn.active:hover {
+                    background: rgba(244, 67, 54, 0.1);
+                    transform: scale(1.05);
+                }
+                .kick-btn.active:active {
+                    transform: scale(0.95);
+                }
             `;
             document.head.appendChild(style);
         }
@@ -190,6 +223,9 @@ setupFeatureButton() {
         toggleContainer.id = 'featureToggleContainer';
         
         toggleContainer.innerHTML = `
+            <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
             <span class="feature-toggle-label" style="color: #f44336;">○</span>
             <label class="feature-switch" id="featureSwitchLabel">
                 <input type="checkbox" id="featureToggleInput">
@@ -201,17 +237,17 @@ setupFeatureButton() {
         container.appendChild(toggleContainer);
         
         const toggleInput = document.getElementById('featureToggleInput');
+        const kickBtn = document.getElementById('kickBtn');
         
         if (!toggleInput) return;
         
         // ✅ حفظ المراجع
         window.featureToggleInput = toggleInput;
         
-        // ✅ معالج الضغط (مع دعم الإيقاف)
+        // ✅ معالج الضغط لزر التفعيل
         toggleInput.onclick = (e) => {
             console.log('🔘 تم الضغط على زر التفعيل');
             
-            // ✅ إذا كانت الميزات مفعلة، قم بإلغائها
             if (this.featuresEnabled) {
                 console.log('⚠️ الميزات مفعلة، جاري إلغاء التفعيل');
                 this.disableFeatures();
@@ -227,14 +263,97 @@ setupFeatureButton() {
             }
         };
         
+        // ✅ معالج الضغط لزر الطرد
+        if (kickBtn) {
+            kickBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm('⚠️ هل أنت متأكد من طرد المستخدم من المحادثة؟\n\nسيتم إخراجه من المحادثة فوراً.')) {
+                    this.kickUserFromConversation();
+                    // تغيير اللون مؤقتاً
+                    kickBtn.style.color = '#2196F3';
+                    setTimeout(() => {
+                        kickBtn.style.color = '#f44336';
+                    }, 500);
+                }
+            };
+        }
+        
         // ✅ إذا كانت الميزات مفعلة مسبقاً
         if (this.featuresEnabled && toggleInput) {
             toggleInput.checked = true;
         }
         
-        console.log('✅ تم إضافة زر التفعيل');
+        // ✅ تحديث حالة زر الطرد بناءً على الميزات
+        this.updateKickButtonState();
+        
+        console.log('✅ تم إضافة زر التفعيل وزر الطرد');
     }, 1000);
 },
+
+// ✅ دالة تحديث حالة زر الطرد
+updateKickButtonState() {
+    const kickBtn = document.getElementById('kickBtn');
+    if (!kickBtn) return;
+    
+    const canUse = (this.friendInConversation && this.featuresEnabled);
+    
+    if (canUse) {
+        kickBtn.classList.add('active');
+        kickBtn.title = 'طرد المستخدم من المحادثة';
+    } else {
+        kickBtn.classList.remove('active');
+        kickBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+    }
+},
+
+
+// ==================== القسم : طرد المستخدم من المحادثة5.1 ====================
+async kickUserFromConversation() {
+    if (!this.currentChat) {
+        console.log('❌ لا توجد محادثة نشطة');
+        return;
+    }
+    
+    if (!this.featuresEnabled || !this.friendInConversation) {
+        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+        return;
+    }
+    
+    console.log('👢 محاولة طرد المستخدم:', this.currentChat);
+    
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+            type: 'force_close_conversation',
+            timestamp: Date.now()
+        }), sharedKey);
+        
+        await SecureChatSystem.sendToServer(this.currentChat, { 
+            id: Date.now().toString(), 
+            type: 'force_close_conversation', 
+            data: encrypted, 
+            timestamp: Date.now() 
+        });
+        
+        console.log('✅ تم إرسال إشارة الطرد إلى:', this.currentChat);
+        
+        // ✅ اختياري: إظهار إشعار للمرسل
+        const notification = document.createElement('div');
+        notification.textContent = '✅ تم طرد المستخدم من المحادثة';
+        notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+        
+    } catch(e) {
+        console.error('❌ فشل إرسال إشارة الطرد:', e);
+    }
+},
+    
     
     // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
