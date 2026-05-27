@@ -600,7 +600,7 @@ handleFeatureResponse(fromId, action) {
     }
 },
 
-    // ==================== القسم 10.1: disableFeatures ====================
+     // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
@@ -629,10 +629,8 @@ async disableFeatures() {
         switchLabel.classList.remove('blinking');
     }
     
-    // ✅ إرسال إشارة إلغاء إلى الطرف الآخر
-    if (this.currentChat) {
-        await this.sendFeatureCancelImmediately(this.currentChat);
-    }
+    // ✅ تم إزالة إرسال إشارة feature_cancel (لم نعد نرسلها عبر Firebase)
+    // الطرف الآخر سيعرف بانقطاع القناة عبر onclose
     
     // ✅ إغلاق Data Channel
     if (CallSystem.dc) {
@@ -647,31 +645,6 @@ async disableFeatures() {
     this.updateAllButtons();
     console.log('✅ تم إلغاء تفعيل الميزات');
 },
-    
-    
-    // ==================== القسم 11: sendFeatureCancelImmediately ====================
-    async sendFeatureCancelImmediately(chatId) {
-        console.log('📤 sendFeatureCancelImmediately - إرسال إلغاء إلى:', chatId);
-        try {
-            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
-            if (!myPrivateKey || !receiverPublicKey) return;
-            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-                type: 'feature_cancel',
-                timestamp: Date.now()
-            }), sharedKey);
-            await SecureChatSystem.sendToServer(chatId, { 
-                id: Date.now().toString(), 
-                type: 'feature_cancel', 
-                data: encrypted, 
-                timestamp: Date.now() 
-            });
-            console.log('✅ تم إرسال إشارة الإلغاء بنجاح إلى:', chatId);
-        } catch(e) {
-            console.error('❌ خطأ في إرسال الإلغاء:', e);
-        }
-    },
     
     // ==================== القسم 12: resetFeatures ====================
 resetFeatures() {
