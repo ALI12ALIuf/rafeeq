@@ -301,48 +301,7 @@ updateKickButtonState() {
     }
 },
 
-
-// ==================== القسم : 5.1طرد المستخدم من المحادثة ====================
-async kickUserFromConversation() {
-    if (!this.currentChat) {
-        console.log('❌ لا توجد محادثة نشطة');
-        return;
-    }
-    
-    if (!this.featuresEnabled || !this.friendInConversation) {
-        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
-        return;
-    }
-    
-    console.log('👢 محاولة طرد المستخدم:', this.currentChat);
-    
-    try {
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-            type: 'force_close_conversation',
-            timestamp: Date.now()
-        }), sharedKey);
-        
-        await SecureChatSystem.sendToServer(this.currentChat, { 
-            id: Date.now().toString(), 
-            type: 'force_close_conversation', 
-            data: encrypted, 
-            timestamp: Date.now() 
-        });
-        
-        console.log('✅ تم إرسال إشارة الطرد إلى:', this.currentChat);
-        
-        // ✅ لا نعرض أي إشعار (تمت الإزالة)
-        
-    } catch(e) {
-        console.error('❌ فشل إرسال إشارة الطرد:', e);
-    }
-},
-    
+       
     
     // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
