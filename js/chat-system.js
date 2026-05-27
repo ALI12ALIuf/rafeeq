@@ -632,8 +632,8 @@ resetFeatures() {
     }
     
     if (chatId) {
-        console.log('📤 إرسال إشارة إلغاء فوراً إلى:', chatId);
-        this.sendFeatureCancelImmediately(chatId);
+        console.log('📤 تم إلغاء الميزات محلياً - لا حاجة لإرسال إشارة');
+        // ✅ تم إزالة إرسال feature_cancel (الدالة محذوفة)
     }
     
     this.updateAllButtons();
