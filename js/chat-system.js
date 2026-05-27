@@ -301,7 +301,38 @@ updateKickButtonState() {
     }
 },
 
-       
+    // ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
+async kickUserFromConversation() {
+    if (!this.currentChat) {
+        console.log('❌ لا توجد محادثة نشطة');
+        return;
+    }
+    
+    if (!this.featuresEnabled || !this.friendInConversation) {
+        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+        return;
+    }
+    
+    console.log('👢 محاولة طرد المستخدم:', this.currentChat);
+    
+    // ✅ إرسال إشارة الطرد مباشرة عبر Data Channel (بدون Firebase)
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        try {
+            CallSystem.dc.send(JSON.stringify({ 
+                type: 'force_close_conversation',
+                timestamp: Date.now()
+            }));
+            console.log('✅ تم إرسال إشارة الطرد مباشرة عبر Data Channel إلى:', this.currentChat);
+        } catch(e) {
+            console.error('❌ فشل إرسال إشارة الطرد عبر Data Channel:', e);
+        }
+    } else {
+        console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
+    }
+    
+    // ✅ لا نعرض أي إشعار (تمت الإزالة)
+},
+    
     
     // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
