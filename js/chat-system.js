@@ -2069,24 +2069,49 @@ showVideoPreview(videoSrc) {
     }).catch(() => {});
 },
 
-
-    
-
-    
     // ==================== القسم 27: sendMessage ====================
-    async sendMessage(text) { 
-        if (!this.currentChat || !text.trim()) return false; 
-        const mid = Date.now().toString(); 
-        try { 
-            const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
-            if (!pr || !pu) return false;
-            const sk = await SecureChatSystem.deriveSharedKey(pr, pu), enc = await SecureChatSystem.encryptData(text.trim(), sk); 
-            await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
+async sendMessage(text) { 
+    if (!this.currentChat || !text.trim()) return false; 
+    const mid = Date.now().toString(); 
+    
+    // ✅ إذا الميزات مفعلة والطرف الآخر في المحادثة وقناة Data Channel مفتوحة، نرسل مباشرة
+    if (this.featuresEnabled && this.friendInConversation && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        try {
+            const messageData = {
+                type: 'direct_text',
+                id: mid,
+                text: text.trim(),
+                sender: 'me',
+                time: new Date().toISOString()
+            };
+            CallSystem.dc.send(JSON.stringify(messageData));
+            
             this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
             this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            return true; 
-        } catch (e) { return false; } 
-    },
+            console.log('✅ تم إرسال النص مباشرة عبر Data Channel');
+            return true;
+        } catch(e) {
+            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
+            // نواصل إلى الإرسال عبر Firebase كحل بديل
+        }
+    }
+    
+    // ✅ الطريقة العادية: إرسال عبر Firebase (مشفرة E2EE)
+    try { 
+        const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
+        if (!pr || !pu) return false;
+        const sk = await SecureChatSystem.deriveSharedKey(pr, pu), enc = await SecureChatSystem.encryptData(text.trim(), sk); 
+        await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
+        this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+        this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+        console.log('✅ تم إرسال النص عبر Firebase (تشفير E2EE)');
+        return true; 
+    } catch (e) { 
+        console.error('❌ فشل إرسال النص:', e);
+        return false; 
+    } 
+},
+    
     
     // ==================== القسم 28: sendFileWithRetry ====================
     async sendFileWithRetry(file, type, maxRetries = 3) {
