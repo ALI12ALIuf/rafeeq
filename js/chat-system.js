@@ -749,61 +749,64 @@ handleFeatureCancel() {
     console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
 },
     
-    // ==================== القسم 14: updateAllButtons ====================
-    updateAllButtons() {
-        const canUse = (this.friendInConversation && this.featuresEnabled);
-        
-        const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
-        btns.forEach(btn => { 
-            if (canUse) { 
-                btn.classList.remove('locked'); 
-                btn.title = ''; 
-                btn.style.opacity = '1';
-                btn.style.pointerEvents = 'auto';
-            } else { 
-                btn.classList.add('locked'); 
-                btn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
-                btn.style.opacity = '0.5';
-                btn.style.pointerEvents = 'none';
-            } 
-        });
-        
-        const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
-                             document.querySelector('.audio-call-btn') ||
-                             document.querySelector('#audioCallBtn') ||
-                             document.querySelector('button[data-call="audio"]');
-        
-        const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
-                             document.querySelector('.video-call-btn') ||
-                             document.querySelector('#videoCallBtn') ||
-                             document.querySelector('button[data-call="video"]');
-        
-        if (audioCallBtn) {
-            if (canUse) {
-                audioCallBtn.style.opacity = '1';
-                audioCallBtn.style.pointerEvents = 'auto';
-                audioCallBtn.title = 'مكالمة صوتية';
-            } else {
-                audioCallBtn.style.opacity = '0.5';
-                audioCallBtn.style.pointerEvents = 'none';
-                audioCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
-            }
+   // ==================== القسم 14: updateAllButtons ====================
+updateAllButtons() {
+    const canUse = (this.friendInConversation && this.featuresEnabled);
+    
+    const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
+    btns.forEach(btn => { 
+        if (canUse) { 
+            btn.classList.remove('locked'); 
+            btn.title = ''; 
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        } else { 
+            btn.classList.add('locked'); 
+            btn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        } 
+    });
+    
+    const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
+                         document.querySelector('.audio-call-btn') ||
+                         document.querySelector('#audioCallBtn') ||
+                         document.querySelector('button[data-call="audio"]');
+    
+    const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
+                         document.querySelector('.video-call-btn') ||
+                         document.querySelector('#videoCallBtn') ||
+                         document.querySelector('button[data-call="video"]');
+    
+    if (audioCallBtn) {
+        if (canUse) {
+            audioCallBtn.style.opacity = '1';
+            audioCallBtn.style.pointerEvents = 'auto';
+            audioCallBtn.title = 'مكالمة صوتية';
+        } else {
+            audioCallBtn.style.opacity = '0.5';
+            audioCallBtn.style.pointerEvents = 'none';
+            audioCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
         }
-        
-        if (videoCallBtn) {
-            if (canUse) {
-                videoCallBtn.style.opacity = '1';
-                videoCallBtn.style.pointerEvents = 'auto';
-                videoCallBtn.title = 'مكالمة فيديو';
-            } else {
-                videoCallBtn.style.opacity = '0.5';
-                videoCallBtn.style.pointerEvents = 'none';
-                videoCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
-            }
+    }
+    
+    if (videoCallBtn) {
+        if (canUse) {
+            videoCallBtn.style.opacity = '1';
+            videoCallBtn.style.pointerEvents = 'auto';
+            videoCallBtn.title = 'مكالمة فيديو';
+        } else {
+            videoCallBtn.style.opacity = '0.5';
+            videoCallBtn.style.pointerEvents = 'none';
+            videoCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
         }
-        
-        console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
-    },
+    }
+    
+    // ✅ تحديث حالة زر الطرد
+    this.updateKickButtonState();
+    
+    console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
+}, 
     
     // ==================== القسم 15: setupPageFocusListener ====================
 setupPageFocusListener() {
