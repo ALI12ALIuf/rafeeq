@@ -1050,7 +1050,7 @@ openChat(friendId, friendName, friendAvatar) {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-    // ==================== القسم 26: displayMessage ====================
+   // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1096,10 +1096,13 @@ displayMessage(msg) {
         
         div.appendChild(contentDiv);
         
-        // ✅ الوقت يظهر فقط مع أول رسالة في الجلسة الحالية
-        // نستخدم متغير sessionFirstMessageSent الذي يتم إعادة تعيينه عند فتح المحادثة
-        if (!this.sessionFirstMessageSent) {
-            this.sessionFirstMessageSent = true;
+        // ✅ الوقت يظهر كل 10 رسائل فقط (بدون شرط الوقت)
+        // نتحقق من عدد الرسائل النصية في الـ DOM حالياً
+        const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
+        const currentMessageCount = existingTextMessages.length;
+        
+        // كل 10 رسائل (الرسائل رقم 0, 10, 20, 30...)
+        if (currentMessageCount % 10 === 0) {
             const timeSeparator = document.createElement('div');
             timeSeparator.className = 'time-separator';
             timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
@@ -1381,7 +1384,7 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},
+}, 
      
 
     // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
