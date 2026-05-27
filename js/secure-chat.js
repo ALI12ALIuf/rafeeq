@@ -242,9 +242,17 @@ const SecureChatSystem = {
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
             else if (msg.package.type === 'webrtc') { 
-                // ✅ تجاهل إشارات WebRTC إذا الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة
-                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-                    console.log('📞 تجاهل إشارة WebRTC واردة - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+                // ✅ تجاهل إشارات WebRTC تماماً إذا:
+                // 1. الميزات غير مفعلة
+                // 2. أو الطرف الآخر ليس في المحادثة
+                // 3. أو المستخدم الحالي ليس في محادثة مع المرسل
+                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
+                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
+                        featuresEnabled: ChatSystem.featuresEnabled,
+                        friendInConversation: ChatSystem.friendInConversation,
+                        currentChat: ChatSystem.currentChat,
+                        sender: msg.from
+                    });
                     return;
                 }
                 
