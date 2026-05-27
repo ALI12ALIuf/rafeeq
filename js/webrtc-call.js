@@ -871,6 +871,13 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // ✅ معالجة إشارات WebRTC المباشرة (عبر Data Channel)
+            if (msg.type === 'webrtc_signal') {
+                console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
+                this.handleSignaling(msg.data);
+                return;
+            }
+            
             if (msg.type === 'ping') return;
             if (msg.type === 'call_status') {
                 this.handleCallStatus(msg);
@@ -1109,6 +1116,18 @@ async sendSignal(calleeId, data) {
         return;
     }
     
+    // ✅ إذا كان Data Channel مفتوحاً، أرسل مباشرة عبره (بدون Firebase)
+    if (this.dc && this.dc.readyState === 'open') {
+        try {
+            this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
+            console.log('📡 تم إرسال الإشارة مباشرة عبر Data Channel');
+            return;
+        } catch(e) {
+            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
+        }
+    }
+    
+    // ✅ إذا فشل الإرسال المباشر، نرسل عبر Firebase (كحل احتياطي)
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
@@ -1116,6 +1135,7 @@ async sendSignal(calleeId, data) {
         const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
         const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
         await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
+        console.log('📡 تم إرسال الإشارة عبر Firebase (حل احتياطي)');
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
