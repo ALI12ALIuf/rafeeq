@@ -27,6 +27,10 @@ const ChatSystem = {
     offlineStartTime: null,
     offlineTimer: null,
     offlineCountdownInterval: null,
+    
+    // ✅ متغير الجلسة للوقت (يظهر مرة واحدة فقط عند فتح المحادثة)
+    sessionFirstMessageSent: false,
+    
 
     // ==================== القسم 3: init ====================
 init() { 
@@ -871,6 +875,9 @@ setupPageFocusListener() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
+    // ✅ إعادة تعيين متغير الجلسة للوقت
+    this.sessionFirstMessageSent = false;
+    
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
         this.friendInConversation = this._pendingConversationStatus[friendId];
         console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
@@ -908,7 +915,7 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
     setTimeout(() => this.setupFeatureButton(), 500);
-}, 
+},
     
     
     // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
@@ -1095,12 +1102,10 @@ displayMessage(msg) {
         
         div.appendChild(contentDiv);
         
-        // ✅ الوقت يظهر فقط مع أول رسالة في الجلسة الحالية (عند فتح المحادثة)
-        // نتحقق إذا كانت هذه أول رسالة تُعرض في الـ DOM حالياً
-        const existingMessages = c.querySelectorAll('.message, .time-separator');
-        const isFirstMessageInSession = existingMessages.length === 0;
-        
-        if (isFirstMessageInSession) {
+        // ✅ الوقت يظهر فقط مع أول رسالة في الجلسة الحالية
+        // نستخدم متغير sessionFirstMessageSent الذي يتم إعادة تعيينه عند فتح المحادثة
+        if (!this.sessionFirstMessageSent) {
+            this.sessionFirstMessageSent = true;
             const timeSeparator = document.createElement('div');
             timeSeparator.className = 'time-separator';
             timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
@@ -1383,7 +1388,6 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-    
      
 
     // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
