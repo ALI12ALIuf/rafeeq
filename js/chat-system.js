@@ -1095,12 +1095,12 @@ displayMessage(msg) {
         
         div.appendChild(contentDiv);
         
-        // ✅ الوقت يظهر مرة واحدة فقط في بداية المحادثة (أول رسالة فقط)
-        const messages = this.messages[this.currentChat] || [];
-        const currentIndex = messages.findIndex(m => m.id === msg.id);
+        // ✅ الوقت يظهر فقط مع أول رسالة في الجلسة الحالية (عند فتح المحادثة)
+        // نتحقق إذا كانت هذه أول رسالة تُعرض في الـ DOM حالياً
+        const existingMessages = c.querySelectorAll('.message, .time-separator');
+        const isFirstMessageInSession = existingMessages.length === 0;
         
-        // فقط أول رسالة في المحادثة تظهر الوقت
-        if (currentIndex === 0) {
+        if (isFirstMessageInSession) {
             const timeSeparator = document.createElement('div');
             timeSeparator.className = 'time-separator';
             timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
