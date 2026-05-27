@@ -2648,9 +2648,9 @@ closeChat() {
     const chatId = this.currentChat;
     
     if (chatId) {
-        console.log('📤 إرسال إشارة إلغاء إلى:', chatId);
-        this.sendFeatureCancelImmediately(chatId);
-        this.sendConversationStatus(false);
+        console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
+        // ✅ تم إزالة إرسال feature_cancel (لم نعد نرسله عبر Firebase)
+        // ✅ تم إزالة إرسال conversation_status (لم نعد نرسله)
         
         // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
         if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
@@ -2694,7 +2694,7 @@ closeChat() {
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
-}, 
+},
     
     
     // ==================== القسم 38: escapeHtml ====================
