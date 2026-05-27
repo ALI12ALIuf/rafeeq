@@ -28,9 +28,6 @@ const ChatSystem = {
     offlineTimer: null,
     offlineCountdownInterval: null,
     
-    // ✅ متغير الجلسة للوقت (يظهر مرة واحدة فقط عند فتح المحادثة)
-    sessionFirstMessageSent: false,
-    
 
     // ==================== القسم 3: init ====================
 init() { 
@@ -871,12 +868,9 @@ setupPageFocusListener() {
         this.updateAllButtons();
     },
 
-   // ==================== القسم 23: openChat ====================
+    // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
-    
-    // ✅ إعادة تعيين متغير الجلسة للوقت
-    this.sessionFirstMessageSent = false;
     
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
         this.friendInConversation = this._pendingConversationStatus[friendId];
@@ -915,7 +909,7 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
     setTimeout(() => this.setupFeatureButton(), 500);
-},
+}, 
     
     
     // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
