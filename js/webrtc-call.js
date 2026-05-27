@@ -878,6 +878,29 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // ✅✅ معالجة إشارة الطرد المباشرة (عبر Data Channel)
+            if (msg.type === 'force_close_conversation') {
+                console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
+                if (ChatSystem.currentChat) {
+                    console.log('🚪 تم طردك من المحادثة');
+                    ChatSystem.closeChat();
+                    ChatSystem.featuresEnabled = false;
+                    ChatSystem.featureRequestPending = false;
+                    ChatSystem.featureRequestReceived = false;
+                    
+                    const toggleInput = document.getElementById('featureToggleInput');
+                    if (toggleInput) toggleInput.checked = false;
+                    
+                    const kickBtn = document.getElementById('kickBtn');
+                    if (kickBtn) {
+                        kickBtn.classList.remove('active');
+                        kickBtn.style.opacity = '0.5';
+                        kickBtn.style.pointerEvents = 'none';
+                    }
+                }
+                return;
+            }
+            
             if (msg.type === 'ping') return;
             if (msg.type === 'call_status') {
                 this.handleCallStatus(msg);
