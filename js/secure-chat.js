@@ -227,7 +227,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (مع إضافة شرط منع الإشارات ومعالج الطرد) ==========
+    // ========== الدالة المعدلة (مع إضافة شرط منع الإشارات ومعالج الطرد بدون إشعارات) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -323,21 +323,14 @@ const SecureChatSystem = {
                     }
                 }
             }
-            // ✅✅✅ معالجة إشارة الطرد (force_close_conversation)
+            // ✅✅✅ معالجة إشارة الطرد (force_close_conversation) - بدون إشعارات
             else if (msg.package.type === 'force_close_conversation') {
                 console.log('👢 استلام إشارة طرد من:', msg.from);
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
                     console.log('🚪 تم طردك من المحادثة من قبل الطرف الآخر');
                     
-                    // ✅ إظهار إشعار للمستخدم
-                    const notification = document.createElement('div');
-                    notification.textContent = '🚪 تم طردك من المحادثة';
-                    notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
-                    document.body.appendChild(notification);
-                    setTimeout(() => notification.remove(), 3000);
-                    
-                    // ✅ تنفيذ الخروج من المحادثة
+                    // ✅ تنفيذ الخروج من المحادثة (بدون إشعار)
                     ChatSystem.closeChat();
                     
                     // ✅ إعادة تعيين حالة الميزات
