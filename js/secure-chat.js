@@ -204,11 +204,31 @@ const SecureChatSystem = {
     
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
+        
+        // ✅ تحديد مدة الصلاحية حسب نوع الإشارة
+        let expiryHours = 24; // الافتراضي 24 ساعة
+        let expirySeconds = null;
+        
+        if (encryptedPackage.type === 'webrtc' || 
+            encryptedPackage.type === 'feature_request' || 
+            encryptedPackage.type === 'feature_response') {
+            expirySeconds = 30; // 30 ثانية فقط
+        }
+        
+        let expiresAt;
+        if (expirySeconds) {
+            expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expirySeconds * 1000));
+        } else {
+            expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
+        }
+        
         try {
             await window.db.collection('secure_messages').add({ 
-                to: receiverId, from: window.auth.currentUser.uid, package: encryptedPackage, 
+                to: receiverId, 
+                from: window.auth.currentUser.uid, 
+                package: encryptedPackage, 
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
-                expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + this.MESSAGE_EXPIRY_HOURS * 3600000))
+                expiresAt: expiresAt
             });
         } catch (error) { throw error; }
     },
@@ -227,7 +247,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (مع إضافة شرط منع الإشارات ومعالج الطرد بدون إشعارات) ==========
+    // ========== الدالة المعدلة (تم إزالة conversation_status, conversation_status_request, feature_cancel) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -276,21 +296,6 @@ const SecureChatSystem = {
                     }
                 }
             }
-            else if (msg.package.type === 'conversation_status') {
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                const statusData = JSON.parse(decryptedData);
-                console.log('💬 استلام حالة محادثة من:', msg.from, '| مفتوحة:', statusData.isOpen);
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.updateFriendConversationStatus) {
-                    ChatSystem.updateFriendConversationStatus(msg.from, statusData.isOpen);
-                }
-            }
-            else if (msg.package.type === 'conversation_status_request') {
-                console.log('📤 استلام طلب حالة محادثة من:', msg.from);
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('📤 الرد على طلب الحالة - المحادثة مفتوحة');
-                    ChatSystem.sendConversationStatus(true);
-                }
-            }
             else if (msg.package.type === 'feature_request') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const requestData = JSON.parse(decryptedData);
@@ -305,58 +310,6 @@ const SecureChatSystem = {
                 console.log('🔓 استلام رد على طلب التفعيل من:', msg.from, '| الحالة:', responseData.action);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                }
-            }
-            // ✅✅ معالجة إلغاء تفعيل الميزات (feature_cancel) - بدون alert
-            else if (msg.package.type === 'feature_cancel') {
-                console.log('🔓 استلام إشارة feature_cancel من:', msg.from);
-                
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureCancel) {
-                    console.log('✅ جاري استدعاء ChatSystem.handleFeatureCancel');
-                    ChatSystem.handleFeatureCancel();
-                } else {
-                    console.error('❌ ChatSystem.handleFeatureCancel غير موجود');
-                    // حل بديل: إعادة تعيين مباشرة
-                    if (typeof ChatSystem !== 'undefined') {
-                        ChatSystem.featuresEnabled = false;
-                        ChatSystem.featureRequestPending = false;
-                        ChatSystem.featureRequestReceived = false;
-                        
-                        const btn = document.getElementById('enableFeaturesBtn');
-                        if (btn) btn.style.background = '#f44336';
-                        
-                        if (typeof ChatSystem.updateAllButtons === 'function') {
-                            ChatSystem.updateAllButtons();
-                        }
-                    }
-                }
-            }
-            // ✅✅✅ معالجة إشارة الطرد (force_close_conversation) - بدون إشعارات
-            else if (msg.package.type === 'force_close_conversation') {
-                console.log('👢 استلام إشارة طرد من:', msg.from);
-                
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('🚪 تم طردك من المحادثة من قبل الطرف الآخر');
-                    
-                    // ✅ تنفيذ الخروج من المحادثة (بدون إشعار)
-                    ChatSystem.closeChat();
-                    
-                    // ✅ إعادة تعيين حالة الميزات
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    // ✅ تحديث زر التفعيل إذا كان موجوداً
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    // ✅ تحديث زر الطرد إذا كان موجوداً
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
-                    }
                 }
             }
             else if (msg.package.type === 'location') {
