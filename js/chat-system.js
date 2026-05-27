@@ -263,19 +263,13 @@ setupFeatureButton() {
             }
         };
         
-        // ✅ معالج الضغط لزر الطرد
+        // ✅ معالج الضغط لزر الطرد (بدون تأكيد وبدون تغيير لون)
         if (kickBtn) {
             kickBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (confirm('⚠️ هل أنت متأكد من طرد المستخدم من المحادثة؟\n\nسيتم إخراجه من المحادثة فوراً.')) {
-                    this.kickUserFromConversation();
-                    // تغيير اللون مؤقتاً
-                    kickBtn.style.color = '#2196F3';
-                    setTimeout(() => {
-                        kickBtn.style.color = '#f44336';
-                    }, 500);
-                }
+                // تنفيذ الطرد مباشرة بدون تأكيد
+                this.kickUserFromConversation();
             };
         }
         
@@ -308,7 +302,7 @@ updateKickButtonState() {
 },
 
 
-// ==================== القسم : طرد المستخدم من المحادثة5.1 ====================
+// ==================== القسم : 5.1طرد المستخدم من المحادثة ====================
 async kickUserFromConversation() {
     if (!this.currentChat) {
         console.log('❌ لا توجد محادثة نشطة');
@@ -342,12 +336,7 @@ async kickUserFromConversation() {
         
         console.log('✅ تم إرسال إشارة الطرد إلى:', this.currentChat);
         
-        // ✅ اختياري: إظهار إشعار للمرسل
-        const notification = document.createElement('div');
-        notification.textContent = '✅ تم طرد المستخدم من المحادثة';
-        notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
+        // ✅ لا نعرض أي إشعار (تمت الإزالة)
         
     } catch(e) {
         console.error('❌ فشل إرسال إشارة الطرد:', e);
