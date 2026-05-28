@@ -402,6 +402,12 @@ async acceptFeatureRequest() {
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
     
+    // ✅✅ تأكيد أن الطرف الآخر في المحادثة (حل المشكلة الأساسي)
+    if (this.currentChat) {
+        this.friendInConversation = true;
+        console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب');
+    }
+    
     console.log('✅ featuresEnabled =', this.featuresEnabled);
     
     if (this.featureBlinkInterval) {
@@ -462,13 +468,19 @@ async acceptFeatureRequest() {
 },
     
     // ==================== القسم 10: handleFeatureResponse ====================
-handleFeatureResponse(fromId, action) {
+async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
     if (action === 'accepted') {
         this.featuresEnabled = true;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
+        
+        // ✅✅ تأكيد أن الطرف الآخر في المحادثة (حل المشكلة الأساسي)
+        if (this.currentChat === fromId) {
+            this.friendInConversation = true;
+            console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب من الطرف الآخر');
+        }
         
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
@@ -486,6 +498,21 @@ handleFeatureResponse(fromId, action) {
         if (switchLabel) {
             switchLabel.classList.remove('blinking');
             console.log('✅ تم إيقاف الرمش');
+        }
+        
+        // ✅ فتح Data Channel بعد قبول الطلب (مهم للملفات والمكالمات)
+        if (this.currentChat) {
+            try {
+                console.log('🔧 محاولة فتح Data Channel بعد قبول الطرف الآخر...');
+                const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+                if (success) {
+                    console.log('✅ تم فتح Data Channel بنجاح');
+                } else {
+                    console.log('⚠️ فشل فتح Data Channel، سيتم إعادة المحاولة لاحقاً');
+                }
+            } catch(e) {
+                console.error('❌ خطأ في فتح Data Channel:', e);
+            }
         }
         
         // ✅ للتوافق مع الزر القديم (إذا وجد)
