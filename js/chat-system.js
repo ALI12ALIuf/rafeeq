@@ -1,10 +1,20 @@
 // ========== chat-system.js ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
+// ==================== القسم 1: تعريف PresenceSystem ====================
+const PresenceSystem = {
+    listeners: {}, heartbeatInterval: null,
+    async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
+    async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
+    startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
+    stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
+    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data()); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
+    stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
+};
 
 // ==================== القسم 2: تعريف ChatSystem ====================
 const ChatSystem = {
-    currentChat: null, messages: {},
+    currentChat: null, messages: {}, friendOnline: false,
     friendInConversation: false,
     _pendingConversationStatus: {},
     
@@ -18,7 +28,7 @@ const ChatSystem = {
     offlineTimer: null,
     offlineCountdownInterval: null,
     
-    
+
     // ==================== القسم 3: init ====================
 init() { 
     this.loadAllChats(); 
@@ -60,7 +70,7 @@ setupBeforeUnloadListener() {
 },
 
 
-   // ==================== القسم 5: setupFeatureButton ====================
+    // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
     setTimeout(() => {
         // ✅ إزالة أي أزرار قديمة
@@ -177,106 +187,6 @@ setupFeatureButton() {
             document.head.appendChild(style);
         }
         
-        // ✅ إضافة لوحة تشخيص واحدة فقط (إذا لم تكن موجودة)
-        let debugPanel = document.getElementById('debugPanel');
-        if (!debugPanel) {
-            debugPanel = document.createElement('div');
-            debugPanel.id = 'debugPanel';
-            debugPanel.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                background: rgba(0,0,0,0.85);
-                color: #0f0;
-                font-family: 'Courier New', monospace;
-                font-size: 12px;
-                padding: 12px 15px;
-                border-radius: 8px;
-                z-index: 99999;
-                direction: ltr;
-                text-align: left;
-                border: 1px solid #0f0;
-                box-shadow: 0 0 10px rgba(0,255,0,0.3);
-                backdrop-filter: blur(5px);
-                cursor: move;
-                user-select: text;
-                min-width: 280px;
-            `;
-            debugPanel.innerHTML = `
-                <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #0f0; padding-bottom:4px;">
-                    <span style="font-weight:bold;">🔧 DIAGNOSTIC PANEL</span>
-                    <button id="closeDebugPanel" style="background:none; border:none; color:#0f0; cursor:pointer; font-size:14px;">✖</button>
-                </div>
-                <div id="debugContent" style="line-height:1.5;">
-                    F:${this.featuresEnabled} | DC:none | IC:${this.friendInConversation}<br>
-                    📡 DC state: waiting...
-                </div>
-                <div style="margin-top:8px; font-size:10px; color:#888; border-top:1px solid #333; padding-top:4px;">
-                    💡 Click text to copy | Drag to move
-                </div>
-            `;
-            document.body.appendChild(debugPanel);
-            
-            // جعل اللوحة قابلة للسحب
-            let isDragging = false;
-            let dragOffsetX = 0, dragOffsetY = 0;
-            debugPanel.addEventListener('mousedown', (e) => {
-                if (e.target.id !== 'closeDebugPanel') {
-                    isDragging = true;
-                    dragOffsetX = e.clientX - debugPanel.offsetLeft;
-                    dragOffsetY = e.clientY - debugPanel.offsetTop;
-                    debugPanel.style.cursor = 'grabbing';
-                }
-            });
-            document.addEventListener('mousemove', (e) => {
-                if (isDragging) {
-                    let newLeft = e.clientX - dragOffsetX;
-                    let newTop = e.clientY - dragOffsetY;
-                    newLeft = Math.max(0, Math.min(window.innerWidth - debugPanel.offsetWidth, newLeft));
-                    newTop = Math.max(0, Math.min(window.innerHeight - debugPanel.offsetHeight, newTop));
-                    debugPanel.style.left = newLeft + 'px';
-                    debugPanel.style.right = 'auto';
-                    debugPanel.style.bottom = 'auto';
-                    debugPanel.style.top = newTop + 'px';
-                }
-            });
-            document.addEventListener('mouseup', () => {
-                isDragging = false;
-                debugPanel.style.cursor = 'move';
-            });
-            
-            // إغلاق اللوحة
-            document.getElementById('closeDebugPanel').onclick = () => {
-                debugPanel.style.display = 'none';
-            };
-            
-            // جعل المحتوى قابلاً للنسخ عند الضغط
-            const debugContent = document.getElementById('debugContent');
-            debugContent.style.cursor = 'pointer';
-            debugContent.onclick = () => {
-                const text = debugContent.innerText;
-                navigator.clipboard.writeText(text).then(() => {
-                    const originalColor = debugContent.style.color;
-                    debugContent.style.color = '#ff0';
-                    setTimeout(() => { debugContent.style.color = originalColor; }, 300);
-                });
-            };
-        }
-        
-        // ✅ تحديث لوحة التشخيص كل ثانية (بدون إنشاء لوحة جديدة)
-        setInterval(() => {
-            const panel = document.getElementById('debugContent');
-            if (panel && debugPanel.style.display !== 'none') {
-                const dcState = CallSystem.dc?.readyState || 'none';
-                const connectionState = CallSystem.pc?.connectionState || 'none';
-                panel.innerHTML = `
-                    F:${ChatSystem.featuresEnabled} | DC:${dcState} | IC:${ChatSystem.friendInConversation}<br>
-                    📡 PC:${connectionState} | 🔄 Reconnect:${CallSystem.reconnectAttempts || 0}<br>
-                    🆔 Current Chat:${ChatSystem.currentChat ? ChatSystem.currentChat.substring(0, 8)+'...' : 'none'}
-                `;
-            }
-        }, 1000);
-        
         // ✅ إنشاء حاوية الزر
         const toggleContainer = document.createElement('div');
         toggleContainer.className = 'feature-toggle-container';
@@ -341,37 +251,35 @@ setupFeatureButton() {
         // ✅ تحديث حالة زر الطرد بناءً على الميزات
         this.updateKickButtonState();
         
-        console.log('✅ تم إضافة زر التفعيل وزر الطرد ولوحة التشخيص');
+        console.log('✅ تم إضافة زر التفعيل وزر الطرد');
     }, 1000);
 },
 
-// ✅ دالة تحديث حالة زر الطرد (تم إزالة friendInConversation)
+// ✅ دالة تحديث حالة زر الطرد
 updateKickButtonState() {
     const kickBtn = document.getElementById('kickBtn');
     if (!kickBtn) return;
     
-    // ✅ نعتمد فقط على featuresEnabled (بدون friendInConversation)
-    const canUse = this.featuresEnabled;
+    const canUse = (this.friendInConversation && this.featuresEnabled);
     
     if (canUse) {
         kickBtn.classList.add('active');
         kickBtn.title = 'طرد المستخدم من المحادثة';
     } else {
         kickBtn.classList.remove('active');
-        kickBtn.title = 'غير متاح - الميزات غير مفعلة';
+        kickBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
     }
 },
 
-// ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
+    // ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
 async kickUserFromConversation() {
     if (!this.currentChat) {
         console.log('❌ لا توجد محادثة نشطة');
         return;
     }
     
-    // ✅ إزالة شرط friendInConversation
-    if (!this.featuresEnabled) {
-        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة');
+    if (!this.featuresEnabled || !this.friendInConversation) {
+        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
         return;
     }
     
@@ -393,7 +301,7 @@ async kickUserFromConversation() {
     }
     
     // ✅ لا نعرض أي إشعار (تمت الإزالة)
-}, 
+},
     
     
     // ==================== القسم 6: startFeatureBlink ====================
@@ -534,17 +442,6 @@ async acceptFeatureRequest() {
     }
     
     this.updateAllButtons();
-    
-    // ✅ فتح Data Channel بعد قبول الطلب
-    setTimeout(() => {
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            console.log('✅ Data Channel مفتوح بالفعل');
-        } else if (CallSystem.createNewDataChannel) {
-            console.log('📡 بدء فتح Data Channel...');
-            CallSystem.createNewDataChannel(this.currentChat);
-        }
-    }, 500);
-    
     console.log('✅ تم تفعيل الميزات!');
     console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
 },
@@ -774,10 +671,9 @@ handleFeatureCancel() {
     console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
 },
     
-    // ==================== القسم 14: updateAllButtons ====================
+   // ==================== القسم 14: updateAllButtons ====================
 updateAllButtons() {
-    // ✅ نعتمد فقط على featuresEnabled (بدون friendInConversation)
-    const canUse = this.featuresEnabled;
+    const canUse = (this.friendInConversation && this.featuresEnabled);
     
     const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
     btns.forEach(btn => { 
@@ -828,22 +724,69 @@ updateAllButtons() {
         }
     }
     
+    // ✅ تعطيل زر التفعيل (Toggle Switch) إذا الطرف الآخر ليس في المحادثة أو غير متصل
+    const toggleInput = document.getElementById('featureToggleInput');
+    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) {
+        // لا يمكن الضغط على الزر إلا إذا كان الطرف الآخر في المحادثة ومتصل
+        const canUseToggle = (this.friendInConversation && this.friendOnline);
+        
+        if (!canUseToggle) {
+            toggleInput.disabled = true;
+            if (featureSwitchLabel) {
+                featureSwitchLabel.style.opacity = '0.5';
+                featureSwitchLabel.style.pointerEvents = 'none';
+            }
+        } else {
+            toggleInput.disabled = false;
+            if (featureSwitchLabel) {
+                featureSwitchLabel.style.opacity = '1';
+                featureSwitchLabel.style.pointerEvents = 'auto';
+            }
+        }
+    }
+    
     // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
     
-    console.log(`🎛️ تحديث الأزرار: featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
+    console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
 },
     
     // ==================== القسم 15: setupPageFocusListener ====================
 setupPageFocusListener() {
     window.addEventListener('focus', () => {
-        if (this.currentChat && this.featuresEnabled) { // ✅ تم إزالة this.friendOnline
+        if (this.currentChat && this.friendOnline && this.featuresEnabled) { // ✅ تم إضافة this.featuresEnabled
             console.log('👁️ الصفحة في المقدمة - تحديث حالة المحادثة');
             this.sendConversationStatus(true);
             this.requestConversationStatus();
         }
     });
 },
+    
+    // ==================== القسم 16: requestConversationStatus ====================
+    async requestConversationStatus() {
+        if (!this.currentChat) return;
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'conversation_status_request',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'conversation_status_request', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('📤 تم إرسال طلب حالة المحادثة إلى:', this.currentChat);
+        } catch(e) {
+            console.error('خطأ في طلب حالة المحادثة:', e);
+        }
+    },
     
     // ==================== القسم 17: loadAllChats ====================
     loadAllChats() { 
@@ -908,6 +851,30 @@ setupPageFocusListener() {
     // ==================== القسم 20: hideProgressBar ====================
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
+    // ==================== القسم 21: sendConversationStatus ====================
+    async sendConversationStatus(isOpen) {
+        if (!this.currentChat) return;
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'conversation_status', 
+                isOpen: isOpen,
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'conversation_status', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log(`📬 تم إرسال حالة المحادثة: ${isOpen ? 'مفتوحة' : 'مغلقة'}`);
+        } catch(e) {
+            console.error('خطأ في إرسال حالة المحادثة:', e);
+        }
+    },
     
     // ==================== القسم 22: updateFriendConversationStatus ====================
     updateFriendConversationStatus(friendId, isInConversation) {
@@ -972,14 +939,12 @@ setupPageFocusListener() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
-    // ✅ تعيين friendInConversation إلى true (لأنك فتحت المحادثة)
-    this.friendInConversation = true;
-    
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
-        // نتحقق من القيمة المخزنة (قد تكون false إذا كان الطرف الآخر خرج)
         this.friendInConversation = this._pendingConversationStatus[friendId];
         console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
         delete this._pendingConversationStatus[friendId];
+    } else {
+        this.friendInConversation = false;
     }
     
     this.resetFeatures();
@@ -990,42 +955,77 @@ openChat(friendId, friendName, friendAvatar) {
     document.querySelector('.chat-page').style.display = 'none'; 
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
+    PresenceSystem.watchFriend(friendId);
+    
+    setTimeout(() => {
+        this.sendConversationStatus(true);
+    }, 500);
+    
+    setTimeout(() => {
+        this.requestConversationStatus();
+    }, 1000);
+    
+    // ✅ تم إزالة استدعاء ensureDataChannelOnly (لن يتم فتح Data Channel إلا بعد تفعيل الميزات)
+    // setTimeout(() => { 
+    //     if (this.friendOnline) {
+    //         CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
+    //     }
+    // }, 500);
     
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+    
     setTimeout(() => this.setupFeatureButton(), 500);
+}, 
     
-    console.log(`✅ تم فتح المحادثة مع ${friendName}, friendInConversation = ${this.friendInConversation}`);
-},
     
-  // ==================== القسم 24: updateFriendStatus (تم إلغاء حالة الاتصال نهائياً) ====================
+    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
-    // ✅ تم إلغاء جميع تحديثات حالة الاتصال (متصل/غير متصل)
-    // يتم الاحتفاظ فقط بآلية 120 ثانية لإلغاء الميزات عند انقطاع الاتصال
-    
     // الحالة 1: الشخص غير متصل
     if (!isOnline) {
-        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة)
+        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة) → أحمر مباشر
         if (!this.featuresEnabled) {
-            // ✅ لا نقوم بتحديث أي واجهة (تم إلغاء ظهور الحالة)
+            this.friendOnline = false;
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '🔴 غير متصل';
+                statusEl.className = 'conversation-status offline';
+            }
             return;
         }
         
-        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع
-        // نبدأ العداد الأصفر 120 ثانية (دون عرض في الواجهة)
+        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
+        // نبدأ العداد الأصفر 120 ثانية
         if (this.offlineTimer) clearTimeout(this.offlineTimer);
         if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
         
         this.offlineStartTime = Date.now();
         this.friendOnline = false;
         
-        // ✅ تم إلغاء عرض العداد في الواجهة (لا نعرض "🟡 غير متصل مؤقتاً")
+        let secondsLeft = 120;
+        const statusEl = document.getElementById('conversationStatus');
+        
+        const updateCountdown = () => {
+            if (statusEl) {
+                statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
+                statusEl.className = 'conversation-status offline-temp';
+            }
+            secondsLeft--;
+            if (secondsLeft < 0) {
+                clearInterval(this.offlineCountdownInterval);
+                this.offlineCountdownInterval = null;
+            }
+        };
+        
+        updateCountdown();
+        this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
                 console.log('🔴 120 ثانية وما رجع - إلغاء الميزات محلياً');
+                // ✅ تم إزالة إرسال feature_cancel (لم نعد نرسلها عبر Firebase)
                 
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
@@ -1050,6 +1050,11 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 this.offlineCountdownInterval = null;
             }
             
+            if (statusEl && !this.friendOnline) {
+                statusEl.innerHTML = '🔴 غير متصل';
+                statusEl.className = 'conversation-status offline';
+            }
+            
             this.offlineTimer = null;
         }, 120000);
         
@@ -1067,12 +1072,15 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.offlineStartTime = null;
         this.friendOnline = true;
         
-        // ✅ تم إلغاء عرض "🟢 متصل" في الواجهة
-        
+        const statusEl = document.getElementById('conversationStatus');
+        if (statusEl) {
+            statusEl.innerHTML = '🟢 متصل';
+            statusEl.className = 'conversation-status online';
+        }
         return;
     }
     
-    // الحالة 3: الوضع الطبيعي
+    // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
     this.friendOnline = isOnline;
     
     if (!userData && window.auth?.currentUser) {
@@ -1082,11 +1090,25 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         return;
     }
     
-    // ✅ تم إلغاء تحديث واجهة المستخدم نهائياً
+    const statusEl = document.getElementById('conversationStatus');
+    if (!statusEl) return;
+    
+    let statusHtml = '';
+    let statusClass = '';
+    
+    if (isOnline) {
+        statusHtml = '🟢 متصل';
+        statusClass = 'conversation-status online';
+    } else {
+        statusHtml = '🔴 غير متصل';
+        statusClass = 'conversation-status offline';
+    }
+    
+    statusEl.innerHTML = statusHtml;
+    statusEl.className = statusClass;
     
     this.updateAllButtons();
-}, 
-    
+},
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
@@ -2580,6 +2602,8 @@ closeChat() {
     
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
+        // ✅ تم إزالة إرسال feature_cancel (لم نعد نرسله عبر Firebase)
+        // ✅ تم إزالة إرسال conversation_status (لم نعد نرسله)
         
         // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
         if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
@@ -2619,7 +2643,7 @@ closeChat() {
     PresenceSystem.stopAll();
     if (!CallSystem.isInCall) CallSystem.cleanupConnections();
     this.currentChat = null;
-    // ✅ تم إزالة this.friendOnline = false;
+    this.friendOnline = false;
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
