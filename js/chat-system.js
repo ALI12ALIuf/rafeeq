@@ -935,7 +935,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 statusEl.innerHTML = '🔴 غير متصل';
                 statusEl.className = 'conversation-status offline';
             }
-            this.updateAllButtons(); // ✅ إضافة هذا السطر
             return;
         }
         
@@ -968,6 +967,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
                 console.log('🔴 120 ثانية وما رجع - إلغاء الميزات محلياً');
+                // ✅ تم إزالة إرسال feature_cancel (لم نعد نرسلها عبر Firebase)
                 
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
@@ -1000,7 +1000,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
             this.offlineTimer = null;
         }, 120000);
         
-        this.updateAllButtons(); // ✅ إضافة هذا السطر
         return;
     }
     
@@ -1020,7 +1019,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
             statusEl.innerHTML = '🟢 متصل';
             statusEl.className = 'conversation-status online';
         }
-        this.updateAllButtons(); // ✅ إضافة هذا السطر
         return;
     }
     
@@ -1052,7 +1050,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-}, 
+},
     
     
     // ==================== القسم 25: displayMessages ====================
