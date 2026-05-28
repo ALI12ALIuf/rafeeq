@@ -878,7 +878,7 @@ openChat(friendId, friendName, friendAvatar) {
     document.querySelector('.chat-page').style.display = 'none'; 
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
-    PresenceSystem.watchFriend(friendId);
+    // ✅ تم إزالة PresenceSystem.watchFriend (إلغاء حالة الاتصال نهائياً)
     
     setTimeout(() => {
         this.sendConversationStatus(true);
@@ -899,8 +899,7 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
     setTimeout(() => this.setupFeatureButton(), 500);
-}, 
-    
+},
     
   // ==================== القسم 24: updateFriendStatus (تم إلغاء حالة الاتصال نهائياً) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
