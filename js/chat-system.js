@@ -432,6 +432,17 @@ async acceptFeatureRequest() {
     }
     
     this.updateAllButtons();
+    
+    // ✅ فتح Data Channel بعد قبول الطلب
+    setTimeout(() => {
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            console.log('✅ Data Channel مفتوح بالفعل');
+        } else if (CallSystem.createNewDataChannel) {
+            console.log('📡 بدء فتح Data Channel...');
+            CallSystem.createNewDataChannel(this.currentChat);
+        }
+    }, 500);
+    
     console.log('✅ تم تفعيل الميزات!');
     console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
 },
