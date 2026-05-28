@@ -879,8 +879,8 @@ showIncomingCall(callerId, callData) {
     });
 },
     
-    
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+
+  // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -1122,10 +1122,12 @@ async createNewDataChannel(calleeId) {
             }
         };
         
-        // ✅ لا نرسل offer تلقائياً لمنع ظهور شاشة مكالمة وهمية
-        // بدلاً من ذلك، ننتظر حتى يقوم الطرف الآخر بطلب فتح القناة
-        console.log('✅ [DEBUG] تم إنشاء Data Channel، في انتظار الطرف الآخر');
+        // ✅ إنشاء offer مع إيقاف الصوت والفيديو تماماً (يمنع ظهور شاشة مكالمة)
+        const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+        await this.pc.setLocalDescription(offer);
+        await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
         
+        console.log('✅ [DEBUG] تم إنشاء وإرسال offer لفتح Data Channel');
     } catch (error) {
         console.error('❌ [DEBUG] فشل إنشاء Data Channel:', error);
         throw error;
@@ -1208,7 +1210,8 @@ async sendSignal(calleeId, data) {
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
-},
+},  
+    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
