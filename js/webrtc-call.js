@@ -1100,7 +1100,7 @@ async createNewDataChannel(calleeId) {
         dcState: this.dc?.readyState
     });
     
-    // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة (تم إزالة friendInConversation)
+    // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة
     if (!ChatSystem.featuresEnabled) {
         console.log('❌ [DEBUG] فشل: الميزات غير مفعلة');
         return;
@@ -1121,10 +1121,11 @@ async createNewDataChannel(calleeId) {
                 case 'failed': case 'disconnected': this.scheduleReconnect(); break;
             }
         };
-        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-        await this.pc.setLocalDescription(offer);
-        await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-        console.log('✅ [DEBUG] تم إنشاء Data Channel بنجاح');
+        
+        // ✅ لا نرسل offer تلقائياً لمنع ظهور شاشة مكالمة وهمية
+        // بدلاً من ذلك، ننتظر حتى يقوم الطرف الآخر بطلب فتح القناة
+        console.log('✅ [DEBUG] تم إنشاء Data Channel، في انتظار الطرف الآخر');
+        
     } catch (error) {
         console.error('❌ [DEBUG] فشل إنشاء Data Channel:', error);
         throw error;
@@ -1178,7 +1179,7 @@ async sendSignal(calleeId, data) {
         hasData: !!data
     });
     
-    // ✅ منع إرسال أي إشارة WebRTC إذا الميزات غير مفعلة (تم إزالة friendInConversation و friendOnline)
+    // ✅ منع إرسال أي إشارة WebRTC إذا الميزات غير مفعلة
     if (!ChatSystem.featuresEnabled) {
         console.log('❌ [DEBUG] فشل إرسال الإشارة: الميزات غير مفعلة');
         return;
