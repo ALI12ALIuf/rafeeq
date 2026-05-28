@@ -972,12 +972,14 @@ setupPageFocusListener() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
+    // ✅ تعيين friendInConversation إلى true (لأنك فتحت المحادثة)
+    this.friendInConversation = true;
+    
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
+        // نتحقق من القيمة المخزنة (قد تكون false إذا كان الطرف الآخر خرج)
         this.friendInConversation = this._pendingConversationStatus[friendId];
         console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
         delete this._pendingConversationStatus[friendId];
-    } else {
-        this.friendInConversation = false;
     }
     
     this.resetFeatures();
@@ -988,27 +990,12 @@ openChat(friendId, friendName, friendAvatar) {
     document.querySelector('.chat-page').style.display = 'none'; 
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
-    // ✅ تم إزالة PresenceSystem.watchFriend (إلغاء حالة الاتصال نهائياً)
-    
-    setTimeout(() => {
-        this.sendConversationStatus(true);
-    }, 500);
-    
-    setTimeout(() => {
-        this.requestConversationStatus();
-    }, 1000);
-    
-    // ✅ تم إزالة استدعاء ensureDataChannelOnly (لن يتم فتح Data Channel إلا بعد تفعيل الميزات)
-    // setTimeout(() => { 
-    //     if (this.friendOnline) {
-    //         CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
-    //     }
-    // }, 500);
     
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
-    
     setTimeout(() => this.setupFeatureButton(), 500);
+    
+    console.log(`✅ تم فتح المحادثة مع ${friendName}, friendInConversation = ${this.friendInConversation}`);
 },
     
   // ==================== القسم 24: updateFriendStatus (تم إلغاء حالة الاتصال نهائياً) ====================
