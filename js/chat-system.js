@@ -661,7 +661,7 @@ handleFeatureCancel() {
     console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
 },
     
-      // ==================== القسم 14: updateAllButtons ====================
+    // ==================== القسم 14: updateAllButtons ====================
 updateAllButtons() {
     const canUse = (this.friendInConversation && this.featuresEnabled);
     
@@ -717,8 +717,11 @@ updateAllButtons() {
     // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
     
+    // ✅ تم إزالة تعطيل زر التفعيل (Toggle Switch) نهائياً
+    // زر التفعيل الآن مفعل دائماً (قابل للضغط في أي وقت)
+    
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
-}, 
+},
     
     // ==================== القسم 15: setupPageFocusListener ====================
 setupPageFocusListener() {
