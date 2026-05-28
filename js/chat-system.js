@@ -910,8 +910,8 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => this.setupFeatureButton(), 500);
 }, 
     
-    
-    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+
+   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1040,7 +1040,8 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-},
+}, 
+    
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
