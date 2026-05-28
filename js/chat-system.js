@@ -764,6 +764,29 @@ setupPageFocusListener() {
     });
 },
     
+    // ==================== القسم 16: requestConversationStatus ====================
+    async requestConversationStatus() {
+        if (!this.currentChat) return;
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'conversation_status_request',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'conversation_status_request', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('📤 تم إرسال طلب حالة المحادثة إلى:', this.currentChat);
+        } catch(e) {
+            console.error('خطأ في طلب حالة المحادثة:', e);
+        }
+    },
     
     // ==================== القسم 17: loadAllChats ====================
     loadAllChats() { 
@@ -828,6 +851,30 @@ setupPageFocusListener() {
     // ==================== القسم 20: hideProgressBar ====================
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
+    // ==================== القسم 21: sendConversationStatus ====================
+    async sendConversationStatus(isOpen) {
+        if (!this.currentChat) return;
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'conversation_status', 
+                isOpen: isOpen,
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'conversation_status', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log(`📬 تم إرسال حالة المحادثة: ${isOpen ? 'مفتوحة' : 'مغلقة'}`);
+        } catch(e) {
+            console.error('خطأ في إرسال حالة المحادثة:', e);
+        }
+    },
     
     // ==================== القسم 22: updateFriendConversationStatus ====================
     updateFriendConversationStatus(friendId, isInConversation) {
