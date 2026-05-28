@@ -1058,8 +1058,8 @@ async ensureDataChannel(calleeId) {
 },
 
 async createNewDataChannel(calleeId) {
-    // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة
-    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
+    // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة (تم إزالة friendInConversation)
+    if (!ChatSystem.featuresEnabled) {
         console.log('🚫 منع إنشاء Data Channel جديد - الميزات غير مفعلة');
         return;
     }
@@ -1128,14 +1128,9 @@ async handleSignaling(data) {
 },
 
 async sendSignal(calleeId, data) {
-    // ✅ منع إرسال أي إشارة WebRTC إذا الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة
-    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-        console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
-        return;
-    }
-    
-    if (!ChatSystem.friendOnline) {
-        console.log('❌ المستخدم غير متصل، تم إلغاء إرسال الإشارة');
+    // ✅ منع إرسال أي إشارة WebRTC إذا الميزات غير مفعلة (تم إزالة friendInConversation و friendOnline)
+    if (!ChatSystem.featuresEnabled) {
+        console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة');
         return;
     }
     
