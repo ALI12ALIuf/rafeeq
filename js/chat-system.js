@@ -177,93 +177,96 @@ setupFeatureButton() {
             document.head.appendChild(style);
         }
         
-        // ✅ إضافة لوحة تشخيص متطورة (قابلة للنسخ والإخفاء والسحب)
-        const debugPanel = document.createElement('div');
-        debugPanel.id = 'debugPanel';
-        debugPanel.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.85);
-            color: #0f0;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            padding: 12px 15px;
-            border-radius: 8px;
-            z-index: 99999;
-            direction: ltr;
-            text-align: left;
-            border: 1px solid #0f0;
-            box-shadow: 0 0 10px rgba(0,255,0,0.3);
-            backdrop-filter: blur(5px);
-            cursor: move;
-            user-select: text;
-            min-width: 280px;
-        `;
-        debugPanel.innerHTML = `
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #0f0; padding-bottom:4px;">
-                <span style="font-weight:bold;">🔧 DIAGNOSTIC PANEL</span>
-                <button id="closeDebugPanel" style="background:none; border:none; color:#0f0; cursor:pointer; font-size:14px;">✖</button>
-            </div>
-            <div id="debugContent" style="line-height:1.5;">
-                F:${this.featuresEnabled} | DC:none | IC:${this.friendInConversation}<br>
-                📡 DC state: waiting...
-            </div>
-            <div style="margin-top:8px; font-size:10px; color:#888; border-top:1px solid #333; padding-top:4px;">
-                💡 Click text to copy | Drag to move
-            </div>
-        `;
-        document.body.appendChild(debugPanel);
-        
-        // جعل اللوحة قابلة للسحب
-        let isDragging = false;
-        let dragOffsetX = 0, dragOffsetY = 0;
-        debugPanel.addEventListener('mousedown', (e) => {
-            if (e.target.id !== 'closeDebugPanel') {
-                isDragging = true;
-                dragOffsetX = e.clientX - debugPanel.offsetLeft;
-                dragOffsetY = e.clientY - debugPanel.offsetTop;
-                debugPanel.style.cursor = 'grabbing';
-            }
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                let newLeft = e.clientX - dragOffsetX;
-                let newTop = e.clientY - dragOffsetY;
-                newLeft = Math.max(0, Math.min(window.innerWidth - debugPanel.offsetWidth, newLeft));
-                newTop = Math.max(0, Math.min(window.innerHeight - debugPanel.offsetHeight, newTop));
-                debugPanel.style.left = newLeft + 'px';
-                debugPanel.style.right = 'auto';
-                debugPanel.style.bottom = 'auto';
-                debugPanel.style.top = newTop + 'px';
-            }
-        });
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            debugPanel.style.cursor = 'move';
-        });
-        
-        // إغلاق اللوحة
-        document.getElementById('closeDebugPanel').onclick = () => {
-            debugPanel.style.display = 'none';
-        };
-        
-        // جعل المحتوى قابلاً للنسخ عند الضغط
-        const debugContent = document.getElementById('debugContent');
-        debugContent.style.cursor = 'pointer';
-        debugContent.onclick = () => {
-            const text = debugContent.innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                const originalColor = debugContent.style.color;
-                debugContent.style.color = '#ff0';
-                setTimeout(() => { debugContent.style.color = originalColor; }, 300);
+        // ✅ إضافة لوحة تشخيص واحدة فقط (إذا لم تكن موجودة)
+        let debugPanel = document.getElementById('debugPanel');
+        if (!debugPanel) {
+            debugPanel = document.createElement('div');
+            debugPanel.id = 'debugPanel';
+            debugPanel.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: rgba(0,0,0,0.85);
+                color: #0f0;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                padding: 12px 15px;
+                border-radius: 8px;
+                z-index: 99999;
+                direction: ltr;
+                text-align: left;
+                border: 1px solid #0f0;
+                box-shadow: 0 0 10px rgba(0,255,0,0.3);
+                backdrop-filter: blur(5px);
+                cursor: move;
+                user-select: text;
+                min-width: 280px;
+            `;
+            debugPanel.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #0f0; padding-bottom:4px;">
+                    <span style="font-weight:bold;">🔧 DIAGNOSTIC PANEL</span>
+                    <button id="closeDebugPanel" style="background:none; border:none; color:#0f0; cursor:pointer; font-size:14px;">✖</button>
+                </div>
+                <div id="debugContent" style="line-height:1.5;">
+                    F:${this.featuresEnabled} | DC:none | IC:${this.friendInConversation}<br>
+                    📡 DC state: waiting...
+                </div>
+                <div style="margin-top:8px; font-size:10px; color:#888; border-top:1px solid #333; padding-top:4px;">
+                    💡 Click text to copy | Drag to move
+                </div>
+            `;
+            document.body.appendChild(debugPanel);
+            
+            // جعل اللوحة قابلة للسحب
+            let isDragging = false;
+            let dragOffsetX = 0, dragOffsetY = 0;
+            debugPanel.addEventListener('mousedown', (e) => {
+                if (e.target.id !== 'closeDebugPanel') {
+                    isDragging = true;
+                    dragOffsetX = e.clientX - debugPanel.offsetLeft;
+                    dragOffsetY = e.clientY - debugPanel.offsetTop;
+                    debugPanel.style.cursor = 'grabbing';
+                }
             });
-        };
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    let newLeft = e.clientX - dragOffsetX;
+                    let newTop = e.clientY - dragOffsetY;
+                    newLeft = Math.max(0, Math.min(window.innerWidth - debugPanel.offsetWidth, newLeft));
+                    newTop = Math.max(0, Math.min(window.innerHeight - debugPanel.offsetHeight, newTop));
+                    debugPanel.style.left = newLeft + 'px';
+                    debugPanel.style.right = 'auto';
+                    debugPanel.style.bottom = 'auto';
+                    debugPanel.style.top = newTop + 'px';
+                }
+            });
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                debugPanel.style.cursor = 'move';
+            });
+            
+            // إغلاق اللوحة
+            document.getElementById('closeDebugPanel').onclick = () => {
+                debugPanel.style.display = 'none';
+            };
+            
+            // جعل المحتوى قابلاً للنسخ عند الضغط
+            const debugContent = document.getElementById('debugContent');
+            debugContent.style.cursor = 'pointer';
+            debugContent.onclick = () => {
+                const text = debugContent.innerText;
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalColor = debugContent.style.color;
+                    debugContent.style.color = '#ff0';
+                    setTimeout(() => { debugContent.style.color = originalColor; }, 300);
+                });
+            };
+        }
         
-        // تحديث لوحة التشخيص كل ثانية
+        // ✅ تحديث لوحة التشخيص كل ثانية (بدون إنشاء لوحة جديدة)
         setInterval(() => {
             const panel = document.getElementById('debugContent');
-            if (panel) {
+            if (panel && debugPanel.style.display !== 'none') {
                 const dcState = CallSystem.dc?.readyState || 'none';
                 const connectionState = CallSystem.pc?.connectionState || 'none';
                 panel.innerHTML = `
@@ -338,7 +341,7 @@ setupFeatureButton() {
         // ✅ تحديث حالة زر الطرد بناءً على الميزات
         this.updateKickButtonState();
         
-        console.log('✅ تم إضافة زر التفعيل وزر الطرد ولوحة التشخيص المتطورة');
+        console.log('✅ تم إضافة زر التفعيل وزر الطرد ولوحة التشخيص');
     }, 1000);
 },
 
