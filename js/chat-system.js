@@ -888,6 +888,7 @@ setupPageFocusListener() {
         this.updateAllButtons();
     },
 
+
     // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
@@ -901,6 +902,18 @@ openChat(friendId, friendName, friendAvatar) {
     }
     
     this.resetFeatures();
+    
+    // ✅ تعطيل زر التفعيل فوراً حتى يتم تحديث الحالة
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (toggleInput) {
+        toggleInput.disabled = true;
+        const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+        if (featureSwitchLabel) {
+            featureSwitchLabel.style.opacity = '0.5';
+            featureSwitchLabel.style.pointerEvents = 'none';
+        }
+    }
+    
     document.body.classList.add('conversation-open');
     const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
     if (nameEl) nameEl.textContent = friendName;
@@ -929,7 +942,7 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
     setTimeout(() => this.setupFeatureButton(), 500);
-}, 
+},
     
     
     // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
