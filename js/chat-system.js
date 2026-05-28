@@ -671,7 +671,6 @@ handleFeatureCancel() {
     console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
 },
     
-
    // ==================== القسم 14: updateAllButtons ====================
 updateAllButtons() {
     const canUse = (this.friendInConversation && this.featuresEnabled);
@@ -725,12 +724,34 @@ updateAllButtons() {
         }
     }
     
+    // ✅ تعطيل زر التفعيل (Toggle Switch) إذا الطرف الآخر ليس في المحادثة أو غير متصل
+    const toggleInput = document.getElementById('featureToggleInput');
+    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) {
+        // لا يمكن الضغط على الزر إلا إذا كان الطرف الآخر في المحادثة ومتصل
+        const canUseToggle = (this.friendInConversation && this.friendOnline);
+        
+        if (!canUseToggle) {
+            toggleInput.disabled = true;
+            if (featureSwitchLabel) {
+                featureSwitchLabel.style.opacity = '0.5';
+                featureSwitchLabel.style.pointerEvents = 'none';
+            }
+        } else {
+            toggleInput.disabled = false;
+            if (featureSwitchLabel) {
+                featureSwitchLabel.style.opacity = '1';
+                featureSwitchLabel.style.pointerEvents = 'auto';
+            }
+        }
+    }
+    
     // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
     
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
-},  
-    
+},
     
     // ==================== القسم 15: setupPageFocusListener ====================
 setupPageFocusListener() {
@@ -867,7 +888,6 @@ setupPageFocusListener() {
         this.updateAllButtons();
     },
 
-
     // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
@@ -911,8 +931,8 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => this.setupFeatureButton(), 500);
 }, 
     
-
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+    
+    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1041,8 +1061,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-}, 
-    
+},
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
