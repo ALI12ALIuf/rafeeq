@@ -60,7 +60,7 @@ setupBeforeUnloadListener() {
 },
 
 
-    // ==================== القسم 5: setupFeatureButton ====================
+   // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
     setTimeout(() => {
         // ✅ إزالة أي أزرار قديمة
@@ -177,6 +177,35 @@ setupFeatureButton() {
             document.head.appendChild(style);
         }
         
+        // ✅ إضافة لوحة التشخيص (Debug Panel)
+        const debugPanel = document.createElement('div');
+        debugPanel.id = 'debugPanel';
+        debugPanel.style.cssText = `
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            z-index: 99999;
+            pointer-events: none;
+            direction: ltr;
+            border: 1px solid #0f0;
+        `;
+        debugPanel.innerHTML = `🔧 F:${this.featuresEnabled} | DC:none | IC:${this.friendInConversation}`;
+        document.body.appendChild(debugPanel);
+        
+        // تحديث لوحة التشخيص كل ثانية
+        setInterval(() => {
+            const panel = document.getElementById('debugPanel');
+            if (panel) {
+                panel.innerHTML = `🔧 F:${ChatSystem.featuresEnabled} | DC:${CallSystem.dc?.readyState || 'none'} | IC:${ChatSystem.friendInConversation}`;
+            }
+        }, 1000);
+        
         // ✅ إنشاء حاوية الزر
         const toggleContainer = document.createElement('div');
         toggleContainer.className = 'feature-toggle-container';
@@ -241,7 +270,7 @@ setupFeatureButton() {
         // ✅ تحديث حالة زر الطرد بناءً على الميزات
         this.updateKickButtonState();
         
-        console.log('✅ تم إضافة زر التفعيل وزر الطرد');
+        console.log('✅ تم إضافة زر التفعيل وزر الطرد ولوحة التشخيص');
     }, 1000);
 },
 
@@ -259,7 +288,7 @@ updateKickButtonState() {
         kickBtn.classList.remove('active');
         kickBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
     }
-},
+}, 
 
     // ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
 async kickUserFromConversation() {
