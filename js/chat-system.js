@@ -12,6 +12,7 @@ const PresenceSystem = {
     stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
 };
 
+
 // ==================== القسم 2: تعريف ChatSystem ====================
 const ChatSystem = {
     currentChat: null, messages: {}, friendOnline: false,
@@ -27,6 +28,35 @@ const ChatSystem = {
     offlineStartTime: null,
     offlineTimer: null,
     offlineCountdownInterval: null,
+    
+    // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
+    updateFeatureToggleUI() {
+        const toggleInput = document.getElementById('featureToggleInput');
+        if (!toggleInput) return;
+        
+        // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
+        toggleInput.checked = this.featuresEnabled;
+        
+        // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة أو غير متصل
+        const canUseToggle = (this.friendInConversation && this.friendOnline);
+        toggleInput.disabled = !canUseToggle;
+        
+        // ✅ تحديث الشفافية
+        const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+        if (featureSwitchLabel) {
+            if (!canUseToggle) {
+                featureSwitchLabel.style.opacity = '0.5';
+                featureSwitchLabel.style.pointerEvents = 'none';
+            } else {
+                featureSwitchLabel.style.opacity = '1';
+                featureSwitchLabel.style.pointerEvents = 'auto';
+            }
+        }
+        
+        console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
+    },
+    
+    // ==================== القسم 3: init ====================
     
 
     // ==================== القسم 3: init ====================
@@ -299,6 +329,9 @@ async kickUserFromConversation() {
     } else {
         console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
     }
+    
+    // ✅ تحديث واجهة المستخدم (تحديث حالة زر التفعيل)
+    this.updateAllButtons();
     
     // ✅ لا نعرض أي إشعار (تمت الإزالة)
 },
@@ -766,28 +799,8 @@ updateAllButtons() {
         }
     }
     
-    // ✅ تعطيل زر التفعيل (Toggle Switch) إذا الطرف الآخر ليس في المحادثة أو غير متصل
-    const toggleInput = document.getElementById('featureToggleInput');
-    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) {
-        // لا يمكن الضغط على الزر إلا إذا كان الطرف الآخر في المحادثة ومتصل
-        const canUseToggle = (this.friendInConversation && this.friendOnline);
-        
-        if (!canUseToggle) {
-            toggleInput.disabled = true;
-            if (featureSwitchLabel) {
-                featureSwitchLabel.style.opacity = '0.5';
-                featureSwitchLabel.style.pointerEvents = 'none';
-            }
-        } else {
-            toggleInput.disabled = false;
-            if (featureSwitchLabel) {
-                featureSwitchLabel.style.opacity = '1';
-                featureSwitchLabel.style.pointerEvents = 'auto';
-            }
-        }
-    }
+    // ✅ تحديث زر التفعيل باستخدام الدالة المركزية
+    this.updateFeatureToggleUI();
     
     // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
