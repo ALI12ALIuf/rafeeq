@@ -20,7 +20,7 @@ const SecureChatSystem = {
             console.log('🔐 بدء تهيئة نظام التشفير...');
             await this.setupKeys();
             this.startReceiving();
-            // ✅ تم إزالة PresenceSystem.setOnline() (إلغاء حالة الاتصال نهائياً)
+            PresenceSystem.setOnline();
             console.log('✅ تم تهيئة نظام التشفير بنجاح');
             return true;
         } catch (error) {
