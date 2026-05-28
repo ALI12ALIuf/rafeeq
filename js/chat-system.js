@@ -867,6 +867,7 @@ setupPageFocusListener() {
         this.updateAllButtons();
     },
 
+
     // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
