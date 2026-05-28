@@ -726,14 +726,13 @@ updateAllButtons() {
     // ==================== القسم 15: setupPageFocusListener ====================
 setupPageFocusListener() {
     window.addEventListener('focus', () => {
-        if (this.currentChat && this.friendOnline && this.featuresEnabled) { // ✅ تم إضافة this.featuresEnabled
+        if (this.currentChat && this.featuresEnabled) { // ✅ تم إزالة this.friendOnline
             console.log('👁️ الصفحة في المقدمة - تحديث حالة المحادثة');
             this.sendConversationStatus(true);
             this.requestConversationStatus();
         }
     });
 },
-    
     
     // ==================== القسم 17: loadAllChats ====================
     loadAllChats() { 
@@ -2483,8 +2482,6 @@ closeChat() {
     
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
-        // ✅ تم إزالة إرسال feature_cancel (لم نعد نرسله عبر Firebase)
-        // ✅ تم إزالة إرسال conversation_status (لم نعد نرسله)
         
         // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
         if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
@@ -2524,7 +2521,7 @@ closeChat() {
     PresenceSystem.stopAll();
     if (!CallSystem.isInCall) CallSystem.cleanupConnections();
     this.currentChat = null;
-    this.friendOnline = false;
+    // ✅ تم إزالة this.friendOnline = false;
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
