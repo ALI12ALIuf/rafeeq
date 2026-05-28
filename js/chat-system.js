@@ -776,7 +776,8 @@ handleFeatureCancel() {
     
     // ==================== القسم 14: updateAllButtons ====================
 updateAllButtons() {
-    const canUse = (this.friendInConversation && this.featuresEnabled);
+    // ✅ نعتمد فقط على featuresEnabled (بدون friendInConversation)
+    const canUse = this.featuresEnabled;
     
     const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
     btns.forEach(btn => { 
@@ -830,10 +831,7 @@ updateAllButtons() {
     // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
     
-    // ✅ تم إزالة تعطيل زر التفعيل (Toggle Switch) نهائياً
-    // زر التفعيل الآن مفعل دائماً (قابل للضغط في أي وقت)
-    
-    console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
+    console.log(`🎛️ تحديث الأزرار: featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
 },
     
     // ==================== القسم 15: setupPageFocusListener ====================
