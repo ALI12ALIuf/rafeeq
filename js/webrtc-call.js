@@ -130,76 +130,76 @@ const CallSystem = {
     
     // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
     
-    async ensureDataChannelOnly(calleeId) {
-        // ✅ منع فتح Data Channel إذا الميزات غير مفعلة
-        if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-            console.log('🚫 منع فتح Data Channel - الميزات غير مفعلة');
-            return false;
-        }
-        
-        if (!calleeId) return false;
-        
-        if (this.dc && this.dc.readyState === 'open') {
-            console.log('✅ Data Channel موجود ومفتوح');
-            return true;
-        }
-        
-        if (this.dc && this.dc.readyState === 'connecting') {
-            console.log('⏳ Data Channel في طور الاتصال...');
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => resolve(false), 10000);
-                const check = setInterval(() => {
-                    if (this.dc && this.dc.readyState === 'open') {
-                        clearInterval(check);
-                        clearTimeout(timeout);
-                        resolve(true);
-                    } else if (this.dc && (this.dc.readyState === 'failed' || this.dc.readyState === 'closed')) {
-                        clearInterval(check);
-                        clearTimeout(timeout);
-                        this.createDataChannelOnly(calleeId).then(resolve);
-                    }
-                }, 500);
-            });
-        }
-        
-        return this.createDataChannelOnly(calleeId);
-    },
+async ensureDataChannelOnly(calleeId) {
+    // ✅ منع فتح Data Channel إذا الميزات غير مفعلة (تم إزالة friendInConversation)
+    if (!ChatSystem.featuresEnabled) {
+        console.log('🚫 منع فتح Data Channel - الميزات غير مفعلة');
+        return false;
+    }
     
-    async createDataChannelOnly(calleeId) {
-        // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة
-        if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-            console.log('🚫 منع إنشاء Data Channel - الميزات غير مفعلة');
-            return false;
-        }
+    if (!calleeId) return false;
+    
+    if (this.dc && this.dc.readyState === 'open') {
+        console.log('✅ Data Channel موجود ومفتوح');
+        return true;
+    }
+    
+    if (this.dc && this.dc.readyState === 'connecting') {
+        console.log('⏳ Data Channel في طور الاتصال...');
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(false), 10000);
+            const check = setInterval(() => {
+                if (this.dc && this.dc.readyState === 'open') {
+                    clearInterval(check);
+                    clearTimeout(timeout);
+                    resolve(true);
+                } else if (this.dc && (this.dc.readyState === 'failed' || this.dc.readyState === 'closed')) {
+                    clearInterval(check);
+                    clearTimeout(timeout);
+                    this.createDataChannelOnly(calleeId).then(resolve);
+                }
+            }, 500);
+        });
+    }
+    
+    return this.createDataChannelOnly(calleeId);
+},
+
+async createDataChannelOnly(calleeId) {
+    // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة (تم إزالة friendInConversation)
+    if (!ChatSystem.featuresEnabled) {
+        console.log('🚫 منع إنشاء Data Channel - الميزات غير مفعلة');
+        return false;
+    }
+    
+    this.cleanupConnections();
+    try {
+        console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
         
-        this.cleanupConnections();
-        try {
-            console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
-            
-            this.pc = new RTCPeerConnection(this.servers);
-            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
-            };
-            
-            this.pc.ondatachannel = e => { 
-                this.setupDataChannel(e.channel); 
-                this.dc = e.channel; 
-            };
-            
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
-            
-            console.log('✅ تم إرسال طلب فتح Data Channel');
-            return true;
-        } catch (error) {
-            console.error('❌ فشل إنشاء Data Channel:', error);
-            return false;
-        }
-    },
+        this.pc = new RTCPeerConnection(this.servers);
+        this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
+        this.setupDataChannel(this.dc);
+        
+        this.pc.onicecandidate = e => { 
+            if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
+        };
+        
+        this.pc.ondatachannel = e => { 
+            this.setupDataChannel(e.channel); 
+            this.dc = e.channel; 
+        };
+        
+        const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+        await this.pc.setLocalDescription(offer);
+        await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
+        
+        console.log('✅ تم إرسال طلب فتح Data Channel');
+        return true;
+    } catch (error) {
+        console.error('❌ فشل إنشاء Data Channel:', error);
+        return false;
+    }
+},
     
     // ==================== 4. المكالمة الصوتية ====================
 
