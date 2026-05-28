@@ -1058,9 +1058,15 @@ async ensureDataChannel(calleeId) {
 },
 
 async createNewDataChannel(calleeId) {
+    console.log('🔍 [DEBUG] createNewDataChannel - بدء', {
+        featuresEnabled: ChatSystem.featuresEnabled,
+        calleeId: calleeId,
+        dcState: this.dc?.readyState
+    });
+    
     // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة (تم إزالة friendInConversation)
     if (!ChatSystem.featuresEnabled) {
-        console.log('🚫 منع إنشاء Data Channel جديد - الميزات غير مفعلة');
+        console.log('❌ [DEBUG] فشل: الميزات غير مفعلة');
         return;
     }
     
@@ -1082,7 +1088,9 @@ async createNewDataChannel(calleeId) {
         const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
         await this.pc.setLocalDescription(offer);
         await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
+        console.log('✅ [DEBUG] تم إنشاء Data Channel بنجاح');
     } catch (error) {
+        console.error('❌ [DEBUG] فشل إنشاء Data Channel:', error);
         throw error;
     }
 },
@@ -1128,9 +1136,15 @@ async handleSignaling(data) {
 },
 
 async sendSignal(calleeId, data) {
+    console.log('🔍 [DEBUG] sendSignal - بدء', {
+        featuresEnabled: ChatSystem.featuresEnabled,
+        dcState: this.dc?.readyState,
+        hasData: !!data
+    });
+    
     // ✅ منع إرسال أي إشارة WebRTC إذا الميزات غير مفعلة (تم إزالة friendInConversation و friendOnline)
     if (!ChatSystem.featuresEnabled) {
-        console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة');
+        console.log('❌ [DEBUG] فشل إرسال الإشارة: الميزات غير مفعلة');
         return;
     }
     
