@@ -671,6 +671,7 @@ handleFeatureCancel() {
     console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
 },
     
+
    // ==================== القسم 14: updateAllButtons ====================
 updateAllButtons() {
     const canUse = (this.friendInConversation && this.featuresEnabled);
@@ -724,34 +725,12 @@ updateAllButtons() {
         }
     }
     
-    // ✅ تعطيل زر التفعيل (Toggle Switch) إذا الطرف الآخر ليس في المحادثة أو غير متصل
-    const toggleInput = document.getElementById('featureToggleInput');
-    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) {
-        // لا يمكن الضغط على الزر إلا إذا كان الطرف الآخر في المحادثة ومتصل
-        const canUseToggle = (this.friendInConversation && this.friendOnline);
-        
-        if (!canUseToggle) {
-            toggleInput.disabled = true;
-            if (featureSwitchLabel) {
-                featureSwitchLabel.style.opacity = '0.5';
-                featureSwitchLabel.style.pointerEvents = 'none';
-            }
-        } else {
-            toggleInput.disabled = false;
-            if (featureSwitchLabel) {
-                featureSwitchLabel.style.opacity = '1';
-                featureSwitchLabel.style.pointerEvents = 'auto';
-            }
-        }
-    }
-    
     // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
     
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
-},
+},  
+    
     
     // ==================== القسم 15: setupPageFocusListener ====================
 setupPageFocusListener() {
