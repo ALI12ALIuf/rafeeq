@@ -59,7 +59,8 @@ setupBeforeUnloadListener() {
     });
 },
 
-// ==================== القسم 5: setupFeatureButton ====================
+
+    // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
     setTimeout(() => {
         // ✅ إزالة أي أزرار قديمة
@@ -71,10 +72,6 @@ setupFeatureButton() {
         
         const oldKickBtn = document.getElementById('kickBtn');
         if (oldKickBtn) oldKickBtn.remove();
-        
-        // ✅ إزالة لوحة التشخيص القديمة
-        const oldDebugPanel = document.getElementById('debugPanel');
-        if (oldDebugPanel) oldDebugPanel.remove();
         
         const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
         if (!container) {
@@ -176,86 +173,104 @@ setupFeatureButton() {
                 .kick-btn.active:active {
                     transform: scale(0.95);
                 }
-                /* لوحة التشخيص - أعلى الشاشة */
-                .debug-panel {
-                    position: fixed;
-                    top: 60px;
-                    right: 10px;
-                    background: rgba(0,0,0,0.85);
-                    color: #0f0;
-                    font-family: monospace;
-                    font-size: 10px;
-                    padding: 6px 10px;
-                    border-radius: 6px;
-                    z-index: 99999;
-                    border: 1px solid #0f0;
-                    backdrop-filter: blur(4px);
-                    direction: ltr;
-                    text-align: left;
-                    pointer-events: none;
-                    opacity: 0.8;
-                }
-                .debug-copy-btn {
-                    position: fixed;
-                    top: 60px;
-                    right: 10px;
-                    margin-top: 95px;
-                    background: rgba(0,0,0,0.7);
-                    color: #fff;
-                    font-family: monospace;
-                    font-size: 9px;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    z-index: 99999;
-                    border: 1px solid #888;
-                    cursor: pointer;
-                    pointer-events: auto;
-                    transition: all 0.2s;
-                }
-                .debug-copy-btn:hover {
-                    background: #4CAF50;
-                    color: white;
-                }
             `;
             document.head.appendChild(style);
         }
         
-        // ✅ إنشاء لوحة التشخيص (عرض فقط، لا تعترض النقرات)
+        // ✅ إضافة لوحة تشخيص متطورة (قابلة للنسخ والإخفاء والسحب)
         const debugPanel = document.createElement('div');
         debugPanel.id = 'debugPanel';
-        debugPanel.className = 'debug-panel';
+        debugPanel.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.85);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 12px 15px;
+            border-radius: 8px;
+            z-index: 99999;
+            direction: ltr;
+            text-align: left;
+            border: 1px solid #0f0;
+            box-shadow: 0 0 10px rgba(0,255,0,0.3);
+            backdrop-filter: blur(5px);
+            cursor: move;
+            user-select: text;
+            min-width: 280px;
+        `;
         debugPanel.innerHTML = `
-            F:${ChatSystem.featuresEnabled} | DC:${CallSystem.dc?.readyState || 'none'} | IC:${ChatSystem.friendInConversation}
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #0f0; padding-bottom:4px;">
+                <span style="font-weight:bold;">🔧 DIAGNOSTIC PANEL</span>
+                <button id="closeDebugPanel" style="background:none; border:none; color:#0f0; cursor:pointer; font-size:14px;">✖</button>
+            </div>
+            <div id="debugContent" style="line-height:1.5;">
+                F:${this.featuresEnabled} | DC:none | IC:${this.friendInConversation}<br>
+                📡 DC state: waiting...
+            </div>
+            <div style="margin-top:8px; font-size:10px; color:#888; border-top:1px solid #333; padding-top:4px;">
+                💡 Click text to copy | Drag to move
+            </div>
         `;
         document.body.appendChild(debugPanel);
         
-        // ✅ زر نسخ منفصل
-        const copyBtn = document.createElement('button');
-        copyBtn.id = 'debugCopyBtn';
-        copyBtn.className = 'debug-copy-btn';
-        copyBtn.innerHTML = '📋 نسخ التشخيص';
-        copyBtn.onclick = () => {
-            const info = `🔧 DIAGNOSTIC INFO
-━━━━━━━━━━━━━━━━━━━━━
-📅 Time: ${new Date().toLocaleTimeString()}
-📱 Features Enabled (F): ${ChatSystem.featuresEnabled}
-🔌 Data Channel (DC): ${CallSystem.dc?.readyState || 'none'}
-💬 In Conversation (IC): ${ChatSystem.friendInConversation}
-💬 Current Chat: ${ChatSystem.currentChat || 'none'}
-━━━━━━━━━━━━━━━━━━━━━`;
-            navigator.clipboard.writeText(info);
-            copyBtn.innerHTML = '✅ تم النسخ!';
-            setTimeout(() => {
-                copyBtn.innerHTML = '📋 نسخ التشخيص';
-            }, 2000);
-        };
-        document.body.appendChild(copyBtn);
+        // جعل اللوحة قابلة للسحب
+        let isDragging = false;
+        let dragOffsetX = 0, dragOffsetY = 0;
+        debugPanel.addEventListener('mousedown', (e) => {
+            if (e.target.id !== 'closeDebugPanel') {
+                isDragging = true;
+                dragOffsetX = e.clientX - debugPanel.offsetLeft;
+                dragOffsetY = e.clientY - debugPanel.offsetTop;
+                debugPanel.style.cursor = 'grabbing';
+            }
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                let newLeft = e.clientX - dragOffsetX;
+                let newTop = e.clientY - dragOffsetY;
+                newLeft = Math.max(0, Math.min(window.innerWidth - debugPanel.offsetWidth, newLeft));
+                newTop = Math.max(0, Math.min(window.innerHeight - debugPanel.offsetHeight, newTop));
+                debugPanel.style.left = newLeft + 'px';
+                debugPanel.style.right = 'auto';
+                debugPanel.style.bottom = 'auto';
+                debugPanel.style.top = newTop + 'px';
+            }
+        });
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            debugPanel.style.cursor = 'move';
+        });
         
-        // ✅ تحديث لوحة التشخيص كل ثانية
+        // إغلاق اللوحة
+        document.getElementById('closeDebugPanel').onclick = () => {
+            debugPanel.style.display = 'none';
+        };
+        
+        // جعل المحتوى قابلاً للنسخ عند الضغط
+        const debugContent = document.getElementById('debugContent');
+        debugContent.style.cursor = 'pointer';
+        debugContent.onclick = () => {
+            const text = debugContent.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const originalColor = debugContent.style.color;
+                debugContent.style.color = '#ff0';
+                setTimeout(() => { debugContent.style.color = originalColor; }, 300);
+            });
+        };
+        
+        // تحديث لوحة التشخيص كل ثانية
         setInterval(() => {
-            const panel = document.getElementById('debugPanel');
+            const panel = document.getElementById('debugContent');
             if (panel) {
-                panel.innerHTML = `F:${ChatSystem.featuresEnabled} | DC:${CallSystem.dc?.readyState || 'none'} | IC:${ChatSystem.friendInConversation}`;
+                const dcState = CallSystem.dc?.readyState || 'none';
+                const connectionState = CallSystem.pc?.connectionState || 'none';
+                panel.innerHTML = `
+                    F:${ChatSystem.featuresEnabled} | DC:${dcState} | IC:${ChatSystem.friendInConversation}<br>
+                    📡 PC:${connectionState} | 🔄 Reconnect:${CallSystem.reconnectAttempts || 0}<br>
+                    🆔 Current Chat:${ChatSystem.currentChat ? ChatSystem.currentChat.substring(0, 8)+'...' : 'none'}
+                `;
             }
         }, 1000);
         
@@ -310,6 +325,7 @@ setupFeatureButton() {
             kickBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                // تنفيذ الطرد مباشرة بدون تأكيد
                 this.kickUserFromConversation();
             };
         }
@@ -319,12 +335,29 @@ setupFeatureButton() {
             toggleInput.checked = true;
         }
         
-        // ✅ تحديث حالة زر الطرد
+        // ✅ تحديث حالة زر الطرد بناءً على الميزات
         this.updateKickButtonState();
         
-        console.log('✅ تم إضافة زر التفعيل وزر الطرد ولوحة التشخيص');
+        console.log('✅ تم إضافة زر التفعيل وزر الطرد ولوحة التشخيص المتطورة');
     }, 1000);
 },
+
+// ✅ دالة تحديث حالة زر الطرد
+updateKickButtonState() {
+    const kickBtn = document.getElementById('kickBtn');
+    if (!kickBtn) return;
+    
+    const canUse = (this.friendInConversation && this.featuresEnabled);
+    
+    if (canUse) {
+        kickBtn.classList.add('active');
+        kickBtn.title = 'طرد المستخدم من المحادثة';
+    } else {
+        kickBtn.classList.remove('active');
+        kickBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+    }
+},
+    
 
     // ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
 async kickUserFromConversation() {
