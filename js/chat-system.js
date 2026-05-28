@@ -60,7 +60,7 @@ setupBeforeUnloadListener() {
 },
 
 
-    // ==================== القسم 5: setupFeatureButton ====================
+   // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
     setTimeout(() => {
         // ✅ إزالة أي أزرار قديمة
@@ -345,32 +345,33 @@ setupFeatureButton() {
     }, 1000);
 },
 
-// ✅ دالة تحديث حالة زر الطرد
+// ✅ دالة تحديث حالة زر الطرد (تم إزالة friendInConversation)
 updateKickButtonState() {
     const kickBtn = document.getElementById('kickBtn');
     if (!kickBtn) return;
     
-    const canUse = (this.friendInConversation && this.featuresEnabled);
+    // ✅ نعتمد فقط على featuresEnabled (بدون friendInConversation)
+    const canUse = this.featuresEnabled;
     
     if (canUse) {
         kickBtn.classList.add('active');
         kickBtn.title = 'طرد المستخدم من المحادثة';
     } else {
         kickBtn.classList.remove('active');
-        kickBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+        kickBtn.title = 'غير متاح - الميزات غير مفعلة';
     }
 },
-    
 
-    // ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
+// ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
 async kickUserFromConversation() {
     if (!this.currentChat) {
         console.log('❌ لا توجد محادثة نشطة');
         return;
     }
     
-    if (!this.featuresEnabled || !this.friendInConversation) {
-        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+    // ✅ إزالة شرط friendInConversation
+    if (!this.featuresEnabled) {
+        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة');
         return;
     }
     
@@ -392,7 +393,7 @@ async kickUserFromConversation() {
     }
     
     // ✅ لا نعرض أي إشعار (تمت الإزالة)
-},
+}, 
     
     
     // ==================== القسم 6: startFeatureBlink ====================
