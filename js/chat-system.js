@@ -724,13 +724,13 @@ updateAllButtons() {
         }
     }
     
-    // ✅ تعطيل زر التفعيل (Toggle Switch) إذا الطرف الآخر ليس في المحادثة أو غير متصل
+    // ✅ تعطيل زر التفعيل (Toggle Switch) إذا الطرف الآخر غير متصل
     const toggleInput = document.getElementById('featureToggleInput');
     const featureSwitchLabel = document.getElementById('featureSwitchLabel');
     
     if (toggleInput) {
-        // لا يمكن الضغط على الزر إلا إذا كان الطرف الآخر في المحادثة ومتصل
-        const canUseToggle = (this.friendInConversation && this.friendOnline);
+        // ✅ نعتمد فقط على friendOnline (بدون friendInConversation)
+        const canUseToggle = this.friendOnline;
         
         if (!canUseToggle) {
             toggleInput.disabled = true;
