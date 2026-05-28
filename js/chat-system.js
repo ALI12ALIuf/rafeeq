@@ -902,53 +902,34 @@ openChat(friendId, friendName, friendAvatar) {
 }, 
     
     
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+  // ==================== القسم 24: updateFriendStatus (تم إلغاء حالة الاتصال نهائياً) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
+    // ✅ تم إلغاء جميع تحديثات حالة الاتصال (متصل/غير متصل)
+    // يتم الاحتفاظ فقط بآلية 120 ثانية لإلغاء الميزات عند انقطاع الاتصال
+    
     // الحالة 1: الشخص غير متصل
     if (!isOnline) {
-        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة) → أحمر مباشر
+        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة)
         if (!this.featuresEnabled) {
-            this.friendOnline = false;
-            const statusEl = document.getElementById('conversationStatus');
-            if (statusEl) {
-                statusEl.innerHTML = '🔴 غير متصل';
-                statusEl.className = 'conversation-status offline';
-            }
+            // ✅ لا نقوم بتحديث أي واجهة (تم إلغاء ظهور الحالة)
             return;
         }
         
-        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
-        // نبدأ العداد الأصفر 120 ثانية
+        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع
+        // نبدأ العداد الأصفر 120 ثانية (دون عرض في الواجهة)
         if (this.offlineTimer) clearTimeout(this.offlineTimer);
         if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
         
         this.offlineStartTime = Date.now();
         this.friendOnline = false;
         
-        let secondsLeft = 120;
-        const statusEl = document.getElementById('conversationStatus');
-        
-        const updateCountdown = () => {
-            if (statusEl) {
-                statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
-                statusEl.className = 'conversation-status offline-temp';
-            }
-            secondsLeft--;
-            if (secondsLeft < 0) {
-                clearInterval(this.offlineCountdownInterval);
-                this.offlineCountdownInterval = null;
-            }
-        };
-        
-        updateCountdown();
-        this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
+        // ✅ تم إلغاء عرض العداد في الواجهة (لا نعرض "🟡 غير متصل مؤقتاً")
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
                 console.log('🔴 120 ثانية وما رجع - إلغاء الميزات محلياً');
-                // ✅ تم إزالة إرسال feature_cancel (لم نعد نرسلها عبر Firebase)
                 
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
@@ -973,11 +954,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 this.offlineCountdownInterval = null;
             }
             
-            if (statusEl && !this.friendOnline) {
-                statusEl.innerHTML = '🔴 غير متصل';
-                statusEl.className = 'conversation-status offline';
-            }
-            
             this.offlineTimer = null;
         }, 120000);
         
@@ -995,15 +971,12 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.offlineStartTime = null;
         this.friendOnline = true;
         
-        const statusEl = document.getElementById('conversationStatus');
-        if (statusEl) {
-            statusEl.innerHTML = '🟢 متصل';
-            statusEl.className = 'conversation-status online';
-        }
+        // ✅ تم إلغاء عرض "🟢 متصل" في الواجهة
+        
         return;
     }
     
-    // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
+    // الحالة 3: الوضع الطبيعي
     this.friendOnline = isOnline;
     
     if (!userData && window.auth?.currentUser) {
@@ -1013,25 +986,10 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         return;
     }
     
-    const statusEl = document.getElementById('conversationStatus');
-    if (!statusEl) return;
-    
-    let statusHtml = '';
-    let statusClass = '';
-    
-    if (isOnline) {
-        statusHtml = '🟢 متصل';
-        statusClass = 'conversation-status online';
-    } else {
-        statusHtml = '🔴 غير متصل';
-        statusClass = 'conversation-status offline';
-    }
-    
-    statusEl.innerHTML = statusHtml;
-    statusEl.className = statusClass;
+    // ✅ تم إلغاء تحديث واجهة المستخدم نهائياً
     
     this.updateAllButtons();
-},
+}, 
     
     
     // ==================== القسم 25: displayMessages ====================
