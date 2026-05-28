@@ -420,6 +420,21 @@ async acceptFeatureRequest() {
         switchLabel.classList.remove('blinking');
     }
     
+    // ✅ فتح Data Channel بعد تفعيل الميزات (مهم للملفات والمكالمات)
+    if (this.currentChat) {
+        try {
+            console.log('🔧 محاولة فتح Data Channel...');
+            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+            if (success) {
+                console.log('✅ تم فتح Data Channel بنجاح');
+            } else {
+                console.log('⚠️ فشل فتح Data Channel، سيتم إعادة المحاولة لاحقاً');
+            }
+        } catch(e) {
+            console.error('❌ خطأ في فتح Data Channel:', e);
+        }
+    }
+    
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
