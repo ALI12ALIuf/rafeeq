@@ -247,7 +247,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة ==========
+    // ========== الدالة المعدلة (تم إزالة conversation_status, conversation_status_request, feature_cancel) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -262,8 +262,17 @@ const SecureChatSystem = {
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
             else if (msg.package.type === 'webrtc') { 
+                // ✅ تجاهل إشارات WebRTC تماماً إذا:
+                // 1. الميزات غير مفعلة
+                // 2. أو الطرف الآخر ليس في المحادثة
+                // 3. أو المستخدم الحالي ليس في محادثة مع المرسل
                 if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة WebRTC');
+                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
+                        featuresEnabled: ChatSystem.featuresEnabled,
+                        friendInConversation: ChatSystem.friendInConversation,
+                        currentChat: ChatSystem.currentChat,
+                        sender: msg.from
+                    });
                     return;
                 }
                 
@@ -271,10 +280,14 @@ const SecureChatSystem = {
                 const parsedData = JSON.parse(signalData);
                 
                 console.log('📞 استلام إشارة WebRTC من:', msg.from);
+                console.log('📞 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
                 
                 if (parsedData.sdp && parsedData.sdp.type === 'offer') {
+                    console.log('📞 مكالمة واردة جديدة من:', msg.from, 'نوع:', parsedData.type || 'audio');
                     if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
                         CallSystem.showIncomingCall(msg.from, parsedData);
+                    } else {
+                        console.error('❌ CallSystem.showIncomingCall غير موجود');
                     }
                 } 
                 else {
@@ -299,13 +312,28 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
-            // ==================== القسم 100: معالجة إشارة إلغاء الميزات ====================
+            // ==================== القسم 100: معالجة إشارة إلغاء الميزات (force_disable_features) ====================
             else if (msg.package.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ إعادة تعيين الميزات بالكامل بناءً على طلب الطرف الآخر');
-                    await ChatSystem.fullFeaturesReset();
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    
+                    ChatSystem.featuresEnabled = false;
+                    ChatSystem.featureRequestPending = false;
+                    ChatSystem.featureRequestReceived = false;
+                    
+                    const toggleInput = document.getElementById('featureToggleInput');
+                    if (toggleInput) toggleInput.checked = false;
+                    
+                    const kickBtn = document.getElementById('kickBtn');
+                    if (kickBtn) {
+                        kickBtn.classList.remove('active');
+                        kickBtn.style.opacity = '0.5';
+                        kickBtn.style.pointerEvents = 'none';
+                    }
+                    
+                    ChatSystem.updateAllButtons();
                 }
             }
             else if (msg.package.type === 'location') {
