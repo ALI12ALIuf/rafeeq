@@ -55,8 +55,8 @@ const ChatSystem = {
         
         console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
     },
-    
-   // ==================== القسم 3: init ====================
+
+    // ==================== القسم 3: init ====================
 init() { 
     this.loadAllChats(); 
     this.setupPageFocusListener();
@@ -66,27 +66,40 @@ init() {
     // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
     this.cleanMediaMessagesOnLoad();
     
-    // ✅ إضافة متغير لتتبع حالة التبويب (مخفي/مرئي)
-    this.isTabHidden = false;
-    
-    // ✅ كشف عندما يغادر المستخدم التبويب أو يعود إليه
+    // ✅ كشف عندما يغادر المستخدم التبويب (دون إغلاق المتصفح)
     document.addEventListener('visibilitychange', () => {
-        this.isTabHidden = document.hidden;
-        console.log(`👁️ تغيير حالة التبويب: ${this.isTabHidden ? '🟡 مخفي (المستخدم خارج المتصفح)' : '🟢 مرئي (المستخدم داخل المحادثة)'}`);
-        
-        // ✅ إذا عاد المستخدم إلى التبويب وكان العداد يعمل، قم بإلغائه
-        if (!this.isTabHidden && this.offlineTimer) {
-            console.log('🔄 المستخدم عاد إلى التبويب - إلغاء العداد');
-            clearTimeout(this.offlineTimer);
-            clearInterval(this.offlineCountdownInterval);
-            this.offlineTimer = null;
-            this.offlineCountdownInterval = null;
-            
-            const statusEl = document.getElementById('conversationStatus');
-            if (statusEl && this.friendOnline === false && this.featuresEnabled) {
-                statusEl.innerHTML = '🟢 متصل';
-                statusEl.className = 'conversation-status online';
-                this.friendOnline = true;
+        if (document.hidden) {
+            console.log('👁️ المستخدم غادر التبويب - بدء عداد 120 ثانية');
+            // إذا كانت الميزات مفعلة، نبدأ عداد محلي
+            if (this.featuresEnabled && this.currentChat) {
+                // حفظ وقت المغادرة
+                sessionStorage.setItem(`tab_hide_time_${this.currentChat}`, Date.now().toString());
+            }
+        } else {
+            console.log('👁️ المستخدم عاد إلى التبويب');
+            // التحقق من وقت المغادرة
+            const hideTime = sessionStorage.getItem(`tab_hide_time_${this.currentChat}`);
+            if (hideTime && this.currentChat) {
+                const timePassed = (Date.now() - parseInt(hideTime)) / 1000;
+                console.log(`⏱️ مضى ${timePassed} ثانية منذ مغادرة التبويب`);
+                
+                if (timePassed >= 120 && this.featuresEnabled) {
+                    console.log('⚠️ مضى 120 ثانية - إلغاء الميزات وإخراج المستخدم');
+                    // ✅ حفظ علامة في localStorage
+                    localStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
+                    // ✅ إغلاق المحادثة
+                    this.closeChat();
+                    
+                    // إظهار إشعار
+                    const notification = document.createElement('div');
+                    notification.textContent = '🔄 تم إعادة تعيين المحادثة بسبب انقطاع طويل';
+                    notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                } else if (timePassed < 120 && timePassed > 0) {
+                    console.log(`✅ مضى ${timePassed} ثانية فقط، لا حاجة للإخراج`);
+                }
+                sessionStorage.removeItem(`tab_hide_time_${this.currentChat}`);
             }
         }
     });
@@ -113,10 +126,6 @@ cleanMediaMessagesOnLoad() {
     // ==================== القسم 4: setupBeforeUnloadListener (تم حذف sendFeatureCancelBeforeUnload) ====================
 setupBeforeUnloadListener() {
     window.addEventListener('beforeunload', () => {
-        // ✅ عند إغلاق المتصفح أو التبويب، اعتبر التبويب مخفياً
-        this.isTabHidden = true;
-        console.log('🚪 الصفحة تغلق - تم تعيين isTabHidden = true');
-        
         if (this.currentChat && this.featuresEnabled) {
             console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات محلياً');
             // ✅ لم نعد نرسل إشارة feature_cancel عبر Firebase
@@ -665,6 +674,12 @@ async handleFeatureResponse(fromId, action) {
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
+    // ✅ حفظ علامة في localStorage (بدلاً من sessionStorage)
+    if (this.currentChat) {
+        localStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
+        console.log(`✅ تم حفظ علامة للمحادثة ${this.currentChat} في localStorage: تم إلغاء الميزات`);
+    }
+    
     // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
     if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
         await CallSystem.deleteAllWebRTCSignals(this.currentChat);
@@ -1021,6 +1036,26 @@ setupPageFocusListener() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
+    // ✅ التحقق من العلامة في localStorage (بدلاً من sessionStorage)
+    const wasEnabledBefore = localStorage.getItem(`features_was_enabled_${friendId}`) === 'true';
+    console.log(`🔍 التحقق من العلامة للمحادثة ${friendId}: wasEnabledBefore = ${wasEnabledBefore}`);
+    
+    // ✅ إذا كانت العلامة موجودة، نخرج المستخدم دون فتح المحادثة
+    if (wasEnabledBefore) {
+        console.log(`⚠️ تم اكتشاف علامة للمحادثة ${friendId} - إخراج المستخدم`);
+        localStorage.removeItem(`features_was_enabled_${friendId}`);
+        
+        // إظهار إشعار
+        const notification = document.createElement('div');
+        notification.textContent = '🔄 تم إعادة تعيين المحادثة بسبب انقطاع سابق';
+        notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+        
+        // ✅ لا نفتح المحادثة
+        return;
+    }
+    
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
         this.friendInConversation = this._pendingConversationStatus[friendId];
         console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
@@ -1047,13 +1082,6 @@ openChat(friendId, friendName, friendAvatar) {
         this.requestConversationStatus();
     }, 1000);
     
-    // ✅ تم إزالة استدعاء ensureDataChannelOnly (لن يتم فتح Data Channel إلا بعد تفعيل الميزات)
-    // setTimeout(() => { 
-    //     if (this.friendOnline) {
-    //         CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
-    //     }
-    // }, 500);
-    
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
@@ -1075,14 +1103,15 @@ openChat(friendId, friendName, friendAvatar) {
         }
     }, 1000);
 },
-    
 
-    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+
+// ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
     // الحالة 1: الشخص غير متصل
     if (!isOnline) {
+        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة) → أحمر مباشر
         if (!this.featuresEnabled) {
             this.friendOnline = false;
             const statusEl = document.getElementById('conversationStatus');
@@ -1093,6 +1122,8 @@ updateFriendStatus(friendId, isOnline, userData = null) {
             return;
         }
         
+        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
+        // نبدأ العداد الأصفر 120 ثانية
         if (this.offlineTimer) clearTimeout(this.offlineTimer);
         if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
         
@@ -1100,7 +1131,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.friendOnline = false;
         
         let secondsLeft = 120;
-        let signalSent115 = false;
         const statusEl = document.getElementById('conversationStatus');
         
         const updateCountdown = () => {
@@ -1108,25 +1138,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
                 statusEl.className = 'conversation-status offline-temp';
             }
-            
-            // ✅ عند الوصول إلى 115 ثانية، أرسل إشارة الخروج (إذا كان التبويب مخفياً)
-            if (secondsLeft === 115 && !signalSent115 && this.featuresEnabled && this.isTabHidden) {
-                signalSent115 = true;
-                console.log('⏰ 115 ثانية والتبويب مخفي - إرسال إشارة الخروج إلى الطرف الآخر');
-                
-                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-                    try {
-                        CallSystem.dc.send(JSON.stringify({ 
-                            type: 'force_close_conversation_at_115',
-                            timestamp: Date.now()
-                        }));
-                        console.log('✅ تم إرسال إشارة الخروج إلى الطرف الآخر');
-                    } catch(e) {
-                        console.error('❌ فشل إرسال إشارة الخروج:', e);
-                    }
-                }
-            }
-            
             secondsLeft--;
             if (secondsLeft < 0) {
                 clearInterval(this.offlineCountdownInterval);
@@ -1139,15 +1150,28 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
-                // ✅ يخرج فقط إذا كان التبويب مخفياً (المستخدم خارج المتصفح)
-                if (this.isTabHidden) {
-                    console.log('🔴 120 ثانية والتبويب مخفي - إخراج المستخدم من المحادثة');
-                    this.closeChat();
-                } else {
-                    console.log('⚠️ 120 ثانية ولكن التبويب مرئي - إلغاء الميزات فقط (لا خروج)');
+                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
+                
+                // ✅ حفظ علامة في localStorage (بدلاً من sessionStorage)
+                if (this.currentChat) {
+                    localStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
+                    console.log(`✅ تم حفظ علامة للمحادثة ${this.currentChat} في localStorage: كانت الميزات مفعلة وتوقفت`);
                 }
                 
-                // ✅ إلغاء الميزات محلياً (في كلتا الحالتين)
+                // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
+                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                    try {
+                        CallSystem.dc.send(JSON.stringify({ 
+                            type: 'force_disable_features',
+                            timestamp: Date.now()
+                        }));
+                        console.log('✅ تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر');
+                    } catch(e) {
+                        console.error('❌ فشل إرسال إشارة الإلغاء:', e);
+                    }
+                }
+                
+                // ✅ إلغاء الميزات محلياً
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
                 this.featureRequestReceived = false;
@@ -1157,6 +1181,13 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                     this.featureBlinkInterval = null;
                 }
                 
+                const btn = document.getElementById('enableFeaturesBtn');
+                if (btn) {
+                    btn.style.background = '#f44336';
+                    btn.title = 'تفعيل الميزات';
+                }
+                
+                // ✅ تحديث زر التفعيل
                 const toggleInput = document.getElementById('featureToggleInput');
                 if (toggleInput) toggleInput.checked = false;
                 
@@ -1179,7 +1210,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         return;
     }
     
-    // الحالة 2: الشخص رجع متصل خلال 120 ثانية
+    // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
     if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {
         console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
         
@@ -1198,7 +1229,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         return;
     }
     
-    // الحالة 3: الوضع الطبيعي
+    // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
     this.friendOnline = isOnline;
     
     if (!userData && window.auth?.currentUser) {
@@ -1228,6 +1259,8 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     this.updateAllButtons();
 },
 
+
+    
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
