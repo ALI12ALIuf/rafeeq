@@ -29,11 +29,6 @@ const ChatSystem = {
     offlineTimer: null,
     offlineCountdownInterval: null,
     
-    // ✅ متغير تتبع نشاط المستخدم (لحماية المستخدم النشط من الطرد)
-    userIsActive: true,
-    
-
-    
     // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
     updateFeatureToggleUI() {
         const toggleInput = document.getElementById('featureToggleInput');
@@ -61,8 +56,10 @@ const ChatSystem = {
         console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
     },
     
+    // ==================== القسم 3: init ====================
+    
 
-  // ==================== القسم 3: init ====================
+    // ==================== القسم 3: init ====================
 init() { 
     this.loadAllChats(); 
     this.setupPageFocusListener();
@@ -71,36 +68,7 @@ init() {
     
     // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
     this.cleanMediaMessagesOnLoad();
-    
-    // ✅✅ إضافة تتبع نشاط المستخدم
-    this.setupUserActivityTracking();
 },
-
-// ==================== القسم 3.6: تتبع نشاط المستخدم ====================
-setupUserActivityTracking() {
-    // تحديث الحالة عند تغيير علامة التبويب
-    document.addEventListener('visibilitychange', () => {
-        this.userIsActive = !document.hidden;
-        console.log(`👁️ نشاط المستخدم: ${this.userIsActive ? 'نشط' : 'غير نشط'}`);
-    });
-    
-    // تحديث الحالة عند التركيز على النافذة
-    window.addEventListener('focus', () => {
-        this.userIsActive = true;
-        console.log('👁️ المستخدم نشط (focus)');
-    });
-    
-    // تحديث الحالة عند فقدان التركيز
-    window.addEventListener('blur', () => {
-        this.userIsActive = false;
-        console.log('👁️ المستخدم غير نشط (blur)');
-    });
-    
-    // ✅ تحديث أولي
-    this.userIsActive = !document.hidden;
-    console.log(`👁️ حالة النشاط الأولية: ${this.userIsActive ? 'نشط' : 'غير نشط'}`);
-},  
-
 
 // ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
 cleanMediaMessagesOnLoad() {
@@ -1082,8 +1050,8 @@ openChat(friendId, friendName, friendAvatar) {
     }, 1000);
 },
     
-
- // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+    
+   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1128,17 +1096,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
-                // ✅✅ التحقق من نشاط المستخدم الحالي
-                const isUserActive = !document.hidden;
-                
-                if (isUserActive) {
-                    console.log('⚠️ 120 ثانية لكن المستخدم نشط في المتصفح - إلغاء الميزات فقط (بدون إخراج)');
-                } else {
-                    console.log('🔴 120 ثانية والمستخدم غير نشط - إخراج المستخدم من المحادثة');
-                    
-                    // ✅ إخراج المستخدم من المحادثة (فقط إذا كان غير نشط)
-                    this.closeChat();
-                }
+                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
                 
                 // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
@@ -1153,7 +1111,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                     }
                 }
                 
-                // ✅ إلغاء الميزات محلياً (في جميع الأحوال)
+                // ✅ إلغاء الميزات محلياً
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
                 this.featureRequestReceived = false;
@@ -1240,7 +1198,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     
     this.updateAllButtons();
 }, 
-    
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
