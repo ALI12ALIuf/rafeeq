@@ -997,34 +997,28 @@ setupPageFocusListener() {
     },
 
 
-   // ==================== القسم 23: openChat ====================
+    // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
-    // ✅ التحقق من وجود علامة أن الميزات كانت مفعلة ثم توقفت (قبل أي شيء)
-    const wasEnabledBefore = sessionStorage.getItem(`features_was_enabled_${friendId}`) === 'true';
-    console.log(`🔍 التحقق من العلامة للمحادثة ${friendId}: wasEnabledBefore = ${wasEnabledBefore}, featuresEnabled = ${this.featuresEnabled}`);
+    // ✅ التحقق من العلامة في localStorage (بدلاً من sessionStorage)
+    const wasEnabledBefore = localStorage.getItem(`features_was_enabled_${friendId}`) === 'true';
+    console.log(`🔍 التحقق من العلامة للمحادثة ${friendId}: wasEnabledBefore = ${wasEnabledBefore}`);
     
-    if (!this.featuresEnabled && wasEnabledBefore) {
-        console.log(`⚠️ الميزات كانت مفعلة سابقاً وتوقفت للمحادثة ${friendId} - إخراج المستخدم`);
-        sessionStorage.removeItem(`features_was_enabled_${friendId}`);
+    // ✅ إذا كانت العلامة موجودة، نخرج المستخدم دون فتح المحادثة
+    if (wasEnabledBefore) {
+        console.log(`⚠️ تم اكتشاف علامة للمحادثة ${friendId} - إخراج المستخدم`);
+        localStorage.removeItem(`features_was_enabled_${friendId}`);
         
-        // ✅ إخراج المستخدم من المحادثة
-        this.closeChat();
-        
-        // ✅ إظهار إشعار للمستخدم
+        // إظهار إشعار
         const notification = document.createElement('div');
         notification.textContent = '🔄 تم إعادة تعيين المحادثة بسبب انقطاع سابق';
         notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
         document.body.appendChild(notification);
         setTimeout(() => notification.remove(), 3000);
+        
+        // ✅ لا نفتح المحادثة
         return;
-    }
-    
-    // مسح العلامة إذا كانت موجودة والميزات مفعلة (حالة طبيعية)
-    if (wasEnabledBefore) {
-        sessionStorage.removeItem(`features_was_enabled_${friendId}`);
-        console.log(`🧹 تم مسح العلامة القديمة للمحادثة ${friendId}`);
     }
     
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
@@ -1073,10 +1067,10 @@ openChat(friendId, friendName, friendAvatar) {
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
     }, 1000);
-}, 
-    
-    
-  // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+},
+
+
+// ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1123,10 +1117,10 @@ updateFriendStatus(friendId, isOnline, userData = null) {
             if (!this.friendOnline && this.featuresEnabled) {
                 console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
                 
-                // ✅ حفظ علامة أن الميزات كانت مفعلة ثم توقفت (للإخراج عند العودة)
+                // ✅ حفظ علامة في localStorage (بدلاً من sessionStorage)
                 if (this.currentChat) {
-                    sessionStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
-                    console.log(`✅ تم حفظ علامة للمحادثة ${this.currentChat}: كانت الميزات مفعلة وتوقفت`);
+                    localStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
+                    console.log(`✅ تم حفظ علامة للمحادثة ${this.currentChat} في localStorage: كانت الميزات مفعلة وتوقفت`);
                 }
                 
                 // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
@@ -1228,7 +1222,10 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-}, 
+},
+
+
+    
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
