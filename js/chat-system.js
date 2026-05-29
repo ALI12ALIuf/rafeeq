@@ -55,6 +55,9 @@ const ChatSystem = {
         
         console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
     },
+    
+    // ==================== القسم 3: init ====================
+    
 
     // ==================== القسم 3: init ====================
 init() { 
@@ -65,44 +68,6 @@ init() {
     
     // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
     this.cleanMediaMessagesOnLoad();
-    
-    // ✅ كشف عندما يغادر المستخدم التبويب (دون إغلاق المتصفح)
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            console.log('👁️ المستخدم غادر التبويب - بدء عداد 120 ثانية');
-            // إذا كانت الميزات مفعلة، نبدأ عداد محلي
-            if (this.featuresEnabled && this.currentChat) {
-                // حفظ وقت المغادرة
-                sessionStorage.setItem(`tab_hide_time_${this.currentChat}`, Date.now().toString());
-            }
-        } else {
-            console.log('👁️ المستخدم عاد إلى التبويب');
-            // التحقق من وقت المغادرة
-            const hideTime = sessionStorage.getItem(`tab_hide_time_${this.currentChat}`);
-            if (hideTime && this.currentChat) {
-                const timePassed = (Date.now() - parseInt(hideTime)) / 1000;
-                console.log(`⏱️ مضى ${timePassed} ثانية منذ مغادرة التبويب`);
-                
-                if (timePassed >= 120 && this.featuresEnabled) {
-                    console.log('⚠️ مضى 120 ثانية - إلغاء الميزات وإخراج المستخدم');
-                    // ✅ حفظ علامة في localStorage
-                    localStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
-                    // ✅ إغلاق المحادثة
-                    this.closeChat();
-                    
-                    // إظهار إشعار
-                    const notification = document.createElement('div');
-                    notification.textContent = '🔄 تم إعادة تعيين المحادثة بسبب انقطاع طويل';
-                    notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
-                    document.body.appendChild(notification);
-                    setTimeout(() => notification.remove(), 3000);
-                } else if (timePassed < 120 && timePassed > 0) {
-                    console.log(`✅ مضى ${timePassed} ثانية فقط، لا حاجة للإخراج`);
-                }
-                sessionStorage.removeItem(`tab_hide_time_${this.currentChat}`);
-            }
-        }
-    });
 },
 
 // ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
@@ -674,12 +639,6 @@ async handleFeatureResponse(fromId, action) {
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
-    // ✅ حفظ علامة في localStorage (بدلاً من sessionStorage)
-    if (this.currentChat) {
-        localStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
-        console.log(`✅ تم حفظ علامة للمحادثة ${this.currentChat} في localStorage: تم إلغاء الميزات`);
-    }
-    
     // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
     if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
         await CallSystem.deleteAllWebRTCSignals(this.currentChat);
@@ -1036,26 +995,6 @@ setupPageFocusListener() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
-    // ✅ التحقق من العلامة في localStorage (بدلاً من sessionStorage)
-    const wasEnabledBefore = localStorage.getItem(`features_was_enabled_${friendId}`) === 'true';
-    console.log(`🔍 التحقق من العلامة للمحادثة ${friendId}: wasEnabledBefore = ${wasEnabledBefore}`);
-    
-    // ✅ إذا كانت العلامة موجودة، نخرج المستخدم دون فتح المحادثة
-    if (wasEnabledBefore) {
-        console.log(`⚠️ تم اكتشاف علامة للمحادثة ${friendId} - إخراج المستخدم`);
-        localStorage.removeItem(`features_was_enabled_${friendId}`);
-        
-        // إظهار إشعار
-        const notification = document.createElement('div');
-        notification.textContent = '🔄 تم إعادة تعيين المحادثة بسبب انقطاع سابق';
-        notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
-        
-        // ✅ لا نفتح المحادثة
-        return;
-    }
-    
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
         this.friendInConversation = this._pendingConversationStatus[friendId];
         console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
@@ -1082,6 +1021,13 @@ openChat(friendId, friendName, friendAvatar) {
         this.requestConversationStatus();
     }, 1000);
     
+    // ✅ تم إزالة استدعاء ensureDataChannelOnly (لن يتم فتح Data Channel إلا بعد تفعيل الميزات)
+    // setTimeout(() => { 
+    //     if (this.friendOnline) {
+    //         CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
+    //     }
+    // }, 500);
+    
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
@@ -1103,9 +1049,9 @@ openChat(friendId, friendName, friendAvatar) {
         }
     }, 1000);
 },
-
-
-// ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+    
+    
+   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1151,12 +1097,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
                 console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
-                
-                // ✅ حفظ علامة في localStorage (بدلاً من sessionStorage)
-                if (this.currentChat) {
-                    localStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
-                    console.log(`✅ تم حفظ علامة للمحادثة ${this.currentChat} في localStorage: كانت الميزات مفعلة وتوقفت`);
-                }
                 
                 // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
@@ -1257,10 +1197,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-},
-
-
-    
+}, 
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
