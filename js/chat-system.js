@@ -991,7 +991,7 @@ setupPageFocusListener() {
     },
 
 
-    // ==================== القسم 23: openChat ====================
+// ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
@@ -1012,7 +1012,9 @@ openChat(friendId, friendName, friendAvatar) {
             console.log(`⏰ متبقي ${remaining} ثانية من المهلة - استئناف العداد`);
             localStorage.removeItem('offline_timer_start');
             localStorage.removeItem('offline_timer_chat');
-            // سنبدأ العداد بالمتبقي عبر updateFriendStatus
+            // ✅ استئناف العداد بالمدة المتبقية
+            this.startOfflineTimerWithRemaining(remaining);
+            return; // منع فتح المحادثة حتى انتهاء العداد
         }
     }
     
