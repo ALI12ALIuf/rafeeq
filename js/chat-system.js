@@ -991,32 +991,9 @@ setupPageFocusListener() {
     },
 
 
-// ==================== القسم 23: openChat ====================
+    // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
-    
-    // ✅ التحقق من وجود عداد قديم في localStorage
-    const timerStart = localStorage.getItem('offline_timer_start');
-    const timerChat = localStorage.getItem('offline_timer_chat');
-    
-    if (timerStart && timerChat === friendId) {
-        const elapsed = (Date.now() - parseInt(timerStart)) / 1000;
-        if (elapsed >= 120) {
-            console.log('⏰ انتهت مهلة 120 ثانية - إخراج المستخدم تلقائياً');
-            localStorage.removeItem('offline_timer_start');
-            localStorage.removeItem('offline_timer_chat');
-            this.closeChat();
-            return;
-        } else if (elapsed > 0) {
-            const remaining = Math.ceil(120 - elapsed);
-            console.log(`⏰ متبقي ${remaining} ثانية من المهلة - استئناف العداد`);
-            localStorage.removeItem('offline_timer_start');
-            localStorage.removeItem('offline_timer_chat');
-            // ✅ استئناف العداد بالمدة المتبقية
-            this.startOfflineTimerWithRemaining(remaining);
-            return; // منع فتح المحادثة حتى انتهاء العداد
-        }
-    }
     
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
         this.friendInConversation = this._pendingConversationStatus[friendId];
@@ -1072,10 +1049,9 @@ openChat(friendId, friendName, friendAvatar) {
         }
     }, 1000);
 },
-
-
-
-    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+    
+    
+   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1100,11 +1076,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.offlineStartTime = Date.now();
         this.friendOnline = false;
         
-        // ✅ حفظ وقت بدء العداد في localStorage (للعودة بعد إغلاق المتصفح)
-        localStorage.setItem('offline_timer_start', this.offlineStartTime.toString());
-        localStorage.setItem('offline_timer_chat', this.currentChat);
-        console.log('💾 تم حفظ وقت بدء العداد في localStorage');
-        
         let secondsLeft = 120;
         const statusEl = document.getElementById('conversationStatus');
         
@@ -1126,10 +1097,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
                 console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
-                
-                // ✅ مسح localStorage
-                localStorage.removeItem('offline_timer_start');
-                localStorage.removeItem('offline_timer_chat');
                 
                 // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
@@ -1187,10 +1154,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {
         console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
         
-        // ✅ مسح localStorage
-        localStorage.removeItem('offline_timer_start');
-        localStorage.removeItem('offline_timer_chat');
-        
         if (this.offlineTimer) clearTimeout(this.offlineTimer);
         if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
         
@@ -1234,49 +1197,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-},
-
-
-// ==================== القسم 24.5: استئناف العداد بمدة متبقية (دالة مساعدة) ====================
-startOfflineTimerWithRemaining(secondsLeft) {
-    if (this.offlineTimer) clearTimeout(this.offlineTimer);
-    if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
-    
-    this.friendOnline = false;
-    this.offlineStartTime = Date.now();
-    
-    const statusEl = document.getElementById('conversationStatus');
-    
-    const updateCountdown = () => {
-        if (statusEl) {
-            statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
-            statusEl.className = 'conversation-status offline-temp';
-        }
-        secondsLeft--;
-        if (secondsLeft < 0) {
-            clearInterval(this.offlineCountdownInterval);
-            this.offlineCountdownInterval = null;
-            // انتهاء الوقت - إخراج المستخدم
-            console.log('🔴 انتهت المهلة - إخراج المستخدم من المحادثة');
-            this.closeChat();
-            this.featuresEnabled = false;
-            this.updateAllButtons();
-        }
-    };
-    
-    updateCountdown();
-    this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
-    
-    this.offlineTimer = setTimeout(() => {
-        if (!this.friendOnline && this.featuresEnabled) {
-            this.closeChat();
-            this.featuresEnabled = false;
-            this.updateAllButtons();
-        }
-        this.offlineTimer = null;
-    }, secondsLeft * 1000);
-},
-    
+}, 
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
