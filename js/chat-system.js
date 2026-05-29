@@ -1034,7 +1034,7 @@ openChat(friendId, friendName, friendAvatar) {
 }, 
     
     
-    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1079,9 +1079,22 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
-                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات محلياً');
-                // ✅ تم إزالة إرسال feature_cancel (لم نعد نرسلها عبر Firebase)
+                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
                 
+                // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
+                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                    try {
+                        CallSystem.dc.send(JSON.stringify({ 
+                            type: 'force_disable_features',
+                            timestamp: Date.now()
+                        }));
+                        console.log('✅ تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر');
+                    } catch(e) {
+                        console.error('❌ فشل إرسال إشارة الإلغاء:', e);
+                    }
+                }
+                
+                // ✅ إلغاء الميزات محلياً
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
                 this.featureRequestReceived = false;
@@ -1096,6 +1109,10 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                     btn.style.background = '#f44336';
                     btn.title = 'تفعيل الميزات';
                 }
+                
+                // ✅ تحديث زر التفعيل
+                const toggleInput = document.getElementById('featureToggleInput');
+                if (toggleInput) toggleInput.checked = false;
                 
                 this.updateAllButtons();
             }
@@ -1163,7 +1180,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-},
+}, 
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
