@@ -1001,6 +1001,25 @@ setupPageFocusListener() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
+    // ✅ التحقق من وجود علامة أن الميزات كانت مفعلة ثم توقفت
+    const wasEnabledBefore = sessionStorage.getItem(`features_was_enabled_${friendId}`) === 'true';
+    
+    if (!this.featuresEnabled && wasEnabledBefore) {
+        console.log(`⚠️ الميزات كانت مفعلة سابقاً وتوقفت للمحادثة ${friendId} - إخراج المستخدم`);
+        sessionStorage.removeItem(`features_was_enabled_${friendId}`);
+        
+        // ✅ إخراج المستخدم من المحادثة
+        this.closeChat();
+        
+        // ✅ إظهار إشعار للمستخدم
+        const notification = document.createElement('div');
+        notification.textContent = '🔄 تم إعادة تعيين المحادثة بسبب انقطاع سابق';
+        notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+        return;
+    }
+    
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
         this.friendInConversation = this._pendingConversationStatus[friendId];
         console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
@@ -1057,7 +1076,7 @@ openChat(friendId, friendName, friendAvatar) {
 },
     
     
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+  // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1103,6 +1122,12 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
                 console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
+                
+                // ✅ حفظ علامة أن الميزات كانت مفعلة ثم توقفت (للإخراج عند العودة)
+                if (this.currentChat) {
+                    sessionStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
+                    console.log(`✅ تم حفظ علامة للمحادثة ${this.currentChat}: كانت الميزات مفعلة وتوقفت`);
+                }
                 
                 // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
