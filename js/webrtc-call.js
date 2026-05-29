@@ -278,7 +278,7 @@ const CallSystem = {
             
             this.pc.onconnectionstatechange = () => {
                 console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                if (this.pc && (thisshowIncomingCallomingCallnectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
                     this.endCall();
                 }
             };
@@ -897,6 +897,30 @@ setupDataChannel(channel) {
                         kickBtn.style.opacity = '0.5';
                         kickBtn.style.pointerEvents = 'none';
                     }
+                }
+                return;
+            }
+            
+            // ✅✅✅ معالجة إشارة إلغاء الميزات المباشرة (عبر Data Channel)
+            if (msg.type === 'force_disable_features') {
+                console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
+                if (ChatSystem.currentChat) {
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    ChatSystem.featuresEnabled = false;
+                    ChatSystem.featureRequestPending = false;
+                    ChatSystem.featureRequestReceived = false;
+                    
+                    const toggleInput = document.getElementById('featureToggleInput');
+                    if (toggleInput) toggleInput.checked = false;
+                    
+                    const kickBtn = document.getElementById('kickBtn');
+                    if (kickBtn) {
+                        kickBtn.classList.remove('active');
+                        kickBtn.style.opacity = '0.5';
+                        kickBtn.style.pointerEvents = 'none';
+                    }
+                    
+                    ChatSystem.updateAllButtons();
                 }
                 return;
             }
