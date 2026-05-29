@@ -56,10 +56,7 @@ const ChatSystem = {
         console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
     },
     
-    // ==================== القسم 3: init ====================
-    
-
-    // ==================== القسم 3: init ====================
+   // ==================== القسم 3: init ====================
 init() { 
     this.loadAllChats(); 
     this.setupPageFocusListener();
@@ -68,7 +65,16 @@ init() {
     
     // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
     this.cleanMediaMessagesOnLoad();
-},
+    
+    // ✅ إضافة متغير لتتبع حالة التبويب (مخفي/مرئي)
+    this.isTabHidden = false;
+    
+    // ✅ كشف عندما يغادر المستخدم التبويب أو يعود إليه
+    document.addEventListener('visibilitychange', () => {
+        this.isTabHidden = document.hidden;
+        console.log(`👁️ تغيير حالة التبويب: ${this.isTabHidden ? '🟡 مخفي (المستخدم خارج المتصفح)' : '🟢 مرئي (المستخدم داخل المحادثة)'}`);
+    });
+}, 
 
 // ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
 cleanMediaMessagesOnLoad() {
@@ -1050,8 +1056,8 @@ openChat(friendId, friendName, friendAvatar) {
     }, 1000);
 },
     
-    
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+
+    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1074,7 +1080,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.friendOnline = false;
         
         let secondsLeft = 120;
-        let signalSent115 = false; // ✅ متغير لمنع إرسال الإشارة أكثر من مرة
+        let signalSent115 = false;
         const statusEl = document.getElementById('conversationStatus');
         
         const updateCountdown = () => {
@@ -1083,10 +1089,10 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 statusEl.className = 'conversation-status offline-temp';
             }
             
-            // ✅ عند الوصول إلى 115 ثانية، أرسل إشارة الخروج
-            if (secondsLeft === 115 && !signalSent115 && this.featuresEnabled) {
+            // ✅ عند الوصول إلى 115 ثانية، أرسل إشارة الخروج (إذا كان التبويب مخفياً)
+            if (secondsLeft === 115 && !signalSent115 && this.featuresEnabled && this.isTabHidden) {
                 signalSent115 = true;
-                console.log('⏰ 115 ثانية - إرسال إشارة الخروج إلى الطرف الآخر');
+                console.log('⏰ 115 ثانية والتبويب مخفي - إرسال إشارة الخروج إلى الطرف الآخر');
                 
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
                     try {
@@ -1113,12 +1119,15 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
-                console.log('🔴 120 ثانية - إخراج المستخدم من المحادثة');
+                // ✅ يخرج فقط إذا كان التبويب مخفياً (المستخدم خارج المتصفح)
+                if (this.isTabHidden) {
+                    console.log('🔴 120 ثانية والتبويب مخفي - إخراج المستخدم من المحادثة');
+                    this.closeChat();
+                } else {
+                    console.log('⚠️ 120 ثانية ولكن التبويب مرئي - إلغاء الميزات فقط (لا خروج)');
+                }
                 
-                // ✅ إخراج المستخدم (المرسل)
-                this.closeChat();
-                
-                // ✅ إلغاء الميزات محلياً
+                // ✅ إلغاء الميزات محلياً (في كلتا الحالتين)
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
                 this.featureRequestReceived = false;
@@ -1198,7 +1207,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     
     this.updateAllButtons();
 },
-    
 
     
     // ==================== القسم 25: displayMessages ====================
