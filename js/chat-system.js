@@ -639,6 +639,12 @@ async handleFeatureResponse(fromId, action) {
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
+    // ✅ حفظ علامة أن الميزات كانت مفعلة ثم توقفت (للإخراج عند العودة)
+    if (this.currentChat) {
+        sessionStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
+        console.log(`✅ تم حفظ علامة للمحادثة ${this.currentChat}: كانت الميزات مفعلة`);
+    }
+    
     // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
     if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
         await CallSystem.deleteAllWebRTCSignals(this.currentChat);
