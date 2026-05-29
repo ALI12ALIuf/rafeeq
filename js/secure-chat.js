@@ -319,9 +319,6 @@ const SecureChatSystem = {
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
                     console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
                     
-                    // ✅ إغلاق المحادثة (إخراج المستخدم)
-                    ChatSystem.closeChat();
-                    
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
                     ChatSystem.featureRequestReceived = false;
