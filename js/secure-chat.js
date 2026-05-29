@@ -312,6 +312,30 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
+            // ==================== القسم 100: معالجة إشارة إلغاء الميزات (force_disable_features) ====================
+            else if (msg.package.type === 'force_disable_features') {
+                console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
+                
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    
+                    ChatSystem.featuresEnabled = false;
+                    ChatSystem.featureRequestPending = false;
+                    ChatSystem.featureRequestReceived = false;
+                    
+                    const toggleInput = document.getElementById('featureToggleInput');
+                    if (toggleInput) toggleInput.checked = false;
+                    
+                    const kickBtn = document.getElementById('kickBtn');
+                    if (kickBtn) {
+                        kickBtn.classList.remove('active');
+                        kickBtn.style.opacity = '0.5';
+                        kickBtn.style.pointerEvents = 'none';
+                    }
+                    
+                    ChatSystem.updateAllButtons();
+                }
+            }
             else if (msg.package.type === 'location') {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
