@@ -905,7 +905,7 @@ setupDataChannel(channel) {
             if (msg.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر');
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
                     ChatSystem.featureRequestReceived = false;
@@ -969,6 +969,12 @@ setupDataChannel(channel) {
             this.keepAliveInterval = null;
         }
         this.scheduleReconnect();
+        
+        // ✅✅✅ إغلاق المحادثة فور انقطاع القناة (بدون انتظار 120 ثانية)
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('🔌 انقطاع القناة - إغلاق المحادثة فوراً');
+            ChatSystem.closeChat();
+        }
         
         if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
@@ -1186,7 +1192,7 @@ async sendSignal(calleeId, data) {
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
-},
+}, 
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
