@@ -55,9 +55,6 @@ const ChatSystem = {
         
         console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
     },
-    
-    // ==================== القسم 3: init ====================
-    
 
     // ==================== القسم 3: init ====================
 init() { 
@@ -68,6 +65,44 @@ init() {
     
     // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
     this.cleanMediaMessagesOnLoad();
+    
+    // ✅ كشف عندما يغادر المستخدم التبويب (دون إغلاق المتصفح)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            console.log('👁️ المستخدم غادر التبويب - بدء عداد 120 ثانية');
+            // إذا كانت الميزات مفعلة، نبدأ عداد محلي
+            if (this.featuresEnabled && this.currentChat) {
+                // حفظ وقت المغادرة
+                sessionStorage.setItem(`tab_hide_time_${this.currentChat}`, Date.now().toString());
+            }
+        } else {
+            console.log('👁️ المستخدم عاد إلى التبويب');
+            // التحقق من وقت المغادرة
+            const hideTime = sessionStorage.getItem(`tab_hide_time_${this.currentChat}`);
+            if (hideTime && this.currentChat) {
+                const timePassed = (Date.now() - parseInt(hideTime)) / 1000;
+                console.log(`⏱️ مضى ${timePassed} ثانية منذ مغادرة التبويب`);
+                
+                if (timePassed >= 120 && this.featuresEnabled) {
+                    console.log('⚠️ مضى 120 ثانية - إلغاء الميزات وإخراج المستخدم');
+                    // ✅ حفظ علامة في localStorage
+                    localStorage.setItem(`features_was_enabled_${this.currentChat}`, 'true');
+                    // ✅ إغلاق المحادثة
+                    this.closeChat();
+                    
+                    // إظهار إشعار
+                    const notification = document.createElement('div');
+                    notification.textContent = '🔄 تم إعادة تعيين المحادثة بسبب انقطاع طويل';
+                    notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                } else if (timePassed < 120 && timePassed > 0) {
+                    console.log(`✅ مضى ${timePassed} ثانية فقط، لا حاجة للإخراج`);
+                }
+                sessionStorage.removeItem(`tab_hide_time_${this.currentChat}`);
+            }
+        }
+    });
 },
 
 // ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
