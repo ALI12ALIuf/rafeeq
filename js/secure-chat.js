@@ -336,34 +336,6 @@ const SecureChatSystem = {
                     ChatSystem.updateAllButtons();
                 }
             }
-            // ==================== القسم 101: معالجة إشارة الخروج عند 115 ثانية ====================
-            else if (msg.package.type === 'force_close_conversation_at_115') {
-                console.log('⏰ استلام إشارة خروج (115 ثانية) من:', msg.from);
-                
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('🚪 تم إخراجك من المحادثة بناءً على طلب الطرف الآخر');
-                    
-                    // ✅ إخراج المستخدم من المحادثة
-                    ChatSystem.closeChat();
-                    
-                    // ✅ إعادة تعيين الميزات
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
-                    }
-                    
-                    ChatSystem.updateAllButtons();
-                }
-            }
             else if (msg.package.type === 'location') {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
