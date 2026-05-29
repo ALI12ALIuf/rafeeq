@@ -56,6 +56,7 @@ const ChatSystem = {
         console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
     },
     
+    // ==================== القسم 3: init ====================
     
 
     // ==================== القسم 3: init ====================
@@ -1050,7 +1051,7 @@ openChat(friendId, friendName, friendAvatar) {
 },
     
     
-  // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1093,34 +1094,24 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         updateCountdown();
         this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
         
-        // ✅ إرسال إشارة إلغاء الميزات عند 110 ثانية (عبر Data Channel فقط)
-        const signalTimer = setTimeout(() => {
+        this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
-                console.log('⚠️ 110 ثانية - إرسال إشارة إلغاء الميزات إلى الطرف الآخر');
+                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
                 
+                // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
                     try {
                         CallSystem.dc.send(JSON.stringify({ 
                             type: 'force_disable_features',
                             timestamp: Date.now()
                         }));
-                        console.log('✅ تم إرسال إشارة إلغاء الميزات عبر Data Channel');
+                        console.log('✅ تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر');
                     } catch(e) {
                         console.error('❌ فشل إرسال إشارة الإلغاء:', e);
                     }
                 }
-            }
-        }, 110000); // 110 ثانية
-        
-        // ✅ إغلاق المحادثة عند 120 ثانية
-        this.offlineTimer = setTimeout(() => {
-            if (!this.friendOnline && this.featuresEnabled) {
-                console.log('🔴 120 ثانية - إخراج المستخدم من المحادثة تلقائياً');
                 
-                // ✅ إغلاق المحادثة (إخراج المستخدم)
-                this.closeChat();
-                
-                // ✅ إعادة تعيين الميزات محلياً
+                // ✅ إلغاء الميزات محلياً
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
                 this.featureRequestReceived = false;
@@ -1141,8 +1132,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 if (toggleInput) toggleInput.checked = false;
                 
                 this.updateAllButtons();
-                
-                console.log('✅ تم إخراج المستخدم من المحادثة تلقائياً بعد 120 ثانية');
             }
             
             if (this.offlineCountdownInterval) {
@@ -1208,7 +1197,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-},
+}, 
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
