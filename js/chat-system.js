@@ -56,7 +56,6 @@ const ChatSystem = {
         console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
     },
     
-    // ==================== القسم 3: init ====================
     
 
     // ==================== القسم 3: init ====================
@@ -1051,7 +1050,7 @@ openChat(friendId, friendName, friendAvatar) {
 },
     
     
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+  // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1096,7 +1095,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
-                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
+                console.log('🔴 120 ثانية وما رجع - إخراج المستخدم من المحادثة تلقائياً');
                 
                 // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
@@ -1111,7 +1110,15 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                     }
                 }
                 
-                // ✅ إلغاء الميزات محلياً
+                // ✅ حفظ معلومات المحادثة قبل الإغلاق
+                const chatId = this.currentChat;
+                const chatName = document.getElementById('conversationName')?.textContent;
+                const chatAvatar = document.getElementById('conversationAvatar')?.textContent;
+                
+                // ✅ إغلاق المحادثة (إخراج المستخدم)
+                this.closeChat();
+                
+                // ✅ إعادة تعيين الميزات محلياً
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
                 this.featureRequestReceived = false;
@@ -1132,6 +1139,8 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 if (toggleInput) toggleInput.checked = false;
                 
                 this.updateAllButtons();
+                
+                console.log('✅ تم إخراج المستخدم من المحادثة تلقائياً بعد 120 ثانية');
             }
             
             if (this.offlineCountdownInterval) {
