@@ -73,8 +73,24 @@ init() {
     document.addEventListener('visibilitychange', () => {
         this.isTabHidden = document.hidden;
         console.log(`👁️ تغيير حالة التبويب: ${this.isTabHidden ? '🟡 مخفي (المستخدم خارج المتصفح)' : '🟢 مرئي (المستخدم داخل المحادثة)'}`);
+        
+        // ✅ إذا عاد المستخدم إلى التبويب وكان العداد يعمل، قم بإلغائه
+        if (!this.isTabHidden && this.offlineTimer) {
+            console.log('🔄 المستخدم عاد إلى التبويب - إلغاء العداد');
+            clearTimeout(this.offlineTimer);
+            clearInterval(this.offlineCountdownInterval);
+            this.offlineTimer = null;
+            this.offlineCountdownInterval = null;
+            
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl && this.friendOnline === false && this.featuresEnabled) {
+                statusEl.innerHTML = '🟢 متصل';
+                statusEl.className = 'conversation-status online';
+                this.friendOnline = true;
+            }
+        }
     });
-}, 
+},
 
 // ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
 cleanMediaMessagesOnLoad() {
@@ -97,6 +113,10 @@ cleanMediaMessagesOnLoad() {
     // ==================== القسم 4: setupBeforeUnloadListener (تم حذف sendFeatureCancelBeforeUnload) ====================
 setupBeforeUnloadListener() {
     window.addEventListener('beforeunload', () => {
+        // ✅ عند إغلاق المتصفح أو التبويب، اعتبر التبويب مخفياً
+        this.isTabHidden = true;
+        console.log('🚪 الصفحة تغلق - تم تعيين isTabHidden = true');
+        
         if (this.currentChat && this.featuresEnabled) {
             console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات محلياً');
             // ✅ لم نعد نرسل إشارة feature_cancel عبر Firebase
