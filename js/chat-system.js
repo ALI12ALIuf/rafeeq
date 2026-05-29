@@ -997,12 +997,13 @@ setupPageFocusListener() {
     },
 
 
-    // ==================== القسم 23: openChat ====================
+   // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
-    // ✅ التحقق من وجود علامة أن الميزات كانت مفعلة ثم توقفت
+    // ✅ التحقق من وجود علامة أن الميزات كانت مفعلة ثم توقفت (قبل أي شيء)
     const wasEnabledBefore = sessionStorage.getItem(`features_was_enabled_${friendId}`) === 'true';
+    console.log(`🔍 التحقق من العلامة للمحادثة ${friendId}: wasEnabledBefore = ${wasEnabledBefore}, featuresEnabled = ${this.featuresEnabled}`);
     
     if (!this.featuresEnabled && wasEnabledBefore) {
         console.log(`⚠️ الميزات كانت مفعلة سابقاً وتوقفت للمحادثة ${friendId} - إخراج المستخدم`);
@@ -1018,6 +1019,12 @@ openChat(friendId, friendName, friendAvatar) {
         document.body.appendChild(notification);
         setTimeout(() => notification.remove(), 3000);
         return;
+    }
+    
+    // مسح العلامة إذا كانت موجودة والميزات مفعلة (حالة طبيعية)
+    if (wasEnabledBefore) {
+        sessionStorage.removeItem(`features_was_enabled_${friendId}`);
+        console.log(`🧹 تم مسح العلامة القديمة للمحادثة ${friendId}`);
     }
     
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
@@ -1046,13 +1053,6 @@ openChat(friendId, friendName, friendAvatar) {
         this.requestConversationStatus();
     }, 1000);
     
-    // ✅ تم إزالة استدعاء ensureDataChannelOnly (لن يتم فتح Data Channel إلا بعد تفعيل الميزات)
-    // setTimeout(() => { 
-    //     if (this.friendOnline) {
-    //         CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
-    //     }
-    // }, 500);
-    
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
@@ -1073,7 +1073,7 @@ openChat(friendId, friendName, friendAvatar) {
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
     }, 1000);
-},
+}, 
     
     
   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
