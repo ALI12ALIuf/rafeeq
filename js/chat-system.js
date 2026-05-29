@@ -1032,28 +1032,17 @@ setupPageFocusListener() {
     },
 
 
-    // ==================== القسم 23: openChat ====================
+   // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
-    // ✅ التحقق من العلامة في localStorage (بدلاً من sessionStorage)
+    // ✅ التحقق من العلامة - فقط نمسحها ولا نمنع فتح المحادثة
     const wasEnabledBefore = localStorage.getItem(`features_was_enabled_${friendId}`) === 'true';
-    console.log(`🔍 التحقق من العلامة للمحادثة ${friendId}: wasEnabledBefore = ${wasEnabledBefore}`);
     
-    // ✅ إذا كانت العلامة موجودة، نخرج المستخدم دون فتح المحادثة
     if (wasEnabledBefore) {
-        console.log(`⚠️ تم اكتشاف علامة للمحادثة ${friendId} - إخراج المستخدم`);
+        console.log(`⚠️ تم اكتشاف علامة للمحادثة ${friendId} - سيتم مسحها فقط`);
         localStorage.removeItem(`features_was_enabled_${friendId}`);
-        
-        // إظهار إشعار
-        const notification = document.createElement('div');
-        notification.textContent = '🔄 تم إعادة تعيين المحادثة بسبب انقطاع سابق';
-        notification.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:10px 20px;border-radius:30px;z-index:10000;font-size:0.9rem;animation:fadeOut 3s forwards;';
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
-        
-        // ✅ لا نفتح المحادثة
-        return;
+        // ✅ لا نمنع فتح المحادثة، نكمل طبيعياً
     }
     
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
@@ -1102,7 +1091,7 @@ openChat(friendId, friendName, friendAvatar) {
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
     }, 1000);
-},
+}, 
 
 
 // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
