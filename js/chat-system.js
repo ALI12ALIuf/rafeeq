@@ -1057,7 +1057,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     
     // الحالة 1: الشخص غير متصل
     if (!isOnline) {
-        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة) → أحمر مباشر
         if (!this.featuresEnabled) {
             this.friendOnline = false;
             const statusEl = document.getElementById('conversationStatus');
@@ -1068,8 +1067,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
             return;
         }
         
-        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
-        // نبدأ العداد الأصفر 120 ثانية
         if (this.offlineTimer) clearTimeout(this.offlineTimer);
         if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
         
@@ -1077,6 +1074,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.friendOnline = false;
         
         let secondsLeft = 120;
+        let signalSent115 = false; // ✅ متغير لمنع إرسال الإشارة أكثر من مرة
         const statusEl = document.getElementById('conversationStatus');
         
         const updateCountdown = () => {
@@ -1084,6 +1082,25 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
                 statusEl.className = 'conversation-status offline-temp';
             }
+            
+            // ✅ عند الوصول إلى 115 ثانية، أرسل إشارة الخروج
+            if (secondsLeft === 115 && !signalSent115 && this.featuresEnabled) {
+                signalSent115 = true;
+                console.log('⏰ 115 ثانية - إرسال إشارة الخروج إلى الطرف الآخر');
+                
+                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                    try {
+                        CallSystem.dc.send(JSON.stringify({ 
+                            type: 'force_close_conversation_at_115',
+                            timestamp: Date.now()
+                        }));
+                        console.log('✅ تم إرسال إشارة الخروج إلى الطرف الآخر');
+                    } catch(e) {
+                        console.error('❌ فشل إرسال إشارة الخروج:', e);
+                    }
+                }
+            }
+            
             secondsLeft--;
             if (secondsLeft < 0) {
                 clearInterval(this.offlineCountdownInterval);
@@ -1096,20 +1113,10 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
-                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
+                console.log('🔴 120 ثانية - إخراج المستخدم من المحادثة');
                 
-                // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
-                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-                    try {
-                        CallSystem.dc.send(JSON.stringify({ 
-                            type: 'force_disable_features',
-                            timestamp: Date.now()
-                        }));
-                        console.log('✅ تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر');
-                    } catch(e) {
-                        console.error('❌ فشل إرسال إشارة الإلغاء:', e);
-                    }
-                }
+                // ✅ إخراج المستخدم (المرسل)
+                this.closeChat();
                 
                 // ✅ إلغاء الميزات محلياً
                 this.featuresEnabled = false;
@@ -1121,13 +1128,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                     this.featureBlinkInterval = null;
                 }
                 
-                const btn = document.getElementById('enableFeaturesBtn');
-                if (btn) {
-                    btn.style.background = '#f44336';
-                    btn.title = 'تفعيل الميزات';
-                }
-                
-                // ✅ تحديث زر التفعيل
                 const toggleInput = document.getElementById('featureToggleInput');
                 if (toggleInput) toggleInput.checked = false;
                 
@@ -1150,7 +1150,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         return;
     }
     
-    // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
+    // الحالة 2: الشخص رجع متصل خلال 120 ثانية
     if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {
         console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
         
@@ -1169,7 +1169,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         return;
     }
     
-    // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
+    // الحالة 3: الوضع الطبيعي
     this.friendOnline = isOnline;
     
     if (!userData && window.auth?.currentUser) {
@@ -1197,7 +1197,9 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-}, 
+},
+    
+
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
