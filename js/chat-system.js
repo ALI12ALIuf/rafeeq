@@ -29,15 +29,12 @@ const ChatSystem = {
     offlineTimer: null,
     offlineCountdownInterval: null,
     
-    // ✅ متغير تتبع نشاط المستخدم (لحماية المستخدم النشط من الطرد)
-    userIsActive: true,
+    // ✅ متغيرات تتبع تفاعل المستخدم (لحماية المستخدم النشط من الطرد)
+    userIsInteracting: true,
+    lastInteractionTime: null,
+    interactionTimeout: null,
     
-    // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
-    updateFeatureToggleUI() {
-        // ... موجود مسبقاً
-    },
-    
-    // ==================== القسم 3: init ====================
+
     
     // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
     updateFeatureToggleUI() {
@@ -82,27 +79,48 @@ init() {
 
 // ==================== القسم 3.6: تتبع نشاط المستخدم ====================
 setupUserActivityTracking() {
+    // تحديث وقت آخر تفاعل
+    const updateInteraction = () => {
+        this.userIsInteracting = true;
+        this.lastInteractionTime = Date.now();
+        console.log('🖱️ المستخدم يتفاعل');
+        
+        // بعد 5 ثوانٍ من عدم التفاعل، نعتبره غير متفاعل
+        if (this.interactionTimeout) clearTimeout(this.interactionTimeout);
+        this.interactionTimeout = setTimeout(() => {
+            if (Date.now() - this.lastInteractionTime > 5000) {
+                this.userIsInteracting = false;
+                console.log('💤 المستخدم توقف عن التفاعل');
+            }
+        }, 5000);
+    };
+    
+    // أحداث التفاعل (الماوس، الكيبورد، اللمس)
+    window.addEventListener('mousemove', updateInteraction);
+    window.addEventListener('click', updateInteraction);
+    window.addEventListener('keydown', updateInteraction);
+    window.addEventListener('touchstart', updateInteraction);
+    window.addEventListener('scroll', updateInteraction);
+    
     // تحديث الحالة عند تغيير علامة التبويب
     document.addEventListener('visibilitychange', () => {
-        this.userIsActive = !document.hidden;
-        console.log(`👁️ نشاط المستخدم: ${this.userIsActive ? 'نشط' : 'غير نشط'}`);
+        if (!document.hidden) {
+            updateInteraction();
+        } else {
+            this.userIsInteracting = false;
+            console.log('💤 التبويب غير مرئي');
+        }
     });
     
     // تحديث الحالة عند التركيز على النافذة
     window.addEventListener('focus', () => {
-        this.userIsActive = true;
-        console.log('👁️ المستخدم نشط (focus)');
+        updateInteraction();
     });
     
-    // تحديث الحالة عند فقدان التركيز
-    window.addEventListener('blur', () => {
-        this.userIsActive = false;
-        console.log('👁️ المستخدم غير نشط (blur)');
-    });
-    
-    // ✅ تحديث أولي
-    this.userIsActive = !document.hidden;
-    console.log(`👁️ حالة النشاط الأولية: ${this.userIsActive ? 'نشط' : 'غير نشط'}`);
+    // تحديث أولي
+    this.userIsInteracting = true;
+    this.lastInteractionTime = Date.now();
+    console.log('🖱️ تتبع التفاعل بدأ');
 },
 
 
@@ -1087,7 +1105,7 @@ openChat(friendId, friendName, friendAvatar) {
 },
     
 
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+  // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
@@ -1132,15 +1150,15 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         
         this.offlineTimer = setTimeout(() => {
             if (!this.friendOnline && this.featuresEnabled) {
-                // ✅✅ التحقق من نشاط المستخدم الحالي
-                const isUserActive = !document.hidden;
+                // ✅✅ التحقق من تفاعل المستخدم الفعلي
+                const isUserInteracting = this.userIsInteracting;
                 
-                if (isUserActive) {
-                    console.log('⚠️ 120 ثانية لكن المستخدم نشط في المتصفح - إلغاء الميزات فقط (بدون إخراج)');
+                if (isUserInteracting) {
+                    console.log('⚠️ 120 ثانية لكن المستخدم يتفاعل - إلغاء الميزات فقط (بدون إخراج)');
                 } else {
-                    console.log('🔴 120 ثانية والمستخدم غير نشط - إخراج المستخدم من المحادثة');
+                    console.log('🔴 120 ثانية والمستخدم لا يتفاعل - إخراج المستخدم من المحادثة');
                     
-                    // ✅ إخراج المستخدم من المحادثة (فقط إذا كان غير نشط)
+                    // ✅ إخراج المستخدم من المحادثة (فقط إذا كان لا يتفاعل)
                     this.closeChat();
                 }
                 
@@ -1243,7 +1261,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-},
+}, 
     
     
     // ==================== القسم 25: displayMessages ====================
