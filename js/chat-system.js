@@ -990,6 +990,7 @@ setupPageFocusListener() {
         this.updateAllButtons();
     },
 
+
     // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
@@ -1031,7 +1032,23 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
     setTimeout(() => this.setupFeatureButton(), 500);
-}, 
+    
+    // ✅ إذا كانت الميزات مفعلة ولكن Data Channel مغلق، أعد تعيين الميزات
+    setTimeout(() => {
+        if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
+            console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
+            this.featuresEnabled = false;
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            const toggleInput = document.getElementById('featureToggleInput');
+            if (toggleInput) toggleInput.checked = false;
+            
+            this.updateAllButtons();
+            console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
+        }
+    }, 1000);
+},
     
     
    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
