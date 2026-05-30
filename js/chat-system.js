@@ -1,47 +1,32 @@
 // ========== chat-system.js ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
-// ==================== القسم 1: تعريف PresenceSystem (محلي فقط - لا يرسل إلى Firestore) ====================
+// ==================== القسم 1: تعريف PresenceSystem (معطل نهائياً - لا يقرأ ولا يكتب إلى Firestore) ====================
 const PresenceSystem = {
     listeners: {}, heartbeatInterval: null,
     async setOnline() { 
-        // ✅ لا نرسل إلى Firestore، فقط نبدأ heartbeat محلياً
-        this.startHeartbeat(); 
+        // ✅ معطل نهائياً - لا يرسل أي شيء إلى Firestore
+        return; 
     },
     async setOffline() { 
-        this.stopHeartbeat(); 
+        // ✅ معطل نهائياً - لا يرسل أي شيء إلى Firestore
+        return; 
     },
     startHeartbeat() { 
-        this.stopHeartbeat(); 
-        this.heartbeatInterval = setInterval(() => { 
-            // ✅ لا نرسل إلى Firestore، فقط نحدث محلياً إذا أردت
-        }, 30000); 
+        // ✅ معطل نهائياً
+        return; 
     },
     stopHeartbeat() { 
-        if (this.heartbeatInterval) { 
-            clearInterval(this.heartbeatInterval); 
-            this.heartbeatInterval = null; 
-        } 
+        // ✅ معطل نهائياً
+        return; 
     },
     watchFriend(friendId) { 
-        if (!friendId) return; 
-        if (this.listeners[friendId]) this.listeners[friendId](); 
-        // ✅ نستمع للتغييرات المحلية فقط (لا نرسل إلى Firestore)
-        this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { 
-            if (doc.exists) {
-                // ✅ نستخدم البيانات من Firestore ولكن لا نرسل تحديثات من جانبنا
-                ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data());
-            } else {
-                ChatSystem.updateFriendStatus(friendId, false);
-            }
-        }, () => {}); 
+        // ✅ معطل نهائياً - لا يقرأ من Firestore
+        return; 
     },
     stopAll() { 
-        Object.values(this.listeners).forEach(unsub => { 
-            if (typeof unsub === 'function') unsub(); 
-        }); 
-        this.listeners = {}; 
-        this.stopHeartbeat(); 
+        // ✅ معطل نهائياً
+        return; 
     }
 };
 
