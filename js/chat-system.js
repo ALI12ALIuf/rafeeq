@@ -1,15 +1,33 @@
 // ========== chat-system.js ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
-// ==================== القسم 1: تعريف PresenceSystem ====================
+// ==================== القسم 1: تعريف PresenceSystem (معطل بالكامل - لا يرسل أي بيانات إلى Firestore) ====================
 const PresenceSystem = {
     listeners: {}, heartbeatInterval: null,
-    async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
-    async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
-    startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
-    stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
-    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data()); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
-    stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
+    async setOnline() { 
+        // ✅ معطل - لا يفعل شيئاً
+        return; 
+    },
+    async setOffline() { 
+        // ✅ معطل - لا يفعل شيئاً
+        return; 
+    },
+    startHeartbeat() { 
+        // ✅ معطل - لا يفعل شيئاً
+        return; 
+    },
+    stopHeartbeat() { 
+        // ✅ معطل - لا يفعل شيئاً
+        return; 
+    },
+    watchFriend(friendId) { 
+        // ✅ معطل - لا يفعل شيئاً
+        return; 
+    },
+    stopAll() { 
+        // ✅ معطل - لا يفعل شيئاً
+        return; 
+    }
 };
 
 
