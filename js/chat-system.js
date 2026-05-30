@@ -496,6 +496,15 @@ async acceptFeatureRequest() {
 async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
+    // ✅ مؤشر مرئي لمعرفة وصول القبول
+    if (action === 'accepted') {
+        const notif = document.createElement('div');
+        notif.textContent = '✅ تم استلام قبول التفعيل!';
+        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;font-weight:bold;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
+        document.body.appendChild(notif);
+        setTimeout(() => notif.remove(), 3000);
+    }
+    
     if (action === 'accepted') {
         this.featuresEnabled = true;
         this.featureRequestPending = false;
@@ -505,6 +514,13 @@ async handleFeatureResponse(fromId, action) {
         if (this.currentChat === fromId) {
             this.friendInConversation = true;
             console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب من الطرف الآخر');
+            
+            // ✅ مؤشر مرئي لتأكيد تفعيل friendInConversation
+            const notif2 = document.createElement('div');
+            notif2.textContent = '✅ friendInConversation = true';
+            notif2.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
+            document.body.appendChild(notif2);
+            setTimeout(() => notif2.remove(), 3000);
         }
         
         if (this.featureBlinkInterval) {
@@ -532,8 +548,22 @@ async handleFeatureResponse(fromId, action) {
                 const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
                 if (success) {
                     console.log('✅ تم فتح Data Channel بنجاح');
+                    
+                    // ✅ مؤشر مرئي لنجاح فتح القناة
+                    const notif3 = document.createElement('div');
+                    notif3.textContent = '✅ Data Channel مفتوح!';
+                    notif3.style.cssText = 'position:fixed;top:110px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
+                    document.body.appendChild(notif3);
+                    setTimeout(() => notif3.remove(), 3000);
                 } else {
                     console.log('⚠️ فشل فتح Data Channel، سيتم إعادة المحاولة لاحقاً');
+                    
+                    // ✅ مؤشر مرئي لفشل فتح القناة
+                    const notif3 = document.createElement('div');
+                    notif3.textContent = '❌ فشل فتح Data Channel!';
+                    notif3.style.cssText = 'position:fixed;top:110px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
+                    document.body.appendChild(notif3);
+                    setTimeout(() => notif3.remove(), 3000);
                 }
             } catch(e) {
                 console.error('❌ خطأ في فتح Data Channel:', e);
@@ -2041,32 +2071,79 @@ async sendMessage(text) {
         this.hideProgressBar(); return false;
     },
     
+
     // ==================== القسم 29: _ensureChannelReady ====================
-    async _ensureChannelReady() {
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
-            return false;
-        }
+async _ensureChannelReady() {
+    // ✅ مؤشر مرئي لمعرفة السبب
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        const reason = !this.friendInConversation ? 'friendInConversation = false' : 'featuresEnabled = false';
         
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        // ✅ إظهار إشعار على الشاشة
+        const notif = document.createElement('div');
+        notif.textContent = `❌ فشل فتح القناة: ${reason}`;
+        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;font-weight:bold;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
+        document.body.appendChild(notif);
+        setTimeout(() => notif.remove(), 4000);
+        
+        // ✅ إظهار القيم الحالية في إشعار منفصل
+        const valuesNotif = document.createElement('div');
+        valuesNotif.textContent = `friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}`;
+        valuesNotif.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#333;color:#ff0;padding:5px 10px;border-radius:20px;z-index:99999;font-size:11px;';
+        document.body.appendChild(valuesNotif);
+        setTimeout(() => valuesNotif.remove(), 4000);
+        
+        alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
+        return false;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        // ✅ مؤشر مرئي للقناة المفتوحة
+        const notif = document.createElement('div');
+        notif.textContent = '✅ Data Channel مفتوح بالفعل';
+        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
+        document.body.appendChild(notif);
+        setTimeout(() => notif.remove(), 2000);
+        return true;
+    }
+    
+    try {
+        const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+        
+        if (success) {
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // ✅ مؤشر مرئي لنجاح الفتح
+            const notif = document.createElement('div');
+            notif.textContent = '✅ تم فتح Data Channel بنجاح!';
+            notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
+            document.body.appendChild(notif);
+            setTimeout(() => notif.remove(), 3000);
+            
             return true;
         }
         
-        try {
-            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
-            
-            if (success) {
-                await new Promise(r => setTimeout(r, 1000));
-                return true;
-            }
-            
-            alert('تعذر فتح قناة الاتصال لإرسال الملفات');
-            return false;
-        } catch (e) {
-            alert('فشل الاتصال. حاول مرة أخرى.');
-            return false;
-        }
-    },
+        // ✅ مؤشر مرئي لفشل الفتح
+        const notif = document.createElement('div');
+        notif.textContent = '❌ تعذر فتح قناة الاتصال لإرسال الملفات';
+        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
+        document.body.appendChild(notif);
+        setTimeout(() => notif.remove(), 3000);
+        
+        alert('تعذر فتح قناة الاتصال لإرسال الملفات');
+        return false;
+    } catch (e) {
+        // ✅ مؤشر مرئي للخطأ
+        const notif = document.createElement('div');
+        notif.textContent = '❌ فشل الاتصال. حاول مرة أخرى';
+        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
+        document.body.appendChild(notif);
+        setTimeout(() => notif.remove(), 3000);
+        
+        alert('فشل الاتصال. حاول مرة أخرى.');
+        return false;
+    }
+},
+    
     
     // ==================== القسم 30: sendImage ====================
     async sendImage(file) { 
