@@ -1486,53 +1486,100 @@ async sendSignal(calleeId, data) {
     
     // ==================== 13. إرسال الملفات ====================
     
-    async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
-            return false;
+async sendFileDirect(file, type) {
+    // ✅ مؤشر مرئي لحالة القناة عند الإرسال
+    const statusNotif = document.createElement('div');
+    const dcStatus = this.dc ? this.dc.readyState : 'null';
+    statusNotif.textContent = `📡 حالة القناة: ${dcStatus}`;
+    statusNotif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#ff9800;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;font-weight:bold;';
+    document.body.appendChild(statusNotif);
+    setTimeout(() => statusNotif.remove(), 3000);
+    
+    if (!this.dc || this.dc.readyState !== 'open') {
+        console.log('❌ Data Channel غير مفتوح');
+        
+        // ✅ مؤشر مرئي للفشل
+        const failNotif = document.createElement('div');
+        failNotif.textContent = '❌ Data Channel غير مفتوح! لا يمكن الإرسال';
+        failNotif.style.cssText = 'position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;font-weight:bold;';
+        document.body.appendChild(failNotif);
+        setTimeout(() => failNotif.remove(), 3000);
+        
+        return false;
+    }
+    
+    try {
+        let blobToSend = file;
+        if (type === 'image') {
+            blobToSend = await this.compressImage(file);
         }
         
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
+        const b64 = await this.fileToBase64(blobToSend);
+        const chunkSize = 16000;
+        const totalChunks = Math.ceil(b64.length / chunkSize);
+        const fileId = Date.now().toString();
+        
+        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
+        
+        // ✅ مؤشر مرئي لبدء الإرسال
+        const startNotif = document.createElement('div');
+        startNotif.textContent = `📤 بدء إرسال ${type === 'video' ? 'فيديو' : type === 'image' ? 'صورة' : 'ملف'}... (${totalChunks} جزء)`;
+        startNotif.style.cssText = 'position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
+        document.body.appendChild(startNotif);
+        setTimeout(() => startNotif.remove(), 2000);
+        
+        for (let i = 0; i < totalChunks; i++) {
+            if (this.dc.readyState !== 'open') {
+                ChatSystem.hideProgressBar();
+                
+                // ✅ مؤشر مرئي لانقطاع القناة أثناء الإرسال
+                const disconnectNotif = document.createElement('div');
+                disconnectNotif.textContent = '❌ انقطعت القناة أثناء الإرسال!';
+                disconnectNotif.style.cssText = 'position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
+                document.body.appendChild(disconnectNotif);
+                setTimeout(() => disconnectNotif.remove(), 3000);
+                
+                return false;
             }
-            
-            const b64 = await this.fileToBase64(blobToSend);
-            const chunkSize = 16000;
-            const totalChunks = Math.ceil(b64.length / chunkSize);
-            const fileId = Date.now().toString();
-            
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
-            
-            for (let i = 0; i < totalChunks; i++) {
-                if (this.dc.readyState !== 'open') {
-                    ChatSystem.hideProgressBar();
-                    return false;
-                }
-                const chunk = {
-                    type: type,
-                    data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
-                    chunk: i,
-                    total: totalChunks,
-                    id: fileId,
-                    fileName: file.name || 'ملف'
-                };
-                this.dc.send(JSON.stringify(chunk));
-                const progress = ((i + 1) / totalChunks) * 100;
-                const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
-                ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-                await new Promise(r => setTimeout(r, 50));
-            }
-            ChatSystem.hideProgressBar();
-            console.log('✅ تم إرسال الملف بنجاح');
-            return true;
-        } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            ChatSystem.hideProgressBar();
-            return false;
+            const chunk = {
+                type: type,
+                data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
+                chunk: i,
+                total: totalChunks,
+                id: fileId,
+                fileName: file.name || 'ملف'
+            };
+            this.dc.send(JSON.stringify(chunk));
+            const progress = ((i + 1) / totalChunks) * 100;
+            const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
+            ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
+            await new Promise(r => setTimeout(r, 50));
         }
-    },
+        ChatSystem.hideProgressBar();
+        console.log('✅ تم إرسال الملف بنجاح');
+        
+        // ✅ مؤشر مرئي للنجاح
+        const successNotif = document.createElement('div');
+        successNotif.textContent = '✅ تم إرسال الملف بنجاح!';
+        successNotif.style.cssText = 'position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
+        document.body.appendChild(successNotif);
+        setTimeout(() => successNotif.remove(), 2000);
+        
+        return true;
+    } catch (e) {
+        console.error('❌ فشل إرسال الملف:', e);
+        ChatSystem.hideProgressBar();
+        
+        // ✅ مؤشر مرئي للخطأ
+        const errorNotif = document.createElement('div');
+        errorNotif.textContent = `❌ فشل إرسال الملف: ${e.message || 'خطأ غير معروف'}`;
+        errorNotif.style.cssText = 'position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:12px;';
+        document.body.appendChild(errorNotif);
+        setTimeout(() => errorNotif.remove(), 3000);
+        
+        return false;
+    }
+},
     
     handleChunkMessage(msg) {
         if (!this.incomingChunks[msg.id]) {
