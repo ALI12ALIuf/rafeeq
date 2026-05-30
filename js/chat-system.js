@@ -753,6 +753,50 @@ setupPageFocusListener() {
         }
     });
 },
+
+    // ==================== القسم 15.5: مراقبة صحة القناة من الطرفين (محلياً فقط) ====================
+startChannelHealthCheck() {
+    if (this.channelHealthInterval) clearInterval(this.channelHealthInterval);
+    
+    this.channelHealthInterval = setInterval(async () => {
+        // فقط إذا كنا في محادثة والميزات مفعلة
+        if (!this.currentChat || !this.featuresEnabled) return;
+        
+        // التحقق من صحة Data Channel
+        const isChannelOpen = (CallSystem.dc && CallSystem.dc.readyState === 'open');
+        
+        if (!isChannelOpen) {
+            console.log('⚠️ [صحة القناة] Data Channel غير مفتوح - محاولة الإصلاح...');
+            
+            // محاولة إعادة فتح القناة
+            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+            
+            if (!success) {
+                console.log('❌ [صحة القناة] فشل إعادة فتح القناة - الخروج من المحادثة (محلياً)');
+                // ✅ الخروج من المحادثة دون إرسال أي شيء
+                this.closeChat();
+            }
+            return;
+        }
+        
+        // محاولة إرسال ping لاختبار القناة
+        try {
+            CallSystem.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+            console.log('✅ [صحة القناة] القناة سليمة');
+        } catch(e) {
+            console.log('⚠️ [صحة القناة] فشل إرسال ping - القناة معطلة، الخروج من المحادثة (محلياً)');
+            // ✅ الخروج من المحادثة دون إرسال أي شيء
+            this.closeChat();
+        }
+    }, 10000); // كل 10 ثوانٍ
+},
+
+stopChannelHealthCheck() {
+    if (this.channelHealthInterval) {
+        clearInterval(this.channelHealthInterval);
+        this.channelHealthInterval = null;
+    }
+},
     
     // ==================== القسم 16: requestConversationStatus ====================
     async requestConversationStatus() {
