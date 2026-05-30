@@ -130,8 +130,7 @@ async function logout() {
     } catch (e) {}
     
     sessionStorage.removeItem('_captchaVerified');
-    // ✅ تم إزالة استدعاء PresenceSystem.stopAll() (لم نعد نستخدم Presence)
-    // PresenceSystem.stopAll();
+    PresenceSystem.stopAll();
     
     try { await window.auth.signOut(); } catch (e) {}
     window.location.reload(); 
