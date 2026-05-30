@@ -2072,7 +2072,7 @@ async sendMessage(text) {
     },
     
 
-    // ==================== القسم 29: _ensureChannelReady ====================
+   // ==================== القسم 29: _ensureChannelReady ====================
 async _ensureChannelReady() {
     // ✅ مؤشر مرئي للقيم الفعلية عند دخول الدالة
     const debugNotif = document.createElement('div');
@@ -2124,16 +2124,40 @@ async _ensureChannelReady() {
         const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
         
         if (success) {
-            await new Promise(r => setTimeout(r, 1000));
+            // ✅ انتظر حتى تصبح القناة مفتوحة فعلاً (تصل إلى state 'open')
+            let waitCount = 0;
+            while ((!CallSystem.dc || CallSystem.dc.readyState !== 'open') && waitCount < 30) {
+                await new Promise(r => setTimeout(r, 500));
+                waitCount++;
+                console.log(`⏳ انتظار القناة... ${waitCount * 0.5} ثانية`);
+                
+                // ✅ مؤشر مرئي لحالة الانتظار
+                const waitNotif = document.createElement('div');
+                waitNotif.textContent = `⏳ جاري فتح القناة... (${waitCount * 0.5} ثانية)`;
+                waitNotif.style.cssText = 'position:fixed;top:140px;left:50%;transform:translateX(-50%);background:#ff9800;color:white;padding:5px 10px;border-radius:20px;z-index:99999;font-size:11px;';
+                document.body.appendChild(waitNotif);
+                setTimeout(() => waitNotif.remove(), 400);
+            }
             
-            // ✅ مؤشر مرئي لنجاح الفتح
-            const notif = document.createElement('div');
-            notif.textContent = '✅ تم فتح Data Channel بنجاح!';
-            notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
-            document.body.appendChild(notif);
-            setTimeout(() => notif.remove(), 3000);
-            
-            return true;
+            if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                // ✅ مؤشر مرئي لنجاح الفتح
+                const notif = document.createElement('div');
+                notif.textContent = '✅ تم فتح Data Channel بنجاح!';
+                notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
+                document.body.appendChild(notif);
+                setTimeout(() => notif.remove(), 3000);
+                return true;
+            } else {
+                // ❌ القناة لم تفتح بعد الانتظار
+                const notif = document.createElement('div');
+                notif.textContent = '❌ تعذر فتح قناة الاتصال لإرسال الملفات (انتهت المهلة)';
+                notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
+                document.body.appendChild(notif);
+                setTimeout(() => notif.remove(), 4000);
+                
+                alert('تعذر فتح قناة الاتصال لإرسال الملفات');
+                return false;
+            }
         }
         
         // ✅ مؤشر مرئي لفشل الفتح
@@ -2156,7 +2180,7 @@ async _ensureChannelReady() {
         alert('فشل الاتصال. حاول مرة أخرى.');
         return false;
     }
-},
+}, 
     
     
     // ==================== القسم 30: sendImage ====================
