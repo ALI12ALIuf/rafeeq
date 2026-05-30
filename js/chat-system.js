@@ -2,7 +2,15 @@
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 // ==================== القسم 1: تعريف PresenceSystem ====================
-
+const PresenceSystem = {
+    listeners: {}, heartbeatInterval: null,
+    async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
+    async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
+    startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
+    stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
+    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data()); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
+    stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
+};
 
 
 // ==================== القسم 2: تعريف ChatSystem ====================
@@ -76,7 +84,7 @@ cleanMediaMessagesOnLoad() {
             console.log(`✅ تم تنظيف الوسائط من محادثة ${friendId}`);
         }
     }
-    console.log('🧹 تم تنظيف جميع الملفات وheartbeatIntervaltorage');
+    console.log('🧹 تم تنظيف جميع الملفات والوسائط من localStorage');
 },
     
     
@@ -496,15 +504,6 @@ async acceptFeatureRequest() {
 async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
-    // ✅ مؤشر مرئي لمعرفة وصول القبول
-    if (action === 'accepted') {
-        const notif = document.createElement('div');
-        notif.textContent = '✅ تم استلام قبول التفعيل!';
-        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;font-weight:bold;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
-        document.body.appendChild(notif);
-        setTimeout(() => notif.remove(), 3000);
-    }
-    
     if (action === 'accepted') {
         this.featuresEnabled = true;
         this.featureRequestPending = false;
@@ -514,13 +513,6 @@ async handleFeatureResponse(fromId, action) {
         if (this.currentChat === fromId) {
             this.friendInConversation = true;
             console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب من الطرف الآخر');
-            
-            // ✅ مؤشر مرئي لتأكيد تفعيل friendInConversation
-            const notif2 = document.createElement('div');
-            notif2.textContent = '✅ friendInConversation = true';
-            notif2.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
-            document.body.appendChild(notif2);
-            setTimeout(() => notif2.remove(), 3000);
         }
         
         if (this.featureBlinkInterval) {
@@ -548,22 +540,8 @@ async handleFeatureResponse(fromId, action) {
                 const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
                 if (success) {
                     console.log('✅ تم فتح Data Channel بنجاح');
-                    
-                    // ✅ مؤشر مرئي لنجاح فتح القناة
-                    const notif3 = document.createElement('div');
-                    notif3.textContent = '✅ Data Channel مفتوح!';
-                    notif3.style.cssText = 'position:fixed;top:110px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
-                    document.body.appendChild(notif3);
-                    setTimeout(() => notif3.remove(), 3000);
                 } else {
                     console.log('⚠️ فشل فتح Data Channel، سيتم إعادة المحاولة لاحقاً');
-                    
-                    // ✅ مؤشر مرئي لفشل فتح القناة
-                    const notif3 = document.createElement('div');
-                    notif3.textContent = '❌ فشل فتح Data Channel!';
-                    notif3.style.cssText = 'position:fixed;top:110px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
-                    document.body.appendChild(notif3);
-                    setTimeout(() => notif3.remove(), 3000);
                 }
             } catch(e) {
                 console.error('❌ خطأ في فتح Data Channel:', e);
@@ -1012,7 +990,8 @@ setupPageFocusListener() {
         this.updateAllButtons();
     },
 
-   // ==================== القسم 23: openChat ====================
+
+    // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
@@ -1032,8 +1011,7 @@ openChat(friendId, friendName, friendAvatar) {
     document.querySelector('.chat-page').style.display = 'none'; 
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
-    // ✅ تم إزالة استدعاء PresenceSystem.watchFriend (لم نعد نستخدم Presence)
-    // PresenceSystem.watchFriend(friendId);
+    PresenceSystem.watchFriend(friendId);
     
     setTimeout(() => {
         this.sendConversationStatus(true);
@@ -1071,31 +1049,155 @@ openChat(friendId, friendName, friendAvatar) {
         }
     }, 1000);
 },
-
-
-// ==================== القسم 24: updateFriendStatus (معطل - تم إلغاء Presence System) ====================
+    
+    
+   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
-    // ✅ تم تعطيل نظام "متصل/غير متصل" بالكامل لتقليل التكلفة
-    // لن نستخدم friendOnline أو العداد الأصفر 120 ثانية بعد الآن
-    
-    // إخفاء حالة الاتصال من واجهة المستخدم
-    const statusEl = document.getElementById('conversationStatus');
-    if (statusEl) {
-        statusEl.innerHTML = '';
-        statusEl.className = 'conversation-status hidden';
+    // الحالة 1: الشخص غير متصل
+    if (!isOnline) {
+        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة) → أحمر مباشر
+        if (!this.featuresEnabled) {
+            this.friendOnline = false;
+            const statusEl = document.getElementById('conversationStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '🔴 غير متصل';
+                statusEl.className = 'conversation-status offline';
+            }
+            return;
+        }
+        
+        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
+        // نبدأ العداد الأصفر 120 ثانية
+        if (this.offlineTimer) clearTimeout(this.offlineTimer);
+        if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
+        
+        this.offlineStartTime = Date.now();
+        this.friendOnline = false;
+        
+        let secondsLeft = 120;
+        const statusEl = document.getElementById('conversationStatus');
+        
+        const updateCountdown = () => {
+            if (statusEl) {
+                statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
+                statusEl.className = 'conversation-status offline-temp';
+            }
+            secondsLeft--;
+            if (secondsLeft < 0) {
+                clearInterval(this.offlineCountdownInterval);
+                this.offlineCountdownInterval = null;
+            }
+        };
+        
+        updateCountdown();
+        this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
+        
+        this.offlineTimer = setTimeout(() => {
+            if (!this.friendOnline && this.featuresEnabled) {
+                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
+                
+                // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
+                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                    try {
+                        CallSystem.dc.send(JSON.stringify({ 
+                            type: 'force_disable_features',
+                            timestamp: Date.now()
+                        }));
+                        console.log('✅ تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر');
+                    } catch(e) {
+                        console.error('❌ فشل إرسال إشارة الإلغاء:', e);
+                    }
+                }
+                
+                // ✅ إلغاء الميزات محلياً
+                this.featuresEnabled = false;
+                this.featureRequestPending = false;
+                this.featureRequestReceived = false;
+                
+                if (this.featureBlinkInterval) {
+                    clearInterval(this.featureBlinkInterval);
+                    this.featureBlinkInterval = null;
+                }
+                
+                const btn = document.getElementById('enableFeaturesBtn');
+                if (btn) {
+                    btn.style.background = '#f44336';
+                    btn.title = 'تفعيل الميزات';
+                }
+                
+                // ✅ تحديث زر التفعيل
+                const toggleInput = document.getElementById('featureToggleInput');
+                if (toggleInput) toggleInput.checked = false;
+                
+                this.updateAllButtons();
+            }
+            
+            if (this.offlineCountdownInterval) {
+                clearInterval(this.offlineCountdownInterval);
+                this.offlineCountdownInterval = null;
+            }
+            
+            if (statusEl && !this.friendOnline) {
+                statusEl.innerHTML = '🔴 غير متصل';
+                statusEl.className = 'conversation-status offline';
+            }
+            
+            this.offlineTimer = null;
+        }, 120000);
+        
+        return;
     }
     
-    // ✅ لا نقوم بتحديث friendOnline أو بدء أي عداد
-    // الميزات الأخرى (المكالمات، الملفات، تفعيل الميزات) تعمل بشكل مستقل
+    // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
+    if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {
+        console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
+        
+        if (this.offlineTimer) clearTimeout(this.offlineTimer);
+        if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
+        
+        this.offlineTimer = null;
+        this.offlineStartTime = null;
+        this.friendOnline = true;
+        
+        const statusEl = document.getElementById('conversationStatus');
+        if (statusEl) {
+            statusEl.innerHTML = '🟢 متصل';
+            statusEl.className = 'conversation-status online';
+        }
+        return;
+    }
     
-    // فقط نضمن تحديث واجهة الأزرار إذا لزم الأمر
+    // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
+    this.friendOnline = isOnline;
+    
+    if (!userData && window.auth?.currentUser) {
+        window.db.collection('users').doc(friendId).get().then(doc => {
+            if (doc.exists) this.updateFriendStatus(friendId, isOnline, doc.data());
+        }).catch(() => {});
+        return;
+    }
+    
+    const statusEl = document.getElementById('conversationStatus');
+    if (!statusEl) return;
+    
+    let statusHtml = '';
+    let statusClass = '';
+    
+    if (isOnline) {
+        statusHtml = '🟢 متصل';
+        statusClass = 'conversation-status online';
+    } else {
+        statusHtml = '🔴 غير متصل';
+        statusClass = 'conversation-status offline';
+    }
+    
+    statusEl.innerHTML = statusHtml;
+    statusEl.className = statusClass;
+    
     this.updateAllButtons();
-},
-
-
-    
+}, 
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
@@ -2071,117 +2173,32 @@ async sendMessage(text) {
         this.hideProgressBar(); return false;
     },
     
-
-   // ==================== القسم 29: _ensureChannelReady ====================
-async _ensureChannelReady() {
-    // ✅ مؤشر مرئي للقيم الفعلية عند دخول الدالة
-    const debugNotif = document.createElement('div');
-    debugNotif.textContent = `🔍 _ensureChannelReady: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}`;
-    debugNotif.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#333;color:#ff0;padding:5px 10px;border-radius:20px;z-index:99999;font-size:11px;';
-    document.body.appendChild(debugNotif);
-    setTimeout(() => debugNotif.remove(), 5000);
-    
-    // ✅ مؤشر لحالة CallSystem.dc قبل المحاولة
-    const dcDebug = document.createElement('div');
-    dcDebug.textContent = `🔍 CallSystem.dc قبل: ${CallSystem.dc ? CallSystem.dc.readyState : 'null'}`;
-    dcDebug.style.cssText = 'position:fixed;top:110px;left:50%;transform:translateX(-50%);background:#333;color:#0ff;padding:5px 10px;border-radius:20px;z-index:99999;font-size:11px;';
-    document.body.appendChild(dcDebug);
-    setTimeout(() => dcDebug.remove(), 5000);
-    
-    // ✅ مؤشر مرئي لمعرفة السبب
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        const reason = !this.friendInConversation ? 'friendInConversation = false' : 'featuresEnabled = false';
-        
-        // ✅ إظهار إشعار على الشاشة
-        const notif = document.createElement('div');
-        notif.textContent = `❌ فشل فتح القناة: ${reason}`;
-        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;font-weight:bold;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
-        document.body.appendChild(notif);
-        setTimeout(() => notif.remove(), 4000);
-        
-        // ✅ إظهار القيم الحالية في إشعار منفصل
-        const valuesNotif = document.createElement('div');
-        valuesNotif.textContent = `friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}`;
-        valuesNotif.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#333;color:#ff0;padding:5px 10px;border-radius:20px;z-index:99999;font-size:11px;';
-        document.body.appendChild(valuesNotif);
-        setTimeout(() => valuesNotif.remove(), 4000);
-        
-        alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
-        return false;
-    }
-    
-    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-        // ✅ مؤشر مرئي للقناة المفتوحة
-        const notif = document.createElement('div');
-        notif.textContent = '✅ Data Channel مفتوح بالفعل';
-        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:8px 16px;border-radius:30px;z-index:99999;font-size:12px;';
-        document.body.appendChild(notif);
-        setTimeout(() => notif.remove(), 2000);
-        return true;
-    }
-    
-    try {
-        const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
-        
-        if (success) {
-            // ✅ انتظر حتى تصبح القناة مفتوحة فعلاً (تصل إلى state 'open')
-            let waitCount = 0;
-            while ((!CallSystem.dc || CallSystem.dc.readyState !== 'open') && waitCount < 30) {
-                await new Promise(r => setTimeout(r, 500));
-                waitCount++;
-                console.log(`⏳ انتظار القناة... ${waitCount * 0.5} ثانية`);
-                
-                // ✅ مؤشر مرئي لحالة الانتظار
-                const waitNotif = document.createElement('div');
-                waitNotif.textContent = `⏳ جاري فتح القناة... (${waitCount * 0.5} ثانية)`;
-                waitNotif.style.cssText = 'position:fixed;top:140px;left:50%;transform:translateX(-50%);background:#ff9800;color:white;padding:5px 10px;border-radius:20px;z-index:99999;font-size:11px;';
-                document.body.appendChild(waitNotif);
-                setTimeout(() => waitNotif.remove(), 400);
-            }
-            
-            if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-                // ✅ مؤشر مرئي لنجاح الفتح
-                const notif = document.createElement('div');
-                notif.textContent = '✅ تم فتح Data Channel بنجاح!';
-                notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4CAF50;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
-                document.body.appendChild(notif);
-                setTimeout(() => notif.remove(), 3000);
-                return true;
-            } else {
-                // ❌ القناة لم تفتح بعد الانتظار
-                const notif = document.createElement('div');
-                notif.textContent = '❌ تعذر فتح قناة الاتصال لإرسال الملفات (انتهت المهلة)';
-                notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
-                document.body.appendChild(notif);
-                setTimeout(() => notif.remove(), 4000);
-                
-                alert('تعذر فتح قناة الاتصال لإرسال الملفات');
-                return false;
-            }
+    // ==================== القسم 29: _ensureChannelReady ====================
+    async _ensureChannelReady() {
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
+            return false;
         }
         
-        // ✅ مؤشر مرئي لفشل الفتح
-        const notif = document.createElement('div');
-        notif.textContent = '❌ تعذر فتح قناة الاتصال لإرسال الملفات';
-        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
-        document.body.appendChild(notif);
-        setTimeout(() => notif.remove(), 3000);
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            return true;
+        }
         
-        alert('تعذر فتح قناة الاتصال لإرسال الملفات');
-        return false;
-    } catch (e) {
-        // ✅ مؤشر مرئي للخطأ
-        const notif = document.createElement('div');
-        notif.textContent = '❌ فشل الاتصال. حاول مرة أخرى';
-        notif.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#f44336;color:white;padding:10px 20px;border-radius:30px;z-index:99999;font-size:14px;';
-        document.body.appendChild(notif);
-        setTimeout(() => notif.remove(), 3000);
-        
-        alert('فشل الاتصال. حاول مرة أخرى.');
-        return false;
-    }
-}, 
-    
+        try {
+            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+            
+            if (success) {
+                await new Promise(r => setTimeout(r, 1000));
+                return true;
+            }
+            
+            alert('تعذر فتح قناة الاتصال لإرسال الملفات');
+            return false;
+        } catch (e) {
+            alert('فشل الاتصال. حاول مرة أخرى.');
+            return false;
+        }
+    },
     
     // ==================== القسم 30: sendImage ====================
     async sendImage(file) { 
@@ -2712,8 +2729,7 @@ closeChat() {
     document.body.classList.remove('conversation-open');
     document.getElementById('conversationPage').style.display = 'none';
     document.querySelector('.chat-page').style.display = 'block';
-    // ✅ تم إزالة استدعاء PresenceSystem.stopAll() (لم نعد نستخدم Presence)
-    // PresenceSystem.stopAll();
+    PresenceSystem.stopAll();
     if (!CallSystem.isInCall) CallSystem.cleanupConnections();
     this.currentChat = null;
     this.friendOnline = false;
