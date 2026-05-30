@@ -1,15 +1,60 @@
 // ========== chat-system.js ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
-// ==================== القسم 1: تعريف PresenceSystem ====================
+// ==================== القسم 1: تعريف PresenceSystem (تم تعطيل الاتصال بالسيرفر) ====================
 const PresenceSystem = {
     listeners: {}, heartbeatInterval: null,
-    async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
-    async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
-    startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
-    stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
-    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data()); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
-    stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
+    
+    // ✅ تم تعطيل تحديث الحالة في السيرفر (لتوفير التكلفة)
+    async setOnline() { 
+        if (!window.auth?.currentUser) return;
+        // ❌ تم إزالة تحديث Firestore
+        console.log('✅ تم تعطيل تحديث الحالة في السيرفر (توفير التكلفة)');
+        // this.startHeartbeat(); // تم تعطيله
+    },
+    
+    async setOffline() { 
+        if (!window.auth?.currentUser) return;
+        // ❌ تم إزالة تحديث Firestore
+        console.log('✅ تم تعطيل تحديث الحالة في السيرفر (توفير التكلفة)');
+        // this.stopHeartbeat(); // تم تعطيله
+    },
+    
+    // ✅ تم تعطيل نبضات القلب (heartbeat)
+    startHeartbeat() { 
+        // ❌ تم تعطيله بالكامل
+        console.log('✅ تم تعطيل Heartbeat (توفير التكلفة)');
+    },
+    
+    stopHeartbeat() { 
+        // ❌ تم تعطيله بالكامل
+        if (this.heartbeatInterval) { 
+            clearInterval(this.heartbeatInterval); 
+            this.heartbeatInterval = null; 
+        } 
+    },
+    
+    // ✅ تم تعطيل مراقبة الأصدقاء من السيرفر
+    watchFriend(friendId) { 
+        if (!friendId) return;
+        // ❌ تم إزالة onSnapshot من Firestore
+        console.log(`✅ تم تعطيل مراقبة حالة الصديق ${friendId} من السيرفر (توفير التكلفة)`);
+        
+        // ✅ بدلاً من ذلك، نعتمد على الحالة المحلية فقط
+        // نعتبر الصديق متصل افتراضياً (أو نحتفظ بآخر حالة معروفة)
+        if (ChatSystem.currentChat === friendId) {
+            // نحاول الحفاظ على الحالة المحلية دون الاتصال بالسيرفر
+            ChatSystem.updateFriendStatus(friendId, true, null);
+        }
+    },
+    
+    stopAll() { 
+        Object.values(this.listeners).forEach(unsub => { 
+            if (typeof unsub === 'function') unsub(); 
+        }); 
+        this.listeners = {}; 
+        this.stopHeartbeat(); 
+    }
 };
 
 
