@@ -469,9 +469,6 @@ async acceptFeatureRequest() {
             console.log('🔧 محاولة فتح Data Channel...');
             await CallSystem.ensureDataChannelOnly(this.currentChat);
             console.log('✅ تم فتح Data Channel بنجاح');
-            
-            // ✅ بدء مراقبة صحة القناة
-            this.startChannelHealthCheck();
         } catch(e) {
             console.error('❌ خطأ في فتح Data Channel:', e);
         }
@@ -606,9 +603,6 @@ async handleFeatureResponse(fromId, action) {
      // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
-    
-    // ✅ إيقاف مراقبة صحة القناة
-    this.stopChannelHealthCheck();
     
     if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
         await CallSystem.deleteAllWebRTCSignals(this.currentChat);
@@ -758,50 +752,6 @@ setupPageFocusListener() {
             console.log('👁️ الصفحة في المقدمة');
         }
     });
-},
-
-    // ==================== القسم 15.5: مراقبة صحة القناة من الطرفين (محلياً فقط) ====================
-startChannelHealthCheck() {
-    if (this.channelHealthInterval) clearInterval(this.channelHealthInterval);
-    
-    this.channelHealthInterval = setInterval(async () => {
-        // فقط إذا كنا في محادثة والميزات مفعلة
-        if (!this.currentChat || !this.featuresEnabled) return;
-        
-        // التحقق من صحة Data Channel
-        const isChannelOpen = (CallSystem.dc && CallSystem.dc.readyState === 'open');
-        
-        if (!isChannelOpen) {
-            console.log('⚠️ [صحة القناة] Data Channel غير مفتوح - محاولة الإصلاح...');
-            
-            // محاولة إعادة فتح القناة
-            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
-            
-            if (!success) {
-                console.log('❌ [صحة القناة] فشل إعادة فتح القناة - الخروج من المحادثة (محلياً)');
-                // ✅ الخروج من المحادثة دون إرسال أي شيء
-                this.closeChat();
-            }
-            return;
-        }
-        
-        // محاولة إرسال ping لاختبار القناة
-        try {
-            CallSystem.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-            console.log('✅ [صحة القناة] القناة سليمة');
-        } catch(e) {
-            console.log('⚠️ [صحة القناة] فشل إرسال ping - القناة معطلة، الخروج من المحادثة (محلياً)');
-            // ✅ الخروج من المحادثة دون إرسال أي شيء
-            this.closeChat();
-        }
-    }, 10000); // كل 10 ثوانٍ
-},
-
-stopChannelHealthCheck() {
-    if (this.channelHealthInterval) {
-        clearInterval(this.channelHealthInterval);
-        this.channelHealthInterval = null;
-    }
 },
     
     // ==================== القسم 16: requestConversationStatus ====================
@@ -995,9 +945,6 @@ openChat(friendId, friendName, friendAvatar) {
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
     PresenceSystem.watchFriend(friendId);
-    
-    // ✅ بدء مراقبة صحة القناة (حتى لو الميزات غير مفعلة، سنبدأها عند التفعيل)
-    this.startChannelHealthCheck();
     
     setTimeout(() => {
         this.sendConversationStatus(true);
@@ -2572,15 +2519,11 @@ updateLastMessage(friendId, lastMessage) {
     }); 
 },
 
-
-    // ==================== القسم 37: closeChat ====================
+// ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
     console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
-    
-    // ✅ إيقاف مراقبة صحة القناة
-    this.stopChannelHealthCheck();
     
     const chatId = this.currentChat;
     
