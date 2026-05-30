@@ -2081,6 +2081,13 @@ async _ensureChannelReady() {
     document.body.appendChild(debugNotif);
     setTimeout(() => debugNotif.remove(), 5000);
     
+    // ✅ مؤشر لحالة CallSystem.dc قبل المحاولة
+    const dcDebug = document.createElement('div');
+    dcDebug.textContent = `🔍 CallSystem.dc قبل: ${CallSystem.dc ? CallSystem.dc.readyState : 'null'}`;
+    dcDebug.style.cssText = 'position:fixed;top:110px;left:50%;transform:translateX(-50%);background:#333;color:#0ff;padding:5px 10px;border-radius:20px;z-index:99999;font-size:11px;';
+    document.body.appendChild(dcDebug);
+    setTimeout(() => dcDebug.remove(), 5000);
+    
     // ✅ مؤشر مرئي لمعرفة السبب
     if (!this.friendInConversation || !this.featuresEnabled) {
         const reason = !this.friendInConversation ? 'friendInConversation = false' : 'featuresEnabled = false';
