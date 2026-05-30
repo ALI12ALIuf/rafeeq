@@ -1009,15 +1009,10 @@ setupPageFocusListener() {
     },
 
 
+    
     // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
-    
-    // ✅ إخفاء حالة الاتصال (متصل/غير متصل/غير متصل مؤقتاً) من واجهة المستخدم
-    const statusEl = document.getElementById('conversationStatus');
-    if (statusEl) {
-        statusEl.style.display = 'none';
-    }
     
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
         this.friendInConversation = this._pendingConversationStatus[friendId];
@@ -1073,7 +1068,6 @@ openChat(friendId, friendName, friendAvatar) {
         }
     }, 1000);
 },
-    
     
 
     // ==================== القسم 24: updateFriendStatus (معطل نهائياً - تم إلغاء Presence System) ====================
