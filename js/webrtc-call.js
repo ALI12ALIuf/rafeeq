@@ -68,7 +68,6 @@ const CallSystem = {
     async autoCleanupOnLoad() {
         console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
         
-        // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
         await this.deleteAllMyWebRTCSignals();
         
         this.isInCall = false;
@@ -131,7 +130,6 @@ const CallSystem = {
     // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
     
     async ensureDataChannelOnly(calleeId) {
-        // ✅ منع فتح Data Channel إذا الميزات غير مفعلة
         if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
             console.log('🚫 منع فتح Data Channel - الميزات غير مفعلة');
             return false;
@@ -166,7 +164,6 @@ const CallSystem = {
     },
     
     async createDataChannelOnly(calleeId) {
-        // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة
         if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
             console.log('🚫 منع إنشاء Data Channel - الميزات غير مفعلة');
             return false;
@@ -204,11 +201,6 @@ const CallSystem = {
     // ==================== 4. المكالمة الصوتية ====================
 
     async startAudioCall(calleeId) {
-        if (!ChatSystem.friendOnline) {
-            console.log('❌ لا يمكن بدء المكالمة: المستخدم غير متصل');
-            return;
-        }
-        
         if (!ChatSystem.friendInConversation) {
             console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
             return;
@@ -278,7 +270,7 @@ const CallSystem = {
             
             this.pc.onconnectionstatechange = () => {
                 console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (thisshowIncomingCallomingCallnectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
                     this.endCall();
                 }
             };
@@ -298,11 +290,6 @@ const CallSystem = {
     // ==================== 5. المكالمة المرئية ====================
 
     async startVideoCall(calleeId) {
-        if (!ChatSystem.friendOnline) {
-            console.log('❌ لا يمكن بدء المكالمة: المستخدم غير متصل');
-            return;
-        }
-        
         if (!ChatSystem.friendInConversation) {
             console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
             return;
@@ -854,7 +841,6 @@ setupDataChannel(channel) {
         try {
             const msg = JSON.parse(e.data);
             
-            // ✅ معالجة الرسائل النصية المباشرة (عند تفعيل الميزات)
             if (msg.type === 'direct_text') {
                 console.log('📨 استلام رسالة نصية مباشرة:', msg.text);
                 const displayMsg = { 
@@ -871,14 +857,12 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // ✅ معالجة إشارات WebRTC المباشرة (عبر Data Channel)
             if (msg.type === 'webrtc_signal') {
                 console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
                 this.handleSignaling(msg.data);
                 return;
             }
             
-            // ✅✅ معالجة إشارة الطرد المباشرة (عبر Data Channel)
             if (msg.type === 'force_close_conversation') {
                 console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -901,7 +885,6 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // ✅✅✅ معالجة إشارة إلغاء الميزات المباشرة (عبر Data Channel)
             if (msg.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -1037,14 +1020,14 @@ sendCallStatus(status) {
 },
 
 scheduleReconnect() {
-    if (!ChatSystem.currentChat || !ChatSystem.friendOnline) return;
+    if (!ChatSystem.currentChat) return;
     if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
     this.reconnectTimer = setTimeout(async () => {
         try {
-            if (ChatSystem.currentChat && ChatSystem.friendOnline) {
+            if (ChatSystem.currentChat) {
                 await this.ensureDataChannelOnly(ChatSystem.currentChat);
             }
         } catch (error) {}
@@ -1082,7 +1065,6 @@ async ensureDataChannel(calleeId) {
 },
 
 async createNewDataChannel(calleeId) {
-    // ✅ منع إنشاء Data Channel إذا الميزات غير مفعلة
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('🚫 منع إنشاء Data Channel جديد - الميزات غير مفعلة');
         return;
@@ -1152,18 +1134,11 @@ async handleSignaling(data) {
 },
 
 async sendSignal(calleeId, data) {
-    // ✅ منع إرسال أي إشارة WebRTC إذا الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
         return;
     }
     
-    if (!ChatSystem.friendOnline) {
-        console.log('❌ المستخدم غير متصل، تم إلغاء إرسال الإشارة');
-        return;
-    }
-    
-    // ✅ إذا كان Data Channel مفتوحاً، أرسل مباشرة عبره (بدون Firebase)
     if (this.dc && this.dc.readyState === 'open') {
         try {
             this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
@@ -1174,7 +1149,6 @@ async sendSignal(calleeId, data) {
         }
     }
     
-    // ✅ إذا فشل الإرسال المباشر، نرسل عبر Firebase (كحل احتياطي)
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
