@@ -2598,7 +2598,8 @@ closeChat() {
     document.body.classList.remove('conversation-open');
     document.getElementById('conversationPage').style.display = 'none';
     document.querySelector('.chat-page').style.display = 'block';
-    PresenceSystem.stopAll();
+    // ✅ تم إزالة استدعاء PresenceSystem.stopAll() (لم نعد نستخدم Presence)
+    // PresenceSystem.stopAll();
     if (!CallSystem.isInCall) CallSystem.cleanupConnections();
     this.currentChat = null;
     this.friendOnline = false;
