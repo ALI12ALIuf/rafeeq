@@ -1,33 +1,15 @@
 // ========== chat-system.js ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
-// ==================== القسم 1: تعريف PresenceSystem (معطل نهائياً - لا يقرأ ولا يكتب إلى Firestore) ====================
+// ==================== القسم 1: تعريف PresenceSystem ====================
 const PresenceSystem = {
     listeners: {}, heartbeatInterval: null,
-    async setOnline() { 
-        // ✅ معطل نهائياً - لا يرسل أي شيء إلى Firestore
-        return; 
-    },
-    async setOffline() { 
-        // ✅ معطل نهائياً - لا يرسل أي شيء إلى Firestore
-        return; 
-    },
-    startHeartbeat() { 
-        // ✅ معطل نهائياً
-        return; 
-    },
-    stopHeartbeat() { 
-        // ✅ معطل نهائياً
-        return; 
-    },
-    watchFriend(friendId) { 
-        // ✅ معطل نهائياً - لا يقرأ من Firestore
-        return; 
-    },
-    stopAll() { 
-        // ✅ معطل نهائياً
-        return; 
-    }
+    async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
+    async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
+    startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
+    stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
+    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data()); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
+    stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
 };
 
 
@@ -518,7 +500,7 @@ async acceptFeatureRequest() {
     console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
 },
     
-   // ==================== القسم 10: handleFeatureResponse ====================
+    // ==================== القسم 10: handleFeatureResponse ====================
 async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
@@ -527,9 +509,11 @@ async handleFeatureResponse(fromId, action) {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         
-        // ✅✅ تأكيد أن الطرف الآخر في المحادثة (للمرسل والمستلم على حد سواء)
-        this.friendInConversation = true;
-        console.log('✅ تم تفعيل friendInConversation = true');
+        // ✅✅ تأكيد أن الطرف الآخر في المحادثة (حل المشكلة الأساسي)
+        if (this.currentChat === fromId) {
+            this.friendInConversation = true;
+            console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب من الطرف الآخر');
+        }
         
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
@@ -649,7 +633,7 @@ async handleFeatureResponse(fromId, action) {
         this.updateAllButtons();
         console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
     }
-},  
+},
 
      // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
@@ -1007,7 +991,6 @@ setupPageFocusListener() {
     },
 
 
-    
     // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
@@ -1067,13 +1050,9 @@ openChat(friendId, friendName, friendAvatar) {
     }, 1000);
 },
     
-
-    // ==================== القسم 24: updateFriendStatus (معطل نهائياً - تم إلغاء Presence System) ====================
-updateFriendStatus(friendId, isOnline, userData = null) {
-    // ✅ معطل نهائياً - لا يفعل شيئاً (تم إلغاء Presence System بالكامل)
-    return;
     
-    // باقي الكود محفوظ لكن لن يُنفذ
+   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
     // الحالة 1: الشخص غير متصل
@@ -1218,8 +1197,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-},
-   
+}, 
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
