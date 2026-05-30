@@ -2074,6 +2074,13 @@ async sendMessage(text) {
 
     // ==================== القسم 29: _ensureChannelReady ====================
 async _ensureChannelReady() {
+    // ✅ مؤشر مرئي للقيم الفعلية عند دخول الدالة
+    const debugNotif = document.createElement('div');
+    debugNotif.textContent = `🔍 _ensureChannelReady: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}`;
+    debugNotif.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#333;color:#ff0;padding:5px 10px;border-radius:20px;z-index:99999;font-size:11px;';
+    document.body.appendChild(debugNotif);
+    setTimeout(() => debugNotif.remove(), 5000);
+    
     // ✅ مؤشر مرئي لمعرفة السبب
     if (!this.friendInConversation || !this.featuresEnabled) {
         const reason = !this.friendInConversation ? 'friendInConversation = false' : 'featuresEnabled = false';
