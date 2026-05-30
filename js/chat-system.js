@@ -779,13 +779,8 @@ setupPageFocusListener() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
-    if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
-        this.friendInConversation = this._pendingConversationStatus[friendId];
-        console.log(`📂 تم استرجاع حالة المحادثة لـ ${friendId}: ${this.friendInConversation ? 'مفتوحة' : 'مغلقة'}`);
-        delete this._pendingConversationStatus[friendId];
-    } else {
-        this.friendInConversation = false;
-    }
+    // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
+    this.friendInConversation = false;
     
     this.resetFeatures();
     document.body.classList.add('conversation-open');
@@ -795,15 +790,10 @@ openChat(friendId, friendName, friendAvatar) {
     document.querySelector('.chat-page').style.display = 'none'; 
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
-    PresenceSystem.watchFriend(friendId);
     
-    setTimeout(() => {
-        this.sendConversationStatus(true);
-    }, 500);
+    // ✅ تم إزالة PresenceSystem.watchFriend (لم نعد نستخدم حالة الاتصال من السيرفر)
     
-    setTimeout(() => {
-        this.requestConversationStatus();
-    }, 1000);
+    // ✅ تم إزالة sendConversationStatus و requestConversationStatus (لم نعد نرسلهما)
     
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
