@@ -1068,9 +1068,13 @@ openChat(friendId, friendName, friendAvatar) {
     }, 1000);
 },
     
-    
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+
+    // ==================== القسم 24: updateFriendStatus (معطل نهائياً - تم إلغاء Presence System) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
+    // ✅ معطل نهائياً - لا يفعل شيئاً (تم إلغاء Presence System بالكامل)
+    return;
+    
+    // باقي الكود محفوظ لكن لن يُنفذ
     if (this.currentChat !== friendId) return;
     
     // الحالة 1: الشخص غير متصل
@@ -1215,7 +1219,8 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-}, 
+},
+   
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
