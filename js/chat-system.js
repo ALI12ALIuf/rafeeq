@@ -518,7 +518,7 @@ async acceptFeatureRequest() {
     console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
 },
     
-    // ==================== القسم 10: handleFeatureResponse ====================
+   // ==================== القسم 10: handleFeatureResponse ====================
 async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
@@ -527,11 +527,9 @@ async handleFeatureResponse(fromId, action) {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         
-        // ✅✅ تأكيد أن الطرف الآخر في المحادثة (حل المشكلة الأساسي)
-        if (this.currentChat === fromId) {
-            this.friendInConversation = true;
-            console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب من الطرف الآخر');
-        }
+        // ✅✅ تأكيد أن الطرف الآخر في المحادثة (للمرسل والمستلم على حد سواء)
+        this.friendInConversation = true;
+        console.log('✅ تم تفعيل friendInConversation = true');
         
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
@@ -651,7 +649,7 @@ async handleFeatureResponse(fromId, action) {
         this.updateAllButtons();
         console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
     }
-},
+},  
 
      // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
