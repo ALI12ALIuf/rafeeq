@@ -1095,10 +1095,13 @@ openChat(friendId, friendName, friendAvatar) {
     }, 1000);
 },
     
-    
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+
+    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
+    
+    // ✅ تحديث الحالة المحلية مباشرة (بدون الاعتماد على Firestore)
+    // تم تعطيل جلب البيانات من Firestore لتوفير التكلفة
     
     // الحالة 1: الشخص غير متصل
     if (!isOnline) {
@@ -1217,12 +1220,13 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
     this.friendOnline = isOnline;
     
-    if (!userData && window.auth?.currentUser) {
-        window.db.collection('users').doc(friendId).get().then(doc => {
-            if (doc.exists) this.updateFriendStatus(friendId, isOnline, doc.data());
-        }).catch(() => {});
-        return;
-    }
+    // ✅ تم تعطيل جلب البيانات من Firestore (توفير التكلفة)
+    // if (!userData && window.auth?.currentUser) {
+    //     window.db.collection('users').doc(friendId).get().then(doc => {
+    //         if (doc.exists) this.updateFriendStatus(friendId, isOnline, doc.data());
+    //     }).catch(() => {});
+    //     return;
+    // }
     
     const statusEl = document.getElementById('conversationStatus');
     if (!statusEl) return;
@@ -1242,7 +1246,8 @@ updateFriendStatus(friendId, isOnline, userData = null) {
     statusEl.className = statusClass;
     
     this.updateAllButtons();
-}, 
+},
+    
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
