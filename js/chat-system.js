@@ -469,6 +469,9 @@ async acceptFeatureRequest() {
             console.log('🔧 محاولة فتح Data Channel...');
             await CallSystem.ensureDataChannelOnly(this.currentChat);
             console.log('✅ تم فتح Data Channel بنجاح');
+            
+            // ✅ بدء مراقبة صحة القناة
+            this.startChannelHealthCheck();
         } catch(e) {
             console.error('❌ خطأ في فتح Data Channel:', e);
         }
@@ -603,6 +606,9 @@ async handleFeatureResponse(fromId, action) {
      // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
+    
+    // ✅ إيقاف مراقبة صحة القناة
+    this.stopChannelHealthCheck();
     
     if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
         await CallSystem.deleteAllWebRTCSignals(this.currentChat);
@@ -989,6 +995,9 @@ openChat(friendId, friendName, friendAvatar) {
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
     PresenceSystem.watchFriend(friendId);
+    
+    // ✅ بدء مراقبة صحة القناة (حتى لو الميزات غير مفعلة، سنبدأها عند التفعيل)
+    this.startChannelHealthCheck();
     
     setTimeout(() => {
         this.sendConversationStatus(true);
@@ -2563,11 +2572,15 @@ updateLastMessage(friendId, lastMessage) {
     }); 
 },
 
-// ==================== القسم 37: closeChat ====================
+
+    // ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
     console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
+    
+    // ✅ إيقاف مراقبة صحة القناة
+    this.stopChannelHealthCheck();
     
     const chatId = this.currentChat;
     
