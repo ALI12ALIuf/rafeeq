@@ -2,15 +2,7 @@
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 // ==================== القسم 1: تعريف PresenceSystem ====================
-const PresenceSystem = {
-    listeners: {}, heartbeatInterval: null,
-    async setOnline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.startHeartbeat(); } catch (e) {} },
-    async setOffline() { if (!window.auth?.currentUser) return; try { await window.db.collection('users').doc(window.auth.currentUser.uid).update({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }); this.stopHeartbeat(); } catch (e) {} },
-    startHeartbeat() { this.stopHeartbeat(); this.heartbeatInterval = setInterval(() => { if (window.auth?.currentUser) window.db.collection('users').doc(window.auth.currentUser.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {}); }, 30000); },
-    stopHeartbeat() { if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; } },
-    watchFriend(friendId) { if (!friendId) return; if (this.listeners[friendId]) this.listeners[friendId](); this.listeners[friendId] = window.db.collection('users').doc(friendId).onSnapshot(doc => { if (doc.exists) ChatSystem.updateFriendStatus(friendId, doc.data().online === true, doc.data()); else ChatSystem.updateFriendStatus(friendId, false); }, () => {}); },
-    stopAll() { Object.values(this.listeners).forEach(unsub => { if (typeof unsub === 'function') unsub(); }); this.listeners = {}; this.stopHeartbeat(); }
-};
+
 
 
 // ==================== القسم 2: تعريف ChatSystem ====================
@@ -84,7 +76,7 @@ cleanMediaMessagesOnLoad() {
             console.log(`✅ تم تنظيف الوسائط من محادثة ${friendId}`);
         }
     }
-    console.log('🧹 تم تنظيف جميع الملفات والوسائط من localStorage');
+    console.log('🧹 تم تنظيف جميع الملفات وheartbeatIntervaltorage');
 },
     
     
@@ -1011,7 +1003,8 @@ openChat(friendId, friendName, friendAvatar) {
     document.querySelector('.chat-page').style.display = 'none'; 
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
-    PresenceSystem.watchFriend(friendId);
+    // ✅ تم إزالة استدعاء PresenceSystem.watchFriend (لم نعد نستخدم Presence)
+    // PresenceSystem.watchFriend(friendId);
     
     setTimeout(() => {
         this.sendConversationStatus(true);
@@ -1049,155 +1042,31 @@ openChat(friendId, friendName, friendAvatar) {
         }
     }, 1000);
 },
-    
-    
-   // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+
+
+// ==================== القسم 24: updateFriendStatus (معطل - تم إلغاء Presence System) ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
-    // الحالة 1: الشخص غير متصل
-    if (!isOnline) {
-        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة) → أحمر مباشر
-        if (!this.featuresEnabled) {
-            this.friendOnline = false;
-            const statusEl = document.getElementById('conversationStatus');
-            if (statusEl) {
-                statusEl.innerHTML = '🔴 غير متصل';
-                statusEl.className = 'conversation-status offline';
-            }
-            return;
-        }
-        
-        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
-        // نبدأ العداد الأصفر 120 ثانية
-        if (this.offlineTimer) clearTimeout(this.offlineTimer);
-        if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
-        
-        this.offlineStartTime = Date.now();
-        this.friendOnline = false;
-        
-        let secondsLeft = 120;
-        const statusEl = document.getElementById('conversationStatus');
-        
-        const updateCountdown = () => {
-            if (statusEl) {
-                statusEl.innerHTML = `🟡 غير متصل مؤقتاً (${secondsLeft})`;
-                statusEl.className = 'conversation-status offline-temp';
-            }
-            secondsLeft--;
-            if (secondsLeft < 0) {
-                clearInterval(this.offlineCountdownInterval);
-                this.offlineCountdownInterval = null;
-            }
-        };
-        
-        updateCountdown();
-        this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
-        
-        this.offlineTimer = setTimeout(() => {
-            if (!this.friendOnline && this.featuresEnabled) {
-                console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
-                
-                // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
-                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-                    try {
-                        CallSystem.dc.send(JSON.stringify({ 
-                            type: 'force_disable_features',
-                            timestamp: Date.now()
-                        }));
-                        console.log('✅ تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر');
-                    } catch(e) {
-                        console.error('❌ فشل إرسال إشارة الإلغاء:', e);
-                    }
-                }
-                
-                // ✅ إلغاء الميزات محلياً
-                this.featuresEnabled = false;
-                this.featureRequestPending = false;
-                this.featureRequestReceived = false;
-                
-                if (this.featureBlinkInterval) {
-                    clearInterval(this.featureBlinkInterval);
-                    this.featureBlinkInterval = null;
-                }
-                
-                const btn = document.getElementById('enableFeaturesBtn');
-                if (btn) {
-                    btn.style.background = '#f44336';
-                    btn.title = 'تفعيل الميزات';
-                }
-                
-                // ✅ تحديث زر التفعيل
-                const toggleInput = document.getElementById('featureToggleInput');
-                if (toggleInput) toggleInput.checked = false;
-                
-                this.updateAllButtons();
-            }
-            
-            if (this.offlineCountdownInterval) {
-                clearInterval(this.offlineCountdownInterval);
-                this.offlineCountdownInterval = null;
-            }
-            
-            if (statusEl && !this.friendOnline) {
-                statusEl.innerHTML = '🔴 غير متصل';
-                statusEl.className = 'conversation-status offline';
-            }
-            
-            this.offlineTimer = null;
-        }, 120000);
-        
-        return;
-    }
+    // ✅ تم تعطيل نظام "متصل/غير متصل" بالكامل لتقليل التكلفة
+    // لن نستخدم friendOnline أو العداد الأصفر 120 ثانية بعد الآن
     
-    // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
-    if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {
-        console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
-        
-        if (this.offlineTimer) clearTimeout(this.offlineTimer);
-        if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
-        
-        this.offlineTimer = null;
-        this.offlineStartTime = null;
-        this.friendOnline = true;
-        
-        const statusEl = document.getElementById('conversationStatus');
-        if (statusEl) {
-            statusEl.innerHTML = '🟢 متصل';
-            statusEl.className = 'conversation-status online';
-        }
-        return;
-    }
-    
-    // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
-    this.friendOnline = isOnline;
-    
-    if (!userData && window.auth?.currentUser) {
-        window.db.collection('users').doc(friendId).get().then(doc => {
-            if (doc.exists) this.updateFriendStatus(friendId, isOnline, doc.data());
-        }).catch(() => {});
-        return;
-    }
-    
+    // إخفاء حالة الاتصال من واجهة المستخدم
     const statusEl = document.getElementById('conversationStatus');
-    if (!statusEl) return;
-    
-    let statusHtml = '';
-    let statusClass = '';
-    
-    if (isOnline) {
-        statusHtml = '🟢 متصل';
-        statusClass = 'conversation-status online';
-    } else {
-        statusHtml = '🔴 غير متصل';
-        statusClass = 'conversation-status offline';
+    if (statusEl) {
+        statusEl.innerHTML = '';
+        statusEl.className = 'conversation-status hidden';
     }
     
-    statusEl.innerHTML = statusHtml;
-    statusEl.className = statusClass;
+    // ✅ لا نقوم بتحديث friendOnline أو بدء أي عداد
+    // الميزات الأخرى (المكالمات، الملفات، تفعيل الميزات) تعمل بشكل مستقل
     
+    // فقط نضمن تحديث واجهة الأزرار إذا لزم الأمر
     this.updateAllButtons();
-}, 
+},
+
+
+    
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
