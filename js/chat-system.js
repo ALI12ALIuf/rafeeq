@@ -1,33 +1,25 @@
 // ========== chat-system.js ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
-// ==================== القسم 1: تعريف PresenceSystem (تم تعطيل الاتصال بالسيرفر) ====================
+// ==================== القسم 1: تعريف PresenceSystem (تم تعطيل الاتصال بالسيرفر بالكامل) ====================
 const PresenceSystem = {
     listeners: {}, heartbeatInterval: null,
     
-    // ✅ تم تعطيل تحديث الحالة في السيرفر (لتوفير التكلفة)
     async setOnline() { 
         if (!window.auth?.currentUser) return;
-        // ❌ تم إزالة تحديث Firestore
         console.log('✅ تم تعطيل تحديث الحالة في السيرفر (توفير التكلفة)');
-        // this.startHeartbeat(); // تم تعطيله
     },
     
     async setOffline() { 
         if (!window.auth?.currentUser) return;
-        // ❌ تم إزالة تحديث Firestore
         console.log('✅ تم تعطيل تحديث الحالة في السيرفر (توفير التكلفة)');
-        // this.stopHeartbeat(); // تم تعطيله
     },
     
-    // ✅ تم تعطيل نبضات القلب (heartbeat)
     startHeartbeat() { 
-        // ❌ تم تعطيله بالكامل
         console.log('✅ تم تعطيل Heartbeat (توفير التكلفة)');
     },
     
     stopHeartbeat() { 
-        // ❌ تم تعطيله بالكامل
         if (this.heartbeatInterval) { 
             clearInterval(this.heartbeatInterval); 
             this.heartbeatInterval = null; 
@@ -37,13 +29,9 @@ const PresenceSystem = {
     // ✅ تم تعطيل مراقبة الأصدقاء من السيرفر
     watchFriend(friendId) { 
         if (!friendId) return;
-        // ❌ تم إزالة onSnapshot من Firestore
-        console.log(`✅ تم تعطيل مراقبة حالة الصديق ${friendId} من السيرفر (توفير التكلفة)`);
-        
-        // ✅ بدلاً من ذلك، نعتمد على الحالة المحلية فقط
-        // نعتبر الصديق متصل افتراضياً (أو نحتفظ بآخر حالة معروفة)
+        console.log(`✅ تم تعطيل مراقبة حالة الصديق ${friendId} من السيرفر`);
+        // نعتمد على الحالة المحلية فقط
         if (ChatSystem.currentChat === friendId) {
-            // نحاول الحفاظ على الحالة المحلية دون الاتصال بالسيرفر
             ChatSystem.updateFriendStatus(friendId, true, null);
         }
     },
@@ -60,7 +48,7 @@ const PresenceSystem = {
 
 // ==================== القسم 2: تعريف ChatSystem ====================
 const ChatSystem = {
-    currentChat: null, messages: {}, friendOnline: false,
+    currentChat: null, messages: {},
     friendInConversation: false,
     _pendingConversationStatus: {},
     
@@ -82,8 +70,8 @@ const ChatSystem = {
         // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
         toggleInput.checked = this.featuresEnabled;
         
-        // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة أو غير متصل
-        const canUseToggle = (this.friendInConversation && this.friendOnline);
+        // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة
+        const canUseToggle = this.friendInConversation;
         toggleInput.disabled = !canUseToggle;
         
         // ✅ تحديث الشفافية
@@ -98,12 +86,9 @@ const ChatSystem = {
             }
         }
         
-        console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}, friendOnline=${this.friendOnline}`);
+        console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}`);
     },
     
-    // ==================== القسم 3: init ====================
-    
-
     // ==================== القسم 3: init ====================
 init() { 
     this.loadAllChats(); 
@@ -117,8 +102,6 @@ init() {
 
 // ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
 cleanMediaMessagesOnLoad() {
-    // تنظيف جميع المحادثات من الملفات والوسائط (صور، فيديو، بصمات، ملفات)
-    // بحيث يبقى فقط النصوص
     for (const friendId in this.messages) {
         const messages = this.messages[friendId] || [];
         const filteredMessages = messages.filter(msg => msg.type === 'text');
@@ -133,13 +116,11 @@ cleanMediaMessagesOnLoad() {
 },
     
     
-    // ==================== القسم 4: setupBeforeUnloadListener (تم حذف sendFeatureCancelBeforeUnload) ====================
+    // ==================== القسم 4: setupBeforeUnloadListener ====================
 setupBeforeUnloadListener() {
     window.addEventListener('beforeunload', () => {
         if (this.currentChat && this.featuresEnabled) {
             console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات محلياً');
-            // ✅ لم نعد نرسل إشارة feature_cancel عبر Firebase
-            // الطرف الآخر سيعرف بانقطاع القناة عبر onclose
         }
     });
 },
@@ -148,7 +129,6 @@ setupBeforeUnloadListener() {
     // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
     setTimeout(() => {
-        // ✅ إزالة أي أزرار قديمة
         const oldBtn = document.getElementById('enableFeaturesBtn');
         if (oldBtn) oldBtn.remove();
         
@@ -164,7 +144,6 @@ setupFeatureButton() {
             return;
         }
         
-        // ✅ إضافة الأنماط
         if (!document.getElementById('featureToggleStyles')) {
             const style = document.createElement('style');
             style.id = 'featureToggleStyles';
@@ -220,7 +199,6 @@ setupFeatureButton() {
                 input:checked + .feature-slider:before {
                     transform: translateX(26px);
                 }
-                /* تأثير الرمش */
                 @keyframes featureBlink {
                     0% { background-color: #f44336; }
                     50% { background-color: #2196F3; }
@@ -229,7 +207,6 @@ setupFeatureButton() {
                 .feature-switch.blinking .feature-slider {
                     animation: featureBlink 0.8s ease-in-out infinite;
                 }
-                /* زر الطرد */
                 .kick-btn {
                     background: none;
                     border: none;
@@ -262,7 +239,6 @@ setupFeatureButton() {
             document.head.appendChild(style);
         }
         
-        // ✅ إنشاء حاوية الزر
         const toggleContainer = document.createElement('div');
         toggleContainer.className = 'feature-toggle-container';
         toggleContainer.id = 'featureToggleContainer';
@@ -286,10 +262,8 @@ setupFeatureButton() {
         
         if (!toggleInput) return;
         
-        // ✅ حفظ المراجع
         window.featureToggleInput = toggleInput;
         
-        // ✅ معالج الضغط لزر التفعيل
         toggleInput.onclick = (e) => {
             console.log('🔘 تم الضغط على زر التفعيل');
             
@@ -308,22 +282,18 @@ setupFeatureButton() {
             }
         };
         
-        // ✅ معالج الضغط لزر الطرد (بدون تأكيد وبدون تغيير لون)
         if (kickBtn) {
             kickBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // تنفيذ الطرد مباشرة بدون تأكيد
                 this.kickUserFromConversation();
             };
         }
         
-        // ✅ إذا كانت الميزات مفعلة مسبقاً
         if (this.featuresEnabled && toggleInput) {
             toggleInput.checked = true;
         }
         
-        // ✅ تحديث حالة زر الطرد بناءً على الميزات
         this.updateKickButtonState();
         
         console.log('✅ تم إضافة زر التفعيل وزر الطرد');
@@ -360,7 +330,6 @@ async kickUserFromConversation() {
     
     console.log('👢 محاولة طرد المستخدم:', this.currentChat);
     
-    // ✅ إرسال إشارة الطرد مباشرة عبر Data Channel (بدون Firebase)
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
         try {
             CallSystem.dc.send(JSON.stringify({ 
@@ -375,10 +344,7 @@ async kickUserFromConversation() {
         console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
     }
     
-    // ✅ تحديث واجهة المستخدم (تحديث حالة زر التفعيل)
     this.updateAllButtons();
-    
-    // ✅ لا نعرض أي إشعار (تمت الإزالة)
 },
     
     
@@ -480,7 +446,6 @@ async acceptFeatureRequest() {
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
     
-    // ✅✅ تأكيد أن الطرف الآخر في المحادثة (حل المشكلة الأساسي)
     if (this.currentChat) {
         this.friendInConversation = true;
         console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب');
@@ -493,27 +458,17 @@ async acceptFeatureRequest() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث زر التفعيل
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (toggleInput) {
-        toggleInput.checked = true;
-    }
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-    }
+    if (toggleInput) toggleInput.checked = true;
+    if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ فتح Data Channel بعد تفعيل الميزات (مهم للملفات والمكالمات)
     if (this.currentChat) {
         try {
             console.log('🔧 محاولة فتح Data Channel...');
-            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
-            if (success) {
-                console.log('✅ تم فتح Data Channel بنجاح');
-            } else {
-                console.log('⚠️ فشل فتح Data Channel، سيتم إعادة المحاولة لاحقاً');
-            }
+            await CallSystem.ensureDataChannelOnly(this.currentChat);
+            console.log('✅ تم فتح Data Channel بنجاح');
         } catch(e) {
             console.error('❌ خطأ في فتح Data Channel:', e);
         }
@@ -542,7 +497,6 @@ async acceptFeatureRequest() {
     
     this.updateAllButtons();
     console.log('✅ تم تفعيل الميزات!');
-    console.log('✅ acceptFeatureRequest - انتهى التنفيذ');
 },
     
     // ==================== القسم 10: handleFeatureResponse ====================
@@ -554,7 +508,6 @@ async handleFeatureResponse(fromId, action) {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         
-        // ✅✅ تأكيد أن الطرف الآخر في المحادثة (حل المشكلة الأساسي)
         if (this.currentChat === fromId) {
             this.friendInConversation = true;
             console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب من الطرف الآخر');
@@ -565,35 +518,22 @@ async handleFeatureResponse(fromId, action) {
             this.featureBlinkInterval = null;
         }
         
-        // ✅ تحديث زر التفعيل المنزلق (Toggle Switch)
         const toggleInput = document.getElementById('featureToggleInput');
         const switchLabel = document.getElementById('featureSwitchLabel');
         
-        if (toggleInput) {
-            toggleInput.checked = true;
-            console.log('✅ تم تفعيل زر التفعيل (ON)');
-        }
-        if (switchLabel) {
-            switchLabel.classList.remove('blinking');
-            console.log('✅ تم إيقاف الرمش');
-        }
+        if (toggleInput) toggleInput.checked = true;
+        if (switchLabel) switchLabel.classList.remove('blinking');
         
-        // ✅ فتح Data Channel بعد قبول الطلب (مهم للملفات والمكالمات)
         if (this.currentChat) {
             try {
                 console.log('🔧 محاولة فتح Data Channel بعد قبول الطرف الآخر...');
-                const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
-                if (success) {
-                    console.log('✅ تم فتح Data Channel بنجاح');
-                } else {
-                    console.log('⚠️ فشل فتح Data Channel، سيتم إعادة المحاولة لاحقاً');
-                }
+                await CallSystem.ensureDataChannelOnly(this.currentChat);
+                console.log('✅ تم فتح Data Channel بنجاح');
             } catch(e) {
                 console.error('❌ خطأ في فتح Data Channel:', e);
             }
         }
         
-        // ✅ للتوافق مع الزر القديم (إذا وجد)
         const btn = document.getElementById('enableFeaturesBtn');
         if (btn) {
             btn.style.background = '#4CAF50';
@@ -612,27 +552,16 @@ async handleFeatureResponse(fromId, action) {
             this.featureBlinkInterval = null;
         }
         
-        // ✅ تحديث زر التفعيل المنزلق (إلغاء)
         const toggleInput = document.getElementById('featureToggleInput');
         const switchLabel = document.getElementById('featureSwitchLabel');
         
-        if (toggleInput) {
-            toggleInput.checked = false;
-            console.log('✅ تم إلغاء تفعيل الزر (OFF)');
-        }
-        if (switchLabel) {
-            switchLabel.classList.remove('blinking');
-            console.log('✅ تم إيقاف الرمش');
-        }
+        if (toggleInput) toggleInput.checked = false;
+        if (switchLabel) switchLabel.classList.remove('blinking');
         
-        // ✅ للتوافق مع الزر القديم
         const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) {
-            btn.style.background = '#f44336';
-        }
+        if (btn) btn.style.background = '#f44336';
         console.log('❌ تم رفض طلب تفعيل الميزات');
         
-    // ✅✅✅ إضافة معالجة إشارة الإيقاف من الطرف الآخر
     } else if (action === 'disable') {
         console.log('🔴 استلام إشارة إيقاف من الطرف الآخر');
         
@@ -645,27 +574,18 @@ async handleFeatureResponse(fromId, action) {
             this.featureBlinkInterval = null;
         }
         
-        // ✅ تحديث زر التفعيل إلى اللون الأحمر
         const toggleInput = document.getElementById('featureToggleInput');
         const switchLabel = document.getElementById('featureSwitchLabel');
         
-        if (toggleInput) {
-            toggleInput.checked = false;
-            console.log('✅ تم إلغاء تفعيل الزر (OFF)');
-        }
-        if (switchLabel) {
-            switchLabel.classList.remove('blinking');
-            console.log('✅ تم إيقاف الرمش');
-        }
+        if (toggleInput) toggleInput.checked = false;
+        if (switchLabel) switchLabel.classList.remove('blinking');
         
-        // ✅ للتوافق مع الزر القديم
         const btn = document.getElementById('enableFeaturesBtn');
         if (btn) {
             btn.style.background = '#f44336';
             btn.title = 'تفعيل الميزات';
         }
         
-        // ✅ إغلاق Data Channel
         if (CallSystem.dc) {
             try { CallSystem.dc.close(); } catch(e) {}
             CallSystem.dc = null;
@@ -684,7 +604,6 @@ async handleFeatureResponse(fromId, action) {
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
-    // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
     if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
         await CallSystem.deleteAllWebRTCSignals(this.currentChat);
     }
@@ -698,21 +617,12 @@ async disableFeatures() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث زر التفعيل إلى اللون الأحمر
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (toggleInput) {
-        toggleInput.checked = false;
-    }
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-    }
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ تم إزالة إرسال إشارة feature_cancel (لم نعد نرسلها عبر Firebase)
-    // الطرف الآخر سيعرف بانقطاع القناة عبر onclose
-    
-    // ✅ إغلاق Data Channel
     if (CallSystem.dc) {
         try { CallSystem.dc.close(); } catch(e) {}
         CallSystem.dc = null;
@@ -740,20 +650,14 @@ resetFeatures() {
         clearInterval(this.featureBlinkInterval);
     }
     
-    // ✅ تحديث زر التفعيل
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (toggleInput) {
-        toggleInput.checked = false;
-    }
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-    }
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
     
     if (chatId) {
-        console.log('📤 تم إلغاء الميزات محلياً - لا حاجة لإرسال إشارة');
-        // ✅ تم إزالة إرسال feature_cancel (الدالة محذوفة)
+        console.log('📤 تم إلغاء الميزات محلياً');
     }
     
     this.updateAllButtons();
@@ -762,33 +666,24 @@ resetFeatures() {
     // ==================== القسم 13: handleFeatureCancel ====================
 handleFeatureCancel() {
     console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
-    console.log('featuresEnabled قبيل الإلغاء:', this.featuresEnabled);
     
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
-    
-    console.log('✅ featuresEnabled بعد الإلغاء:', this.featuresEnabled);
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
     }
     
-    // ✅ تحديث زر التفعيل
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (toggleInput) {
-        toggleInput.checked = false;
-    }
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-    }
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
     
     this.updateAllButtons();
     console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
-    console.log('✅ handleFeatureCancel - انتهى, featuresEnabled =', this.featuresEnabled);
 },
     
    // ==================== القسم 14: updateAllButtons ====================
@@ -844,10 +739,7 @@ updateAllButtons() {
         }
     }
     
-    // ✅ تحديث زر التفعيل باستخدام الدالة المركزية
     this.updateFeatureToggleUI();
-    
-    // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
     
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
@@ -856,10 +748,8 @@ updateAllButtons() {
     // ==================== القسم 15: setupPageFocusListener ====================
 setupPageFocusListener() {
     window.addEventListener('focus', () => {
-        if (this.currentChat && this.friendOnline && this.featuresEnabled) { // ✅ تم إضافة this.featuresEnabled
-            console.log('👁️ الصفحة في المقدمة - تحديث حالة المحادثة');
-            this.sendConversationStatus(true);
-            this.requestConversationStatus();
+        if (this.currentChat && this.featuresEnabled) {
+            console.log('👁️ الصفحة في المقدمة');
         }
     });
 },
@@ -979,7 +869,6 @@ setupPageFocusListener() {
     // ==================== القسم 22: updateFriendConversationStatus ====================
     updateFriendConversationStatus(friendId, isInConversation) {
         console.log(`👥 استلام تحديث حالة المحادثة من: ${friendId}, في المحادثة: ${isInConversation}`);
-        console.log('currentChat الحالي:', this.currentChat);
         
         if (this.currentChat === friendId) {
             this.friendInConversation = isInConversation;
@@ -1000,7 +889,6 @@ setupPageFocusListener() {
                 if (btn) {
                     btn.style.background = '#f44336';
                     btn.title = 'تفعيل الميزات';
-                    console.log('✅ تم تغيير لون الزر إلى الأحمر');
                 }
                 
                 this.updateAllButtons();
@@ -1066,19 +954,11 @@ openChat(friendId, friendName, friendAvatar) {
         this.requestConversationStatus();
     }, 1000);
     
-    // ✅ تم إزالة استدعاء ensureDataChannelOnly (لن يتم فتح Data Channel إلا بعد تفعيل الميزات)
-    // setTimeout(() => { 
-    //     if (this.friendOnline) {
-    //         CallSystem.ensureDataChannelOnly(friendId).catch(() => {});
-    //     }
-    // }, 500);
-    
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
     setTimeout(() => this.setupFeatureButton(), 500);
     
-    // ✅ إذا كانت الميزات مفعلة ولكن Data Channel مغلق، أعد تعيين الميزات
     setTimeout(() => {
         if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
             console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
@@ -1096,18 +976,12 @@ openChat(friendId, friendName, friendAvatar) {
 },
     
 
-    // ==================== القسم 24: updateFriendStatus (الرئيسي مع الوقت 120 ثانية) ====================
+    // ==================== القسم 24: updateFriendStatus ====================
 updateFriendStatus(friendId, isOnline, userData = null) {
     if (this.currentChat !== friendId) return;
     
-    // ✅ تحديث الحالة المحلية مباشرة (بدون الاعتماد على Firestore)
-    // تم تعطيل جلب البيانات من Firestore لتوفير التكلفة
-    
-    // الحالة 1: الشخص غير متصل
     if (!isOnline) {
-        // ✅ إذا كان غير متصل من البداية (الميزات غير مفعلة) → أحمر مباشر
         if (!this.featuresEnabled) {
-            this.friendOnline = false;
             const statusEl = document.getElementById('conversationStatus');
             if (statusEl) {
                 statusEl.innerHTML = '🔴 غير متصل';
@@ -1116,13 +990,10 @@ updateFriendStatus(friendId, isOnline, userData = null) {
             return;
         }
         
-        // ✅ هنا: الميزات مفعلة، فالمستخدم كان متصلاً وانقطع (دخل ملف أو خرج فجأة)
-        // نبدأ العداد الأصفر 120 ثانية
         if (this.offlineTimer) clearTimeout(this.offlineTimer);
         if (this.offlineCountdownInterval) clearInterval(this.offlineCountdownInterval);
         
         this.offlineStartTime = Date.now();
-        this.friendOnline = false;
         
         let secondsLeft = 120;
         const statusEl = document.getElementById('conversationStatus');
@@ -1143,10 +1014,9 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         this.offlineCountdownInterval = setInterval(updateCountdown, 1000);
         
         this.offlineTimer = setTimeout(() => {
-            if (!this.friendOnline && this.featuresEnabled) {
+            if (this.featuresEnabled) {
                 console.log('🔴 120 ثانية وما رجع - إلغاء الميزات وإرسال إشارة إلى الطرف الآخر');
                 
-                // ✅ إرسال إشارة إلغاء الميزات إلى الطرف الآخر عبر Data Channel
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
                     try {
                         CallSystem.dc.send(JSON.stringify({ 
@@ -1159,7 +1029,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                     }
                 }
                 
-                // ✅ إلغاء الميزات محلياً
                 this.featuresEnabled = false;
                 this.featureRequestPending = false;
                 this.featureRequestReceived = false;
@@ -1175,7 +1044,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                     btn.title = 'تفعيل الميزات';
                 }
                 
-                // ✅ تحديث زر التفعيل
                 const toggleInput = document.getElementById('featureToggleInput');
                 if (toggleInput) toggleInput.checked = false;
                 
@@ -1187,7 +1055,7 @@ updateFriendStatus(friendId, isOnline, userData = null) {
                 this.offlineCountdownInterval = null;
             }
             
-            if (statusEl && !this.friendOnline) {
+            if (statusEl) {
                 statusEl.innerHTML = '🔴 غير متصل';
                 statusEl.className = 'conversation-status offline';
             }
@@ -1198,7 +1066,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         return;
     }
     
-    // الحالة 2: الشخص رجع متصل خلال 120 ثانية (نرجع الميزات كما هي)
     if (isOnline && this.offlineStartTime && (Date.now() - this.offlineStartTime) < 120000) {
         console.log('✅ الطرف الآخر عاد خلال 120 ثانية - إبقاء الميزات مفعلة');
         
@@ -1207,7 +1074,6 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         
         this.offlineTimer = null;
         this.offlineStartTime = null;
-        this.friendOnline = true;
         
         const statusEl = document.getElementById('conversationStatus');
         if (statusEl) {
@@ -1217,37 +1083,19 @@ updateFriendStatus(friendId, isOnline, userData = null) {
         return;
     }
     
-    // الحالة 3: الوضع الطبيعي (متصل أو غير متصل بشكل نهائي)
-    this.friendOnline = isOnline;
-    
-    // ✅ تم تعطيل جلب البيانات من Firestore (توفير التكلفة)
-    // if (!userData && window.auth?.currentUser) {
-    //     window.db.collection('users').doc(friendId).get().then(doc => {
-    //         if (doc.exists) this.updateFriendStatus(friendId, isOnline, doc.data());
-    //     }).catch(() => {});
-    //     return;
-    // }
-    
     const statusEl = document.getElementById('conversationStatus');
     if (!statusEl) return;
     
-    let statusHtml = '';
-    let statusClass = '';
-    
     if (isOnline) {
-        statusHtml = '🟢 متصل';
-        statusClass = 'conversation-status online';
+        statusEl.innerHTML = '🟢 متصل';
+        statusEl.className = 'conversation-status online';
     } else {
-        statusHtml = '🔴 غير متصل';
-        statusClass = 'conversation-status offline';
+        statusEl.innerHTML = '🔴 غير متصل';
+        statusEl.className = 'conversation-status offline';
     }
-    
-    statusEl.innerHTML = statusHtml;
-    statusEl.className = statusClass;
     
     this.updateAllButtons();
 },
-    
     
     // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
@@ -1261,7 +1109,6 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
     div.id = `msg-${msg.id}`;
     
-    // ✅ الوقت بالتنسيق المطلوب: 2026-05-23 08:04 AM
     const formatDateTime = (dateObj) => {
         const year = dateObj.getFullYear();
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -1276,35 +1123,25 @@ displayMessage(msg) {
     
     const dateTime = formatDateTime(new Date(msg.time));
     
-    // ✅ إلغاء علامات الصح نهائياً
-    
     if (msg.type === 'text') {
-        // ✅ النص: الخلفية كما كانت (var(--card-bg))، الإطار مثل لون الزر
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         
         if (msg.sender === 'me') {
-            // ✅ المرسلة: إطار أزرق (#2196F3) مثل لون زر الإرسال
             contentDiv.style.cssText = 'border: 1.5px solid #2196F3; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
         } else {
-            // ✅ المستلمة: إطار أخضر (#4CAF50)
             contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
         }
         
-        // النص
         const textSpan = document.createElement('span');
         textSpan.style.cssText = 'font-size: 1rem; line-height: 1.4; display: block;';
         textSpan.innerHTML = this.escapeHtml(msg.text);
         contentDiv.appendChild(textSpan);
-        
         div.appendChild(contentDiv);
         
-        // ✅ الوقت يظهر كل 10 رسائل فقط (بدون شرط الوقت)
-        // نتحقق من عدد الرسائل النصية في الـ DOM حالياً
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
-        // كل 10 رسائل (الرسائل رقم 0, 10, 20, 30...)
         if (currentMessageCount % 10 === 0) {
             const timeSeparator = document.createElement('div');
             timeSeparator.className = 'time-separator';
@@ -1314,7 +1151,6 @@ displayMessage(msg) {
         }
     } 
     else if (msg.type === 'location') {
-        // معالجة رسالة الموقع (بدون وقت)
         let locationData = msg.data;
         let locationUrl = '';
         
@@ -1369,7 +1205,6 @@ displayMessage(msg) {
             div.appendChild(locationDiv);
         }
     }
-    // ✅ قسم الصور
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
         if (imageSrc && typeof imageSrc === 'string') {
@@ -1516,7 +1351,6 @@ displayMessage(msg) {
             }
         }, 10);
     } 
-    // ✅ قسم الفيديو
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
         if (videoSrc && typeof videoSrc === 'string') {
@@ -1590,13 +1424,11 @@ displayMessage(msg) {
 }, 
      
 
-    // ==================== القسم 26.1: showImagePreview (عرض الصورة بملء الشاشة مع إطار كامل) ====================
+    // ==================== القسم 26.1: showImagePreview ====================
 showImagePreview(imageSrc) {
-    // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء النافذة المنبثقة (ملء الشاشة)
     const modal = document.createElement('div');
     modal.id = 'imagePreviewModal';
     modal.style.cssText = `
@@ -1615,13 +1447,11 @@ showImagePreview(imageSrc) {
         touch-action: pan-x pan-y;
     `;
     
-    // منع القوائم الافتراضية على النافذة بأكملها
     modal.oncontextmenu = (e) => {
         e.preventDefault();
         return false;
     };
     
-    // ========== الإطار الثابت الأخضر (يغطي كامل الشاشة) ==========
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1636,7 +1466,6 @@ showImagePreview(imageSrc) {
         box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
     `;
     
-    // ========== حاوية الصورة ==========
     const imageContainer = document.createElement('div');
     imageContainer.style.cssText = `
         position: absolute;
@@ -1665,7 +1494,6 @@ showImagePreview(imageSrc) {
         touch-action: none;
     `;
     
-    // ✅ منع القوائم الافتراضية نهائياً (Context Menu, Drag, Copy, Save)
     img.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -1692,7 +1520,6 @@ showImagePreview(imageSrc) {
         return false;
     };
     
-    // ========== الأزرار ==========
     const buttonOverlay = document.createElement('div');
     buttonOverlay.style.cssText = `
         position: absolute;
@@ -1706,7 +1533,6 @@ showImagePreview(imageSrc) {
         z-index: 10052;
     `;
     
-    // زر الرجوع
     const backBtn = document.createElement('button');
     backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
     backBtn.style.cssText = `
@@ -1731,7 +1557,6 @@ showImagePreview(imageSrc) {
         modal.remove();
     };
     
-    // زر التحميل
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
@@ -1763,7 +1588,6 @@ showImagePreview(imageSrc) {
     buttonOverlay.appendChild(backBtn);
     buttonOverlay.appendChild(downloadBtn);
     
-    // ========== التكبير والتصغير باللمس ==========
     let currentScale = 1;
     let initialDistance = 0;
     let initialScale = 1;
@@ -1841,7 +1665,6 @@ showImagePreview(imageSrc) {
     modal.appendChild(imageContainer);
     modal.appendChild(buttonOverlay);
     
-    // إغلاق بزر ESC
     const escHandler = (e) => {
         if (e.key === 'Escape' && document.getElementById('imagePreviewModal')) {
             modal.remove();
@@ -1853,13 +1676,11 @@ showImagePreview(imageSrc) {
     document.body.appendChild(modal);
 },
 
-// ==================== القسم 26.2: showVideoPreview (عرض الفيديو بملء الشاشة - خروج فقط بزر الرجوع) ====================
+// ==================== القسم 26.2: showVideoPreview ====================
 showVideoPreview(videoSrc) {
-    // إزالة أي نافذة سابقة
     const existingPreview = document.getElementById('videoPreviewModal');
     if (existingPreview) existingPreview.remove();
     
-    // إنشاء النافذة المنبثقة (ملء الشاشة)
     const modal = document.createElement('div');
     modal.id = 'videoPreviewModal';
     modal.style.cssText = `
@@ -1877,13 +1698,11 @@ showVideoPreview(videoSrc) {
         overflow: hidden;
     `;
     
-    // منع القوائم الافتراضية على النافذة بأكملها
     modal.oncontextmenu = (e) => {
         e.preventDefault();
         return false;
     };
     
-    // الإطار الثابت الأخضر
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: absolute;
@@ -1898,7 +1717,6 @@ showVideoPreview(videoSrc) {
         box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
     `;
     
-    // المحتوى داخل الإطار
     const contentContainer = document.createElement('div');
     contentContainer.style.cssText = `
         position: absolute;
@@ -1913,7 +1731,6 @@ showVideoPreview(videoSrc) {
         overflow: hidden;
     `;
     
-    // حاوية الفيديو
     const videoWrapper = document.createElement('div');
     videoWrapper.style.cssText = `
         flex: 1;
@@ -1936,7 +1753,6 @@ showVideoPreview(videoSrc) {
     video.controls = false;
     video.playsinline = true;
     
-    // ✅ منع القوائم الافتراضية على الفيديو (Context Menu, Drag, Save)
     video.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -1948,7 +1764,6 @@ showVideoPreview(videoSrc) {
         return false;
     };
     
-    // أزرار علوية
     const topButtons = document.createElement('div');
     topButtons.style.cssText = `
         position: absolute;
@@ -1962,7 +1777,6 @@ showVideoPreview(videoSrc) {
         z-index: 10062;
     `;
     
-    // زر الرجوع (الطريقة الوحيدة للخروج)
     const backBtn = document.createElement('button');
     backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
     backBtn.style.cssText = `
@@ -1988,7 +1802,6 @@ showVideoPreview(videoSrc) {
         modal.remove();
     };
     
-    // زر التحميل
     const downloadBtn = document.createElement('button');
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.style.cssText = `
@@ -2020,7 +1833,6 @@ showVideoPreview(videoSrc) {
     topButtons.appendChild(backBtn);
     topButtons.appendChild(downloadBtn);
     
-    // شريط التحكم السفلي
     const controlsBar = document.createElement('div');
     controlsBar.style.cssText = `
         width: 100%;
@@ -2035,7 +1847,6 @@ showVideoPreview(videoSrc) {
         z-index: 10062;
     `;
     
-    // زر تشغيل/إيقاف
     const playPauseBtn = document.createElement('button');
     playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
     playPauseBtn.style.cssText = `
@@ -2053,12 +1864,10 @@ showVideoPreview(videoSrc) {
         transition: all 0.2s;
     `;
     
-    // وقت الفيديو الحالي
     const currentTimeSpan = document.createElement('span');
     currentTimeSpan.textContent = '0:00';
     currentTimeSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
     
-    // شريط التقدم
     const progressBar = document.createElement('div');
     progressBar.style.cssText = `
         flex: 1;
@@ -2079,7 +1888,6 @@ showVideoPreview(videoSrc) {
     `;
     progressBar.appendChild(progressFill);
     
-    // المدة الإجمالية
     const durationSpan = document.createElement('span');
     durationSpan.textContent = '0:00';
     durationSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
@@ -2089,7 +1897,6 @@ showVideoPreview(videoSrc) {
     controlsBar.appendChild(progressBar);
     controlsBar.appendChild(durationSpan);
     
-    // ترتيب العناصر
     videoWrapper.appendChild(video);
     contentContainer.appendChild(videoWrapper);
     contentContainer.appendChild(controlsBar);
@@ -2098,14 +1905,12 @@ showVideoPreview(videoSrc) {
     modal.appendChild(contentContainer);
     modal.appendChild(topButtons);
     
-    // الحصول على مدة الفيديو
     video.addEventListener('loadedmetadata', () => {
         const minutes = Math.floor(video.duration / 60);
         const seconds = Math.floor(video.duration % 60);
         durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     });
     
-    // تحديث الوقت والتقدم أثناء التشغيل
     video.addEventListener('timeupdate', () => {
         const minutes = Math.floor(video.currentTime / 60);
         const seconds = Math.floor(video.currentTime % 60);
@@ -2114,7 +1919,6 @@ showVideoPreview(videoSrc) {
         progressFill.style.width = percent + '%';
     });
     
-    // تشغيل/إيقاف
     let isPlaying = false;
     playPauseBtn.onclick = () => {
         if (isPlaying) {
@@ -2128,13 +1932,11 @@ showVideoPreview(videoSrc) {
         }
     };
     
-    // عند انتهاء الفيديو
     video.onended = () => {
         playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
         isPlaying = false;
     };
     
-    // التقدم بالضغط على شريط التقدم
     progressBar.onclick = (e) => {
         const rect = progressBar.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -2142,7 +1944,6 @@ showVideoPreview(videoSrc) {
         video.currentTime = percent * video.duration;
     };
     
-    // إغلاق بزر ESC
     const escHandler = (e) => {
         if (e.key === 'Escape' && document.getElementById('videoPreviewModal')) {
             if (video) video.pause();
@@ -2154,7 +1955,6 @@ showVideoPreview(videoSrc) {
     
     document.body.appendChild(modal);
     
-    // بدء التشغيل تلقائياً
     video.play().then(() => {
         playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
         isPlaying = true;
@@ -2166,7 +1966,6 @@ async sendMessage(text) {
     if (!this.currentChat || !text.trim()) return false; 
     const mid = Date.now().toString(); 
     
-    // ✅ إذا الميزات مفعلة والطرف الآخر في المحادثة وقناة Data Channel مفتوحة، نرسل مباشرة
     if (this.featuresEnabled && this.friendInConversation && CallSystem.dc && CallSystem.dc.readyState === 'open') {
         try {
             const messageData = {
@@ -2184,11 +1983,9 @@ async sendMessage(text) {
             return true;
         } catch(e) {
             console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
-            // نواصل إلى الإرسال عبر Firebase كحل بديل
         }
     }
     
-    // ✅ الطريقة العادية: إرسال عبر Firebase (مشفرة E2EE)
     try { 
         const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
         if (!pr || !pu) return false;
@@ -2492,17 +2289,13 @@ showLocationSwipeModalWithClicks(locationData) {
             <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
             <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي</p>
             
-            <!-- الإحداثيات -->
             <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 20px;">
                 <div style="color: #4CAF50; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px;">الإحداثيات</div>
                 <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
             </div>
             
-            <!-- عدد مرات فتح الموقع -->
             <div style="margin-bottom: 15px;">
                 <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; text-align: center;">عدد مرات فتح الموقع</div>
-                
-                <!-- ✅ أزرار اختيار من 1 إلى 5 فقط (في المنتصف) -->
                 <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
                     <button type="button" class="click-preset" data-clicks="1">1</button>
                     <button type="button" class="click-preset" data-clicks="2">2</button>
@@ -2512,7 +2305,6 @@ showLocationSwipeModalWithClicks(locationData) {
                 </div>
             </div>
             
-            <!-- زر السحب -->
             <div style="margin-bottom: 15px;">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
                     <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
@@ -2524,10 +2316,8 @@ showLocationSwipeModalWithClicks(locationData) {
                 </div>
             </div>
             
-            <!-- نص توضيحي -->
             <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
             
-            <!-- شريط السحب -->
             <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
                 <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor};">
                     <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%);"></div>
@@ -2554,7 +2344,6 @@ showLocationSwipeModalWithClicks(locationData) {
     let selectedClicks = 1;
     let selectedButton = null;
     
-    // معالج أزرار الاختيار
     document.querySelectorAll('.click-preset').forEach(btn => {
         btn.onclick = () => {
             if (selectedButton) {
@@ -2568,7 +2357,6 @@ showLocationSwipeModalWithClicks(locationData) {
         };
     });
     
-    // تحديد الزر الأول (1) بشكل افتراضي
     const firstBtn = document.querySelector('.click-preset[data-clicks="1"]');
     if (firstBtn) {
         firstBtn.style.background = '#4CAF50';
@@ -2741,18 +2529,13 @@ closeChat() {
     
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
-        // ✅ تم إزالة إرسال feature_cancel (لم نعد نرسله عبر Firebase)
-        // ✅ تم إزالة إرسال conversation_status (لم نعد نرسله)
         
-        // ✅ حذف جميع إشارات WebRTC العالقة من Firestore
         if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
             CallSystem.deleteAllWebRTCSignals(chatId);
         }
         
-        // ✅ حذف جميع الملفات والوسائط (صور، فيديو، بصمات، ملفات) عند إغلاق المحادثة
         const key = `chat_${chatId}`;
         const messages = this.messages[chatId] || [];
-        // إبقاء النصوص فقط، حذف كل ما هو ليس نصاً
         const filteredMessages = messages.filter(msg => msg.type === 'text');
         this.messages[chatId] = filteredMessages;
         localStorage.setItem(key, JSON.stringify(filteredMessages));
@@ -2782,7 +2565,6 @@ closeChat() {
     PresenceSystem.stopAll();
     if (!CallSystem.isInCall) CallSystem.cleanupConnections();
     this.currentChat = null;
-    this.friendOnline = false;
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
