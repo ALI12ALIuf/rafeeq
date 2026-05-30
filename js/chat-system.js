@@ -983,9 +983,12 @@ setupPageFocusListener() {
     },
 
 
-    // ==================== القسم 23: openChat ====================
+// ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
+    
+    // ✅ حل مؤقت: تفعيل friendInConversation تلقائياً لضمان عمل الميزات
+    this.friendInConversation = true;
     
     if (this._pendingConversationStatus && this._pendingConversationStatus[friendId] !== undefined) {
         this.friendInConversation = this._pendingConversationStatus[friendId];
