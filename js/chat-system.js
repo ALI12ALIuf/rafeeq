@@ -19,31 +19,26 @@ const ChatSystem = {
     offlineCountdownInterval: null,
     
     // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
-    updateFeatureToggleUI() {
-        const toggleInput = document.getElementById('featureToggleInput');
-        if (!toggleInput) return;
-        
-        // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
-        toggleInput.checked = this.featuresEnabled;
-        
-        // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة
-        const canUseToggle = this.friendInConversation;
-        toggleInput.disabled = !canUseToggle;
-        
-        // ✅ تحديث الشفافية
-        const featureSwitchLabel = document.getElementById('featureSwitchLabel');
-        if (featureSwitchLabel) {
-            if (!canUseToggle) {
-                featureSwitchLabel.style.opacity = '0.5';
-                featureSwitchLabel.style.pointerEvents = 'none';
-            } else {
-                featureSwitchLabel.style.opacity = '1';
-                featureSwitchLabel.style.pointerEvents = 'auto';
-            }
-        }
-        
-        console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}`);
-    },
+updateFeatureToggleUI() {
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (!toggleInput) return;
+    
+    // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
+    toggleInput.checked = this.featuresEnabled;
+    
+    // ✅ الزر يكون مفعلاً دائماً (يمكن الضغط عليه لإرسال طلب التفعيل)
+    // بغض النظر عن friendInConversation
+    toggleInput.disabled = false;
+    
+    // ✅ تحديث الشفافية (الزر دائماً مرئي بالكامل)
+    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+    if (featureSwitchLabel) {
+        featureSwitchLabel.style.opacity = '1';
+        featureSwitchLabel.style.pointerEvents = 'auto';
+    }
+    
+    console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=false`);
+},
     
     // ==================== القسم 3: init ====================
 init() { 
@@ -81,179 +76,158 @@ setupBeforeUnloadListener() {
     });
 },
 
-
-    // ==================== القسم 5: setupFeatureButton ====================
+    // ==================== القسم 5: setupFeatureButton (تبسيط - الأزرار موجودة في HTML) ====================
 setupFeatureButton() {
-    setTimeout(() => {
-        const oldBtn = document.getElementById('enableFeaturesBtn');
-        if (oldBtn) oldBtn.remove();
+    // ✅ الأزرار موجودة بالفعل في HTML، فقط نحدثها ونجعلها مرئية
+    const toggleContainer = document.getElementById('featureToggleContainer');
+    const kickBtn = document.getElementById('kickBtn');
+    const toggleInput = document.getElementById('featureToggleInput');
+    
+    if (!toggleContainer || !kickBtn || !toggleInput) {
+        console.log('⚠️ لم يتم العثور على الأزرار في HTML');
+        return;
+    }
+    
+    // ✅ إضافة الأنماط إذا لم تكن موجودة (مرة واحدة)
+    if (!document.getElementById('featureToggleStyles')) {
+        const style = document.createElement('style');
+        style.id = 'featureToggleStyles';
+        style.textContent = `
+            .feature-toggle-container {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                margin: 0 5px;
+                direction: ltr;
+            }
+            .feature-toggle-label {
+                font-size: 0.7rem;
+                color: #888;
+            }
+            .feature-switch {
+                position: relative;
+                display: inline-block;
+                width: 52px;
+                height: 26px;
+            }
+            .feature-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .feature-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #f44336;
+                transition: 0.3s;
+                border-radius: 26px;
+            }
+            .feature-slider:before {
+                position: absolute;
+                content: "";
+                height: 20px;
+                width: 20px;
+                left: 3px;
+                bottom: 3px;
+                background-color: white;
+                transition: 0.3s;
+                border-radius: 50%;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            }
+            input:checked + .feature-slider {
+                background-color: #4CAF50;
+            }
+            input:checked + .feature-slider:before {
+                transform: translateX(26px);
+            }
+            @keyframes featureBlink {
+                0% { background-color: #f44336; }
+                50% { background-color: #2196F3; }
+                100% { background-color: #f44336; }
+            }
+            .feature-switch.blinking .feature-slider {
+                animation: featureBlink 0.8s ease-in-out infinite;
+            }
+            .kick-btn {
+                background: none;
+                border: none;
+                color: #f44336;
+                font-size: 1.3rem;
+                cursor: pointer;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s ease;
+                opacity: 0.5;
+                pointer-events: none;
+            }
+            .kick-btn.active {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .kick-btn.active:hover {
+                background: rgba(244, 67, 54, 0.1);
+                transform: scale(1.05);
+            }
+            .kick-btn.active:active {
+                transform: scale(0.95);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // ✅ إظهار الأزرار
+    toggleContainer.style.display = 'inline-flex';
+    kickBtn.style.display = 'inline-flex';
+    
+    // ✅ حفظ المراجع
+    window.featureToggleInput = toggleInput;
+    
+    // ✅ إزالة المستمع القديم لتجنب التكرار
+    toggleInput.onclick = (e) => {
+        console.log('🔘 تم الضغط على زر التفعيل');
         
-        const oldContainer = document.getElementById('featureToggleContainer');
-        if (oldContainer) oldContainer.remove();
-        
-        const oldKickBtn = document.getElementById('kickBtn');
-        if (oldKickBtn) oldKickBtn.remove();
-        
-        const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
-        if (!container) {
-            console.log('⚠️ لم يتم العثور على حاوية للزر');
+        if (this.featuresEnabled) {
+            console.log('⚠️ الميزات مفعلة، جاري إلغاء التفعيل');
+            this.disableFeatures();
             return;
         }
         
-        if (!document.getElementById('featureToggleStyles')) {
-            const style = document.createElement('style');
-            style.id = 'featureToggleStyles';
-            style.textContent = `
-                .feature-toggle-container {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin: 0 5px;
-                    direction: ltr;
-                }
-                .feature-toggle-label {
-                    font-size: 0.7rem;
-                    color: #888;
-                }
-                .feature-switch {
-                    position: relative;
-                    display: inline-block;
-                    width: 52px;
-                    height: 26px;
-                }
-                .feature-switch input {
-                    opacity: 0;
-                    width: 0;
-                    height: 0;
-                }
-                .feature-slider {
-                    position: absolute;
-                    cursor: pointer;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: #f44336;
-                    transition: 0.3s;
-                    border-radius: 26px;
-                }
-                .feature-slider:before {
-                    position: absolute;
-                    content: "";
-                    height: 20px;
-                    width: 20px;
-                    left: 3px;
-                    bottom: 3px;
-                    background-color: white;
-                    transition: 0.3s;
-                    border-radius: 50%;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-                }
-                input:checked + .feature-slider {
-                    background-color: #4CAF50;
-                }
-                input:checked + .feature-slider:before {
-                    transform: translateX(26px);
-                }
-                @keyframes featureBlink {
-                    0% { background-color: #f44336; }
-                    50% { background-color: #2196F3; }
-                    100% { background-color: #f44336; }
-                }
-                .feature-switch.blinking .feature-slider {
-                    animation: featureBlink 0.8s ease-in-out infinite;
-                }
-                .kick-btn {
-                    background: none;
-                    border: none;
-                    color: #f44336;
-                    font-size: 1.1rem;
-                    cursor: pointer;
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.3s ease;
-                    margin-right: 5px;
-                    opacity: 0.5;
-                    pointer-events: none;
-                }
-                .kick-btn.active {
-                    opacity: 1;
-                    pointer-events: auto;
-                }
-                .kick-btn.active:hover {
-                    background: rgba(244, 67, 54, 0.1);
-                    transform: scale(1.05);
-                }
-                .kick-btn.active:active {
-                    transform: scale(0.95);
-                }
-            `;
-            document.head.appendChild(style);
+        if (this.featureRequestReceived) {
+            this.acceptFeatureRequest();
+        } else if (this.featureRequestPending) {
+            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+        } else {
+            this.requestEnableFeatures();
         }
-        
-        const toggleContainer = document.createElement('div');
-        toggleContainer.className = 'feature-toggle-container';
-        toggleContainer.id = 'featureToggleContainer';
-        
-        toggleContainer.innerHTML = `
-            <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة">
-                <i class="fas fa-sign-out-alt"></i>
-            </button>
-            <span class="feature-toggle-label" style="color: #f44336;">○</span>
-            <label class="feature-switch" id="featureSwitchLabel">
-                <input type="checkbox" id="featureToggleInput">
-                <span class="feature-slider" id="featureToggleSlider"></span>
-            </label>
-            <span class="feature-toggle-label" style="color: #4CAF50;">●</span>
-        `;
-        
-        container.appendChild(toggleContainer);
-        
-        const toggleInput = document.getElementById('featureToggleInput');
-        const kickBtn = document.getElementById('kickBtn');
-        
-        if (!toggleInput) return;
-        
-        window.featureToggleInput = toggleInput;
-        
-        toggleInput.onclick = (e) => {
-            console.log('🔘 تم الضغط على زر التفعيل');
-            
-            if (this.featuresEnabled) {
-                console.log('⚠️ الميزات مفعلة، جاري إلغاء التفعيل');
-                this.disableFeatures();
-                return;
-            }
-            
-            if (this.featureRequestReceived) {
-                this.acceptFeatureRequest();
-            } else if (this.featureRequestPending) {
-                alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
-            } else {
-                this.requestEnableFeatures();
-            }
+    };
+    
+    // ✅ معالج الضغط لزر الطرد
+    if (kickBtn) {
+        kickBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.kickUserFromConversation();
         };
-        
-        if (kickBtn) {
-            kickBtn.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.kickUserFromConversation();
-            };
-        }
-        
-        if (this.featuresEnabled && toggleInput) {
-            toggleInput.checked = true;
-        }
-        
-        this.updateKickButtonState();
-        
-        console.log('✅ تم إضافة زر التفعيل وزر الطرد');
-    }, 1000);
+    }
+    
+    // ✅ تحديث حالة الزر إذا كانت الميزات مفعلة مسبقاً
+    if (this.featuresEnabled && toggleInput) {
+        toggleInput.checked = true;
+    }
+    
+    // ✅ تحديث حالة زر الطرد
+    this.updateKickButtonState();
+    this.updateFeatureToggleUI();
+    
+    console.log('✅ تم تهيئة أزرار التفعيل والطرد');
 },
 
 // ✅ دالة تحديث حالة زر الطرد
@@ -271,6 +245,7 @@ updateKickButtonState() {
         kickBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
     }
 },
+    
 
     // ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
 async kickUserFromConversation() {
@@ -798,7 +773,16 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
-    setTimeout(() => this.setupFeatureButton(), 500);
+    // ✅ تم إزالة setupFeatureButton (الأزرار أصبحت دائمة في HTML)
+    
+    // ✅ تحديث حالة الأزرار (إظهار/إخفاء إذا لزم الأمر)
+    const toggleContainer = document.getElementById('featureToggleContainer');
+    const kickBtn = document.getElementById('kickBtn');
+    if (toggleContainer) toggleContainer.style.display = 'flex';
+    if (kickBtn) kickBtn.style.display = 'flex';
+    
+    // ✅ تحديث حالة الزر فوراً
+    this.updateAllButtons();
     
     setTimeout(() => {
         if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
@@ -2239,7 +2223,8 @@ updateLastMessage(friendId, lastMessage) {
     }); 
 },
 
-// ==================== القسم 37: closeChat ====================
+
+    // ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2276,6 +2261,12 @@ closeChat() {
         btn.style.background = '#f44336';
         btn.title = 'تفعيل الميزات';
     }
+    
+    // ✅ إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
+    const toggleContainer = document.getElementById('featureToggleContainer');
+    const kickBtn = document.getElementById('kickBtn');
+    if (toggleContainer) toggleContainer.style.display = 'none';
+    if (kickBtn) kickBtn.style.display = 'none';
     
     this.updateAllButtons();
     
