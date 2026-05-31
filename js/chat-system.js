@@ -2291,8 +2291,8 @@ closeChat() {
 },
     
     
-    // ==================== القسم 38: escapeHtml ====================
-    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+// ==================== القسم 38: escapeHtml ====================
+escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 
 // ==================== القسم 39: تشغيل النظام ====================
@@ -2313,3 +2313,18 @@ if (window.visualViewport) {
     // تنفيذ فوري لضبط الارتفاع عند فتح المحادثة
     setTimeout(fixViewportHeight, 100);
 }
+
+// ✅ حل مشكلة التداخل مع القوائم عند التمرير
+const fixScrollPosition = () => {
+    const messagesContainer = document.querySelector('.messages-container');
+    if (messagesContainer && document.body.classList.contains('conversation-open')) {
+        // منع التمرير الزائد
+        if (messagesContainer.scrollTop < 0) messagesContainer.scrollTop = 0;
+        if (messagesContainer.scrollTop + messagesContainer.clientHeight > messagesContainer.scrollHeight) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight - messagesContainer.clientHeight;
+        }
+    }
+};
+
+// إضافة مستمع لحدث التمرير لمنع التداخل
+document.addEventListener('scroll', fixScrollPosition, true);
