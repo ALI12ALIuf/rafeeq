@@ -1,430 +1,408 @@
-// ========== captcha.js ==========
-// نظام الكابتشا الكامل مع Slider مدمج
 
-// ========== متغيرات الكابتشا ==========
-let _captchaCode = '';
-let _captchaBlocked = false;
-let _captchaActive = false;
-let _captchaAttempts = 0;
-let _pendingGoogleUser = null;
-let _isLoggingIn = false;
-let _captchaBlockTimer = null;
-let _captchaCountdownTimer = null;
-let _captchaRemainingSeconds = 0;
-let _sliderVerified = false;
-
-// ========== استعادة حالة الحظر من localStorage ==========
-(function() {
-    const blockedUntil = localStorage.getItem('_captchaBlockedUntil');
-    
-    if (blockedUntil) {
-        const remaining = Math.ceil((parseInt(blockedUntil) - Date.now()) / 1000);
-        if (remaining > 0) {
-            const app = document.getElementById('app');
-            const splash = document.getElementById('splash');
-            if (app) app.style.display = 'none';
-            if (splash) splash.style.display = 'none';
-            
-            _captchaBlocked = true;
-            _captchaActive = true;
-            _captchaRemainingSeconds = remaining;
-            
-            window.addEventListener('load', function() {
-                setTimeout(function() {
-                    if (_captchaBlocked) {
-                        const loginEl = document.querySelector('.login-screen');
-                        if (loginEl) loginEl.remove();
-                        showCaptchaScreen(function() {});
-                    }
-                }, 500);
-            });
-        } else {
-            localStorage.removeItem('_captchaBlockedUntil');
-        }
-    }
-})();
-
-function getBlockTime(totalAttempts) {
-    if (totalAttempts <= 3) return 60;
-    if (totalAttempts <= 6) return 300;
-    if (totalAttempts <= 9) return 1800;
-    return 86400;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-// ========== الكابتشا + Slider في نفس الصفحة ==========
-function showCaptchaScreen(onSuccess) {
-    _captchaActive = true;
-    _captchaBlocked = _captchaBlocked || false;
-    _captchaAttempts = 0;
-    _sliderVerified = false;
-    const captchaCode = generateCaptchaLocal();
-    
-    const existing = document.querySelector('.captcha-screen');
-    if (existing) {
-        if (existing._cleanup) existing._cleanup();
-        existing.remove();
-    }
-    
-    const d = document.createElement('div');
-    d.className = 'captcha-screen';
-    d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10001;';
-    d.innerHTML = `
-        <div style="text-align:center;padding:25px;max-width:400px;width:90%;background:var(--card-bg);border-radius:20px;box-shadow:var(--shadow);">
-            <div style="font-size:3.5rem;margin-bottom:0.5rem;">🔐</div>
-            <p style="color:var(--primary);margin-bottom:1rem;font-size:1.1rem;font-weight:600;">أدخل الرمز الظاهر للمتابعة</p>
-            
-            <div style="display:flex;justify-content:center;margin-bottom:1.2rem;">
-                <canvas id="captchaCanvas" width="280" height="60" style="border-radius:10px;border:1px solid var(--border);"></canvas>
-            </div>
-            
-            <input type="text" name="hiddenField" style="position:absolute;left:-9999px;opacity:0;width:1px;height:1px;" autocomplete="off" tabindex="-1">
-            
-            <!-- Slider داخل نفس الصفحة -->
-            <div style="background:var(--light);border-radius:30px;height:50px;position:relative;overflow:hidden;margin-bottom:1rem;border:2px solid var(--border);">
-                <div id="sliderTrack" style="position:absolute;left:0;top:0;height:100%;background:var(--primary);width:0%;transition:width 0.1s;border-radius:30px;opacity:0.2;"></div>
-                <div id="sliderThumb" style="position:absolute;left:0;top:2px;width:44px;height:42px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem;cursor:pointer;transition:left 0.3s;user-select:none;z-index:2;">
-                    ➜
-                </div>
-                <div id="sliderLabel" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--text-light);font-size:0.8rem;pointer-events:none;z-index:1;">
-                    اسحب للتحقق
-                </div>
-            </div>
-            
-            <!-- حقول الإدخال (مقفولة حتى يتم السحب) -->
-            <div id="captchaInputsContainer" style="opacity:0.5;pointer-events:none;transition:opacity 0.3s;">
-                <div style="display:flex;gap:8px;justify-content:center;margin-bottom:1.5rem;direction:ltr;">
-                    <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:40px;height:50px;text-align:center;font-size:1.4rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 0)" onkeydown="handleCaptchaKeyDown(event, this, 0)" onpaste="handleCaptchaPaste(event)" autocomplete="off" disabled>
-                    <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:40px;height:50px;text-align:center;font-size:1.4rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 1)" onkeydown="handleCaptchaKeyDown(event, this, 1)" autocomplete="off" disabled>
-                    <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:40px;height:50px;text-align:center;font-size:1.4rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 2)" onkeydown="handleCaptchaKeyDown(event, this, 2)" autocomplete="off" disabled>
-                    <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:40px;height:50px;text-align:center;font-size:1.4rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 3)" onkeydown="handleCaptchaKeyDown(event, this, 3)" autocomplete="off" disabled>
-                    <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:40px;height:50px;text-align:center;font-size:1.4rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 4)" onkeydown="handleCaptchaKeyDown(event, this, 4)" autocomplete="off" disabled>
-                    <input type="tel" maxlength="1" class="captcha-input" pattern="[0-9]" inputmode="numeric" style="width:40px;height:50px;text-align:center;font-size:1.4rem;font-weight:bold;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);direction:ltr;" oninput="handleCaptchaInput(this, 5)" onkeydown="handleCaptchaKeyDown(event, this, 5)" autocomplete="off" disabled>
-                </div>
-            </div>
-            
-            <p style="color:var(--danger);font-size:0.85rem;margin-bottom:1rem;min-height:20px;" id="captchaError"></p>
-            
-            <button onclick="verifyCaptcha()" style="background:var(--primary);color:white;border:none;border-radius:25px;padding:12px 40px;font-size:1.1rem;cursor:pointer;width:100%;" id="captchaVerifyBtn" disabled>تحقق</button>
-            <button onclick="generateNewCaptcha()" style="background:none;border:none;color:var(--text-light);margin-top:0.8rem;cursor:pointer;font-size:0.9rem;" id="captchaRefreshBtn">رمز جديد</button>
-        </div>`;
-    document.body.appendChild(d);
-    d._onSuccess = onSuccess;
-    
-    // ========== أحداث السحب ==========
-    const thumb = document.getElementById('sliderThumb');
-    const track = document.getElementById('sliderTrack');
-    const sliderLabel = document.getElementById('sliderLabel');
-    const inputsContainer = document.getElementById('captchaInputsContainer');
-    const verifyBtn = document.getElementById('captchaVerifyBtn');
-    const inputs = document.querySelectorAll('.captcha-input');
-    let isDragging = false;
-    let startX = 0;
-    let thumbLeft = 0;
-    
-    const unlockInputs = () => {
-        _sliderVerified = true;
-        inputsContainer.style.opacity = '1';
-        inputsContainer.style.pointerEvents = 'auto';
-        verifyBtn.disabled = false;
-        verifyBtn.style.opacity = '1';
-        sliderLabel.textContent = '✓ تم التحقق';
-        sliderLabel.style.color = '#4CAF50';
-        inputs.forEach(input => { input.disabled = false; });
-        inputs[0].focus();
-    };
-    
-    const onStart = (e) => {
-        if (_sliderVerified) return;
-        isDragging = true;
-        thumb.style.transition = 'none';
-        startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-        startX = startX - thumbLeft;
-    };
-    
-    const onMove = (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-        const sliderWidth = thumb.parentElement.offsetWidth - 50;
-        thumbLeft = Math.max(0, Math.min(clientX - startX, sliderWidth));
-        thumb.style.left = thumbLeft + 'px';
-        track.style.width = (thumbLeft + 22) + 'px';
-    };
-    
-    const onEnd = () => {
-        if (!isDragging) return;
-        isDragging = false;
-        thumb.style.transition = 'left 0.3s';
-        
-        const sliderWidth = thumb.parentElement.offsetWidth - 50;
-        
-        if (thumbLeft >= sliderWidth * 0.85) {
-            thumb.style.left = sliderWidth + 'px';
-            track.style.width = '100%';
-            thumb.innerHTML = '✓';
-            thumb.style.background = '#4CAF50';
-            unlockInputs();
-        } else {
-            thumb.style.left = '0px';
-            track.style.width = '0%';
-            thumbLeft = 0;
-        }
-    };
-    
-    thumb.addEventListener('mousedown', onStart);
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onEnd);
-    thumb.addEventListener('touchstart', onStart, { passive: false });
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onEnd);
-    
-    d._cleanup = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onEnd);
-        document.removeEventListener('touchmove', onMove);
-        document.removeEventListener('touchend', onEnd);
-    };
-    
-    // رسم الكابتشا
-    setTimeout(() => {
-        drawCaptchaCanvas(captchaCode);
-        
-        if (_captchaBlocked && _captchaRemainingSeconds > 0) {
-            // في حالة الحظر المستعاد: قفل تلقائي مع عداد
-            unlockInputs(); // نفك القفل لأن المستخدم أصلاً محظور
-            inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
-            verifyBtn.disabled = true;
-            verifyBtn.style.opacity = '0.5';
-            document.getElementById('captchaRefreshBtn').style.opacity = '0.5';
-            document.getElementById('captchaRefreshBtn').style.pointerEvents = 'none';
-            startCountdown(_captchaRemainingSeconds);
-        }
-    }, 300);
+* {
+    -webkit-tap-highlight-color: transparent !important;
+    outline: none !important;
 }
 
-// ========== التحقق من صحة السحب ==========
-window.verifyCaptcha = function() {
-    if (!_sliderVerified) return;
-    if (_captchaBlocked) return;
-    
-    const honeypot = document.querySelector('input[name="hiddenField"]');
-    if (honeypot && honeypot.value !== '') { return; }
-    
-    const inputs = document.querySelectorAll('.captcha-input');
-    let enteredCode = '';
-    inputs.forEach(input => { enteredCode += input.value; });
-    
-    const errorEl = document.getElementById('captchaError');
-    const verifyBtn = document.getElementById('captchaVerifyBtn');
-    const refreshBtn = document.getElementById('captchaRefreshBtn');
-    
-    if (enteredCode.length < 6) {
-        if (errorEl) { errorEl.textContent = 'الرجاء إدخال 6 أرقام كاملة'; errorEl.style.color = 'var(--danger)'; }
-        return;
-    }
-    
-    const randomDelay = 200 + Math.floor(Math.random() * 400);
-    
-    setTimeout(() => {
-        if (enteredCode === _captchaCode) {
-            _captchaActive = false;
-            _captchaBlocked = false;
-            _captchaAttempts = 0;
-            if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
-            if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
-            sessionStorage.setItem('_captchaVerified', 'true');
-            localStorage.removeItem('_captchaTotalAttempts');
-            localStorage.removeItem('_captchaBlockedUntil');
-            const captchaScreen = document.querySelector('.captcha-screen');
-            if (captchaScreen) {
-                if (captchaScreen._cleanup) captchaScreen._cleanup();
-                inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
-                const onSuccess = captchaScreen._onSuccess;
-                captchaScreen.remove();
-                if (onSuccess) onSuccess();
-            }
-        } else {
-            _captchaAttempts++;
-            
-            let totalAttempts = parseInt(localStorage.getItem('_captchaTotalAttempts') || '0');
-            totalAttempts++;
-            localStorage.setItem('_captchaTotalAttempts', totalAttempts.toString());
-            
-            for (let i = 0; i < 6; i++) {
-                if (inputs[i].value !== _captchaCode[i]) {
-                    inputs[i].style.borderColor = '#f44336';
-                    inputs[i].style.background = 'rgba(244,67,54,0.2)';
-                }
-            }
-            
-            if (_captchaAttempts >= 3) {
-                _captchaBlocked = true;
-                _captchaAttempts = 0;
-                
-                if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.style.opacity = '0.5'; }
-                if (refreshBtn) { refreshBtn.style.opacity = '0.5'; refreshBtn.style.pointerEvents = 'none'; }
-                inputs.forEach(input => { input.disabled = true; input.style.opacity = '0.5'; });
-                
-                const blockSeconds = getBlockTime(totalAttempts);
-                const blockedUntil = Date.now() + (blockSeconds * 1000);
-                localStorage.setItem('_captchaBlockedUntil', blockedUntil.toString());
-                
-                if (_captchaBlockTimer) clearTimeout(_captchaBlockTimer);
-                _captchaBlockTimer = setTimeout(() => {
-                    _captchaBlocked = false;
-                    localStorage.removeItem('_captchaBlockedUntil');
-                    if (errorEl) { errorEl.textContent = ''; }
-                    if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
-                    if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
-                    inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; });
-                    refreshCaptchaAndCanvas();
-                    resetInputs();
-                    _captchaBlockTimer = null;
-                }, blockSeconds * 1000);
-                
-                startCountdown(blockSeconds);
-                
-            } else {
-                const remaining = 3 - _captchaAttempts;
-                if (errorEl) { errorEl.textContent = `رمز غير صحيح. متبقي ${remaining} محاولات`; errorEl.style.color = 'var(--danger)'; }
-                setTimeout(() => {
-                    refreshCaptchaAndCanvas();
-                    resetInputs();
-                }, 800);
-            }
-        }
-    }, randomDelay);
-};
-
-// ========== باقي الدوال ==========
-function generateCaptchaLocal() {
-    _captchaCode = Math.floor(100000 + Math.random() * 900000).toString();
-    return _captchaCode;
+*:focus {
+    outline: none !important;
+    box-shadow: none !important;
 }
 
-function drawCaptchaCanvas(code) {
-    const canvas = document.getElementById('captchaCanvas');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width;
-    const h = canvas.height;
-    
-    ctx.fillStyle = '#f5f5f5';
-    ctx.fillRect(0, 0, w, h);
-    
-    for (let i = 0; i < 100; i++) {
-        ctx.fillStyle = `rgba(${Math.random()*200},${Math.random()*200},${Math.random()*200},0.4)`;
-        ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
-    }
-    
-    for (let i = 0; i < 6; i++) {
-        ctx.beginPath();
-        ctx.moveTo(0, Math.random() * h);
-        ctx.bezierCurveTo(w/3, Math.random()*h, 2*w/3, Math.random()*h, w, Math.random()*h);
-        ctx.strokeStyle = `rgba(${Math.random()*150},${Math.random()*150},${Math.random()*150},0.6)`;
-        ctx.lineWidth = 1 + Math.random() * 2;
-        ctx.stroke();
-    }
-    
-    for (let i = 0; i < code.length; i++) {
-        const x = 25 + (i * 42) + Math.random() * 6;
-        const y = 35 + Math.random() * 12;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate((Math.random() - 0.5) * 0.7);
-        ctx.font = `bold ${32 + Math.random() * 8}px Arial`;
-        ctx.fillStyle = `rgb(${20+Math.random()*100},${20+Math.random()*100},${20+Math.random()*100})`;
-        ctx.fillText(code[i], 0, 0);
-        ctx.restore();
-    }
+:root {
+    --primary: #2196F3;
+    --primary-dark: #1976D2;
+    --secondary: #FFC107;
+    --success: #4CAF50;
+    --danger: #f44336;
+    --dark: #333;
+    --light: #f5f5f5;
+    --border: #e0e0e0;
+    --text: #333;
+    --text-light: #666;
+    --bg: #fff;
+    --card-bg: #fff;
+    --shadow: 0 2px 10px rgba(0,0,0,0.1);
+    --radius: 12px;
+    --header-height: 60px;
+    --nav-height: 60px;
 }
 
-function resetInputs() {
-    const inputs = document.querySelectorAll('.captcha-input');
-    inputs.forEach(input => { input.value = ''; input.style.borderColor = 'var(--border)'; input.style.background = 'var(--bg)'; });
-    if (!_captchaBlocked) inputs[0].focus();
+.theme-dark {
+    --primary: #64B5F6;
+    --primary-dark: #42A5F5;
+    --dark: #f5f5f5;
+    --light: #333;
+    --border: #444;
+    --text: #fff;
+    --text-light: #ccc;
+    --bg: #1a1a1a;
+    --card-bg: #2d2d2d;
+    --shadow: 0 2px 10px rgba(0,0,0,0.3);
 }
 
-function refreshCaptchaAndCanvas() {
-    const code = generateCaptchaLocal();
-    drawCaptchaCanvas(code);
-    return code;
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    transition: background-color 0.3s, color 0.3s;
+    height: 100vh;
+    overflow: hidden;
 }
 
-window.handleCaptchaInput = function(input, index) {
-    input.value = input.value.replace(/\D/g, '');
-    if (input.value.length === 1 && index < 5) {
-        const inputs = document.querySelectorAll('.captcha-input');
-        if (inputs[index + 1]) inputs[index + 1].focus();
-    }
-};
+.splash-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--primary); display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s; }
+.splash-screen.hide { opacity: 0; pointer-events: none; }
+.splash-content { text-align: center; color: white; }
+.splash-content .app-icon { font-size: 5rem; margin-bottom: 1rem; }
+.splash-content h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin: 2rem auto 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-window.handleCaptchaKeyDown = function(event, input, index) {
-    if (event.key === 'Backspace' && input.value === '' && index > 0) {
-        const inputs = document.querySelectorAll('.captcha-input');
-        if (inputs[index - 1]) { inputs[index - 1].focus(); inputs[index - 1].value = ''; }
-    }
-    if (event.key === 'Enter') { verifyCaptcha(); }
-};
+.app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+.app-header { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; position: sticky; top: 0; z-index: 100; }
+.header-left, .header-right { display: flex; gap: 0.5rem; }
+.icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.header-title h1 { font-size: 1.2rem; font-weight: 600; }
+.app-content { flex: 1; overflow-y: auto; padding-bottom: var(--nav-height); -webkit-overflow-scrolling: touch; }
+.page { display: none; padding: 1rem; }
+.page.active { display: block; }
 
-window.handleCaptchaPaste = function(event) {
-    event.preventDefault();
-    const paste = (event.clipboardData || window.clipboardData).getData('text');
-    const digits = paste.replace(/\D/g, '').slice(0, 6);
-    const inputs = document.querySelectorAll('.captcha-input');
-    for (let i = 0; i < 6; i++) { inputs[i].value = digits[i] || ''; }
-    if (digits.length === 6) { inputs[5].focus(); setTimeout(() => verifyCaptcha(), 200); }
-};
+.bottom-nav { height: var(--nav-height); background: var(--card-bg); border-top: 1px solid var(--border); display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; }
+.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; background: none; border: none; color: var(--text-light); font-size: 0.8rem; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nav-item i { font-size: 1.2rem; }
+.nav-item.active { color: var(--primary); }
 
-function startCountdown(totalSeconds) {
-    _captchaRemainingSeconds = totalSeconds;
-    const errorEl = document.getElementById('captchaError');
-    const verifyBtn = document.getElementById('captchaVerifyBtn');
-    const refreshBtn = document.getElementById('captchaRefreshBtn');
-    const inputs = document.querySelectorAll('.captcha-input');
-    
-    if (_captchaCountdownTimer) clearInterval(_captchaCountdownTimer);
-    
-    const updateCountdown = () => {
-        if (_captchaRemainingSeconds <= 0) {
-            clearInterval(_captchaCountdownTimer);
-            _captchaCountdownTimer = null;
-            _captchaBlocked = false;
-            localStorage.removeItem('_captchaBlockedUntil');
-            if (errorEl) { errorEl.textContent = ''; errorEl.style.color = 'var(--danger)'; }
-            if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.style.opacity = '1'; }
-            if (refreshBtn) { refreshBtn.style.opacity = '1'; refreshBtn.style.pointerEvents = 'auto'; }
-            inputs.forEach(input => { input.disabled = false; input.style.opacity = '1'; });
-            refreshCaptchaAndCanvas();
-            resetInputs();
-            return;
-        }
-        
-        const hours = Math.floor(_captchaRemainingSeconds / 3600);
-        const mins = Math.floor((_captchaRemainingSeconds % 3600) / 60);
-        const secs = _captchaRemainingSeconds % 60;
-        
-        let timeStr;
-        if (hours > 0) {
-            timeStr = `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        } else {
-            timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        if (errorEl) { errorEl.textContent = `تم تجاوز الحد الأقصى. انتظر ${timeStr}`; }
-        _captchaRemainingSeconds--;
-    };
-    
-    updateCountdown();
-    _captchaCountdownTimer = setInterval(updateCountdown, 1000);
+.post-card { background: var(--card-bg); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; box-shadow: var(--shadow); }
+.post-header { display: flex; align-items: center; padding: 1rem; gap: 0.75rem; }
+.post-avatar-emoji { width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden; line-height: 1; }
+.post-user { flex: 1; }
+.post-user h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
+.post-time { font-size: 0.8rem; color: var(--text-light); }
+.post-menu { background: none; border: none; color: var(--text-light); cursor: pointer; }
+.post-content { padding: 0 1rem 1rem; }
+.post-location { display: flex; align-items: center; gap: 0.5rem; color: var(--text-light); font-size: 0.9rem; margin-bottom: 0.5rem; }
+.post-actions { display: flex; gap: 1rem; padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--border); }
+.post-action { background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+
+.search-box { display: flex; align-items: center; background: var(--light); border-radius: 25px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
+.search-box i { color: var(--text-light); margin-left: 0.5rem; }
+.search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; }
+.chats-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.chat-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.chat-avatar-emoji { width: 50px; height: 50px; min-width: 50px; min-height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; line-height: 1; }
+.chat-info { flex: 1; }
+.chat-info h4 { margin-bottom: 0.25rem; font-size: 0.9rem; }
+.chat-info p { color: var(--text-light); font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-time { color: var(--text-light); font-size: 0.7rem; }
+
+.profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
+.profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
+.profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
+.profile-avatar-emoji { width: 100%; height: 100%; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 5rem; border: 4px solid white; box-shadow: var(--shadow); overflow: hidden; line-height: 1; }
+.edit-profile-btn-left { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; border-radius: 50%; background: white; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; box-shadow: var(--shadow); z-index: 10; }
+.profile-info-container { padding: 1rem; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.profile-name-wrapper { text-align: center; width: 100%; }
+.profile-name-wrapper h2 { font-size: 1.3rem; color: var(--text); margin: 0; }
+.profile-id-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--light); padding: 0.5rem 1rem; border-radius: 25px; width: fit-content; max-width: 100%; min-width: 250px; }
+.copy-btn-left { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1.1rem; padding: 0 5px; -webkit-tap-highlight-color: transparent; }
+.id-value-numbers { font-family: monospace; font-size: 1.1rem; font-weight: 500; color: var(--primary); direction: ltr; letter-spacing: 1px; flex: 1; text-align: center; }
+.id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
+.profile-bio { padding: 0 1rem 1rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
+.profile-stats { display: flex; justify-content: space-around; padding: 1rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.stat-link { text-decoration: none; color: var(--text); text-align: center; padding: 10px; border-radius: var(--radius); display: inline-block; flex: 1; -webkit-tap-highlight-color: transparent; }
+.stat-value { display: block; font-size: 1.2rem; font-weight: bold; color: var(--primary); }
+.stat-link span:last-child { font-size: 0.8rem; color: var(--text-light); }
+
+.profile-subpage { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 1000; overflow-y: auto; padding: 0; }
+.subpage-header { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow); }
+.back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.back-btn:hover { background: var(--primary); color: white; }
+.subpage-header h3 { flex: 1; text-align: center; font-size: 1.2rem; font-weight: 600; color: var(--primary); }
+.trips-grid, .users-list { padding: 1rem; }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; padding: 2rem; color: var(--text-light); }
+.empty-state i { font-size: 4rem; margin-bottom: 1rem; color: var(--primary); opacity: 0.5; }
+.empty-state h3 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--text); font-weight: 600; }
+.empty-state p { font-size: 1rem; max-width: 300px; margin: 0 auto; line-height: 1.6; color: var(--text-light); }
+.user-item { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); margin-bottom: 0.75rem; box-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
+.user-avatar-emoji { width: 50px; height: 50px; min-width: 50px; min-height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; line-height: 1; }
+.user-info { flex: 1; }
+.user-info h4 { margin-bottom: 0.25rem; font-size: 1rem; font-weight: 600; }
+.user-info p { color: var(--text-light); font-size: 0.85rem; }
+.user-actions { display: flex; gap: 0.5rem; }
+.action-btn { width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.action-btn.following { background: var(--primary); color: white; }
+.action-btn.remove { background: var(--danger); color: white; }
+
+.modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s; }
+.modal.active { opacity: 1; visibility: visible; }
+.modal-content { background: var(--card-bg); border-radius: var(--radius); padding: 2rem; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
+.modal-content h3 { margin-bottom: 1.5rem; color: var(--primary); text-align: center; }
+.edit-field { margin-bottom: 1.5rem; text-align: center; }
+.edit-field label { display: block; margin-bottom: 0.5rem; color: var(--text-light); font-size: 0.9rem; }
+.input-wrapper { position: relative; width: 100%; max-width: 300px; margin: 0 auto; direction: ltr; }
+.edit-field input { width: 100%; padding: 0.75rem; padding-left: 50px; padding-right: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--light); color: var(--text); font-size: 1rem; text-align: center; }
+.edit-field input:focus { outline: none; border-color: var(--primary); }
+.char-counter { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--text-light); font-weight: 500; direction: ltr; }
+.char-counter.full { color: var(--danger); font-weight: bold; }
+.current-avatar { width: 80px; height: 80px; min-width: 80px; min-height: 80px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 4rem; margin: 0 auto 1rem; overflow: hidden; line-height: 1; }
+.change-avatar-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 0 auto; padding: 0.5rem 1rem; background: var(--light); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; cursor: pointer; }
+.modal-actions { display: flex; gap: 1.2rem; margin-top: 2rem; justify-content: center; }
+.modal-btn { flex: 1; max-width: 140px; padding: 0.9rem 1.5rem; border: none; border-radius: var(--radius); font-weight: 600; font-size: 1rem; cursor: pointer; text-align: center; }
+.modal-btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+.close-modal { position: absolute; top: 1rem; left: 1rem; background: none; border: none; color: var(--text-light); font-size: 1.2rem; cursor: pointer; }
+.avatar-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1rem 0; }
+.avatar-option { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1rem; background: var(--light); border: none; border-radius: var(--radius); cursor: pointer; }
+.avatar-option span:first-child { font-size: 2.5rem; }
+.language-options { display: flex; flex-direction: column; gap: 1rem; }
+.language-option { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--light); border: none; border-radius: var(--radius); color: var(--text); cursor: pointer; }
+.language-option .flag { font-size: 1.5rem; }
+.settings-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); margin-bottom: 0.5rem; -webkit-tap-highlight-color: transparent; }
+.settings-item-left { display: flex; align-items: center; gap: 1rem; }
+.settings-item-left i { font-size: 1.2rem; color: var(--primary); }
+.switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--light); transition: .4s; border-radius: 24px; }
+.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .slider { background-color: var(--primary); }
+input:checked + .slider:before { transform: translateX(26px); }
+
+@media (min-width: 768px) { .bottom-nav { display: none; } }
+@media (max-width: 480px) {
+    .profile-cover { height: 120px; }
+    .profile-avatar-center { width: 80px; height: 80px; }
+    .profile-avatar-emoji { font-size: 4rem; }
+    .edit-profile-btn-left { width: 36px; height: 36px; top: 10px; left: 10px; font-size: 1.1rem; }
+    .profile-id-row { width: 100%; min-width: auto; }
 }
 
-window.generateNewCaptcha = function() {
-    if (_captchaBlocked) return;
-    refreshCaptchaAndCanvas();
-    const errorEl = document.getElementById('captchaError');
-    if (errorEl) { errorEl.textContent = ''; }
-    _captchaAttempts = 0;
-    resetInputs();
-};
+/* ========== المحادثة ========== */
+body.in-call .app-container, body.in-call .bottom-nav, body.in-call .app-header { display: none !important; }
+body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
+body.conversation-open .conversation-page { display: flex !important; flex-direction: column; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: var(--bg); }
+
+.conversation-header { display: flex; align-items: center; padding: 12px 16px; background: var(--card-bg); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); height: 70px; }
+.conversation-header .back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 12px; }
+.conversation-header .back-btn:hover { background: var(--primary); color: white; }
+.conversation-user-info { display: flex; align-items: center; gap: 12px; flex: 1; padding: 4px 8px; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+.conversation-avatar-emoji { width: 45px; height: 45px; min-width: 45px; min-height: 45px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; overflow: hidden; line-height: 1; }
+.conversation-user-details { flex: 1; }
+.conversation-user-details h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.conversation-status { font-size: 0.75rem; color: var(--text-light); }
+.conversation-status.online { color: #4CAF50; }
+.conversation-status.offline { color: var(--text-light); }
+
+/* أزرار الاتصال */
+.call-buttons button { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+.call-buttons button:hover { background: var(--light); }
+.call-buttons button i { font-size: 1.2rem; }
+
+/* أزرار المرفقات مقفولة */
+.attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
+.attachment-menu button.locked::after { content: " 🔒"; font-size: 0.8rem; }
+
+.messages-container { flex: 1; overflow-y: auto; padding: 20px 16px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
+.message { max-width: 70%; margin-bottom: 4px; animation: messagePop 0.2s ease; }
+.message.sent { align-self: flex-end; }
+.message.received { align-self: flex-start; }
+.message-content { padding: 12px 16px; border-radius: 20px; background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); word-wrap: break-word; -webkit-tap-highlight-color: transparent; }
+.message.sent .message-content { background: var(--primary); color: white; }
+.message.received .message-content { background: var(--light); color: var(--text); }
+.message-info { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 2px; font-size: 0.7rem; color: var(--text-light); }
+.message.sent .message-info { color: rgba(255,255,255,0.7); }
+.message-time { font-size: 0.65rem; }
+.message-status { display: flex; align-items: center; gap: 2px; font-size: 0.8rem; }
+.message-image { max-width: 200px; max-height: 200px; border-radius: 12px; cursor: pointer; }
+.message-audio { width: 250px; height: 40px; border-radius: 20px; }
+
+.message-input-container { background: var(--card-bg); border-top: 1px solid var(--border); padding: 12px 16px; }
+.message-input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--light); border-radius: 30px; padding: 4px 8px; border: 1px solid var(--border); }
+.message-input-wrapper:focus-within { border-color: var(--primary); }
+.attach-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: transparent; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+.input-area { flex: 1; display: flex; align-items: center; gap: 4px; }
+#messageInput { flex: 1; background: transparent; border: none; padding: 12px; color: var(--text); font-size: 1rem; outline: none; }
+.emoji-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+.send-btn, .voice-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+
+.attachment-menu { position: absolute; bottom: 80px; left: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2100; min-width: 150px; border: 1px solid var(--border); }
+.attachment-menu button { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: none; background: transparent; color: var(--text); cursor: pointer; border-radius: 12px; font-size: 0.95rem; width: 100%; text-align: right; }
+.attachment-menu button i { width: 24px; color: var(--primary); font-size: 1.2rem; }
+
+.emoji-picker { position: absolute; bottom: 80px; right: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 12px; z-index: 2100; width: 300px; border: 1px solid var(--border); }
+.emoji-categories { display: flex; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.emoji-categories button { width: 40px; height: 40px; border-radius: 20px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.3rem; }
+.emoji-categories button.active { background: var(--light); color: var(--primary); }
+.emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: 200px; overflow-y: auto; }
+.emoji-grid button { width: 40px; height: 40px; border-radius: 8px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; }
+
+@media (max-width: 480px) {
+    .conversation-header { padding: 8px 12px; height: 60px; }
+    .message { max-width: 85%; }
+    .message-image { max-width: 150px; max-height: 150px; }
+    .message-audio { width: 200px; }
+    .attach-btn, .emoji-btn { width: 35px; height: 35px; font-size: 1rem; }
+    .send-btn, .voice-btn { width: 40px; height: 40px; font-size: 1.1rem; }
+}
+
+.theme-dark .message.received .message-content { background: #2d2d2d; color: #fff; }
+.theme-dark .message.sent .message-content { background: #1976D2; }
+.theme-dark .message-info { color: #999; }
+.theme-dark .message.sent .message-info { color: rgba(255,255,255,0.6); }
+.theme-dark .emoji-picker, .theme-dark .attachment-menu { background: #2d2d2d; border-color: #444; }
+.theme-dark .emoji-categories { border-color: #444; }
+.theme-dark .emoji-categories button.active { background: #444; }
+
+@keyframes messagePop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+.messages-container::-webkit-scrollbar { width: 6px; }
+.messages-container::-webkit-scrollbar-track { background: transparent; }
+.messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ========== إصلاح الإيموجي داخل الإطارات الدائرية ========== */
+.profile-avatar-emoji,
+.conversation-avatar-emoji,
+.chat-avatar-emoji,
+.current-avatar,
+.post-avatar-emoji,
+.user-avatar-emoji {
+    overflow: hidden;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ========== إصلاح تداخل الصفحات ========== */
+
+/* إخفاء شريط التنقل السفلي عند فتح أي صفحة فرعية */
+body.conversation-open .bottom-nav,
+body.profile-subpage-open .bottom-nav {
+    display: none !important;
+}
+
+/* صفحة المحادثة - تخفي كل الصفحات الأخرى */
+body.conversation-open .page {
+    display: none !important;
+}
+body.conversation-open .profile-pages,
+body.conversation-open .profile-subpage {
+    display: none !important;
+}
+
+/* الصفحات الفرعية للملف الشخصي - تخفي المحتوى الرئيسي */
+.profile-subpage-open .page {
+    display: none !important;
+}
+.profile-subpage-open .profile-pages {
+    display: block !important;
+}
+
+/* منع تداخل صفحة المحادثة مع الصفحات الفرعية */
+.conversation-page {
+    display: none !important;
+}
+body.conversation-open .conversation-page {
+    display: flex !important;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    background: var(--bg);
+}
+
+/* إخفاء الهيدر عند فتح المحادثة */
+body.conversation-open .app-header {
+    display: none !important;
+}
+
+/* ========== إصلاح تداخل الصفحات - نهائي ========== */
+
+/* إخفاء جميع الصفحات الفرعية عند فتح المحادثة */
+body.conversation-open .page:not(.conversation-page) {
+    display: none !important;
+}
+body.conversation-open .profile-pages,
+body.conversation-open .profile-subpage {
+    display: none !important;
+}
+
+/* صفحة المحادثة تكون فوق الكل */
+.conversation-page {
+    display: none !important;
+}
+body.conversation-open .conversation-page {
+    display: flex !important;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    background: var(--bg);
+}
+
+/* إخفاء الهيدر والتنقل عند فتح المحادثة */
+body.conversation-open .app-header,
+body.conversation-open .bottom-nav {
+    display: none !important;
+}
+
+/* عند فتح الصفحات الفرعية للملف الشخصي */
+body.profile-subpage-open .page:not(.profile-page),
+body.profile-subpage-open .chat-page,
+body.profile-subpage-open .home-page,
+body.profile-subpage-open .settings-page {
+    display: none !important;
+}
+body.profile-subpage-open .page.profile-page {
+    display: none !important;
+}
+body.profile-subpage-open .profile-pages {
+    display: block !important;
+}
+
+/* لما تنغلق المحادثة - تأكد إنه ما تبقى أي صفحة مفتوحة */
+body:not(.conversation-open) .conversation-page {
+    display: none !important;
+}
+
+
+/* ==================== تنسيق مشغل البصمة الصوتية المتقدم ==================== */
+
+/* تنسيق مشغل الصوت (audio) */
+.message-audio {
+    background: #4CAF50;
+    border-radius: 20px;
+    height: 38px;
+}
+
+.message-audio::-webkit-media-controls-panel {
+    background: #4CAF50;
+}
+
+.message-audio::-webkit-media-controls-play-button,
+.message-audio::-webkit-media-controls-mute-button {
+    background-color: white;
+    border-radius: 50%;
+    color: #4CAF50;
+}
+
+.message-audio::-webkit-media-controls-current-time-display,
+.message-audio::-webkit-media-controls-time-remaining-display {
+    color: white;
+}
+
+.message-audio::-webkit-media-controls-timeline {
+    background-color: white;
+    border-radius: 10px;
+}
