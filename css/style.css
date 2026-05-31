@@ -197,6 +197,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 body.in-call .app-container, body.in-call .bottom-nav, body.in-call .app-header { display: none !important; }
 body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
 
+/* ✅ الهيكل الرئيسي - يمنع الحركة عند ظهور الكيبورد */
 body.conversation-open .conversation-page { 
     display: flex !important; 
     flex-direction: column; 
@@ -217,14 +218,7 @@ body.conversation-open .conversation-page {
     }
 }
 
-/* ✅ عند ظهور الكيبورد */
-@media (max-width: 768px) {
-    body.conversation-open .conversation-page {
-        height: -webkit-fill-available;
-    }
-}
-
-/* ==================== القسم 14: رأس المحادثة (ثابت مثل واتساب) ==================== */
+/* ==================== القسم 14: رأس المحادثة (ثابت تماماً) ==================== */
 .conversation-header { 
     display: flex; 
     align-items: center; 
@@ -233,8 +227,7 @@ body.conversation-open .conversation-page {
     border-bottom: 1px solid var(--border); 
     height: 70px;
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 20;
 }
 
@@ -567,18 +560,14 @@ body.conversation-open {
 
 /* ✅ تأكيد ثبات القائمة العلوية */
 .conversation-header {
-    position: sticky;
+    position: relative;
     top: 0;
-    background: var(--card-bg);
-    z-index: 20;
 }
 
 /* ✅ تأكيد ثبات القائمة السفلية */
 .message-input-container {
     position: relative;
     bottom: 0;
-    background: var(--card-bg);
-    z-index: 20;
 }
 
 /* ✅ عند ظهور الكيبورد، شريط الإدخال يبقى فوقه مباشرة */
