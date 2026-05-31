@@ -6,6 +6,7 @@
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
+    _pendingConversationStatus: {},
     
     featuresEnabled: false,
     featureRequestPending: false,
@@ -17,49 +18,32 @@ const ChatSystem = {
     offlineTimer: null,
     offlineCountdownInterval: null,
     
-    // ✅ متغيرات التأخير الجديدة
-    featuresButtonLocked: true,      // قفل زر التفعيل أول 30 ثانية
-    featuresActivationDelay: false,  // تأخير تفعيل الميزات بعد القبول
-    
-    
-   // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
-updateFeatureToggleUI() {
-    const toggleInput = document.getElementById('featureToggleInput');
-    if (!toggleInput) return;
-    
-    // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
-    toggleInput.checked = this.featuresEnabled;
-    
-    // ✅ إذا كان الزر مقفلاً لمدة 30 ثانية، يبقى disabled
-    if (this.featuresButtonLocked) {
-        toggleInput.disabled = true;
+    // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
+    updateFeatureToggleUI() {
+        const toggleInput = document.getElementById('featureToggleInput');
+        if (!toggleInput) return;
+        
+        // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
+        toggleInput.checked = this.featuresEnabled;
+        
+        // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة
+        const canUseToggle = this.friendInConversation;
+        toggleInput.disabled = !canUseToggle;
+        
+        // ✅ تحديث الشفافية
         const featureSwitchLabel = document.getElementById('featureSwitchLabel');
         if (featureSwitchLabel) {
-            featureSwitchLabel.style.opacity = '0.5';
-            featureSwitchLabel.style.pointerEvents = 'none';
+            if (!canUseToggle) {
+                featureSwitchLabel.style.opacity = '0.5';
+                featureSwitchLabel.style.pointerEvents = 'none';
+            } else {
+                featureSwitchLabel.style.opacity = '1';
+                featureSwitchLabel.style.pointerEvents = 'auto';
+            }
         }
-        console.log(`🔒 زر التفعيل مقفل (30 ثانية المتبقية)`);
-        return;
-    }
-    
-    // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة
-    const canUseToggle = this.friendInConversation;
-    toggleInput.disabled = !canUseToggle;
-    
-    // ✅ تحديث الشفافية
-    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
-    if (featureSwitchLabel) {
-        if (!canUseToggle) {
-            featureSwitchLabel.style.opacity = '0.5';
-            featureSwitchLabel.style.pointerEvents = 'none';
-        } else {
-            featureSwitchLabel.style.opacity = '1';
-            featureSwitchLabel.style.pointerEvents = 'auto';
-        }
-    }
-    
-    console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}`);
-}, 
+        
+        console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}`);
+    },
     
     // ==================== القسم 3: init ====================
 init() { 
@@ -97,6 +81,7 @@ setupBeforeUnloadListener() {
     });
 },
 
+
     // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
     setTimeout(() => {
@@ -108,13 +93,6 @@ setupFeatureButton() {
         
         const oldKickBtn = document.getElementById('kickBtn');
         if (oldKickBtn) oldKickBtn.remove();
-        
-        // ✅ إزالة القائمة القديمة إذا وجدت
-        const oldCallMenu = document.getElementById('callMenu');
-        if (oldCallMenu) oldCallMenu.remove();
-        
-        const oldMenuBtn = document.getElementById('callMenuBtn');
-        if (oldMenuBtn) oldMenuBtn.remove();
         
         const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
         if (!container) {
@@ -213,135 +191,8 @@ setupFeatureButton() {
                 .kick-btn.active:active {
                     transform: scale(0.95);
                 }
-                /* زر القائمة */
-                .menu-btn {
-                    background: none;
-                    border: none;
-                    color: var(--primary);
-                    font-size: 1.3rem;
-                    cursor: pointer;
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 50%;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.3s ease;
-                }
-                .menu-btn:hover {
-                    background: rgba(33, 150, 243, 0.1);
-                }
-                /* القائمة المنبثقة */
-                .call-menu {
-                    position: absolute;
-                    background: var(--card-bg);
-                    border-radius: 12px;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-                    padding: 8px;
-                    z-index: 1000;
-                    min-width: 140px;
-                    border: 1px solid var(--border);
-                }
-                .call-menu button {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 10px 16px;
-                    width: 100%;
-                    border: none;
-                    background: none;
-                    color: var(--text);
-                    cursor: pointer;
-                    border-radius: 8px;
-                    font-size: 0.9rem;
-                    text-align: right;
-                }
-                .call-menu button:hover {
-                    background: var(--light);
-                }
-                .call-menu button i {
-                    width: 20px;
-                    color: var(--primary);
-                }
             `;
             document.head.appendChild(style);
-        }
-        
-        // ✅ العثور على حاوية الأزرار (بجانب زر التفعيل)
-        const callButtonsContainer = document.querySelector('.call-buttons');
-        
-        // ✅ إنشاء زر القائمة (ثلاث نقاط)
-        const menuBtn = document.createElement('button');
-        menuBtn.id = 'callMenuBtn';
-        menuBtn.className = 'menu-btn';
-        menuBtn.innerHTML = '<i class="fas fa-ellipsis-v"></i>';
-        menuBtn.title = 'قائمة الاتصال';
-        
-        // ✅ إنشاء القائمة المنبثقة
-        const callMenu = document.createElement('div');
-        callMenu.id = 'callMenu';
-        callMenu.className = 'call-menu';
-        callMenu.style.display = 'none';
-        callMenu.innerHTML = `
-            <button id="audioCallMenuItem" class="audio-call-menu-item">
-                <i class="fas fa-phone"></i>
-                <span>اتصال صوتي</span>
-            </button>
-            <button id="videoCallMenuItem" class="video-call-menu-item">
-                <i class="fas fa-video"></i>
-                <span>اتصال فيديو</span>
-            </button>
-        `;
-        
-        // ✅ إضافة الأزرار إلى الحاوية
-        if (callButtonsContainer) {
-            callButtonsContainer.appendChild(menuBtn);
-            callButtonsContainer.appendChild(callMenu);
-        } else {
-            // إذا لم توجد حاوية call-buttons، نضيفها بجانب التفعيل
-            const toggleContainer = document.querySelector('.feature-toggle-container');
-            if (toggleContainer && toggleContainer.parentNode) {
-                const wrapper = document.createElement('div');
-                wrapper.style.display = 'inline-flex';
-                wrapper.style.alignItems = 'center';
-                wrapper.style.gap = '8px';
-                wrapper.appendChild(menuBtn);
-                wrapper.appendChild(callMenu);
-                toggleContainer.parentNode.insertBefore(wrapper, toggleContainer);
-            }
-        }
-        
-        // ✅ إظهار/إخفاء القائمة عند الضغط على زر القائمة
-        menuBtn.onclick = (e) => {
-            e.stopPropagation();
-            callMenu.style.display = callMenu.style.display === 'none' ? 'block' : 'none';
-        };
-        
-        // ✅ إغلاق القائمة عند الضغط خارجها
-        document.addEventListener('click', (e) => {
-            if (!menuBtn.contains(e.target) && !callMenu.contains(e.target)) {
-                callMenu.style.display = 'none';
-            }
-        });
-        
-        // ✅ إضافة أحداث أزرار الاتصال
-        const audioCallMenuItem = document.getElementById('audioCallMenuItem');
-        const videoCallMenuItem = document.getElementById('videoCallMenuItem');
-        
-        if (audioCallMenuItem) {
-            audioCallMenuItem.onclick = (e) => {
-                e.stopPropagation();
-                callMenu.style.display = 'none';
-                window.startAudioCall();
-            };
-        }
-        
-        if (videoCallMenuItem) {
-            videoCallMenuItem.onclick = (e) => {
-                e.stopPropagation();
-                callMenu.style.display = 'none';
-                window.startVideoCall();
-            };
         }
         
         const toggleContainer = document.createElement('div');
@@ -368,21 +219,6 @@ setupFeatureButton() {
         if (!toggleInput) return;
         
         window.featureToggleInput = toggleInput;
-        
-        // ✅ قفل الزر في البداية لمدة 30 ثانية
-        toggleInput.disabled = true;
-        this.featuresButtonLocked = true;
-        console.log('🔒 زر التفعيل مقفل لمدة 30 ثانية');
-        
-        // ✅ بعد 30 ثانية، فتح الزر
-        setTimeout(() => {
-            if (toggleInput) {
-                toggleInput.disabled = false;
-                this.featuresButtonLocked = false;
-                console.log('✅ زر التفعيل أصبح جاهزاً للضغط بعد 30 ثانية');
-                this.updateAllButtons();
-            }
-        }, 30000);
         
         toggleInput.onclick = (e) => {
             console.log('🔘 تم الضغط على زر التفعيل');
@@ -416,7 +252,7 @@ setupFeatureButton() {
         
         this.updateKickButtonState();
         
-        console.log('✅ تم إضافة زر التفعيل وزر الطرد والقائمة المنبثقة');
+        console.log('✅ تم إضافة زر التفعيل وزر الطرد');
     }, 1000);
 },
 
@@ -464,12 +300,9 @@ async kickUserFromConversation() {
         console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
     }
     
-    // ✅ طرد المستخدم الحالي أيضاً (إغلاق المحادثة من جهته)
-    this.closeChat();
-    
-    // ✅ تحديث واجهة المستخدم
     this.updateAllButtons();
 },
+    
     
     // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
@@ -587,21 +420,15 @@ async acceptFeatureRequest() {
     if (toggleInput) toggleInput.checked = true;
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ تأخير فتح Data Channel وتفعيل الميزات لمدة 30 ثانية
-    setTimeout(async () => {
-        if (this.currentChat) {
-            try {
-                console.log('🔧 محاولة فتح Data Channel بعد 30 ثانية...');
-                await CallSystem.ensureDataChannelOnly(this.currentChat);
-                console.log('✅ تم فتح Data Channel بنجاح');
-            } catch(e) {
-                console.error('❌ خطأ في فتح Data Channel:', e);
-            }
+    if (this.currentChat) {
+        try {
+            console.log('🔧 محاولة فتح Data Channel...');
+            await CallSystem.ensureDataChannelOnly(this.currentChat);
+            console.log('✅ تم فتح Data Channel بنجاح');
+        } catch(e) {
+            console.error('❌ خطأ في فتح Data Channel:', e);
         }
-        
-        this.updateAllButtons();
-        console.log('✅ تم تفعيل الميزات بعد 30 ثانية من القبول');
-    }, 30000);
+    }
     
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -624,9 +451,8 @@ async acceptFeatureRequest() {
         console.error('❌ خطأ في إرسال القبول:', e);
     }
     
-    // ✅ تحديث أولي للواجهة (الزر أخضر لكن الميزات غير مفعلة بعد)
     this.updateAllButtons();
-    console.log('✅ تم تفعيل الميزات! (سيتم فتح القناة خلال 30 ثانية)');
+    console.log('✅ تم تفعيل الميزات!');
 },
     
     // ==================== القسم 10: handleFeatureResponse ====================
@@ -654,31 +480,24 @@ async handleFeatureResponse(fromId, action) {
         if (toggleInput) toggleInput.checked = true;
         if (switchLabel) switchLabel.classList.remove('blinking');
         
-        // ✅ تأخير فتح Data Channel وتفعيل الميزات لمدة 30 ثانية
-        setTimeout(async () => {
-            if (this.currentChat) {
-                try {
-                    console.log('🔧 محاولة فتح Data Channel بعد 30 ثانية...');
-                    await CallSystem.ensureDataChannelOnly(this.currentChat);
-                    console.log('✅ تم فتح Data Channel بنجاح');
-                } catch(e) {
-                    console.error('❌ خطأ في فتح Data Channel:', e);
-                }
+        if (this.currentChat) {
+            try {
+                console.log('🔧 محاولة فتح Data Channel بعد قبول الطرف الآخر...');
+                await CallSystem.ensureDataChannelOnly(this.currentChat);
+                console.log('✅ تم فتح Data Channel بنجاح');
+            } catch(e) {
+                console.error('❌ خطأ في فتح Data Channel:', e);
             }
-            
-            this.updateAllButtons();
-            console.log('✅ تم تفعيل الميزات بعد 30 ثانية من القبول');
-        }, 30000);
+        }
         
         const btn = document.getElementById('enableFeaturesBtn');
         if (btn) {
             btn.style.background = '#4CAF50';
-            btn.title = 'الميزات مفعلة ✅ (سيتم التفعيل خلال 30 ثانية)';
+            btn.title = 'الميزات مفعلة ✅';
         }
         
-        // ✅ تحديث أولي للواجهة (الزر أخضر لكن الميزات غير مفعلة بعد)
         this.updateAllButtons();
-        console.log('✅ تم تفعيل الميزات! (سيتم فتح القناة خلال 30 ثانية)');
+        console.log('✅ تم تفعيل الميزات!');
         
     } else if (action === 'rejected') {
         this.featureRequestPending = false;
@@ -842,14 +661,15 @@ updateAllButtons() {
         } 
     });
     
-    // ✅ أزرار الاتصال داخل القائمة المنبثقة
-    const audioCallBtn = document.querySelector('#audioCallMenuItem') || 
-                         document.querySelector('.audio-call-menu-item') ||
-                         document.querySelector('#callMenu button:first-child');
+    const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
+                         document.querySelector('.audio-call-btn') ||
+                         document.querySelector('#audioCallBtn') ||
+                         document.querySelector('button[data-call="audio"]');
     
-    const videoCallBtn = document.querySelector('#videoCallMenuItem') || 
-                         document.querySelector('.video-call-menu-item') ||
-                         document.querySelector('#callMenu button:last-child');
+    const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
+                         document.querySelector('.video-call-btn') ||
+                         document.querySelector('#videoCallBtn') ||
+                         document.querySelector('button[data-call="video"]');
     
     if (audioCallBtn) {
         if (canUse) {
