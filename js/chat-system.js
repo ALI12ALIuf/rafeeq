@@ -109,6 +109,13 @@ setupFeatureButton() {
         const oldKickBtn = document.getElementById('kickBtn');
         if (oldKickBtn) oldKickBtn.remove();
         
+        // ✅ إزالة القائمة القديمة إذا وجدت
+        const oldCallMenu = document.getElementById('callMenu');
+        if (oldCallMenu) oldCallMenu.remove();
+        
+        const oldMenuBtn = document.getElementById('callMenuBtn');
+        if (oldMenuBtn) oldMenuBtn.remove();
+        
         const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
         if (!container) {
             console.log('⚠️ لم يتم العثور على حاوية للزر');
@@ -206,8 +213,135 @@ setupFeatureButton() {
                 .kick-btn.active:active {
                     transform: scale(0.95);
                 }
+                /* زر القائمة */
+                .menu-btn {
+                    background: none;
+                    border: none;
+                    color: var(--primary);
+                    font-size: 1.3rem;
+                    cursor: pointer;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s ease;
+                }
+                .menu-btn:hover {
+                    background: rgba(33, 150, 243, 0.1);
+                }
+                /* القائمة المنبثقة */
+                .call-menu {
+                    position: absolute;
+                    background: var(--card-bg);
+                    border-radius: 12px;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                    padding: 8px;
+                    z-index: 1000;
+                    min-width: 140px;
+                    border: 1px solid var(--border);
+                }
+                .call-menu button {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 10px 16px;
+                    width: 100%;
+                    border: none;
+                    background: none;
+                    color: var(--text);
+                    cursor: pointer;
+                    border-radius: 8px;
+                    font-size: 0.9rem;
+                    text-align: right;
+                }
+                .call-menu button:hover {
+                    background: var(--light);
+                }
+                .call-menu button i {
+                    width: 20px;
+                    color: var(--primary);
+                }
             `;
             document.head.appendChild(style);
+        }
+        
+        // ✅ العثور على حاوية الأزرار (بجانب زر التفعيل)
+        const callButtonsContainer = document.querySelector('.call-buttons');
+        
+        // ✅ إنشاء زر القائمة (ثلاث نقاط)
+        const menuBtn = document.createElement('button');
+        menuBtn.id = 'callMenuBtn';
+        menuBtn.className = 'menu-btn';
+        menuBtn.innerHTML = '<i class="fas fa-ellipsis-v"></i>';
+        menuBtn.title = 'قائمة الاتصال';
+        
+        // ✅ إنشاء القائمة المنبثقة
+        const callMenu = document.createElement('div');
+        callMenu.id = 'callMenu';
+        callMenu.className = 'call-menu';
+        callMenu.style.display = 'none';
+        callMenu.innerHTML = `
+            <button id="audioCallMenuItem" class="audio-call-menu-item">
+                <i class="fas fa-phone"></i>
+                <span>اتصال صوتي</span>
+            </button>
+            <button id="videoCallMenuItem" class="video-call-menu-item">
+                <i class="fas fa-video"></i>
+                <span>اتصال فيديو</span>
+            </button>
+        `;
+        
+        // ✅ إضافة الأزرار إلى الحاوية
+        if (callButtonsContainer) {
+            callButtonsContainer.appendChild(menuBtn);
+            callButtonsContainer.appendChild(callMenu);
+        } else {
+            // إذا لم توجد حاوية call-buttons، نضيفها بجانب التفعيل
+            const toggleContainer = document.querySelector('.feature-toggle-container');
+            if (toggleContainer && toggleContainer.parentNode) {
+                const wrapper = document.createElement('div');
+                wrapper.style.display = 'inline-flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.gap = '8px';
+                wrapper.appendChild(menuBtn);
+                wrapper.appendChild(callMenu);
+                toggleContainer.parentNode.insertBefore(wrapper, toggleContainer);
+            }
+        }
+        
+        // ✅ إظهار/إخفاء القائمة عند الضغط على زر القائمة
+        menuBtn.onclick = (e) => {
+            e.stopPropagation();
+            callMenu.style.display = callMenu.style.display === 'none' ? 'block' : 'none';
+        };
+        
+        // ✅ إغلاق القائمة عند الضغط خارجها
+        document.addEventListener('click', (e) => {
+            if (!menuBtn.contains(e.target) && !callMenu.contains(e.target)) {
+                callMenu.style.display = 'none';
+            }
+        });
+        
+        // ✅ إضافة أحداث أزرار الاتصال
+        const audioCallMenuItem = document.getElementById('audioCallMenuItem');
+        const videoCallMenuItem = document.getElementById('videoCallMenuItem');
+        
+        if (audioCallMenuItem) {
+            audioCallMenuItem.onclick = (e) => {
+                e.stopPropagation();
+                callMenu.style.display = 'none';
+                window.startAudioCall();
+            };
+        }
+        
+        if (videoCallMenuItem) {
+            videoCallMenuItem.onclick = (e) => {
+                e.stopPropagation();
+                callMenu.style.display = 'none';
+                window.startVideoCall();
+            };
         }
         
         const toggleContainer = document.createElement('div');
@@ -282,7 +416,7 @@ setupFeatureButton() {
         
         this.updateKickButtonState();
         
-        console.log('✅ تم إضافة زر التفعيل وزر الطرد');
+        console.log('✅ تم إضافة زر التفعيل وزر الطرد والقائمة المنبثقة');
     }, 1000);
 },
 
@@ -708,15 +842,14 @@ updateAllButtons() {
         } 
     });
     
-    const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
-                         document.querySelector('.audio-call-btn') ||
-                         document.querySelector('#audioCallBtn') ||
-                         document.querySelector('button[data-call="audio"]');
+    // ✅ أزرار الاتصال داخل القائمة المنبثقة
+    const audioCallBtn = document.querySelector('#audioCallMenuItem') || 
+                         document.querySelector('.audio-call-menu-item') ||
+                         document.querySelector('#callMenu button:first-child');
     
-    const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
-                         document.querySelector('.video-call-btn') ||
-                         document.querySelector('#videoCallBtn') ||
-                         document.querySelector('button[data-call="video"]');
+    const videoCallBtn = document.querySelector('#videoCallMenuItem') || 
+                         document.querySelector('.video-call-menu-item') ||
+                         document.querySelector('#callMenu button:last-child');
     
     if (audioCallBtn) {
         if (canUse) {
