@@ -6,7 +6,6 @@
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
-    _pendingConversationStatus: {},
     
     featuresEnabled: false,
     featureRequestPending: false,
@@ -18,32 +17,49 @@ const ChatSystem = {
     offlineTimer: null,
     offlineCountdownInterval: null,
     
-    // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
-    updateFeatureToggleUI() {
-        const toggleInput = document.getElementById('featureToggleInput');
-        if (!toggleInput) return;
-        
-        // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
-        toggleInput.checked = this.featuresEnabled;
-        
-        // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة
-        const canUseToggle = this.friendInConversation;
-        toggleInput.disabled = !canUseToggle;
-        
-        // ✅ تحديث الشفافية
+    // ✅ متغيرات التأخير الجديدة
+    featuresButtonLocked: true,      // قفل زر التفعيل أول 30 ثانية
+    featuresActivationDelay: false,  // تأخير تفعيل الميزات بعد القبول
+    
+    
+   // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
+updateFeatureToggleUI() {
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (!toggleInput) return;
+    
+    // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
+    toggleInput.checked = this.featuresEnabled;
+    
+    // ✅ إذا كان الزر مقفلاً لمدة 30 ثانية، يبقى disabled
+    if (this.featuresButtonLocked) {
+        toggleInput.disabled = true;
         const featureSwitchLabel = document.getElementById('featureSwitchLabel');
         if (featureSwitchLabel) {
-            if (!canUseToggle) {
-                featureSwitchLabel.style.opacity = '0.5';
-                featureSwitchLabel.style.pointerEvents = 'none';
-            } else {
-                featureSwitchLabel.style.opacity = '1';
-                featureSwitchLabel.style.pointerEvents = 'auto';
-            }
+            featureSwitchLabel.style.opacity = '0.5';
+            featureSwitchLabel.style.pointerEvents = 'none';
         }
-        
-        console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}`);
-    },
+        console.log(`🔒 زر التفعيل مقفل (30 ثانية المتبقية)`);
+        return;
+    }
+    
+    // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة
+    const canUseToggle = this.friendInConversation;
+    toggleInput.disabled = !canUseToggle;
+    
+    // ✅ تحديث الشفافية
+    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+    if (featureSwitchLabel) {
+        if (!canUseToggle) {
+            featureSwitchLabel.style.opacity = '0.5';
+            featureSwitchLabel.style.pointerEvents = 'none';
+        } else {
+            featureSwitchLabel.style.opacity = '1';
+            featureSwitchLabel.style.pointerEvents = 'auto';
+        }
+    }
+    
+    console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}`);
+}, 
     
     // ==================== القسم 3: init ====================
 init() { 
@@ -80,7 +96,6 @@ setupBeforeUnloadListener() {
         }
     });
 },
-
 
     // ==================== القسم 5: setupFeatureButton ====================
 setupFeatureButton() {
@@ -220,6 +235,21 @@ setupFeatureButton() {
         
         window.featureToggleInput = toggleInput;
         
+        // ✅ قفل الزر في البداية لمدة 30 ثانية
+        toggleInput.disabled = true;
+        this.featuresButtonLocked = true;
+        console.log('🔒 زر التفعيل مقفل لمدة 30 ثانية');
+        
+        // ✅ بعد 30 ثانية، فتح الزر
+        setTimeout(() => {
+            if (toggleInput) {
+                toggleInput.disabled = false;
+                this.featuresButtonLocked = false;
+                console.log('✅ زر التفعيل أصبح جاهزاً للضغط بعد 30 ثانية');
+                this.updateAllButtons();
+            }
+        }, 30000);
+        
         toggleInput.onclick = (e) => {
             console.log('🔘 تم الضغط على زر التفعيل');
             
@@ -300,9 +330,12 @@ async kickUserFromConversation() {
         console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
     }
     
+    // ✅ طرد المستخدم الحالي أيضاً (إغلاق المحادثة من جهته)
+    this.closeChat();
+    
+    // ✅ تحديث واجهة المستخدم
     this.updateAllButtons();
 },
-
     
     // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
@@ -420,15 +453,21 @@ async acceptFeatureRequest() {
     if (toggleInput) toggleInput.checked = true;
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    if (this.currentChat) {
-        try {
-            console.log('🔧 محاولة فتح Data Channel...');
-            await CallSystem.ensureDataChannelOnly(this.currentChat);
-            console.log('✅ تم فتح Data Channel بنجاح');
-        } catch(e) {
-            console.error('❌ خطأ في فتح Data Channel:', e);
+    // ✅ تأخير فتح Data Channel وتفعيل الميزات لمدة 30 ثانية
+    setTimeout(async () => {
+        if (this.currentChat) {
+            try {
+                console.log('🔧 محاولة فتح Data Channel بعد 30 ثانية...');
+                await CallSystem.ensureDataChannelOnly(this.currentChat);
+                console.log('✅ تم فتح Data Channel بنجاح');
+            } catch(e) {
+                console.error('❌ خطأ في فتح Data Channel:', e);
+            }
         }
-    }
+        
+        this.updateAllButtons();
+        console.log('✅ تم تفعيل الميزات بعد 30 ثانية من القبول');
+    }, 30000);
     
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -451,8 +490,9 @@ async acceptFeatureRequest() {
         console.error('❌ خطأ في إرسال القبول:', e);
     }
     
+    // ✅ تحديث أولي للواجهة (الزر أخضر لكن الميزات غير مفعلة بعد)
     this.updateAllButtons();
-    console.log('✅ تم تفعيل الميزات!');
+    console.log('✅ تم تفعيل الميزات! (سيتم فتح القناة خلال 30 ثانية)');
 },
     
     // ==================== القسم 10: handleFeatureResponse ====================
@@ -480,24 +520,31 @@ async handleFeatureResponse(fromId, action) {
         if (toggleInput) toggleInput.checked = true;
         if (switchLabel) switchLabel.classList.remove('blinking');
         
-        if (this.currentChat) {
-            try {
-                console.log('🔧 محاولة فتح Data Channel بعد قبول الطرف الآخر...');
-                await CallSystem.ensureDataChannelOnly(this.currentChat);
-                console.log('✅ تم فتح Data Channel بنجاح');
-            } catch(e) {
-                console.error('❌ خطأ في فتح Data Channel:', e);
+        // ✅ تأخير فتح Data Channel وتفعيل الميزات لمدة 30 ثانية
+        setTimeout(async () => {
+            if (this.currentChat) {
+                try {
+                    console.log('🔧 محاولة فتح Data Channel بعد 30 ثانية...');
+                    await CallSystem.ensureDataChannelOnly(this.currentChat);
+                    console.log('✅ تم فتح Data Channel بنجاح');
+                } catch(e) {
+                    console.error('❌ خطأ في فتح Data Channel:', e);
+                }
             }
-        }
+            
+            this.updateAllButtons();
+            console.log('✅ تم تفعيل الميزات بعد 30 ثانية من القبول');
+        }, 30000);
         
         const btn = document.getElementById('enableFeaturesBtn');
         if (btn) {
             btn.style.background = '#4CAF50';
-            btn.title = 'الميزات مفعلة ✅';
+            btn.title = 'الميزات مفعلة ✅ (سيتم التفعيل خلال 30 ثانية)';
         }
         
+        // ✅ تحديث أولي للواجهة (الزر أخضر لكن الميزات غير مفعلة بعد)
         this.updateAllButtons();
-        console.log('✅ تم تفعيل الميزات!');
+        console.log('✅ تم تفعيل الميزات! (سيتم فتح القناة خلال 30 ثانية)');
         
     } else if (action === 'rejected') {
         this.featureRequestPending = false;
