@@ -88,34 +88,35 @@
                         </div>
                     </div>
                     
-                  <!-- ==================== القسم 4.3.2: أزرار الاتصال والميزات ==================== -->
-<div class="call-buttons" style="display:flex;gap:12px;margin-right:auto;">
-    
-    <!-- ✅ زر الطرد (يظهر فقط عند الحاجة) -->
-    <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة" style="background:none;border:none;color:#f44336;font-size:1.3rem;cursor:pointer;display:none;">
-        <i class="fas fa-sign-out-alt"></i>
-    </button>
-    
-    <!-- ✅ زر تفعيل الميزات (يظهر فقط عند الحاجة) -->
-    <div id="featureToggleContainer" class="feature-toggle-container" style="display:none; align-items: center; gap: 8px;">
-        <span class="feature-toggle-label" style="color: #f44336; font-size: 0.7rem;">○</span>
-        <label class="feature-switch" id="featureSwitchLabel">
-            <input type="checkbox" id="featureToggleInput">
-            <span class="feature-slider"></span>
-        </label>
-        <span class="feature-toggle-label" style="color: #4CAF50; font-size: 0.7rem;">●</span>
-    </div>
-    
-    <!-- ✅ زر الاتصال الصوتي -->
-    <button onclick="startAudioCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال صوت">
-        <i class="fas fa-phone"></i>
-    </button>
-    
-    <!-- ✅ زر الاتصال المرئي -->
-    <button onclick="startVideoCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال فيديو">
-        <i class="fas fa-video"></i>
-    </button>
-</div>  
+                    <!-- ==================== القسم 4.3.2: أزرار الاتصال والميزات ==================== -->
+                    <div class="call-buttons" style="display:flex;gap:12px;margin-right:auto;">
+                        
+                        <!-- ✅ زر الطرد (يظهر فقط عند الحاجة) -->
+                        <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة" style="background:none;border:none;color:#f44336;font-size:1.3rem;cursor:pointer;display:none;">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                        
+                        <!-- ✅ زر تفعيل الميزات (يظهر فقط عند الحاجة) -->
+                        <div id="featureToggleContainer" class="feature-toggle-container" style="display:none; align-items: center; gap: 8px;">
+                            <span class="feature-toggle-label" style="color: #f44336; font-size: 0.7rem;">○</span>
+                            <label class="feature-switch">
+                                <input type="checkbox" id="featureToggleInput">
+                                <span class="feature-slider"></span>
+                            </label>
+                            <span class="feature-toggle-label" style="color: #4CAF50; font-size: 0.7rem;">●</span>
+                        </div>
+                        
+                        <!-- ✅ زر الاتصال الصوتي -->
+                        <button onclick="startAudioCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال صوت">
+                            <i class="fas fa-phone"></i>
+                        </button>
+                        
+                        <!-- ✅ زر الاتصال المرئي -->
+                        <button onclick="startVideoCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال فيديو">
+                            <i class="fas fa-video"></i>
+                        </button>
+                    </div>
+                </div>
 
                 <!-- ==================== القسم 4.3.3: حاوية الرسائل ==================== -->
                 <div class="messages-container" id="messagesContainer"></div>
