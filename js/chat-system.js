@@ -798,7 +798,8 @@ openChat(friendId, friendName, friendAvatar) {
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
-    setTimeout(() => this.setupFeatureButton(), 500);
+    // ✅ تم إزالة التأخير (الزر يظهر فوراً)
+    this.setupFeatureButton();
     
     setTimeout(() => {
         if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
