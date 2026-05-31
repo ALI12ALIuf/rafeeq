@@ -19,31 +19,26 @@ const ChatSystem = {
     offlineCountdownInterval: null,
     
     // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
-    updateFeatureToggleUI() {
-        const toggleInput = document.getElementById('featureToggleInput');
-        if (!toggleInput) return;
-        
-        // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
-        toggleInput.checked = this.featuresEnabled;
-        
-        // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة
-        const canUseToggle = this.friendInConversation;
-        toggleInput.disabled = !canUseToggle;
-        
-        // ✅ تحديث الشفافية
-        const featureSwitchLabel = document.getElementById('featureSwitchLabel');
-        if (featureSwitchLabel) {
-            if (!canUseToggle) {
-                featureSwitchLabel.style.opacity = '0.5';
-                featureSwitchLabel.style.pointerEvents = 'none';
-            } else {
-                featureSwitchLabel.style.opacity = '1';
-                featureSwitchLabel.style.pointerEvents = 'auto';
-            }
-        }
-        
-        console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}`);
-    },
+updateFeatureToggleUI() {
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (!toggleInput) return;
+    
+    // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
+    toggleInput.checked = this.featuresEnabled;
+    
+    // ✅ الزر يكون مفعلاً دائماً (يمكن الضغط عليه لإرسال طلب التفعيل)
+    // بغض النظر عن friendInConversation
+    toggleInput.disabled = false;
+    
+    // ✅ تحديث الشفافية (الزر دائماً مرئي بالكامل)
+    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+    if (featureSwitchLabel) {
+        featureSwitchLabel.style.opacity = '1';
+        featureSwitchLabel.style.pointerEvents = 'auto';
+    }
+    
+    console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=false`);
+},
     
     // ==================== القسم 3: init ====================
 init() { 
