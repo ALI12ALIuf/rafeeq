@@ -2297,3 +2297,19 @@ closeChat() {
 
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
+
+// ✅ حل ثبات الواجهة عند ظهور الكيبورد (مثل واتساب)
+const fixViewportHeight = () => {
+    const conversationPage = document.querySelector('.conversation-page');
+    if (conversationPage && document.body.classList.contains('conversation-open')) {
+        if (window.visualViewport) {
+            conversationPage.style.height = window.visualViewport.height + 'px';
+        }
+    }
+};
+
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', fixViewportHeight);
+    // تنفيذ فوري لضبط الارتفاع عند فتح المحادثة
+    setTimeout(fixViewportHeight, 100);
+}
