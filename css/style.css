@@ -1,578 +1,2299 @@
-/* ==================== القسم 1: إعادة تعيين عام ==================== */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+// ========== chat-system.js ==========
+// نظام الدردشة E2EE + نظام الحضور Presence
 
-* {
-    -webkit-tap-highlight-color: transparent !important;
-    outline: none !important;
-}
 
-*:focus {
-    outline: none !important;
-    box-shadow: none !important;
-}
+// ==================== القسم 2: تعريف ChatSystem ====================
+const ChatSystem = {
+    currentChat: null, messages: {},
+    friendInConversation: false,
+    _pendingConversationStatus: {},
+    
+    featuresEnabled: false,
+    featureRequestPending: false,
+    featureRequestReceived: false,
+    featureBlinkInterval: null,
+    
+    // ✅ متغيرات المؤقت 120 ثانية
+    offlineStartTime: null,
+    offlineTimer: null,
+    offlineCountdownInterval: null,
+    
+    // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
+    updateFeatureToggleUI() {
+        const toggleInput = document.getElementById('featureToggleInput');
+        if (!toggleInput) return;
+        
+        // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
+        toggleInput.checked = this.featuresEnabled;
+        
+        // ✅ تحديث تعطيل الزر إذا الطرف الآخر ليس في المحادثة
+        const canUseToggle = this.friendInConversation;
+        toggleInput.disabled = !canUseToggle;
+        
+        // ✅ تحديث الشفافية
+        const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+        if (featureSwitchLabel) {
+            if (!canUseToggle) {
+                featureSwitchLabel.style.opacity = '0.5';
+                featureSwitchLabel.style.pointerEvents = 'none';
+            } else {
+                featureSwitchLabel.style.opacity = '1';
+                featureSwitchLabel.style.pointerEvents = 'auto';
+            }
+        }
+        
+        console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=${!canUseToggle}, friendInConversation=${this.friendInConversation}`);
+    },
+    
+    // ==================== القسم 3: init ====================
+init() { 
+    this.loadAllChats(); 
+    this.setupPageFocusListener();
+    this.setupFeatureButton();
+    this.setupBeforeUnloadListener();
+    
+    // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
+    this.cleanMediaMessagesOnLoad();
+},
 
-/* ==================== القسم 2: المتغيرات العامة ==================== */
-:root {
-    --primary: #2196F3;
-    --primary-dark: #1976D2;
-    --secondary: #FFC107;
-    --success: #4CAF50;
-    --danger: #f44336;
-    --dark: #333;
-    --light: #f5f5f5;
-    --border: #e0e0e0;
-    --text: #333;
-    --text-light: #666;
-    --bg: #fff;
-    --card-bg: #fff;
-    --shadow: 0 2px 10px rgba(0,0,0,0.1);
-    --radius: 12px;
-    --header-height: 60px;
-    --nav-height: 60px;
-}
-
-.theme-dark {
-    --primary: #64B5F6;
-    --primary-dark: #42A5F5;
-    --dark: #f5f5f5;
-    --light: #333;
-    --border: #444;
-    --text: #fff;
-    --text-light: #ccc;
-    --bg: #1a1a1a;
-    --card-bg: #2d2d2d;
-    --shadow: 0 2px 10px rgba(0,0,0,0.3);
-}
-
-/* ==================== القسم 3: الجسم الرئيسي ==================== */
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    transition: background-color 0.3s, color 0.3s;
-    height: 100vh;
-    overflow: hidden;
-}
-
-/* ==================== القسم 4: شاشة البداية (Splash) ==================== */
-.splash-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--primary); display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s; }
-.splash-screen.hide { opacity: 0; pointer-events: none; }
-.splash-content { text-align: center; color: white; }
-.splash-content .app-icon { font-size: 5rem; margin-bottom: 1rem; }
-.splash-content h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
-.spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin: 2rem auto 0; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ==================== القسم 5: حاوية التطبيق الرئيسية ==================== */
-.app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
-.app-header { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; position: sticky; top: 0; z-index: 100; }
-.header-left, .header-right { display: flex; gap: 0.5rem; }
-.icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.header-title h1 { font-size: 1.2rem; font-weight: 600; }
-.app-content { flex: 1; overflow-y: auto; padding-bottom: var(--nav-height); -webkit-overflow-scrolling: touch; }
-.page { display: none; padding: 1rem; }
-.page.active { display: block; }
-
-/* ==================== القسم 6: شريط التنقل السفلي ==================== */
-.bottom-nav { height: var(--nav-height); background: var(--card-bg); border-top: 1px solid var(--border); display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; }
-.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; background: none; border: none; color: var(--text-light); font-size: 0.8rem; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.nav-item i { font-size: 1.2rem; }
-.nav-item.active { color: var(--primary); }
-
-/* ==================== القسم 7: بطاقات المنشورات (Home) ==================== */
-.post-card { background: var(--card-bg); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; box-shadow: var(--shadow); }
-.post-header { display: flex; align-items: center; padding: 1rem; gap: 0.75rem; }
-.post-avatar-emoji { width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden; line-height: 1; }
-.post-user { flex: 1; }
-.post-user h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
-.post-time { font-size: 0.8rem; color: var(--text-light); }
-.post-menu { background: none; border: none; color: var(--text-light); cursor: pointer; }
-.post-content { padding: 0 1rem 1rem; }
-.post-location { display: flex; align-items: center; gap: 0.5rem; color: var(--text-light); font-size: 0.9rem; margin-bottom: 0.5rem; }
-.post-actions { display: flex; gap: 1rem; padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--border); }
-.post-action { background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
-
-/* ==================== القسم 8: البحث وقائمة المحادثات ==================== */
-.search-box { display: flex; align-items: center; background: var(--light); border-radius: 25px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
-.search-box i { color: var(--text-light); margin-left: 0.5rem; }
-.search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; }
-.chats-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.chat-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.chat-avatar-emoji { width: 50px; height: 50px; min-width: 50px; min-height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; line-height: 1; }
-.chat-info { flex: 1; }
-.chat-info h4 { margin-bottom: 0.25rem; font-size: 0.9rem; }
-.chat-info p { color: var(--text-light); font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-time { color: var(--text-light); font-size: 0.7rem; }
-
-/* ==================== القسم 9: صفحة الملف الشخصي ==================== */
-.profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
-.profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
-.profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
-.profile-avatar-emoji { width: 100%; height: 100%; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 5rem; border: 4px solid white; box-shadow: var(--shadow); overflow: hidden; line-height: 1; }
-.edit-profile-btn-left { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; border-radius: 50%; background: white; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; box-shadow: var(--shadow); z-index: 10; }
-.profile-info-container { padding: 1rem; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-.profile-name-wrapper { text-align: center; width: 100%; }
-.profile-name-wrapper h2 { font-size: 1.3rem; color: var(--text); margin: 0; }
-.profile-id-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--light); padding: 0.5rem 1rem; border-radius: 25px; width: fit-content; max-width: 100%; min-width: 250px; }
-.copy-btn-left { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1.1rem; padding: 0 5px; -webkit-tap-highlight-color: transparent; }
-.id-value-numbers { font-family: monospace; font-size: 1.1rem; font-weight: 500; color: var(--primary); direction: ltr; letter-spacing: 1px; flex: 1; text-align: center; }
-.id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
-.profile-bio { padding: 0 1rem 1rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
-.profile-stats { display: flex; justify-content: space-around; padding: 1rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.stat-link { text-decoration: none; color: var(--text); text-align: center; padding: 10px; border-radius: var(--radius); display: inline-block; flex: 1; -webkit-tap-highlight-color: transparent; }
-.stat-value { display: block; font-size: 1.2rem; font-weight: bold; color: var(--primary); }
-.stat-link span:last-child { font-size: 0.8rem; color: var(--text-light); }
-
-/* ==================== القسم 10: الصفحات الفرعية للملف الشخصي ==================== */
-.profile-subpage { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 1000; overflow-y: auto; padding: 0; }
-.subpage-header { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow); }
-.back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.back-btn:hover { background: var(--primary); color: white; }
-.subpage-header h3 { flex: 1; text-align: center; font-size: 1.2rem; font-weight: 600; color: var(--primary); }
-.trips-grid, .users-list { padding: 1rem; }
-.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; padding: 2rem; color: var(--text-light); }
-.empty-state i { font-size: 4rem; margin-bottom: 1rem; color: var(--primary); opacity: 0.5; }
-.empty-state h3 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--text); font-weight: 600; }
-.empty-state p { font-size: 1rem; max-width: 300px; margin: 0 auto; line-height: 1.6; color: var(--text-light); }
-.user-item { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); margin-bottom: 0.75rem; box-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
-.user-avatar-emoji { width: 50px; height: 50px; min-width: 50px; min-height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; line-height: 1; }
-.user-info { flex: 1; }
-.user-info h4 { margin-bottom: 0.25rem; font-size: 1rem; font-weight: 600; }
-.user-info p { color: var(--text-light); font-size: 0.85rem; }
-.user-actions { display: flex; gap: 0.5rem; }
-.action-btn { width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.action-btn.following { background: var(--primary); color: white; }
-.action-btn.remove { background: var(--danger); color: white; }
-
-/* ==================== القسم 11: النوافذ المنبثقة (Modals) ==================== */
-.modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s; }
-.modal.active { opacity: 1; visibility: visible; }
-.modal-content { background: var(--card-bg); border-radius: var(--radius); padding: 2rem; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
-.modal-content h3 { margin-bottom: 1.5rem; color: var(--primary); text-align: center; }
-.edit-field { margin-bottom: 1.5rem; text-align: center; }
-.edit-field label { display: block; margin-bottom: 0.5rem; color: var(--text-light); font-size: 0.9rem; }
-.input-wrapper { position: relative; width: 100%; max-width: 300px; margin: 0 auto; direction: ltr; }
-.edit-field input { width: 100%; padding: 0.75rem; padding-left: 50px; padding-right: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--light); color: var(--text); font-size: 1rem; text-align: center; }
-.edit-field input:focus { outline: none; border-color: var(--primary); }
-.char-counter { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--text-light); font-weight: 500; direction: ltr; }
-.char-counter.full { color: var(--danger); font-weight: bold; }
-.current-avatar { width: 80px; height: 80px; min-width: 80px; min-height: 80px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 4rem; margin: 0 auto 1rem; overflow: hidden; line-height: 1; }
-.change-avatar-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 0 auto; padding: 0.5rem 1rem; background: var(--light); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; cursor: pointer; }
-.modal-actions { display: flex; gap: 1.2rem; margin-top: 2rem; justify-content: center; }
-.modal-btn { flex: 1; max-width: 140px; padding: 0.9rem 1.5rem; border: none; border-radius: var(--radius); font-weight: 600; font-size: 1rem; cursor: pointer; text-align: center; }
-.modal-btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
-.close-modal { position: absolute; top: 1rem; left: 1rem; background: none; border: none; color: var(--text-light); font-size: 1.2rem; cursor: pointer; }
-.avatar-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1rem 0; }
-.avatar-option { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1rem; background: var(--light); border: none; border-radius: var(--radius); cursor: pointer; }
-.avatar-option span:first-child { font-size: 2.5rem; }
-.language-options { display: flex; flex-direction: column; gap: 1rem; }
-.language-option { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--light); border: none; border-radius: var(--radius); color: var(--text); cursor: pointer; }
-.language-option .flag { font-size: 1.5rem; }
-.settings-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); margin-bottom: 0.5rem; -webkit-tap-highlight-color: transparent; }
-.settings-item-left { display: flex; align-items: center; gap: 1rem; }
-.settings-item-left i { font-size: 1.2rem; color: var(--primary); }
-.switch { position: relative; display: inline-block; width: 50px; height: 24px; }
-.switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--light); transition: .4s; border-radius: 24px; }
-.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
-input:checked + .slider { background-color: var(--primary); }
-input:checked + .slider:before { transform: translateX(26px); }
-
-/* ==================== القسم 12: وسائط الاستعلام (Responsive) ==================== */
-@media (min-width: 768px) { .bottom-nav { display: none; } }
-@media (max-width: 480px) {
-    .profile-cover { height: 120px; }
-    .profile-avatar-center { width: 80px; height: 80px; }
-    .profile-avatar-emoji { font-size: 4rem; }
-    .edit-profile-btn-left { width: 36px; height: 36px; top: 10px; left: 10px; font-size: 1.1rem; }
-    .profile-id-row { width: 100%; min-width: auto; }
-}
-
-/* ==================== القسم 13: المحادثة - هيكل مثل واتساب ==================== */
-body.in-call .app-container, body.in-call .bottom-nav, body.in-call .app-header { display: none !important; }
-body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
-
-/* ✅ الهيكل الرئيسي - يمنع الحركة عند ظهور الكيبورد */
-body.conversation-open .conversation-page { 
-    display: flex !important; 
-    flex-direction: column; 
-    position: fixed; 
-    top: 0; 
-    left: 0; 
-    right: 0; 
-    bottom: 0; 
-    z-index: 2000; 
-    background: var(--bg);
-    height: 100%;
-}
-
-/* ✅ دعم المتصفحات الحديثة */
-@supports (height: 100dvh) {
-    body.conversation-open .conversation-page {
-        height: 100dvh;
+// ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
+cleanMediaMessagesOnLoad() {
+    for (const friendId in this.messages) {
+        const messages = this.messages[friendId] || [];
+        const filteredMessages = messages.filter(msg => msg.type === 'text');
+        if (filteredMessages.length !== messages.length) {
+            this.messages[friendId] = filteredMessages;
+            const key = `chat_${friendId}`;
+            localStorage.setItem(key, JSON.stringify(filteredMessages));
+            console.log(`✅ تم تنظيف الوسائط من محادثة ${friendId}`);
+        }
     }
-}
+    console.log('🧹 تم تنظيف جميع الملفات والوسائط من localStorage');
+},
+    
+    
+    // ==================== القسم 4: setupBeforeUnloadListener ====================
+setupBeforeUnloadListener() {
+    window.addEventListener('beforeunload', () => {
+        if (this.currentChat && this.featuresEnabled) {
+            console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات محلياً');
+        }
+    });
+},
 
-/* ==================== القسم 14: رأس المحادثة (ثابت تماماً) ==================== */
-.conversation-header { 
-    display: flex; 
-    align-items: center; 
-    padding: 12px 16px; 
-    background: var(--card-bg); 
-    border-bottom: 1px solid var(--border); 
-    height: 70px;
-    flex-shrink: 0;
-    position: relative;
-    z-index: 20;
-}
 
-.conversation-header .back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 12px; }
-.conversation-header .back-btn:hover { background: var(--primary); color: white; }
-.conversation-user-info { display: flex; align-items: center; gap: 12px; flex: 1; padding: 4px 8px; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
-.conversation-avatar-emoji { width: 45px; height: 45px; min-width: 45px; min-height: 45px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; overflow: hidden; line-height: 1; }
-.conversation-user-details { flex: 1; }
-.conversation-user-details h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 2px; }
-.conversation-status { font-size: 0.75rem; color: var(--text-light); }
-.conversation-status.online { color: #4CAF50; }
-.conversation-status.offline { color: var(--text-light); }
+    // ==================== القسم 5: setupFeatureButton ====================
+setupFeatureButton() {
+    setTimeout(() => {
+        const oldBtn = document.getElementById('enableFeaturesBtn');
+        if (oldBtn) oldBtn.remove();
+        
+        const oldContainer = document.getElementById('featureToggleContainer');
+        if (oldContainer) oldContainer.remove();
+        
+        const oldKickBtn = document.getElementById('kickBtn');
+        if (oldKickBtn) oldKickBtn.remove();
+        
+        const container = document.querySelector('.chat-actions, .message-input-container, .chat-footer, #conversationPage');
+        if (!container) {
+            console.log('⚠️ لم يتم العثور على حاوية للزر');
+            return;
+        }
+        
+        if (!document.getElementById('featureToggleStyles')) {
+            const style = document.createElement('style');
+            style.id = 'featureToggleStyles';
+            style.textContent = `
+                .feature-toggle-container {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin: 0 5px;
+                    direction: ltr;
+                }
+                .feature-toggle-label {
+                    font-size: 0.7rem;
+                    color: #888;
+                }
+                .feature-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 52px;
+                    height: 26px;
+                }
+                .feature-switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                .feature-slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: #f44336;
+                    transition: 0.3s;
+                    border-radius: 26px;
+                }
+                .feature-slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 20px;
+                    width: 20px;
+                    left: 3px;
+                    bottom: 3px;
+                    background-color: white;
+                    transition: 0.3s;
+                    border-radius: 50%;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                }
+                input:checked + .feature-slider {
+                    background-color: #4CAF50;
+                }
+                input:checked + .feature-slider:before {
+                    transform: translateX(26px);
+                }
+                @keyframes featureBlink {
+                    0% { background-color: #f44336; }
+                    50% { background-color: #2196F3; }
+                    100% { background-color: #f44336; }
+                }
+                .feature-switch.blinking .feature-slider {
+                    animation: featureBlink 0.8s ease-in-out infinite;
+                }
+                .kick-btn {
+                    background: none;
+                    border: none;
+                    color: #f44336;
+                    font-size: 1.1rem;
+                    cursor: pointer;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s ease;
+                    margin-right: 5px;
+                    opacity: 0.5;
+                    pointer-events: none;
+                }
+                .kick-btn.active {
+                    opacity: 1;
+                    pointer-events: auto;
+                }
+                .kick-btn.active:hover {
+                    background: rgba(244, 67, 54, 0.1);
+                    transform: scale(1.05);
+                }
+                .kick-btn.active:active {
+                    transform: scale(0.95);
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        const toggleContainer = document.createElement('div');
+        toggleContainer.className = 'feature-toggle-container';
+        toggleContainer.id = 'featureToggleContainer';
+        
+        toggleContainer.innerHTML = `
+            <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+            <span class="feature-toggle-label" style="color: #f44336;">○</span>
+            <label class="feature-switch" id="featureSwitchLabel">
+                <input type="checkbox" id="featureToggleInput">
+                <span class="feature-slider" id="featureToggleSlider"></span>
+            </label>
+            <span class="feature-toggle-label" style="color: #4CAF50;">●</span>
+        `;
+        
+        container.appendChild(toggleContainer);
+        
+        const toggleInput = document.getElementById('featureToggleInput');
+        const kickBtn = document.getElementById('kickBtn');
+        
+        if (!toggleInput) return;
+        
+        window.featureToggleInput = toggleInput;
+        
+        toggleInput.onclick = (e) => {
+            console.log('🔘 تم الضغط على زر التفعيل');
+            
+            if (this.featuresEnabled) {
+                console.log('⚠️ الميزات مفعلة، جاري إلغاء التفعيل');
+                this.disableFeatures();
+                return;
+            }
+            
+            if (this.featureRequestReceived) {
+                this.acceptFeatureRequest();
+            } else if (this.featureRequestPending) {
+                alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+            } else {
+                this.requestEnableFeatures();
+            }
+        };
+        
+        if (kickBtn) {
+            kickBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.kickUserFromConversation();
+            };
+        }
+        
+        if (this.featuresEnabled && toggleInput) {
+            toggleInput.checked = true;
+        }
+        
+        this.updateKickButtonState();
+        
+        console.log('✅ تم إضافة زر التفعيل وزر الطرد');
+    }, 1000);
+},
 
-/* ==================== القسم 15: المحادثة - أزرار الاتصال ==================== */
-.call-buttons button { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
-.call-buttons button:hover { background: var(--light); }
-.call-buttons button i { font-size: 1.2rem; }
-.call-buttons {
-    flex-shrink: 0;
-}
+// ✅ دالة تحديث حالة زر الطرد
+updateKickButtonState() {
+    const kickBtn = document.getElementById('kickBtn');
+    if (!kickBtn) return;
+    
+    const canUse = (this.friendInConversation && this.featuresEnabled);
+    
+    if (canUse) {
+        kickBtn.classList.add('active');
+        kickBtn.title = 'طرد المستخدم من المحادثة';
+    } else {
+        kickBtn.classList.remove('active');
+        kickBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+    }
+},
 
-/* أزرار المرفقات مقفولة */
-.attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
-.attachment-menu button.locked::after { content: " 🔒"; font-size: 0.8rem; }
+    // ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
+async kickUserFromConversation() {
+    if (!this.currentChat) {
+        console.log('❌ لا توجد محادثة نشطة');
+        return;
+    }
+    
+    if (!this.featuresEnabled || !this.friendInConversation) {
+        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+        return;
+    }
+    
+    console.log('👢 محاولة طرد المستخدم:', this.currentChat);
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        try {
+            CallSystem.dc.send(JSON.stringify({ 
+                type: 'force_close_conversation',
+                timestamp: Date.now()
+            }));
+            console.log('✅ تم إرسال إشارة الطرد مباشرة عبر Data Channel إلى:', this.currentChat);
+        } catch(e) {
+            console.error('❌ فشل إرسال إشارة الطرد عبر Data Channel:', e);
+        }
+    } else {
+        console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
+    }
+    
+    this.updateAllButtons();
+},
+    
+    
+    // ==================== القسم 6: startFeatureBlink ====================
+startFeatureBlink() {
+    if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
+    
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    if (!switchLabel) return;
+    
+    switchLabel.classList.add('blinking');
+    
+    let blinkCount = 0;
+    this.featureBlinkInterval = setInterval(() => {
+        if (!this.featureRequestPending && !this.featureRequestReceived) {
+            clearInterval(this.featureBlinkInterval);
+            switchLabel.classList.remove('blinking');
+            return;
+        }
+        
+        blinkCount++;
+        if (blinkCount > 30) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            switchLabel.classList.remove('blinking');
+        }
+    }, 500);
+},
+    
+    // ==================== القسم 7: requestEnableFeatures ====================
+    async requestEnableFeatures() {
+        if (!this.currentChat) {
+            alert('الرجاء اختيار محادثة أولاً');
+            return;
+        }
+        if (this.featuresEnabled) {
+            alert('الميزات مفعلة بالفعل');
+            return;
+        }
+        if (this.featureRequestPending) {
+            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+            return;
+        }
+        
+        this.featureRequestPending = true;
+        this.startFeatureBlink();
+        
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_request',
+                action: 'enable',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_request', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('📨 تم إرسال طلب تفعيل الميزات إلى الطرف الآخر');
+        } catch(e) {
+            this.featureRequestPending = false;
+            this.startFeatureBlink();
+            console.log('❌ فشل إرسال الطلب');
+        }
+    },
+    
+    // ==================== القسم 8: handleFeatureRequest ====================
+    async handleFeatureRequest(fromId) {
+        console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
+        
+        if (this.featuresEnabled) {
+            console.log('الميزات مفعلة بالفعل، قبول تلقائي');
+            await this.acceptFeatureRequest();
+            return;
+        }
+        
+        this.featureRequestReceived = true;
+        this.startFeatureBlink();
+        console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
+        console.log('✅ تم تفعيل وضع الاستقبال');
+    },
+    
+    // ==================== القسم 9: acceptFeatureRequest ====================
+async acceptFeatureRequest() {
+    console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
+    
+    if (!this.featureRequestReceived && !this.featureRequestPending) {
+        console.log('⚠️ لا يوجد طلب معلق');
+        return;
+    }
+    
+    this.featuresEnabled = true;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.currentChat) {
+        this.friendInConversation = true;
+        console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب');
+    }
+    
+    console.log('✅ featuresEnabled =', this.featuresEnabled);
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) toggleInput.checked = true;
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    if (this.currentChat) {
+        try {
+            console.log('🔧 محاولة فتح Data Channel...');
+            await CallSystem.ensureDataChannelOnly(this.currentChat);
+            console.log('✅ تم فتح Data Channel بنجاح');
+        } catch(e) {
+            console.error('❌ خطأ في فتح Data Channel:', e);
+        }
+    }
+    
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+            type: 'feature_response',
+            action: 'accepted',
+            timestamp: Date.now()
+        }), sharedKey);
+        await SecureChatSystem.sendToServer(this.currentChat, { 
+            id: Date.now().toString(), 
+            type: 'feature_response', 
+            data: encrypted, 
+            timestamp: Date.now() 
+        });
+        console.log('✅ تم إرسال قبول التفعيل');
+    } catch(e) {
+        console.error('❌ خطأ في إرسال القبول:', e);
+    }
+    
+    this.updateAllButtons();
+    console.log('✅ تم تفعيل الميزات!');
+},
+    
+    // ==================== القسم 10: handleFeatureResponse ====================
+async handleFeatureResponse(fromId, action) {
+    console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
+    
+    if (action === 'accepted') {
+        this.featuresEnabled = true;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.currentChat === fromId) {
+            this.friendInConversation = true;
+            console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب من الطرف الآخر');
+        }
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const toggleInput = document.getElementById('featureToggleInput');
+        const switchLabel = document.getElementById('featureSwitchLabel');
+        
+        if (toggleInput) toggleInput.checked = true;
+        if (switchLabel) switchLabel.classList.remove('blinking');
+        
+        if (this.currentChat) {
+            try {
+                console.log('🔧 محاولة فتح Data Channel بعد قبول الطرف الآخر...');
+                await CallSystem.ensureDataChannelOnly(this.currentChat);
+                console.log('✅ تم فتح Data Channel بنجاح');
+            } catch(e) {
+                console.error('❌ خطأ في فتح Data Channel:', e);
+            }
+        }
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#4CAF50';
+            btn.title = 'الميزات مفعلة ✅';
+        }
+        
+        this.updateAllButtons();
+        console.log('✅ تم تفعيل الميزات!');
+        
+    } else if (action === 'rejected') {
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const toggleInput = document.getElementById('featureToggleInput');
+        const switchLabel = document.getElementById('featureSwitchLabel');
+        
+        if (toggleInput) toggleInput.checked = false;
+        if (switchLabel) switchLabel.classList.remove('blinking');
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) btn.style.background = '#f44336';
+        console.log('❌ تم رفض طلب تفعيل الميزات');
+        
+    } else if (action === 'disable') {
+        console.log('🔴 استلام إشارة إيقاف من الطرف الآخر');
+        
+        this.featuresEnabled = false;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const toggleInput = document.getElementById('featureToggleInput');
+        const switchLabel = document.getElementById('featureSwitchLabel');
+        
+        if (toggleInput) toggleInput.checked = false;
+        if (switchLabel) switchLabel.classList.remove('blinking');
+        
+        const btn = document.getElementById('enableFeaturesBtn');
+        if (btn) {
+            btn.style.background = '#f44336';
+            btn.title = 'تفعيل الميزات';
+        }
+        
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
+        }
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
+        }
+        
+        this.updateAllButtons();
+        console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
+    }
+},
 
-/* ==================== القسم 16: منطقة الرسائل (تتمرر فقط) ==================== */
-.messages-container { 
-    flex: 1; 
-    overflow-y: auto; 
-    padding: 20px 16px; 
-    background: var(--bg); 
-    display: flex; 
-    flex-direction: column; 
-    gap: 8px;
-    -webkit-overflow-scrolling: touch;
-}
+     // ==================== القسم 10.1: disableFeatures ====================
+async disableFeatures() {
+    console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
+    
+    if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
+        await CallSystem.deleteAllWebRTCSignals(this.currentChat);
+    }
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    if (CallSystem.dc) {
+        try { CallSystem.dc.close(); } catch(e) {}
+        CallSystem.dc = null;
+    }
+    if (CallSystem.pc) {
+        try { CallSystem.pc.close(); } catch(e) {}
+        CallSystem.pc = null;
+    }
+    
+    this.updateAllButtons();
+    console.log('✅ تم إلغاء تفعيل الميزات');
+},
+    
+    // ==================== القسم 12: resetFeatures ====================
+resetFeatures() {
+    console.log('🔄 resetFeatures - إعادة تعيين الميزات');
+    
+    const chatId = this.currentChat;
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    if (chatId) {
+        console.log('📤 تم إلغاء الميزات محلياً');
+    }
+    
+    this.updateAllButtons();
+},
+    
+    // ==================== القسم 13: handleFeatureCancel ====================
+handleFeatureCancel() {
+    console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    this.updateAllButtons();
+    console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
+},
+    
+   // ==================== القسم 14: updateAllButtons ====================
+updateAllButtons() {
+    const canUse = (this.friendInConversation && this.featuresEnabled);
+    
+    const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
+    btns.forEach(btn => { 
+        if (canUse) { 
+            btn.classList.remove('locked'); 
+            btn.title = ''; 
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        } else { 
+            btn.classList.add('locked'); 
+            btn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        } 
+    });
+    
+    const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
+                         document.querySelector('.audio-call-btn') ||
+                         document.querySelector('#audioCallBtn') ||
+                         document.querySelector('button[data-call="audio"]');
+    
+    const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
+                         document.querySelector('.video-call-btn') ||
+                         document.querySelector('#videoCallBtn') ||
+                         document.querySelector('button[data-call="video"]');
+    
+    if (audioCallBtn) {
+        if (canUse) {
+            audioCallBtn.style.opacity = '1';
+            audioCallBtn.style.pointerEvents = 'auto';
+            audioCallBtn.title = 'مكالمة صوتية';
+        } else {
+            audioCallBtn.style.opacity = '0.5';
+            audioCallBtn.style.pointerEvents = 'none';
+            audioCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+        }
+    }
+    
+    if (videoCallBtn) {
+        if (canUse) {
+            videoCallBtn.style.opacity = '1';
+            videoCallBtn.style.pointerEvents = 'auto';
+            videoCallBtn.title = 'مكالمة فيديو';
+        } else {
+            videoCallBtn.style.opacity = '0.5';
+            videoCallBtn.style.pointerEvents = 'none';
+            videoCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+        }
+    }
+    
+    this.updateFeatureToggleUI();
+    this.updateKickButtonState();
+    
+    console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
+},
+    
+    // ==================== القسم 15: setupPageFocusListener ====================
+setupPageFocusListener() {
+    window.addEventListener('focus', () => {
+        if (this.currentChat && this.featuresEnabled) {
+            console.log('👁️ الصفحة في المقدمة');
+        }
+    });
+},
+    
+    
+    // ==================== القسم 17: loadAllChats ====================
+    loadAllChats() { 
+        for (let i = 0; i < localStorage.length; i++) { 
+            const k = localStorage.key(i); 
+            if (k && k.startsWith('chat_')) { 
+                const fid = k.replace('chat_', ''); 
+                try { this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[fid] = []; } 
+            } 
+        } 
+    },
+    
+    // ==================== القسم 18: showProgressBar ====================
+    showProgressBar(message, percent) {
+        let bar = document.getElementById('progressBar');
+        if (!bar) {
+            bar = document.createElement('div'); bar.id = 'progressBar';
+            bar.style.cssText = `
+                position: fixed;
+                top: 70px;
+                left: 0;
+                right: 0;
+                height: 22px;
+                background: rgba(0,0,0,0.3);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            bar.innerHTML = `
+                <div id="progressFill" style="
+                    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+                    height: 100%;
+                    width: 0%;
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    transition: width 0.3s;
+                    border-radius: 0 2px 2px 0;
+                "></div>
+                <span id="progressPercent" style="
+                    position: relative;
+                    z-index: 2;
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: white;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                ">0%</span>
+            `;
+            document.body.appendChild(bar);
+        }
+    },
+    
+    // ==================== القسم 19: updateProgressBar ====================
+    updateProgressBar(percent, message) {
+        const fill = document.getElementById('progressFill');
+        const perc = document.getElementById('progressPercent');
+        if (fill) fill.style.width = Math.min(percent, 100) + '%';
+        if (perc) perc.textContent = Math.round(percent) + '%';
+    },
+    
+    // ==================== القسم 20: hideProgressBar ====================
+    hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
+    
+    
+    // ==================== القسم 23: openChat ====================
+openChat(friendId, friendName, friendAvatar) {
+    this.currentChat = friendId;
+    
+    // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
+    this.friendInConversation = false;
+    
+    this.resetFeatures();
+    document.body.classList.add('conversation-open');
+    const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
+    if (nameEl) nameEl.textContent = friendName;
+    if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
+    document.querySelector('.chat-page').style.display = 'none'; 
+    document.getElementById('conversationPage').style.display = 'flex';
+    this.displayMessages(friendId);
+    
+    // ✅ تم إزالة PresenceSystem.watchFriend (لم نعد نستخدم حالة الاتصال من السيرفر)
+    
+    // ✅ تم إزالة sendConversationStatus و requestConversationStatus (لم نعد نرسلهما)
+    
+    setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
+    setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+    
+    setTimeout(() => this.setupFeatureButton(), 500);
+    
+    setTimeout(() => {
+        if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
+            console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
+            this.featuresEnabled = false;
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            const toggleInput = document.getElementById('featureToggleInput');
+            if (toggleInput) toggleInput.checked = false;
+            
+            this.updateAllButtons();
+            console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
+        }
+    }, 1000);
+},
+    
+    
+    // ==================== القسم 25: displayMessages ====================
+    displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
-/* ==================== القسم 17: رسالة فردية ==================== */
-.message { max-width: 70%; margin-bottom: 4px; animation: messagePop 0.2s ease; }
-.message.sent { align-self: flex-end; }
-.message.received { align-self: flex-start; }
-.message-content { padding: 12px 16px; border-radius: 20px; background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); word-wrap: break-word; -webkit-tap-highlight-color: transparent; }
-.message.sent .message-content { background: var(--primary); color: white; }
-.message.received .message-content { background: var(--light); color: var(--text); }
-.message-info { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 2px; font-size: 0.7rem; color: var(--text-light); }
-.message.sent .message-info { color: rgba(255,255,255,0.7); }
-.message-time { font-size: 0.65rem; }
-.message-status { display: flex; align-items: center; gap: 2px; font-size: 0.8rem; }
-.message-image { max-width: 200px; max-height: 200px; border-radius: 12px; cursor: pointer; }
-.message-audio { width: 250px; height: 40px; border-radius: 20px; }
 
-/* ==================== القسم 18: شريط الإدخال (ثابت في الأسفل مثل واتساب) ==================== */
-.message-input-container { 
-    background: var(--card-bg); 
-    border-top: 1px solid var(--border); 
-    padding: 12px 16px;
-    flex-shrink: 0;
-    position: relative;
-    z-index: 20;
-}
-.message-input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--light); border-radius: 30px; padding: 4px 8px; border: 1px solid var(--border); }
-.message-input-wrapper:focus-within { border-color: var(--primary); }
-.attach-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: transparent; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
-.input-area { flex: 1; display: flex; align-items: center; gap: 4px; }
-#messageInput { flex: 1; background: transparent; border: none; padding: 12px; color: var(--text); font-size: 1rem; outline: none; }
-.emoji-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-.send-btn, .voice-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+   // ==================== القسم 26: displayMessage ====================
+displayMessage(msg) {
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return;
+    const div = document.createElement('div'); 
+    div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
+    div.id = `msg-${msg.id}`;
+    
+    const formatDateTime = (dateObj) => {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        let hours = dateObj.getHours();
+        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        const formattedHours = String(hours).padStart(2, '0');
+        return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
+    };
+    
+    const dateTime = formatDateTime(new Date(msg.time));
+    
+    if (msg.type === 'text') {
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        if (msg.sender === 'me') {
+            contentDiv.style.cssText = 'border: 1.5px solid #2196F3; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
+        } else {
+            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
+        }
+        
+        const textSpan = document.createElement('span');
+        textSpan.style.cssText = 'font-size: 1rem; line-height: 1.4; display: block;';
+        textSpan.innerHTML = this.escapeHtml(msg.text);
+        contentDiv.appendChild(textSpan);
+        div.appendChild(contentDiv);
+        
+        const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
+        const currentMessageCount = existingTextMessages.length;
+        
+        if (currentMessageCount % 10 === 0) {
+            const timeSeparator = document.createElement('div');
+            timeSeparator.className = 'time-separator';
+            timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
+            timeSeparator.textContent = dateTime;
+            c.appendChild(timeSeparator);
+        }
+    } 
+    else if (msg.type === 'location') {
+        let locationData = msg.data;
+        let locationUrl = '';
+        
+        if (typeof locationData === 'object' && locationData.url) {
+            locationUrl = locationData.url;
+        } else if (typeof locationData === 'string') {
+            const match = locationData.match(/https?:\/\/[^\s]+/);
+            locationUrl = match ? match[0] : locationData;
+        } else {
+            locationUrl = '#';
+        }
+        
+        const maxClicks = locationData.maxClicks;
+        let clicksRemaining = locationData.clicksRemaining;
+        
+        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.style.cssText = 'background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: none;';
+            contentDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+            div.appendChild(contentDiv);
+        } else {
+            const locationDiv = document.createElement('div');
+            locationDiv.className = 'message-content location-card';
+            const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+            locationDiv.style.cssText = `cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid ${borderColor};`;
+            locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
+            
+            locationDiv.onclick = (e) => {
+                e.stopPropagation();
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
+                window.open(locationUrl, '_blank');
+                if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                    clicksRemaining--;
+                    msg.data.clicksRemaining = clicksRemaining;
+                    if (clicksRemaining <= 0) {
+                        locationDiv.style.background = '#888';
+                        locationDiv.style.cursor = 'default';
+                        locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                        locationDiv.onclick = () => {};
+                    }
+                    if (ChatSystem.currentChat) {
+                        const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                        const msgIndex = messages.findIndex(m => m.id === msg.id);
+                        if (msgIndex !== -1) {
+                            messages[msgIndex].data.clicksRemaining = clicksRemaining;
+                            ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                        }
+                    }
+                }
+            };
+            div.appendChild(locationDiv);
+        }
+    }
+    else if (msg.type === 'image') {
+        let imageSrc = msg.data;
+        if (imageSrc && typeof imageSrc === 'string') {
+            if (!imageSrc.startsWith('data:image') && !imageSrc.startsWith('http')) {
+                imageSrc = 'data:image/jpeg;base64,' + imageSrc;
+            }
+        }
+        
+        const imageDiv = document.createElement('div');
+        imageDiv.className = 'message-image-wrapper';
+        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+        imageDiv.style.cssText = `cursor: pointer; display: inline-block; border: 2px solid ${borderColor}; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;`;
+        
+        const img = document.createElement('img');
+        img.src = imageSrc;
+        img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
+        img.loading = 'lazy';
+        
+        img.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        };
+        img.ondragstart = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        };
+        
+        img.onclick = () => {
+            this.showImagePreview(imageSrc);
+        };
+        
+        imageDiv.appendChild(img);
+        div.appendChild(imageDiv);
+    } 
+    else if (msg.type === 'voice') {
+        let audioSrc = msg.data;
+        if (audioSrc && typeof audioSrc === 'string' && !audioSrc.startsWith('data:audio')) {
+            audioSrc = 'data:audio/webm;base64,' + audioSrc;
+        }
+        
+        const audioId = `audio_${msg.id}`;
+        let audioDuration = 0;
+        
+        const tempAudio = new Audio(audioSrc);
+        tempAudio.addEventListener('loadedmetadata', () => {
+            audioDuration = tempAudio.duration;
+            const durationSpan = document.getElementById(`duration_${audioId}`);
+            if (durationSpan && !isNaN(audioDuration)) {
+                const minutes = Math.floor(audioDuration / 60);
+                const seconds = Math.floor(audioDuration % 60);
+                durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        });
+        
+        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+        
+        div.innerHTML = `
+            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr; border: 1.5px solid ${borderColor};">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>
+                    </button>
+                    <button class="voice-replay-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
+                    </button>
+                    <div style="text-align: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px;">0:00</span>
+                            <span id="duration_${audioId}" style="color: white; font-size: 0.7rem; opacity: 0.8;">0:00</span>
+                        </div>
+                    </div>
+                    <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
+                    </button>
+                </div>
+                <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
+            </div>
+        `;
+        
+        setTimeout(() => {
+            const playBtn = div.querySelector('.voice-play-btn');
+            const replayBtn = div.querySelector('.voice-replay-btn');
+            const muteBtn = div.querySelector('.voice-mute-btn');
+            const audioEl = document.getElementById(audioId);
+            const timeSpan = document.getElementById(`time_${audioId}`);
+            
+            if (playBtn && audioEl) {
+                let isPlaying = false;
+                
+                playBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isPlaying) {
+                        audioEl.pause();
+                        playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                        isPlaying = false;
+                    } else {
+                        audioEl.play();
+                        playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                        isPlaying = true;
+                    }
+                };
+                
+                replayBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    audioEl.pause();
+                    audioEl.currentTime = 0;
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
+                    audioEl.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = true;
+                };
+                
+                let isMuted = false;
+                muteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isMuted) {
+                        audioEl.muted = false;
+                        muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                        isMuted = false;
+                    } else {
+                        audioEl.muted = true;
+                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #f44336; font-size: 0.9rem;"></i>';
+                        isMuted = true;
+                    }
+                };
+                
+                audioEl.ontimeupdate = () => {
+                    const minutes = Math.floor(audioEl.currentTime / 60);
+                    const seconds = Math.floor(audioEl.currentTime % 60);
+                    if (timeSpan) {
+                        timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                };
+                
+                audioEl.onended = () => {
+                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    isPlaying = false;
+                    if (timeSpan) timeSpan.textContent = '0:00';
+                };
+            }
+        }, 10);
+    } 
+    else if (msg.type === 'video') {
+        let videoSrc = msg.data;
+        if (videoSrc && typeof videoSrc === 'string') {
+            if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
+                videoSrc = 'data:video/mp4;base64,' + videoSrc;
+            }
+        }
+        
+        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+        
+        div.innerHTML = `
+            <div class="message-content video-thumbnail" style="position: relative; width: 250px; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid ${borderColor}; cursor: pointer;">
+                <video style="width: 100%; height: auto; max-height: 200px; display: block; pointer-events: none;" preload="metadata">
+                    <source src="${videoSrc}" type="video/mp4">
+                </video>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+                    <i class="fas fa-expand" style="color: white; font-size: 1.5rem;"></i>
+                </div>
+            </div>
+        `;
+        
+        const videoContainer = div.querySelector('.video-thumbnail');
+        videoContainer.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        };
+        
+        videoContainer.onclick = (e) => {
+            e.stopPropagation();
+            this.showVideoPreview(videoSrc);
+        };
+    } 
+    else if (msg.type === 'file') {
+        let fileName = msg.fileName || 'ملف';
+        
+        let fileSize = '';
+        if (msg.data && typeof msg.data === 'string') {
+            const sizeInBytes = Math.ceil(msg.data.length * 0.75);
+            if (sizeInBytes < 1024) fileSize = sizeInBytes + ' B';
+            else if (sizeInBytes < 1024 * 1024) fileSize = (sizeInBytes / 1024).toFixed(1) + ' KB';
+            else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        let displayName = fileName;
+        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+        
+        div.innerHTML = `
+            <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1.5px solid ${borderColor};">
+                <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex-shrink: 0;">
+                    <span style="font-size: 1.5rem;">📄</span>
+                </div>
+                
+                <div style="flex: 1; overflow: hidden; min-width: 0;">
+                    <div style="font-weight: bold; font-size: 0.85rem; word-break: break-all; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
+                    ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
+                </div>
+                
+                <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
+                     onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
+                     onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                     onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                    <i class="fas fa-download" style="font-size: 1rem; pointer-events: none;"></i>
+                </div>
+            </div>
+        `;
+    }
+    
+    c.appendChild(div); 
+    c.scrollTop = c.scrollHeight;
+}, 
+     
 
-/* ==================== القسم 19: قوائم المرفقات والإيموجي ==================== */
-.attachment-menu { position: absolute; bottom: 80px; left: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2100; min-width: 150px; border: 1px solid var(--border); }
-.attachment-menu button { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: none; background: transparent; color: var(--text); cursor: pointer; border-radius: 12px; font-size: 0.95rem; width: 100%; text-align: right; }
-.attachment-menu button i { width: 24px; color: var(--primary); font-size: 1.2rem; }
+    // ==================== القسم 26.1: showImagePreview ====================
+showImagePreview(imageSrc) {
+    const existingPreview = document.getElementById('imagePreviewModal');
+    if (existingPreview) existingPreview.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'imagePreviewModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.95);
+        z-index: 10050;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        touch-action: pan-x pan-y;
+    `;
+    
+    modal.oncontextmenu = (e) => {
+        e.preventDefault();
+        return false;
+    };
+    
+    const frame = document.createElement('div');
+    frame.style.cssText = `
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
+        border: 3px solid #4CAF50;
+        border-radius: 20px;
+        pointer-events: none;
+        z-index: 10051;
+        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
+    `;
+    
+    const imageContainer = document.createElement('div');
+    imageContainer.style.cssText = `
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        touch-action: none;
+        border-radius: 16px;
+    `;
+    
+    const img = document.createElement('img');
+    img.src = imageSrc;
+    img.style.cssText = `
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        transition: transform 0.1s ease;
+        cursor: default;
+        touch-action: none;
+    `;
+    
+    img.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    img.ondragstart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    img.oncopy = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    img.oncut = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    img.onselectstart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    
+    const buttonOverlay = document.createElement('div');
+    buttonOverlay.style.cssText = `
+        position: absolute;
+        top: 30px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        padding: 0 30px;
+        pointer-events: none;
+        z-index: 10052;
+    `;
+    
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+    backBtn.style.cssText = `
+        background: rgba(0,0,0,0.7);
+        border: 2px solid #4CAF50;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+        color: white;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
+    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
+    backBtn.onclick = () => {
+        modal.remove();
+    };
+    
+    const downloadBtn = document.createElement('button');
+    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+    downloadBtn.style.cssText = `
+        background: rgba(0,0,0,0.7);
+        border: 2px solid #4CAF50;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+        color: white;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
+    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
+    downloadBtn.onclick = (e) => {
+        e.stopPropagation();
+        const link = document.createElement('a');
+        link.href = imageSrc;
+        link.download = 'image.jpg';
+        link.click();
+    };
+    
+    buttonOverlay.appendChild(backBtn);
+    buttonOverlay.appendChild(downloadBtn);
+    
+    let currentScale = 1;
+    let initialDistance = 0;
+    let initialScale = 1;
+    let startX = 0, startY = 0;
+    let translateX = 0, translateY = 0;
+    let isTouching = false;
+    
+    const minScale = 0.8;
+    const maxScale = 3;
+    
+    const updateTransform = () => {
+        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+    };
+    
+    img.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touches = e.touches;
+        
+        if (touches.length === 2) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            initialDistance = Math.hypot(dx, dy);
+            initialScale = currentScale;
+            isTouching = false;
+        } else if (touches.length === 1) {
+            startX = touches[0].clientX - translateX;
+            startY = touches[0].clientY - translateY;
+            isTouching = true;
+        }
+    });
+    
+    img.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const touches = e.touches;
+        
+        if (touches.length === 2 && initialDistance > 0) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            const newDistance = Math.hypot(dx, dy);
+            let newScale = initialScale * (newDistance / initialDistance);
+            newScale = Math.min(maxScale, Math.max(minScale, newScale));
+            
+            if (newScale !== currentScale) {
+                currentScale = newScale;
+                updateTransform();
+            }
+        } else if (touches.length === 1 && isTouching && currentScale > 1) {
+            translateX = touches[0].clientX - startX;
+            translateY = touches[0].clientY - startY;
+            
+            const maxTranslateX = (currentScale - 1) * 200;
+            const maxTranslateY = (currentScale - 1) * 200;
+            translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
+            translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
+            
+            updateTransform();
+        }
+    });
+    
+    img.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        initialDistance = 0;
+        isTouching = false;
+        
+        if (currentScale < 0.95) {
+            currentScale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+        }
+    });
+    
+    imageContainer.appendChild(img);
+    modal.appendChild(frame);
+    modal.appendChild(imageContainer);
+    modal.appendChild(buttonOverlay);
+    
+    const escHandler = (e) => {
+        if (e.key === 'Escape' && document.getElementById('imagePreviewModal')) {
+            modal.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+    
+    document.body.appendChild(modal);
+},
 
-.emoji-picker { position: absolute; bottom: 80px; right: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 12px; z-index: 2100; width: 300px; border: 1px solid var(--border); }
-.emoji-categories { display: flex; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-.emoji-categories button { width: 40px; height: 40px; border-radius: 20px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.3rem; }
-.emoji-categories button.active { background: var(--light); color: var(--primary); }
-.emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: 200px; overflow-y: auto; }
-.emoji-grid button { width: 40px; height: 40px; border-radius: 8px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; }
-
-/* ==================== القسم 20: تحسينات للشاشات الصغيرة ==================== */
-@media (max-width: 480px) {
-    .conversation-header { padding: 8px 12px; height: 60px; }
-    .message { max-width: 85%; }
-    .message-image { max-width: 150px; max-height: 150px; }
-    .message-audio { width: 200px; }
-    .attach-btn, .emoji-btn { width: 35px; height: 35px; font-size: 1rem; }
-    .send-btn, .voice-btn { width: 40px; height: 40px; font-size: 1.1rem; }
-}
-
-/* ==================== القسم 21: الوضع الداكن ==================== */
-.theme-dark .message.received .message-content { background: #2d2d2d; color: #fff; }
-.theme-dark .message.sent .message-content { background: #1976D2; }
-.theme-dark .message-info { color: #999; }
-.theme-dark .message.sent .message-info { color: rgba(255,255,255,0.6); }
-.theme-dark .emoji-picker, .theme-dark .attachment-menu { background: #2d2d2d; border-color: #444; }
-.theme-dark .emoji-categories { border-color: #444; }
-.theme-dark .emoji-categories button.active { background: #444; }
-
-/* ==================== القسم 22: الرسوم المتحركة ==================== */
-@keyframes messagePop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-
-/* ==================== القسم 23: شريط التمرير ==================== */
-.messages-container::-webkit-scrollbar { width: 6px; }
-.messages-container::-webkit-scrollbar-track { background: transparent; }
-.messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-/* ==================== القسم 24: إصلاح الإيموجي داخل الإطارات الدائرية ==================== */
-.profile-avatar-emoji,
-.conversation-avatar-emoji,
-.chat-avatar-emoji,
-.current-avatar,
-.post-avatar-emoji,
-.user-avatar-emoji {
-    overflow: hidden;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* ==================== القسم 25: إصلاح تداخل الصفحات ==================== */
-body.conversation-open .bottom-nav,
-body.profile-subpage-open .bottom-nav {
-    display: none !important;
-}
-
-body.conversation-open .page {
-    display: none !important;
-}
-body.conversation-open .profile-pages,
-body.conversation-open .profile-subpage {
-    display: none !important;
-}
-
-.profile-subpage-open .page {
-    display: none !important;
-}
-.profile-subpage-open .profile-pages {
-    display: block !important;
-}
-
-.conversation-page {
-    display: none !important;
-}
-body.conversation-open .conversation-page {
-    display: flex !important;
-    flex-direction: column;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 2000;
-    background: var(--bg);
-}
-
-body.conversation-open .app-header {
-    display: none !important;
-}
-
-body.conversation-open .page:not(.conversation-page) {
-    display: none !important;
-}
-body.conversation-open .profile-pages,
-body.conversation-open .profile-subpage {
-    display: none !important;
-}
-
-body.conversation-open .app-header,
-body.conversation-open .bottom-nav {
-    display: none !important;
-}
-
-body.profile-subpage-open .page:not(.profile-page),
-body.profile-subpage-open .chat-page,
-body.profile-subpage-open .home-page,
-body.profile-subpage-open .settings-page {
-    display: none !important;
-}
-body.profile-subpage-open .page.profile-page {
-    display: none !important;
-}
-body.profile-subpage-open .profile-pages {
-    display: block !important;
-}
-
-body:not(.conversation-open) .conversation-page {
-    display: none !important;
-}
-
-/* ==================== القسم 26: تنسيق مشغل البصمة الصوتية ==================== */
-.message-audio {
-    background: #4CAF50;
-    border-radius: 20px;
-    height: 38px;
-}
-
-.message-audio::-webkit-media-controls-panel {
-    background: #4CAF50;
-}
-
-.message-audio::-webkit-media-controls-play-button,
-.message-audio::-webkit-media-controls-mute-button {
-    background-color: white;
-    border-radius: 50%;
-    color: #4CAF50;
-}
-
-.message-audio::-webkit-media-controls-current-time-display,
-.message-audio::-webkit-media-controls-time-remaining-display {
-    color: white;
-}
-
-.message-audio::-webkit-media-controls-timeline {
-    background-color: white;
-    border-radius: 10px;
-}
-
-/* ==================== القسم 27: أزرار التفعيل والطرد ==================== */
-.feature-toggle-container {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 5px;
-    direction: ltr;
-}
-
-.feature-toggle-label {
-    font-size: 0.7rem;
-    color: #888;
-}
-
-.feature-switch {
-    position: relative;
-    display: inline-block;
-    width: 52px;
-    height: 26px;
-}
-
-.feature-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.feature-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #f44336;
-    transition: 0.3s;
-    border-radius: 26px;
-}
-
-.feature-slider:before {
-    position: absolute;
-    content: "";
-    height: 20px;
-    width: 20px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: 0.3s;
-    border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
-
-input:checked + .feature-slider {
-    background-color: #4CAF50;
-}
-
-input:checked + .feature-slider:before {
-    transform: translateX(26px);
-}
-
-@keyframes featureBlink {
-    0% { background-color: #f44336; }
-    50% { background-color: #2196F3; }
-    100% { background-color: #f44336; }
-}
-
-.feature-switch.blinking .feature-slider {
-    animation: featureBlink 0.8s ease-in-out infinite;
-}
-
-.kick-btn {
-    background: none;
-    border: none;
-    color: #f44336;
-    font-size: 1.3rem;
-    cursor: pointer;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-.kick-btn.active {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.kick-btn.active:hover {
-    background: rgba(244, 67, 54, 0.1);
-    transform: scale(1.05);
-}
-
-.kick-btn.active:active {
-    transform: scale(0.95);
-}
-
-/* ==================== القسم 28: تثبيت القوائم مثل واتساب (نهائي) ==================== */
-
-/* ✅ منع تمرير الجسم عند فتح المحادثة */
-body.conversation-open {
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
-    height: 100%;
-}
-
-/* ✅ تأكيد ثبات القائمة العلوية */
-.conversation-header {
-    position: relative;
-    top: 0;
-}
-
-/* ✅ تأكيد ثبات القائمة السفلية */
-.message-input-container {
-    position: relative;
-    bottom: 0;
-}
-
-/* ✅ عند ظهور الكيبورد، شريط الإدخال يبقى فوقه مباشرة */
-@media (max-width: 768px) {
-    .message-input-container {
+// ==================== القسم 26.2: showVideoPreview ====================
+showVideoPreview(videoSrc) {
+    const existingPreview = document.getElementById('videoPreviewModal');
+    if (existingPreview) existingPreview.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'videoPreviewModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.95);
+        z-index: 10060;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    `;
+    
+    modal.oncontextmenu = (e) => {
+        e.preventDefault();
+        return false;
+    };
+    
+    const frame = document.createElement('div');
+    frame.style.cssText = `
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
+        border: 3px solid #4CAF50;
+        border-radius: 20px;
+        pointer-events: none;
+        z-index: 10061;
+        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
+    `;
+    
+    const contentContainer = document.createElement('div');
+    contentContainer.style.cssText = `
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        right: 15px;
+        bottom: 15px;
+        display: flex;
+        flex-direction: column;
+        background: #000;
+        border-radius: 16px;
+        overflow: hidden;
+    `;
+    
+    const videoWrapper = document.createElement('div');
+    videoWrapper.style.cssText = `
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        overflow: hidden;
+    `;
+    
+    const video = document.createElement('video');
+    video.src = videoSrc;
+    video.style.cssText = `
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    `;
+    video.controls = false;
+    video.playsinline = true;
+    
+    video.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    video.ondragstart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+    
+    const topButtons = document.createElement('div');
+    topButtons.style.cssText = `
+        position: absolute;
+        top: 30px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        padding: 0 35px;
+        pointer-events: none;
+        z-index: 10062;
+    `;
+    
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+    backBtn.style.cssText = `
+        background: rgba(0,0,0,0.7);
+        border: 2px solid #4CAF50;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+        color: white;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
+    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
+    backBtn.onclick = () => {
+        if (video) video.pause();
+        modal.remove();
+    };
+    
+    const downloadBtn = document.createElement('button');
+    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+    downloadBtn.style.cssText = `
+        background: rgba(0,0,0,0.7);
+        border: 2px solid #4CAF50;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s;
+        color: white;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
+    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
+    downloadBtn.onclick = (e) => {
+        e.stopPropagation();
+        const link = document.createElement('a');
+        link.href = videoSrc;
+        link.download = 'video.mp4';
+        link.click();
+    };
+    
+    topButtons.appendChild(backBtn);
+    topButtons.appendChild(downloadBtn);
+    
+    const controlsBar = document.createElement('div');
+    controlsBar.style.cssText = `
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        background: rgba(0,0,0,0.8);
+        backdrop-filter: blur(10px);
+        padding: 15px 20px;
+        border-top: 1px solid #4CAF50;
+        z-index: 10062;
+    `;
+    
+    const playPauseBtn = document.createElement('button');
+    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+    playPauseBtn.style.cssText = `
+        background: #4CAF50;
+        border: none;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        font-size: 1.1rem;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    `;
+    
+    const currentTimeSpan = document.createElement('span');
+    currentTimeSpan.textContent = '0:00';
+    currentTimeSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
+    
+    const progressBar = document.createElement('div');
+    progressBar.style.cssText = `
+        flex: 1;
+        max-width: 300px;
+        height: 4px;
+        background: rgba(255,255,255,0.3);
+        border-radius: 2px;
+        cursor: pointer;
         position: relative;
+    `;
+    
+    const progressFill = document.createElement('div');
+    progressFill.style.cssText = `
+        width: 0%;
+        height: 100%;
+        background: #4CAF50;
+        border-radius: 2px;
+    `;
+    progressBar.appendChild(progressFill);
+    
+    const durationSpan = document.createElement('span');
+    durationSpan.textContent = '0:00';
+    durationSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
+    
+    controlsBar.appendChild(playPauseBtn);
+    controlsBar.appendChild(currentTimeSpan);
+    controlsBar.appendChild(progressBar);
+    controlsBar.appendChild(durationSpan);
+    
+    videoWrapper.appendChild(video);
+    contentContainer.appendChild(videoWrapper);
+    contentContainer.appendChild(controlsBar);
+    
+    modal.appendChild(frame);
+    modal.appendChild(contentContainer);
+    modal.appendChild(topButtons);
+    
+    video.addEventListener('loadedmetadata', () => {
+        const minutes = Math.floor(video.duration / 60);
+        const seconds = Math.floor(video.duration % 60);
+        durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    });
+    
+    video.addEventListener('timeupdate', () => {
+        const minutes = Math.floor(video.currentTime / 60);
+        const seconds = Math.floor(video.currentTime % 60);
+        currentTimeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        const percent = (video.currentTime / video.duration) * 100;
+        progressFill.style.width = percent + '%';
+    });
+    
+    let isPlaying = false;
+    playPauseBtn.onclick = () => {
+        if (isPlaying) {
+            video.pause();
+            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            isPlaying = false;
+        } else {
+            video.play();
+            playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            isPlaying = true;
+        }
+    };
+    
+    video.onended = () => {
+        playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+        isPlaying = false;
+    };
+    
+    progressBar.onclick = (e) => {
+        const rect = progressBar.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const percent = clickX / rect.width;
+        video.currentTime = percent * video.duration;
+    };
+    
+    const escHandler = (e) => {
+        if (e.key === 'Escape' && document.getElementById('videoPreviewModal')) {
+            if (video) video.pause();
+            modal.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+    
+    document.body.appendChild(modal);
+    
+    video.play().then(() => {
+        playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        isPlaying = true;
+    }).catch(() => {});
+},
+
+    // ==================== القسم 27: sendMessage ====================
+async sendMessage(text) { 
+    if (!this.currentChat || !text.trim()) return false; 
+    const mid = Date.now().toString(); 
+    
+    if (this.featuresEnabled && this.friendInConversation && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        try {
+            const messageData = {
+                type: 'direct_text',
+                id: mid,
+                text: text.trim(),
+                sender: 'me',
+                time: new Date().toISOString()
+            };
+            CallSystem.dc.send(JSON.stringify(messageData));
+            
+            this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            console.log('✅ تم إرسال النص مباشرة عبر Data Channel');
+            return true;
+        } catch(e) {
+            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
+        }
     }
-}
+    
+    try { 
+        const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
+        if (!pr || !pu) return false;
+        const sk = await SecureChatSystem.deriveSharedKey(pr, pu), enc = await SecureChatSystem.encryptData(text.trim(), sk); 
+        await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
+        this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+        this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+        console.log('✅ تم إرسال النص عبر Firebase (تشفير E2EE)');
+        return true; 
+    } catch (e) { 
+        console.error('❌ فشل إرسال النص:', e);
+        return false; 
+    } 
+},
+    
+    
+    // ==================== القسم 28: sendFileWithRetry ====================
+    async sendFileWithRetry(file, type, maxRetries = 3) {
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return false;
+        }
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+                const success = await CallSystem.sendFileDirect(file, type);
+                if (success) { this.hideProgressBar(); return true; }
+                if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
+            } catch (error) {}
+        }
+        this.hideProgressBar(); return false;
+    },
+    
+    // ==================== القسم 29: _ensureChannelReady ====================
+    async _ensureChannelReady() {
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
+            return false;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            return true;
+        }
+        
+        try {
+            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+            
+            if (success) {
+                await new Promise(r => setTimeout(r, 1000));
+                return true;
+            }
+            
+            alert('تعذر فتح قناة الاتصال لإرسال الملفات');
+            return false;
+        } catch (e) {
+            alert('فشل الاتصال. حاول مرة أخرى.');
+            return false;
+        }
+    },
+    
+    // ==================== القسم 30: sendImage ====================
+    async sendImage(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'image');
+            if (success) {
+                const comp = await SecureChatSystem.compressImage(file); 
+                const b64 = await SecureChatSystem.fileToBase64(comp); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الصورة');
+        }
+    },
+    
+    // ==================== القسم 31: sendVideoFile ====================
+    async sendVideoFile(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        try {
+            await SecureChatSystem.validateVideo(file);
+        } catch (error) {
+            alert(error.message);
+            return;
+        }
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            const success = await this.sendFileWithRetry(file, 'video');
+            if (success) {
+                try {
+                    const b64 = await SecureChatSystem.fileToBase64(file); 
+                    const msgId = Date.now().toString();
+                    
+                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
+                    this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
+                } catch (error) { alert('فشل معالجة الفيديو'); }
+            } else alert('فشل إرسال الفيديو');
+        }
+    },
+    
+    // ==================== القسم 32: sendFile ====================
+    async sendFile(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'file');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(file); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الملف');
+        }
+    },
+    
+    // ==================== القسم 33: sendVoiceNote ====================
+    async sendVoiceNote(audioBlob) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(audioBlob, 'voice');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال البصمة الصوتية');
+        }
+    },
+    
+    // ==================== القسم 34: shareLocationDirect ====================
+    
+   async shareLocationDirect() { 
+    if (!this.currentChat) return; 
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
+        return;
+    }
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
+        
+        navigator.geolocation.getCurrentPosition(p => { 
+            const lat = p.coords.latitude.toFixed(6);
+            const lng = p.coords.longitude.toFixed(6);
+            const locationData = {
+                lat: parseFloat(lat),
+                lng: parseFloat(lng),
+                url: `https://www.google.com/maps?q=${lat},${lng}`
+            };
+            
+            this.showLocationSwipeModalWithClicks(locationData);
+            
+        }, () => { 
+            alert('❌ فشل تحديد موقعك');
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    }
+},
+
+showLocationSwipeModalWithClicks(locationData) {
+    const existing = document.getElementById('locationSwipeModal');
+    if (existing) existing.remove();
+    
+    const appColor = '#2196F3';
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'locationSwipeModal';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 10003;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+        backdrop-filter: blur(5px);
+    `;
+    
+    overlay.innerHTML = `
+        <style>
+            .toggle-switch {
+                position: relative;
+                display: inline-block;
+                width: 60px;
+                height: 30px;
+            }
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #555;
+                transition: 0.3s;
+                border-radius: 30px;
+            }
+            .toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 24px;
+                width: 24px;
+                left: 3px;
+                bottom: 3px;
+                background-color: white;
+                transition: 0.3s;
+                border-radius: 50%;
+            }
+            input:checked + .toggle-slider {
+                background-color: #4CAF50;
+            }
+            input:checked + .toggle-slider:before {
+                transform: translateX(30px);
+            }
+            .click-preset {
+                background: #1a1a2e;
+                color: white;
+                border: 1px solid #4CAF50;
+                padding: 6px 12px;
+                border-radius: 20px;
+                cursor: pointer;
+                transition: all 0.2s;
+                font-size: 0.9rem;
+                min-width: 40px;
+            }
+            .click-preset:hover {
+                background: #4CAF50;
+                border-color: #4CAF50;
+            }
+            .click-preset.selected {
+                background: #4CAF50;
+                border-color: #4CAF50;
+            }
+        </style>
+        
+        <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
+            <div style="font-size: 3rem; margin-bottom: 10px;">🗺️</div>
+            <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
+            <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي</p>
+            
+            <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 20px;">
+                <div style="color: #4CAF50; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px;">الإحداثيات</div>
+                <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; text-align: center;">عدد مرات فتح الموقع</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
+                    <button type="button" class="click-preset" data-clicks="1">1</button>
+                    <button type="button" class="click-preset" data-clicks="2">2</button>
+                    <button type="button" class="click-preset" data-clicks="3">3</button>
+                    <button type="button" class="click-preset" data-clicks="4">4</button>
+                    <button type="button" class="click-preset" data-clicks="5">5</button>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="unlimitedToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
+                </div>
+            </div>
+            
+            <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
+            
+            <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
+                <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor};">
+                    <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%);"></div>
+                    <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: ${appColor}; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+                    
+                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #4CAF50, #1b5e2a); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div id="rightThumb" style="position: absolute; top: 8px; right: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #f44336, #8b0000); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: right 0.05s linear; color: white;">
+                        <i class="fas fa-times"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const button = document.getElementById('swipeButton');
+    const leftThumb = document.getElementById('leftThumb');
+    const rightThumb = document.getElementById('rightThumb');
+    const unlimitedToggle = document.getElementById('unlimitedToggle');
+    
+    let selectedClicks = 1;
+    let selectedButton = null;
+    
+    document.querySelectorAll('.click-preset').forEach(btn => {
+        btn.onclick = () => {
+            if (selectedButton) {
+                selectedButton.style.background = '#1a1a2e';
+                selectedButton.style.borderColor = '#4CAF50';
+            }
+            selectedButton = btn;
+            selectedButton.style.background = '#4CAF50';
+            selectedButton.style.borderColor = '#4CAF50';
+            selectedClicks = parseInt(btn.dataset.clicks);
+        };
+    });
+    
+    const firstBtn = document.querySelector('.click-preset[data-clicks="1"]');
+    if (firstBtn) {
+        firstBtn.style.background = '#4CAF50';
+        firstBtn.style.borderColor = '#4CAF50';
+        selectedButton = firstBtn;
+        selectedClicks = 1;
+    }
+    
+    unlimitedToggle.addEventListener('change', () => {
+        if (unlimitedToggle.checked) {
+            document.querySelectorAll('.click-preset').forEach(btn => {
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            });
+        } else {
+            document.querySelectorAll('.click-preset').forEach(btn => {
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            });
+            if (selectedButton) {
+                selectedButton.style.background = '#4CAF50';
+            }
+        }
+    });
+    
+    const buttonWidth = button.clientWidth;
+    const centerPos = buttonWidth / 2;
+    const maxLeftMove = centerPos - 35;
+    const maxRightMove = centerPos - 35;
+    
+    let isDraggingLeft = false, isDraggingRight = false;
+    let leftCurrentPos = 8, rightCurrentPos = 8;
+    
+    const onLeftStart = (e) => {
+        e.preventDefault();
+        isDraggingLeft = true;
+        leftThumb.style.transition = 'none';
+    };
+    
+    const onLeftMove = (e) => {
+        if (!isDraggingLeft) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newLeft = clientX - rect.left - 27;
+        newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
+        leftCurrentPos = newLeft;
+        leftThumb.style.left = newLeft + 'px';
+    };
+    
+    const onLeftEnd = () => {
+        if (!isDraggingLeft) return;
+        isDraggingLeft = false;
+        leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (leftCurrentPos >= maxLeftMove - 10) {
+            leftThumb.style.left = maxLeftMove + 'px';
+            
+            let maxClicks;
+            if (unlimitedToggle.checked) {
+                maxClicks = 999999;
+            } else {
+                maxClicks = selectedClicks;
+                if (maxClicks < 1) maxClicks = 1;
+                if (maxClicks > 5) maxClicks = 5;
+            }
+            
+            locationData.maxClicks = maxClicks;
+            locationData.clicksRemaining = maxClicks;
+            
+            setTimeout(() => {
+                CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                overlay.remove();
+            }, 200);
+        } else {
+            leftThumb.style.left = '8px';
+        }
+    };
+    
+    const onRightStart = (e) => {
+        e.preventDefault();
+        isDraggingRight = true;
+        rightThumb.style.transition = 'none';
+    };
+    
+    const onRightMove = (e) => {
+        if (!isDraggingRight) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newRight = rect.right - clientX - 27;
+        newRight = Math.max(8, Math.min(newRight, maxRightMove));
+        rightCurrentPos = newRight;
+        rightThumb.style.right = newRight + 'px';
+    };
+    
+    const onRightEnd = () => {
+        if (!isDraggingRight) return;
+        isDraggingRight = false;
+        rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (rightCurrentPos >= maxRightMove - 10) {
+            rightThumb.style.right = maxRightMove + 'px';
+            setTimeout(() => {
+                overlay.remove();
+            }, 200);
+        } else {
+            rightThumb.style.right = '8px';
+        }
+    };
+    
+    leftThumb.addEventListener('mousedown', onLeftStart);
+    leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+    rightThumb.addEventListener('mousedown', onRightStart);
+    rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+    
+    document.addEventListener('mousemove', (e) => { onLeftMove(e); onRightMove(e); });
+    document.addEventListener('mouseup', () => { onLeftEnd(); onRightEnd(); });
+    document.addEventListener('touchmove', (e) => { onLeftMove(e); onRightMove(e); }, { passive: false });
+    document.addEventListener('touchend', () => { onLeftEnd(); onRightEnd(); });
+    
+    setTimeout(() => {
+        if (document.getElementById('locationSwipeModal')) overlay.remove();
+    }, 30000);
+}, 
+    
+    
+    
+    // ==================== القسم 35: saveMessage ====================
+    saveMessage(friendId, message) { 
+        const key = `chat_${friendId}`; 
+        let h = []; 
+        try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
+        h.push(message); 
+        let serialized = JSON.stringify(h);
+        while (serialized.length > 4000000) {
+            let removed = false;
+            for (let i = 0; i < h.length; i++) {
+                if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') { h.splice(i, 1); removed = true; break; }
+            }
+            if (!removed) h.splice(0, 1);
+            serialized = JSON.stringify(h);
+        }
+        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
+            h = h.slice(Math.floor(h.length * 0.2));
+            try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
+        }
+        this.messages[friendId] = h; 
+    },
+
+   // ==================== القسم 36: updateLastMessage ====================
+updateLastMessage(friendId, lastMessage) { 
+    document.querySelectorAll('.chat-item').forEach(item => { 
+        if (item.getAttribute('onclick')?.includes(friendId)) { 
+            const lm = item.querySelector('.last-message'), tm = item.querySelector('.chat-time'); 
+            if (lm) lm.textContent = lastMessage; 
+            if (tm) tm.textContent = 'الآن'; 
+        } 
+    }); 
+},
+
+// ==================== القسم 37: closeChat ====================
+closeChat() {
+    console.log('🔴 closeChat - بدء إغلاق المحادثة');
+    console.log('currentChat:', this.currentChat);
+    console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
+    
+    const chatId = this.currentChat;
+    
+    if (chatId) {
+        console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
+        
+        if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
+            CallSystem.deleteAllWebRTCSignals(chatId);
+        }
+        
+        const key = `chat_${chatId}`;
+        const messages = this.messages[chatId] || [];
+        const filteredMessages = messages.filter(msg => msg.type === 'text');
+        this.messages[chatId] = filteredMessages;
+        localStorage.setItem(key, JSON.stringify(filteredMessages));
+        console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
+    }
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const btn = document.getElementById('enableFeaturesBtn');
+    if (btn) {
+        btn.style.background = '#f44336';
+        btn.title = 'تفعيل الميزات';
+    }
+    
+    this.updateAllButtons();
+    
+    document.body.classList.remove('conversation-open');
+    document.getElementById('conversationPage').style.display = 'none';
+    document.querySelector('.chat-page').style.display = 'block';
+    PresenceSystem.stopAll();
+    if (!CallSystem.isInCall) CallSystem.cleanupConnections();
+    this.currentChat = null;
+    this.friendInConversation = false;
+    
+    console.log('✅ closeChat - انتهى');
+},
+    
+    
+    // ==================== القسم 38: escapeHtml ====================
+    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+};
+
+// ==================== القسم 39: تشغيل النظام ====================
+ChatSystem.init();
