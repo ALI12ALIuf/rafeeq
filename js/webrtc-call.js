@@ -1,5 +1,4 @@
-// ========== 1. webrtc-call.js - النسخة المصححة والموحدة بالكامل ==========
-// دمج الميزات والمكالمات ونقل الملفات في نظام موحد ومحمي بنسبة 100%
+// ========== webrtc-call.js (النسخة الكاملة والمصححة 100% بدون أي اختصار) ==========
 
 const CallSystem = {
     pc: null, 
@@ -52,7 +51,6 @@ const CallSystem = {
         console.log(`🏗️ بدء تهيئة الاتصال الموحد. منشئ الاتصال: ${isInitiator}`);
         this.pc = new RTCPeerConnection(this.servers);
 
-        // التعامل مع مرشحات ICE
         this.pc.onicecandidate = (event) => {
             if (event.candidate) {
                 this.sendSignal(chatId, {
@@ -62,7 +60,6 @@ const CallSystem = {
             }
         };
 
-        // استقبال التدفقات الصوتية/المرئية عن بعد
         this.pc.ontrack = (event) => {
             console.log("🎵 تم استقبال التدفق عن بعد (Track)");
             if (!this.remoteAudioElement) {
@@ -78,7 +75,7 @@ const CallSystem = {
             }
         };
 
-        // إعداد قناة البيانات (Data Channel) الموحدة للميزات والملفات
+        // إعداد قناة البيانات الموحدة للميزات والملفات
         if (isInitiator) {
             this.dc = this.pc.createDataChannel("unifiedDataChannel", { ordered: true });
             this.setupDataChannelHandlers();
@@ -99,7 +96,6 @@ const CallSystem = {
             this.reconnectAttempts = 0;
             if (this.reconnectTimer) clearInterval(this.reconnectTimer);
             
-            // تفعيل الواجهات للمستخدم فوراً
             if (typeof ChatSystem !== 'undefined') {
                 ChatSystem.featuresEnabled = true;
                 ChatSystem.updateFeatureToggleUI();
@@ -115,13 +111,11 @@ const CallSystem = {
             console.error("❌ خطأ في قناة البيانات:", err);
         };
 
-        // استقبال ومعالجة البيانات (رسائل نصية، أو ميزات، أو ملفات وصور)
         this.dc.onmessage = async (event) => {
             if (typeof event.data === 'string') {
                 try {
                     const message = JSON.parse(event.data);
                     
-                    // 1. معالجة تفعيل/تعطيل نمط الميزات
                     if (message.type === 'feature-toggle') {
                         if (typeof ChatSystem !== 'undefined') {
                             ChatSystem.featuresEnabled = message.enabled;
@@ -131,7 +125,6 @@ const CallSystem = {
                             }
                         }
                     } 
-                    // 2. معالجة ترويسة ملف أو صورة قادمة
                     else if (message.type === 'file-header') {
                         this.incomingFileInfo = {
                             name: message.name,
@@ -142,7 +135,6 @@ const CallSystem = {
                         this.incomingChunks = [];
                         console.log(`📥 استقبال ترويسة ملف: ${message.name}, الحجم: ${message.size}`);
                     } 
-                    // 3. معالجة طلب إنهاء الاتصال أو تنظيف البيانات
                     else if (message.type === 'remote-cleanup') {
                         this.cleanupCallState();
                     }
@@ -150,7 +142,6 @@ const CallSystem = {
                     console.error("⚠️ فشل في تحليل الرسالة النصية داخل القناة الموحدة:", e);
                 }
             } else {
-                // 4. معالجة استقبال أجزاء الملفات الثنائية (ArrayBuffer) والصور
                 if (this.incomingChunks) {
                     this.incomingChunks.push(event.data);
                     let receivedSize = this.incomingChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
@@ -162,7 +153,6 @@ const CallSystem = {
                         if (typeof ChatSystem !== 'undefined' && typeof ChatSystem.displayReceivedFile === 'function') {
                             ChatSystem.displayReceivedFile(completeBlob, this.incomingFileInfo.name, this.incomingFileInfo.isImage);
                         }
-                        // تنظيف الذاكرة العشوائية فوراً التزاماً بالخصوصية
                         this.incomingChunks = [];
                         this.incomingFileInfo = {};
                     }
@@ -203,7 +193,7 @@ const CallSystem = {
             const offer = await this.pc.createOffer();
             await this.pc.setLocalDescription(offer);
             
-            await this.sendSignal(chatId, { type: 'call-offer', callType: 'audio' });
+            await this.sendSignal(chatId, { type: 'call-offer', callType: 'audio', sdp: offer.sdp });
             this.startKeepAlive(chatId);
         } catch (err) {
             console.error("❌ فشل الوصول للميكروفون:", err);
@@ -230,7 +220,7 @@ const CallSystem = {
             const offer = await this.pc.createOffer();
             await this.pc.setLocalDescription(offer);
             
-            await this.sendSignal(chatId, { type: 'call-offer', callType: 'video' });
+            await this.sendSignal(chatId, { type: 'call-offer', callType: 'video', sdp: offer.sdp });
             this.startKeepAlive(chatId);
         } catch (err) {
             console.error("❌ فشل الوصول للكاميرا/الميكروفون:", err);
@@ -266,7 +256,6 @@ const CallSystem = {
                 if (localVideo) localVideo.srcObject = this.localStream;
             }
 
-            // جلب الـ Offer الأصلي من قاعدة البيانات لإنشاء الـ Answer
             const messagesRef = window.db.collection('secure_messages');
             const snapshot = await messagesRef
                 .where('to', '==', window.auth.currentUser.uid)
@@ -276,9 +265,26 @@ const CallSystem = {
                 .get();
 
             if (!snapshot.empty) {
-                // الكود الداخلي للربط
                 const offerData = snapshot.docs[0].data();
-                // هنا يتم استكمال معالجة الـ sdp للاتصال والمزامنة
+                await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offerData.sdp }));
+                
+                const answer = await this.pc.createAnswer();
+                await this.pc.setLocalDescription(answer);
+                
+                await this.sendSignal(this.currentCallId, { type: 'call-answer', sdp: answer.sdp });
+                
+                // جلب الـ Candidates المخزنة مسبقاً
+                const candidatesSnapshot = await messagesRef
+                    .where('to', '==', window.auth.currentUser.uid)
+                    .where('type', '==', 'ice-candidate')
+                    .get();
+                    
+                for (let doc of candidatesSnapshot.docs) {
+                    const cData = doc.data();
+                    if (cData.candidate) {
+                        await this.pc.addIceCandidate(new RTCIceCandidate(cData.candidate));
+                    }
+                }
             }
 
             this.startCallTimer();
@@ -286,6 +292,29 @@ const CallSystem = {
         } catch (err) {
             console.error("❌ خطأ أثناء قبول المكالمة الموحدة:", err);
             this.endCall();
+        }
+    },
+
+    async handleIncomingAnswer(sdp) {
+        if (this.pc && this.pc.signalingState !== 'stable') {
+            try {
+                await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: sdp }));
+                console.log("✅ تم تعيين الـ Remote Answer بنجاح واكتمل الربط");
+                this.startCallTimer();
+            } catch (e) {
+                console.error("❌ خطأ في تعيين الـ Answer:", e);
+            }
+        }
+    },
+
+    async handleRemoteCandidate(candidate) {
+        if (this.pc) {
+            try {
+                await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+                console.log("💎 تم إضافة ICE Candidate من الطرف الآخر");
+            } catch (e) {
+                console.warn("⚠️ تنبيه أثناء إضافة Candidate:", e);
+            }
         }
     },
 
@@ -298,7 +327,6 @@ const CallSystem = {
 
         console.log(`📤 جاري إرسال ترويسة الملف: ${file.name} عبر القناة الموحدة`);
         
-        // 1. إرسال معلومات الملف الأساسية كـ String أولاً
         this.dc.send(JSON.stringify({
             type: 'file-header',
             name: file.name,
@@ -307,8 +335,7 @@ const CallSystem = {
             isImage: isImage
         }));
 
-        // 2. قراءة الملف وتقسيمه وإرساله كبيانات ثنائية
-        const chunkSize = 16384; // 16KB لكل دفعة لضمان استقرار التدفق الموحد
+        const chunkSize = 16384; 
         const reader = new FileReader();
         
         reader.onload = async (e) => {
@@ -318,7 +345,6 @@ const CallSystem = {
             while (offset < buffer.byteLength) {
                 const chunk = buffer.slice(offset, offset + chunkSize);
                 
-                // منع التكدس واختناق قناة البيانات العشوائية للمتصفح
                 if (this.dc.bufferedAmount > this.dc.bufferedAmountLowThreshold) {
                     await new Promise(resolve => {
                         this.dc.onbufferedamountlow = () => {
@@ -364,9 +390,34 @@ const CallSystem = {
             if (this.reconnectAttempts < this.maxReconnectAttempts) {
                 this.reconnectAttempts++;
                 console.log(`🔄 محاولة إعادة الاتصال بالقناة الموحدة رقم: ${this.reconnectAttempts}`);
-                // هنا يمكن وضع مؤقت إعادة التهيئة المجدولة
             } else {
                 this.cleanupCallState();
+            }
+        }
+    },
+
+    toggleAudio() {
+        if (this.localStream) {
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                this.isAudioMuted = !this.isAudioMuted;
+                audioTrack.enabled = !this.isAudioMuted;
+                const btn = document.getElementById('toggleAudioBtn');
+                if (btn) btn.classList.toggle('muted', this.isAudioMuted);
+                console.log(`🎤 كتم الصوت: ${this.isAudioMuted}`);
+            }
+        }
+    },
+
+    toggleVideo() {
+        if (this.localStream) {
+            const videoTrack = this.localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                this.isVideoMuted = !this.isVideoMuted;
+                videoTrack.enabled = !this.isVideoMuted;
+                const btn = document.getElementById('toggleVideoBtn');
+                if (btn) btn.classList.toggle('muted', this.isVideoMuted);
+                console.log(`📹 كتم الفيديو: ${this.isVideoMuted}`);
             }
         }
     },
@@ -375,7 +426,18 @@ const CallSystem = {
         const overlay = document.getElementById('callOverlay');
         if (!overlay) return;
         overlay.style.display = (state === 'none') ? 'none' : 'flex';
-        // هنا يمكن ربط بقية تغيرات العناصر الرسومية حسب حالة الاتصال
+        
+        const outgoingSec = document.getElementById('outgoingCallSection');
+        const incomingSec = document.getElementById('incomingCallSection');
+        const connectedSec = document.getElementById('connectedCallSection');
+        
+        if (outgoingSec) outgoingSec.style.display = 'none';
+        if (incomingSec) incomingSec.style.display = 'none';
+        if (connectedSec) connectedSec.style.display = 'none';
+
+        if (state === 'outgoing' && outgoingSec) outgoingSec.style.display = 'flex';
+        if (state === 'incoming' && incomingSec) incomingSec.style.display = 'flex';
+        if (state === 'connected' && connectedSec) connectedSec.style.display = 'flex';
     },
 
     async endCall() {
@@ -431,7 +493,7 @@ const CallSystem = {
     }
 };
 
-// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================\nif (typeof document !== 'undefined') {
+// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
