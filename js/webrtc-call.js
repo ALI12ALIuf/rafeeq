@@ -244,19 +244,31 @@ async startAudioCall(calleeId) {
         }
         console.log('✅ تم الحصول على الميكروفون');
         
-        this.pc = new RTCPeerConnection(this.servers);
+        // ✅ استخدام pc الموجود (من الميزات) بدلاً من إنشاء جديد
+        if (!this.pc) {
+            this.pc = new RTCPeerConnection(this.servers);
+            console.log('🔧 تم إنشاء pc جديد (لأنه لم يكن موجوداً)');
+        } else {
+            console.log('✅ استخدام pc الموجود للمكالمة');
+        }
         
+        // ✅ إضافة مسارات الصوت إلى pc الموجود
         this.localStream.getTracks().forEach(track => {
-            this.pc.addTrack(track, this.localStream);
-            console.log(`➕ تم إضافة مسار ${track.kind}`);
+            if (this.pc) {
+                this.pc.addTrack(track, this.localStream);
+                console.log(`➕ تم إضافة مسار ${track.kind} إلى pc الموجود`);
+            }
         });
         
-        // ✅ إذا كان Data Channel موجوداً ومفتوحاً، نستخدمه للمكالمة (بدون إنشاء جديد)
-        if (this.dc && this.dc.readyState === 'open') {
-            console.log('✅ استخدام Data Channel الموجود للمكالمة (الحفاظ على الميزات)');
+        // ✅ استخدام dc الموجود أو إنشاء dc جديد مرتبط بنفس pc
+        if (!this.dc || this.dc.readyState !== 'open') {
+            if (this.pc) {
+                this.dc = this.pc.createDataChannel('chat');
+                this.setupDataChannel(this.dc);
+                console.log('🔧 تم إنشاء Data Channel جديد للمكالمة');
+            }
         } else {
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
+            console.log('✅ استخدام Data Channel الموجود للمكالمة');
         }
         
         this.pc.onicecandidate = e => { 
@@ -333,15 +345,32 @@ async startVideoCall(calleeId) {
         }
         
         this.showCallUI('video');
-        this.pc = new RTCPeerConnection(this.servers);
-        this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
         
-        // ✅ إذا كان Data Channel موجوداً ومفتوحاً، نستخدمه للمكالمة (بدون إنشاء جديد)
-        if (this.dc && this.dc.readyState === 'open') {
-            console.log('✅ استخدام Data Channel الموجود للمكالمة المرئية (الحفاظ على الميزات)');
+        // ✅ استخدام pc الموجود (من الميزات) بدلاً من إنشاء جديد
+        if (!this.pc) {
+            this.pc = new RTCPeerConnection(this.servers);
+            console.log('🔧 تم إنشاء pc جديد (لأنه لم يكن موجوداً)');
         } else {
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
+            console.log('✅ استخدام pc الموجود للمكالمة المرئية');
+        }
+        
+        // ✅ إضافة مسارات الصوت والفيديو إلى pc الموجود
+        this.localStream.getTracks().forEach(track => {
+            if (this.pc) {
+                this.pc.addTrack(track, this.localStream);
+                console.log(`➕ تم إضافة مسار ${track.kind} إلى pc الموجود`);
+            }
+        });
+        
+        // ✅ استخدام dc الموجود أو إنشاء dc جديد مرتبط بنفس pc
+        if (!this.dc || this.dc.readyState !== 'open') {
+            if (this.pc) {
+                this.dc = this.pc.createDataChannel('chat');
+                this.setupDataChannel(this.dc);
+                console.log('🔧 تم إنشاء Data Channel جديد للمكالمة المرئية');
+            }
+        } else {
+            console.log('✅ استخدام Data Channel الموجود للمكالمة المرئية');
         }
         
         this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
@@ -451,11 +480,20 @@ async receiveCall(callerId, callData) {
         
         this.showCallUI(this.callType);
         
-        this.pc = new RTCPeerConnection(this.servers);
+        // ✅ استخدام pc الموجود (من الميزات) بدلاً من إنشاء جديد
+        if (!this.pc) {
+            this.pc = new RTCPeerConnection(this.servers);
+            console.log('🔧 تم إنشاء pc جديد (لأنه لم يكن موجوداً)');
+        } else {
+            console.log('✅ استخدام pc الموجود للمكالمة');
+        }
         
+        // ✅ إضافة مسارات الصوت/الفيديو إلى pc الموجود
         this.localStream.getTracks().forEach(track => {
-            this.pc.addTrack(track, this.localStream);
-            console.log(`➕ تم إضافة مسار ${track.kind}`);
+            if (this.pc) {
+                this.pc.addTrack(track, this.localStream);
+                console.log(`➕ تم إضافة مسار ${track.kind} إلى pc الموجود`);
+            }
         });
         
         this.pc.onicecandidate = e => { 
@@ -528,7 +566,7 @@ async receiveCall(callerId, callData) {
         this.sendSignal(callerId, { type: 'reject' });
         this.endCall(); 
     }
-}, 
+},
 
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
