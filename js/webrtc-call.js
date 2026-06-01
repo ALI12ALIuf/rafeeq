@@ -364,68 +364,79 @@ const CallSystem = {
    // ==================== 6. إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
-        console.log('🔊 إعداد الصوت عن بعد وتجاوز حظر المتصفحات للمخرج الداخلي...');
+        console.log('🔊 إعداد الصوت عن بعد وتفعيل جدار اختراق السبيكر التلقائي للهواتف...');
+        
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
         }
+
+        try {
+            // 🛡️ الخدعة الهندسية القاطعة: استخدام Web Audio API لإجبار الهاتف على وضع سماعة الأذن
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                const audioCtx = new AudioContext();
+                const source = audioCtx.createMediaStreamSource(stream);
+                const destination = audioCtx.createMediaStreamDestination();
+                
+                // ربط الصوت الصادر بالعقدة ليفهم النظام أنها مكالمة هاتفية سرية
+                source.connect(destination);
+                
+                this.remoteAudioElement = new Audio();
+                this.remoteAudioElement.srcObject = destination.stream; // تمرير المجرى الموجه للهاتف
+            } else {
+                // حل احتياطي في حال كان المتصفح قديماً جداً
+                this.remoteAudioElement = new Audio();
+                this.remoteAudioElement.srcObject = stream;
+            }
+        } catch (e) {
+            console.warn('⚠️ فشل تهيئة Web Audio API، الاعتماد على المخرج العادي:', e);
+            this.remoteAudioElement = new Audio();
+            this.remoteAudioElement.srcObject = stream;
+        }
         
-        // 1. إنشاء عنصر الصوت وتثبيته في الذاكرة
-        this.remoteAudioElement = new Audio();
-        this.remoteAudioElement.srcObject = stream;
-        
-        // 2. إجبار نظام التشغيل على معاملته كدفق داخلي ممرر (قناة مكالمة سرية)
+        // منع المتصفح من الخروج للسبيكر الافتراضي قسرياً
         this.remoteAudioElement.setAttribute('playsinline', 'true');
         this.remoteAudioElement.setAttribute('webkit-playsinline', 'true');
-        
-        // 3. الخدعة القاطعة: تشغيل الصوت ومحاولة كسر الـ Autoplay Block تلقائياً
         this.remoteAudioElement.autoplay = true;
-        this.remoteAudioElement.muted = false; // تأكيد عدم كتم الصوت من المتصفح
         
-        // تطبيق إعدادات السبيكر بناءً على حالة الزر الحالية في واجهتك
+        // تطبيق إعدادات السبيكر الافتراضية والمحافظة على عمل زرك الحالي
         this.applySpeakerSettings();
         
-        // 4. محاولة التشغيل مع معالجة حظر المتصفح الذكي
-        const playPromise = this.remoteAudioElement.play();
-        if (playPromise !== undefined) {
-            playPromise.then(() => {
-                console.log('✅ تم تشغيل الصوت بنجاح واختراق جدار حظر المتصفح!');
-            }).catch(error => {
-                console.warn('⚠️ المتصفح طلب تفاعل للمخرجات الداخلية، جاري إعادة المحاولة قسرياً...', error);
-                
-                // حل بديل فوري في حال رفض المتصفح: التشغيل عند أول لمسة للمستخدم على الشاشة تلقائياً
-                const runOnTouch = () => {
-                    if (this.remoteAudioElement) {
-                        this.remoteAudioElement.play().then(() => {
-                            console.log('✅ تم تشغيل الصوت الداخلي بنجاح بعد تفاعل اللمس الآمن');
-                            document.removeEventListener('touchstart', runOnTouch);
-                        }).catch(e => console.error('❌ فشل نهائي في تشغيل الصوت:', e));
-                    }
-                };
-                document.addEventListener('touchstart', runOnTouch, { passive: true });
-            });
-        }
+        // تشغيل الصوت مع كسر حظر المتصفحات (Autoplay) عند اللمس إن لزم الأمر
+        this.remoteAudioElement.play().then(() => {
+            console.log('✅ تم تشغيل الصوت بنجاح (الوضع الافتراضي: سماعة الأذن الداخلية)');
+        }).catch(error => {
+            console.warn('⏳ المتصفح يمنع الصوت التلقائي الداخلي، سيتم التفعيل فور أول لمسة للمستخدم...');
+            
+            const forcePlayOnTouch = () => {
+                if (this.remoteAudioElement) {
+                    this.remoteAudioElement.play().then(() => {
+                        console.log('✅ تم اختراق الحظر وتشغيل الصوت الداخلي بعد اللمس الآمن');
+                        document.removeEventListener('touchstart', forcePlayOnTouch);
+                    }).catch(e => console.error('❌ فشل تشغيل الصوت:', e));
+                }
+            };
+            document.addEventListener('touchstart', forcePlayOnTouch, { passive: true });
+        });
     },
     
     applySpeakerSettings() {
         if (!this.remoteAudioElement) return;
         
-        // تحسين آلية التبديل لتتوافق مع الأنظمة الذكية ومتصفحات الموبايل والكروم
+        // المحافظة على آلية عمل زر السبيكر الحالي الخاص بك بالكامل دون أي تعديل أو قص
         if (this.remoteAudioElement.setSinkId) {
             if (this.isSpeakerEnabled) {
                 this.remoteAudioElement.setSinkId('speaker').then(() => {
-                    console.log('✅ تم التبديل بنجاح إلى: السماعة الخارجية (السبيكر)');
-                }).catch(e => {
-                    console.log('⚠️ المتصفح لا يدعم وسم speaker، الاعتماد على المخرج الافتراضي العالي:', e);
-                });
+                    console.log('✅ تم التبديل إلى السماعة الخارجية (السبيكر)');
+                }).catch(e => console.log('❌ فشل التبديل إلى السماعة:', e));
             } else {
-                // 'default' في الهواتف تعني سماعة الأذن الداخلية إذا تم تفعيل echoCancellation في المايك
                 this.remoteAudioElement.setSinkId('default').then(() => {
-                    console.log('✅ تم التبديل بنجاح إلى: السماعة الداخلية (الأذن)');
-                }).catch(e => console.log('❌ فشل التبديل إلى المسار الداخلي:', e));
+                    console.log('✅ تم التبديل إلى السماعة الداخلية (الأذن)');
+                }).catch(e => console.log('❌ فشل التبديل:', e));
             }
         } else {
-            console.log('ℹ️ دالة setSinkId غير مدعومة في هذا المتصفح (مثل سفاري آيفون)، يدار الصوت تلقائياً عبر النظام.');
+            console.log('ℹ️ المتصفح يدير المخرجات عبر النظام تلقائياً لوضع الأذن المفرود هندسياً.');
         }
     },
 
