@@ -1,4 +1,4 @@
-
+/* ==================== القسم 1: إعادة تعيين الأنماط العامة ==================== */
 * {
     margin: 0;
     padding: 0;
@@ -15,6 +15,7 @@
     box-shadow: none !important;
 }
 
+/* ==================== القسم 2: متغيرات الألوان (الثيم الأساسي) ==================== */
 :root {
     --primary: #2196F3;
     --primary-dark: #1976D2;
@@ -34,6 +35,7 @@
     --nav-height: 60px;
 }
 
+/* ==================== القسم 2.1: متغيرات الألوان (الثيم الداكن) ==================== */
 .theme-dark {
     --primary: #64B5F6;
     --primary-dark: #42A5F5;
@@ -47,6 +49,7 @@
     --shadow: 0 2px 10px rgba(0,0,0,0.3);
 }
 
+/* ==================== القسم 3: أنماط الجسم الرئيسي ==================== */
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background: var(--bg);
@@ -57,6 +60,7 @@ body {
     overflow: hidden;
 }
 
+/* ==================== القسم 4: شاشة البداية (Splash Screen) ==================== */
 .splash-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--primary); display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s; }
 .splash-screen.hide { opacity: 0; pointer-events: none; }
 .splash-content { text-align: center; color: white; }
@@ -65,6 +69,7 @@ body {
 .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin: 2rem auto 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ==================== القسم 5: الحاوية الرئيسية ==================== */
 .app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
 .app-header { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; position: sticky; top: 0; z-index: 100; }
 .header-left, .header-right { display: flex; gap: 0.5rem; }
@@ -74,11 +79,13 @@ body {
 .page { display: none; padding: 1rem; }
 .page.active { display: block; }
 
+/* ==================== القسم 6: شريط التنقل السفلي ==================== */
 .bottom-nav { height: var(--nav-height); background: var(--card-bg); border-top: 1px solid var(--border); display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; }
 .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; background: none; border: none; color: var(--text-light); font-size: 0.8rem; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .nav-item i { font-size: 1.2rem; }
 .nav-item.active { color: var(--primary); }
 
+/* ==================== القسم 7: بطاقات المنشورات (Home) ==================== */
 .post-card { background: var(--card-bg); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; box-shadow: var(--shadow); }
 .post-header { display: flex; align-items: center; padding: 1rem; gap: 0.75rem; }
 .post-avatar-emoji { width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden; line-height: 1; }
@@ -91,6 +98,7 @@ body {
 .post-actions { display: flex; gap: 1rem; padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--border); }
 .post-action { background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
 
+/* ==================== القسم 8: صفحة الدردشة (Chat) ==================== */
 .search-box { display: flex; align-items: center; background: var(--light); border-radius: 25px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; }
@@ -102,6 +110,7 @@ body {
 .chat-info p { color: var(--text-light); font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-time { color: var(--text-light); font-size: 0.7rem; }
 
+/* ==================== القسم 9: صفحة الملف الشخصي (Profile) ==================== */
 .profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
 .profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
 .profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
@@ -120,6 +129,7 @@ body {
 .stat-value { display: block; font-size: 1.2rem; font-weight: bold; color: var(--primary); }
 .stat-link span:last-child { font-size: 0.8rem; color: var(--text-light); }
 
+/* ==================== القسم 10: الصفحات الفرعية للملف الشخصي ==================== */
 .profile-subpage { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 1000; overflow-y: auto; padding: 0; }
 .subpage-header { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow); }
 .back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -140,6 +150,7 @@ body {
 .action-btn.following { background: var(--primary); color: white; }
 .action-btn.remove { background: var(--danger); color: white; }
 
+/* ==================== القسم 11: النوافذ المنبثقة (Modals) ==================== */
 .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s; }
 .modal.active { opacity: 1; visibility: visible; }
 .modal-content { background: var(--card-bg); border-radius: var(--radius); padding: 2rem; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
@@ -173,6 +184,7 @@ body {
 input:checked + .slider { background-color: var(--primary); }
 input:checked + .slider:before { transform: translateX(26px); }
 
+/* ==================== القسم 12: استعلامات الوسائط (Responsive) ==================== */
 @media (min-width: 768px) { .bottom-nav { display: none; } }
 @media (max-width: 480px) {
     .profile-cover { height: 120px; }
@@ -182,7 +194,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     .profile-id-row { width: 100%; min-width: auto; }
 }
 
-/* ========== المحادثة ========== */
+/* ==================== القسم 13: أنماط المحادثة ==================== */
 body.in-call .app-container, body.in-call .bottom-nav, body.in-call .app-header { display: none !important; }
 body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
 body.conversation-open .conversation-page { display: flex !important; flex-direction: column; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: var(--bg); }
@@ -198,15 +210,16 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
 .conversation-status.online { color: #4CAF50; }
 .conversation-status.offline { color: var(--text-light); }
 
-/* أزرار الاتصال */
+/* ==================== القسم 13.1: أزرار الاتصال ==================== */
 .call-buttons button { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
 .call-buttons button:hover { background: var(--light); }
 .call-buttons button i { font-size: 1.2rem; }
 
-/* أزرار المرفقات مقفولة */
+/* ==================== القسم 13.2: أزرار المرفقات المقفولة ==================== */
 .attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
 .attachment-menu button.locked::after { content: " 🔒"; font-size: 0.8rem; }
 
+/* ==================== القسم 13.3: حاوية الرسائل ==================== */
 .messages-container { flex: 1; overflow-y: auto; padding: 20px 16px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
 .message { max-width: 70%; margin-bottom: 4px; animation: messagePop 0.2s ease; }
 .message.sent { align-self: flex-end; }
@@ -221,6 +234,7 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
 .message-image { max-width: 200px; max-height: 200px; border-radius: 12px; cursor: pointer; }
 .message-audio { width: 250px; height: 40px; border-radius: 20px; }
 
+/* ==================== القسم 13.4: مدخل الرسائل ==================== */
 .message-input-container { background: var(--card-bg); border-top: 1px solid var(--border); padding: 12px 16px; }
 .message-input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--light); border-radius: 30px; padding: 4px 8px; border: 1px solid var(--border); }
 .message-input-wrapper:focus-within { border-color: var(--primary); }
@@ -230,10 +244,12 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
 .emoji-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 .send-btn, .voice-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 
+/* ==================== القسم 13.5: قائمة المرفقات ==================== */
 .attachment-menu { position: absolute; bottom: 80px; left: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2100; min-width: 150px; border: 1px solid var(--border); }
 .attachment-menu button { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: none; background: transparent; color: var(--text); cursor: pointer; border-radius: 12px; font-size: 0.95rem; width: 100%; text-align: right; }
 .attachment-menu button i { width: 24px; color: var(--primary); font-size: 1.2rem; }
 
+/* ==================== القسم 13.6: منتقي الإيموجي ==================== */
 .emoji-picker { position: absolute; bottom: 80px; right: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 12px; z-index: 2100; width: 300px; border: 1px solid var(--border); }
 .emoji-categories { display: flex; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .emoji-categories button { width: 40px; height: 40px; border-radius: 20px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.3rem; }
@@ -241,6 +257,7 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
 .emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: 200px; overflow-y: auto; }
 .emoji-grid button { width: 40px; height: 40px; border-radius: 8px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; }
 
+/* ==================== القسم 13.7: استعلامات المحادثة للشاشات الصغيرة ==================== */
 @media (max-width: 480px) {
     .conversation-header { padding: 8px 12px; height: 60px; }
     .message { max-width: 85%; }
@@ -250,6 +267,7 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
     .send-btn, .voice-btn { width: 40px; height: 40px; font-size: 1.1rem; }
 }
 
+/* ==================== القسم 13.8: أنماط الثيم الداكن للمحادثة ==================== */
 .theme-dark .message.received .message-content { background: #2d2d2d; color: #fff; }
 .theme-dark .message.sent .message-content { background: #1976D2; }
 .theme-dark .message-info { color: #999; }
@@ -258,13 +276,15 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
 .theme-dark .emoji-categories { border-color: #444; }
 .theme-dark .emoji-categories button.active { background: #444; }
 
+/* ==================== القسم 13.9: حركات الرسائل ==================== */
 @keyframes messagePop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
+/* ==================== القسم 13.10: شريط التمرير ==================== */
 .messages-container::-webkit-scrollbar { width: 6px; }
 .messages-container::-webkit-scrollbar-track { background: transparent; }
 .messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* ========== إصلاح الإيموجي داخل الإطارات الدائرية ========== */
+/* ==================== القسم 14: إصلاح الإيموجي داخل الإطارات الدائرية ==================== */
 .profile-avatar-emoji,
 .conversation-avatar-emoji,
 .chat-avatar-emoji,
@@ -278,15 +298,12 @@ body.conversation-open .conversation-page { display: flex !important; flex-direc
     justify-content: center;
 }
 
-/* ========== إصلاح تداخل الصفحات ========== */
-
-/* إخفاء شريط التنقل السفلي عند فتح أي صفحة فرعية */
+/* ==================== القسم 15: إصلاح تداخل الصفحات ==================== */
 body.conversation-open .bottom-nav,
 body.profile-subpage-open .bottom-nav {
     display: none !important;
 }
 
-/* صفحة المحادثة - تخفي كل الصفحات الأخرى */
 body.conversation-open .page {
     display: none !important;
 }
@@ -295,7 +312,6 @@ body.conversation-open .profile-subpage {
     display: none !important;
 }
 
-/* الصفحات الفرعية للملف الشخصي - تخفي المحتوى الرئيسي */
 .profile-subpage-open .page {
     display: none !important;
 }
@@ -303,7 +319,6 @@ body.conversation-open .profile-subpage {
     display: block !important;
 }
 
-/* منع تداخل صفحة المحادثة مع الصفحات الفرعية */
 .conversation-page {
     display: none !important;
 }
@@ -319,14 +334,10 @@ body.conversation-open .conversation-page {
     background: var(--bg);
 }
 
-/* إخفاء الهيدر عند فتح المحادثة */
 body.conversation-open .app-header {
     display: none !important;
 }
 
-/* ========== إصلاح تداخل الصفحات - نهائي ========== */
-
-/* إخفاء جميع الصفحات الفرعية عند فتح المحادثة */
 body.conversation-open .page:not(.conversation-page) {
     display: none !important;
 }
@@ -335,7 +346,6 @@ body.conversation-open .profile-subpage {
     display: none !important;
 }
 
-/* صفحة المحادثة تكون فوق الكل */
 .conversation-page {
     display: none !important;
 }
@@ -351,13 +361,11 @@ body.conversation-open .conversation-page {
     background: var(--bg);
 }
 
-/* إخفاء الهيدر والتنقل عند فتح المحادثة */
 body.conversation-open .app-header,
 body.conversation-open .bottom-nav {
     display: none !important;
 }
 
-/* عند فتح الصفحات الفرعية للملف الشخصي */
 body.profile-subpage-open .page:not(.profile-page),
 body.profile-subpage-open .chat-page,
 body.profile-subpage-open .home-page,
@@ -371,15 +379,11 @@ body.profile-subpage-open .profile-pages {
     display: block !important;
 }
 
-/* لما تنغلق المحادثة - تأكد إنه ما تبقى أي صفحة مفتوحة */
 body:not(.conversation-open) .conversation-page {
     display: none !important;
 }
 
-
-/* ==================== تنسيق مشغل البصمة الصوتية المتقدم ==================== */
-
-/* تنسيق مشغل الصوت (audio) */
+/* ==================== القسم 16: تنسيق مشغل البصمة الصوتية المتقدم ==================== */
 .message-audio {
     background: #4CAF50;
     border-radius: 20px;
@@ -407,9 +411,7 @@ body:not(.conversation-open) .conversation-page {
     border-radius: 10px;
 }
 
-
-/* ==================== أزرار التفعيل والطرد ==================== */
-
+/* ==================== القسم 17: أزرار التفعيل والطرد ==================== */
 .feature-toggle-container {
     display: inline-flex;
     align-items: center;
@@ -469,7 +471,6 @@ input:checked + .feature-slider:before {
     transform: translateX(26px);
 }
 
-/* تأثير الرمش عند انتظار الرد */
 @keyframes featureBlink {
     0% { background-color: #f44336; }
     50% { background-color: #2196F3; }
@@ -480,7 +481,6 @@ input:checked + .feature-slider:before {
     animation: featureBlink 0.8s ease-in-out infinite;
 }
 
-/* زر الطرد */
 .kick-btn {
     background: none;
     border: none;
