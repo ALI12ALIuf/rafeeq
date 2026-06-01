@@ -852,13 +852,13 @@ displayMessages(friendId) {
     (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); 
 },
 
-// 🚀 التعديل الجوهري: جعل زر الميزات يتخاطب حياً ومباشرة مع قناة WebRTC دون وسيط Firestore
+// 🚀 التعديل المحصن الحامي من خطأ الـ TypeError الظاهر في الصورة
 toggleFeaturesMode(enabled) {
     this.featuresEnabled = enabled;
     this.updateFeatureToggleUI();
 
-    // 🛡️ إرسال حالة تفعيل أو تعطيل الميزات فوراً وبشكل حي عبر الأنبوب الموحد
-    if (typeof CallSystem !== 'undefined' && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+    // 🛡️ فحص أمان صارم: التأكد أولاً أن الكائن CallSystem موجود، وأن dc معرّف، وأن حالته مفتوح 'open'
+    if (typeof CallSystem !== 'undefined' && CallSystem.dc && typeof CallSystem.dc.send === 'function' && CallSystem.dc.readyState === 'open') {
         try {
             CallSystem.dc.send(JSON.stringify({
                 type: 'feature-toggle',
@@ -869,9 +869,9 @@ toggleFeaturesMode(enabled) {
             console.error("❌ فشل إرسال إشارة الميزات عبر قناة البيانات:", e);
         }
     } else {
-        // حماية: منع المستخدم من تشغيل التمرير للميزات إذا لم يكن هناك اتصال مباشر مفتوح
+        // حماية: إذا كانت القناة غير موجودة أو مغلقة (مثل اللحظة التي ظهر فيها الخطأ عندك)
         if (enabled) {
-            alert("🔒 يجب بدء اتصال (صوتي أو مرئي) مع الطرف الآخر أولاً لتفعيل نقل الملفات والصور حياً!");
+            alert("🔒 تنبيه: يجب بدء اتصال (صوتي أو مرئي) مع الطرف الآخر أولاً لتفعيل نقل الملفات والصور حياً!");
             this.featuresEnabled = false;
             this.updateFeatureToggleUI();
         }
@@ -894,7 +894,6 @@ updateFeatureToggleUI() {
     
     console.log(`🎛️ تم تحديث واجهة زر الميزات الفوري: checked=${this.featuresEnabled}`);
 },
-    
 
     
     // ==================== القسم 26: displayMessage & displayReceivedFile ====================
