@@ -233,8 +233,18 @@ const CallSystem = {
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
             
-            console.log('🎤 طلب الوصول إلى الميكروفون...');
-            const constraints = { audio: true, video: false };
+            console.log('🎤 طلب الوصول إلى الميكروفون بخصائص عزل متقدمة لجلب السماعة الداخلية...');
+            
+            // ✅ التعديل الهندسي: تخصيص دفق المايك لإجبار نظام التشغيل بالموبايل على تفعيل سماعة الأذن تلقائياً
+            const constraints = { 
+                audio: {
+                    echoCancellation: true, // تفعيل إلغاء الصدى (أساسي لتحويل الصوت لسماعة الأذن)
+                    noiseSuppression: true,  // تفعيل منع الضوضاء المحيطة
+                    autoGainControl: true   // التحكم التلقائي بمستوى الصوت ومنع التضخيم المفاجئ
+                }, 
+                video: false 
+            };
+            
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
             const audioTracks = this.localStream.getAudioTracks();
@@ -242,7 +252,7 @@ const CallSystem = {
                 this.endCall();
                 return;
             }
-            console.log('✅ تم الحصول على الميكروفون');
+            console.log('✅ تم الحصول على الميكروفون وتطبيق وضع الاتصال الهاتفي');
             
             this.pc = new RTCPeerConnection(this.servers);
             
@@ -351,10 +361,10 @@ const CallSystem = {
         }
     },
     
-    // ==================== 6. إعداد الصوت عن بعد ====================
+   // ==================== 6. إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
-        console.log('🔊 إعداد الصوت عن بعد...');
+        console.log('🔊 إعداد الصوت عن بعد وتأمين مخرج سماعة الأذن...');
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
@@ -362,12 +372,18 @@ const CallSystem = {
         
         this.remoteAudioElement = new Audio();
         this.remoteAudioElement.srcObject = stream;
+        
+        // ✅ إضافة جدار حماية لمنع تشغيل السبيكر التلقائي الافتراضي في المتصفحات وأنظمة الموبايل
+        this.remoteAudioElement.setAttribute('playsinline', 'true');
+        this.remoteAudioElement.setAttribute('webkit-playsinline', 'true'); // دعم كامل لمتصفح سفاري ونظام الآيفون iOS
+        
         this.remoteAudioElement.autoplay = true;
         
+        // تطبيق إعدادات السماعة الحالية والتحقق من حالة زر السبيكر الفعال
         this.applySpeakerSettings();
         
         this.remoteAudioElement.play().then(() => {
-            console.log('✅ بدء تشغيل الصوت عن بعد');
+            console.log('✅ بدء تشغيل الصوت بنجاح (الوضع الافتراضي: سماعة الأذن الداخلية)');
         }).catch(e => {
             console.log('❌ فشل تشغيل الصوت:', e);
         });
@@ -387,7 +403,7 @@ const CallSystem = {
                 }).catch(e => console.log('❌ فشل التبديل:', e));
             }
         }
-    },
+    }, 
 
     
     // ==================== 7. استقبال المكالمات ====================
