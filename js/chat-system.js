@@ -247,7 +247,7 @@ updateKickButtonState() {
 },
     
 
-    // ==================== القسم : 5.1 إنهاء المحادثة من الطرفين ====================
+    // ==================== القسم : 5.1 طرد المستخدم من المحادثة ====================
 async kickUserFromConversation() {
     if (!this.currentChat) {
         console.log('❌ لا توجد محادثة نشطة');
@@ -255,29 +255,27 @@ async kickUserFromConversation() {
     }
     
     if (!this.featuresEnabled || !this.friendInConversation) {
-        console.log('❌ لا يمكن إنهاء المحادثة - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+        console.log('❌ لا يمكن الطرد - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
         return;
     }
     
-    console.log('👢 إنهاء المحادثة مع المستخدم:', this.currentChat);
+    console.log('👢 محاولة طرد المستخدم:', this.currentChat);
     
-    // ✅ إرسال إشارة إلى الطرف الآخر لإغلاق المحادثة
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
         try {
             CallSystem.dc.send(JSON.stringify({ 
                 type: 'force_close_conversation',
                 timestamp: Date.now()
             }));
-            console.log('✅ تم إرسال إشارة إنهاء المحادثة إلى:', this.currentChat);
+            console.log('✅ تم إرسال إشارة الطرد مباشرة عبر Data Channel إلى:', this.currentChat);
         } catch(e) {
-            console.error('❌ فشل إرسال إشارة إنهاء المحادثة:', e);
+            console.error('❌ فشل إرسال إشارة الطرد عبر Data Channel:', e);
         }
     } else {
-        console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة');
+        console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
     }
     
-    // ✅ إغلاق المحادثة محلياً (عند المرسل أيضاً)
-    this.closeChat();
+    this.updateAllButtons();
 },
     
     
@@ -349,19 +347,23 @@ startFeatureBlink() {
             console.log('❌ فشل إرسال الطلب');
         }
     },
-
     
     // ==================== القسم 8: handleFeatureRequest ====================
-async handleFeatureRequest(fromId) {
-    console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
+    async handleFeatureRequest(fromId) {
+        console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
+        
+        if (this.featuresEnabled) {
+            console.log('الميزات مفعلة بالفعل، قبول تلقائي');
+            await this.acceptFeatureRequest();
+            return;
+        }
+        
+        this.featureRequestReceived = true;
+        this.startFeatureBlink();
+        console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
+        console.log('✅ تم تفعيل وضع الاستقبال');
+    },
     
-    // ✅ تم إزالة القبول التلقائي (لم يعد يتم قبول الطلب تلقائياً)
-    // المستخدم يجب أن يضغط على الزر يدوياً لقبول الطلب
-    
-    this.featureRequestReceived = true;
-    this.startFeatureBlink();
-    console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
-    console.log('✅ تم تفعيل وضع الاستقبال'محادثة    
     // ==================== القسم 9: acceptFeatureRequest ====================
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
