@@ -2372,3 +2372,19 @@ if (document.readyState === 'loading') {
 } else {
     initVisualViewportFix();
 }
+
+
+// 🛡️ تأمين شامل: منع سحب الواجهة بالخطأ للأعلى عند لمس الهيدر أو شريط الكتابة
+document.addEventListener('touchmove', function(e) {
+    // التحقق من أن صفحة المحادثة مفتوحة حالياً
+    if (document.body.classList.contains('conversation-open')) {
+        
+        // التحقق مما إذا كان المستخدم يلمس منطقة الرسائل (المسموح لها بالتمرير)
+        const isMessagesContainer = e.target.closest('.messages-container');
+        
+        // إذا كان الإصبع يلمس أي مكان آخر (مثل حقل الإدخال أو الهيدر) وسحب للأعلى، امنعه فوراً
+        if (!isMessagesContainer) {
+            e.preventDefault();
+        }
+    }
+}, { passive: false }); // { passive: false } إجبارية لمنع السلوك الافتراضي للمتصفح الذكي
