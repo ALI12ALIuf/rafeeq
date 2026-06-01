@@ -2388,3 +2388,23 @@ document.addEventListener('touchmove', function(e) {
         }
     }
 }, { passive: false }); // { passive: false } إجبارية لمنع السلوك الافتراضي للمتصفح الذكي
+
+
+// 🛡️ جدار حماية صارم: منع تكبير أو تصغير الموقع نهائياً بالإصبعين أو النقر المزدوج
+document.addEventListener('touchstart', function (e) {
+    // إذا لمس المستخدم الشاشة بأكثر من إصبع (محاولة عمل زووم)
+    if (e.touches.length > 1) {
+        e.preventDefault(); // إلغاء التكبير فوراً
+    }
+}, { passive: false });
+
+// منع التكبير عند النقر المزدوج السريع (Double-tap to zoom)
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function (e) {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault(); // إلغاء تكبير النقر المزدوج
+    }
+    lastTouchEnd = now;
+}, { passive: false });
+
