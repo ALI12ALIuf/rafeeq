@@ -233,18 +233,8 @@ const CallSystem = {
             silentAudio.volume = 0;
             silentAudio.play().catch(() => {});
             
-            console.log('🎤 طلب الوصول إلى الميكروفون بخصائص عزل متقدمة لجلب السماعة الداخلية...');
-            
-            // ✅ التعديل الهندسي: تخصيص دفق المايك لإجبار نظام التشغيل بالموبايل على تفعيل سماعة الأذن تلقائياً
-            const constraints = { 
-                audio: {
-                    echoCancellation: true, // تفعيل إلغاء الصدى (أساسي لتحويل الصوت لسماعة الأذن)
-                    noiseSuppression: true,  // تفعيل منع الضوضاء المحيطة
-                    autoGainControl: true   // التحكم التلقائي بمستوى الصوت ومنع التضخيم المفاجئ
-                }, 
-                video: false 
-            };
-            
+            console.log('🎤 طلب الوصول إلى الميكروفون...');
+            const constraints = { audio: true, video: false };
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
             const audioTracks = this.localStream.getAudioTracks();
@@ -252,7 +242,7 @@ const CallSystem = {
                 this.endCall();
                 return;
             }
-            console.log('✅ تم الحصول على الميكروفون وتطبيق وضع الاتصال الهاتفي');
+            console.log('✅ تم الحصول على الميكروفون');
             
             this.pc = new RTCPeerConnection(this.servers);
             
@@ -361,41 +351,23 @@ const CallSystem = {
         }
     },
     
-
     // ==================== 6. إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
-        console.log('🔊 إعداد الصوت عن بعد وفصل مسارات السماعة الداخلية عن السفلية الخارجيه...');
+        console.log('🔊 إعداد الصوت عن بعد...');
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
         }
         
         this.remoteAudioElement = new Audio();
-        
-        // 🛡️ الخدعة الهندسية: تعديل خصائص مسار الصوت لمنع خروجه من السماعة السفلية تلقائياً
-        if (stream && stream.getAudioTracks().length > 0) {
-            const audioTrack = stream.getAudioTracks()[0];
-            // إجبار المتصفح على تعطيل ميزات التوزيع المحيطي (Stereo) التي تشغل السماعة السفلية والعلوية معاً
-            if ('enabled' in audioTrack) {
-                audioTrack.enabled = true;
-            }
-        }
-
         this.remoteAudioElement.srcObject = stream;
-        
-        // منع المتصفح من معاملة الصوت كفيديو أو وسائط عامة تشغل جميع سماعات الجهاز
-        this.remoteAudioElement.setAttribute('playsinline', 'true');
-        this.remoteAudioElement.setAttribute('webkit-playsinline', 'true');
-        
         this.remoteAudioElement.autoplay = true;
-        this.remoteAudioElement.muted = false;
         
-        // تطبيق الإعدادات لفصل السماعات بناءً على حالة زر السبيكر الفعلي في واجهتك
         this.applySpeakerSettings();
         
         this.remoteAudioElement.play().then(() => {
-            console.log('✅ بدء تشغيل الصوت بنجاح مع الفصل التام للمنافذ');
+            console.log('✅ بدء تشغيل الصوت عن بعد');
         }).catch(e => {
             console.log('❌ فشل تشغيل الصوت:', e);
         });
@@ -406,17 +378,12 @@ const CallSystem = {
         
         if (this.remoteAudioElement.setSinkId) {
             if (this.isSpeakerEnabled) {
-                // تفعيل السماعة الخارجية (السفلية العالية) فقط
                 this.remoteAudioElement.setSinkId('speaker').then(() => {
-                    console.log('✅ تم التوجيه القسري إلى السماعة الخارجية (السبيكر)');
-                }).catch(e => {
-                    // إذا فشل setSinkId، نترك النظام يديرها كأعلى مخرج افتراضي
-                    console.log('⚠️ التبديل المباشر غير مدعوم، الاعتماد على مخرج النظام العالي');
-                });
+                    console.log('✅ تم التبديل إلى السماعة الخارجية');
+                }).catch(e => console.log('❌ فشل التبديل إلى السماعة:', e));
             } else {
-                // 'default' هنا مع إيقاف التوزيع المحيطي ستجبر الصوت على البقاء في السماعة العلوية للأذن فقط وانكتم السفلية
                 this.remoteAudioElement.setSinkId('default').then(() => {
-                    console.log('✅ تم حصر الصوت داخل السماعة الداخلية (الأذن) وإيقاف السفلية');
+                    console.log('✅ تم التبديل إلى السماعة الداخلية');
                 }).catch(e => console.log('❌ فشل التبديل:', e));
             }
         }
