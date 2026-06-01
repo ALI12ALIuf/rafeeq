@@ -364,46 +364,70 @@ const CallSystem = {
    // ==================== 6. إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
-        console.log('🔊 إعداد الصوت عن بعد وتأمين مخرج سماعة الأذن...');
+        console.log('🔊 إعداد الصوت عن بعد وتجاوز حظر المتصفحات للمخرج الداخلي...');
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
         }
         
+        // 1. إنشاء عنصر الصوت وتثبيته في الذاكرة
         this.remoteAudioElement = new Audio();
         this.remoteAudioElement.srcObject = stream;
         
-        // ✅ إضافة جدار حماية لمنع تشغيل السبيكر التلقائي الافتراضي في المتصفحات وأنظمة الموبايل
+        // 2. إجبار نظام التشغيل على معاملته كدفق داخلي ممرر (قناة مكالمة سرية)
         this.remoteAudioElement.setAttribute('playsinline', 'true');
-        this.remoteAudioElement.setAttribute('webkit-playsinline', 'true'); // دعم كامل لمتصفح سفاري ونظام الآيفون iOS
+        this.remoteAudioElement.setAttribute('webkit-playsinline', 'true');
         
+        // 3. الخدعة القاطعة: تشغيل الصوت ومحاولة كسر الـ Autoplay Block تلقائياً
         this.remoteAudioElement.autoplay = true;
+        this.remoteAudioElement.muted = false; // تأكيد عدم كتم الصوت من المتصفح
         
-        // تطبيق إعدادات السماعة الحالية والتحقق من حالة زر السبيكر الفعال
+        // تطبيق إعدادات السبيكر بناءً على حالة الزر الحالية في واجهتك
         this.applySpeakerSettings();
         
-        this.remoteAudioElement.play().then(() => {
-            console.log('✅ بدء تشغيل الصوت بنجاح (الوضع الافتراضي: سماعة الأذن الداخلية)');
-        }).catch(e => {
-            console.log('❌ فشل تشغيل الصوت:', e);
-        });
+        // 4. محاولة التشغيل مع معالجة حظر المتصفح الذكي
+        const playPromise = this.remoteAudioElement.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                console.log('✅ تم تشغيل الصوت بنجاح واختراق جدار حظر المتصفح!');
+            }).catch(error => {
+                console.warn('⚠️ المتصفح طلب تفاعل للمخرجات الداخلية، جاري إعادة المحاولة قسرياً...', error);
+                
+                // حل بديل فوري في حال رفض المتصفح: التشغيل عند أول لمسة للمستخدم على الشاشة تلقائياً
+                const runOnTouch = () => {
+                    if (this.remoteAudioElement) {
+                        this.remoteAudioElement.play().then(() => {
+                            console.log('✅ تم تشغيل الصوت الداخلي بنجاح بعد تفاعل اللمس الآمن');
+                            document.removeEventListener('touchstart', runOnTouch);
+                        }).catch(e => console.error('❌ فشل نهائي في تشغيل الصوت:', e));
+                    }
+                };
+                document.addEventListener('touchstart', runOnTouch, { passive: true });
+            });
+        }
     },
     
     applySpeakerSettings() {
         if (!this.remoteAudioElement) return;
         
+        // تحسين آلية التبديل لتتوافق مع الأنظمة الذكية ومتصفحات الموبايل والكروم
         if (this.remoteAudioElement.setSinkId) {
             if (this.isSpeakerEnabled) {
                 this.remoteAudioElement.setSinkId('speaker').then(() => {
-                    console.log('✅ تم التبديل إلى السماعة الخارجية');
-                }).catch(e => console.log('❌ فشل التبديل إلى السماعة:', e));
+                    console.log('✅ تم التبديل بنجاح إلى: السماعة الخارجية (السبيكر)');
+                }).catch(e => {
+                    console.log('⚠️ المتصفح لا يدعم وسم speaker، الاعتماد على المخرج الافتراضي العالي:', e);
+                });
             } else {
+                // 'default' في الهواتف تعني سماعة الأذن الداخلية إذا تم تفعيل echoCancellation في المايك
                 this.remoteAudioElement.setSinkId('default').then(() => {
-                    console.log('✅ تم التبديل إلى السماعة الداخلية');
-                }).catch(e => console.log('❌ فشل التبديل:', e));
+                    console.log('✅ تم التبديل بنجاح إلى: السماعة الداخلية (الأذن)');
+                }).catch(e => console.log('❌ فشل التبديل إلى المسار الداخلي:', e));
             }
+        } else {
+            console.log('ℹ️ دالة setSinkId غير مدعومة في هذا المتصفح (مثل سفاري آيفون)، يدار الصوت تلقائياً عبر النظام.');
         }
-    }, 
+    },
 
     
     // ==================== 7. استقبال المكالمات ====================
