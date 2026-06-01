@@ -685,7 +685,7 @@ updateAllButtons() {
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
 },
     
-    // ==================== القسم 15: setupPageFocusListener ====================
+   // ==================== القسم 15: setupPageFocusListener & closeConversation ====================
 setupPageFocusListener() {
     window.addEventListener('focus', () => {
         if (this.currentChat && this.featuresEnabled) {
@@ -693,6 +693,40 @@ setupPageFocusListener() {
         }
     });
 },
+
+closeConversation() {
+    console.log("🚪 إغلاق صفحة المحادثة والعودة للقائمة الرئيسية");
+    
+    // ✅ السطر المضاف لتنظيف الـ body وإيقاف حسابات الكيبورد فوراً
+    document.body.classList.remove('conversation-open');
+
+    this.currentChat = null;
+    this.friendInConversation = false;
+    
+    const conversationPage = document.querySelector('.conversation-page');
+    if (conversationPage) conversationPage.style.display = 'none';
+    
+    const chatPage = document.querySelector('.page.active') || document.querySelector('.chat-page');
+    if (chatPage) chatPage.style.display = 'block';
+    
+    // إيقاف الوميض إذا كان شغالاً
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    const featureSwitch = document.querySelector('.feature-switch');
+    if (featureSwitch) featureSwitch.classList.remove('blinking');
+    
+    // إعادة تعيين واجهة زر الميزات
+    this.updateFeatureToggleUI();
+    
+    // إعادة إظهار القائمة السفلية والهيدر العام للموقع
+    const bottomNav = document.querySelector('.bottom-nav');
+    if (bottomNav) bottomNav.style.setProperty('display', 'flex', 'important');
+    
+    const appHeader = document.querySelector('.app-header');
+    if (appHeader) appHeader.style.setProperty('display', 'flex', 'important');
+}, 
     
     
     // ==================== القسم 17: loadAllChats ====================
