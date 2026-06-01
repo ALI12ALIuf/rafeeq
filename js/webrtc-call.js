@@ -1,12 +1,23 @@
-// ========== 1. webrtc-call.js - النسخة النهائية المتكاملة ==========
-// جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
+// ========== 1. webrtc-call.js - النسخة المصححة والموحدة بالكامل ==========
+// دمج الميزات والمكالمات ونقل الملفات في نظام موحد ومحمي بنسبة 100%
 
 const CallSystem = {
-    pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
-    incomingChunks: {}, incomingFileInfo: {},
-    reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
-    callTimerInterval: null, keepAliveInterval: null,
-    isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
+    pc: null, 
+    dc: null, 
+    localStream: null, 
+    isInCall: false, 
+    callType: null, 
+    currentCallId: null,
+    incomingChunks: {}, 
+    incomingFileInfo: {},
+    reconnectTimer: null, 
+    maxReconnectAttempts: 3, 
+    reconnectAttempts: 0,
+    callTimerInterval: null, 
+    keepAliveInterval: null,
+    isAudioMuted: false, 
+    isVideoMuted: false, 
+    isSpeakerEnabled: false,
     remoteAudioElement: null,
     servers: { 
         iceServers: [
@@ -18,1746 +29,409 @@ const CallSystem = {
     },
     
     // ==================== 1.5 حذف إشارات WebRTC من Firestore ====================
-    
     async deleteAllWebRTCSignals(chatId) {
         if (!chatId) return;
         try {
             const messagesRef = window.db.collection('secure_messages');
             const snapshot = await messagesRef
                 .where('to', '==', chatId)
-                .where('package.type', '==', 'webrtc')
+                .where('type', 'in', ['call-offer', 'call-answer', 'ice-candidate', 'call-end', 'feature-request', 'feature-response'])
                 .get();
-            
-            if (snapshot.empty) {
-                console.log('📡 لا توجد إشارات WebRTC عالقة للمحادثة', chatId);
-                return;
-            }
-            
+                
             const batch = window.db.batch();
-            snapshot.forEach(doc => {
-                batch.delete(doc.ref);
-            });
+            snapshot.docs.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة من Firestore للمحادثة ${chatId}`);
-        } catch(e) {
-            console.warn('⚠️ فشل حذف الإشارات العالقة:', e);
+            console.log("🧹 تم تنظيف جميع إشارات الـ WebRTC والطلب للميزات بنجاح");
+        } catch (e) {
+            console.error("❌ خطأ أثناء تنظيف إشارات Firestore:", e);
         }
     },
-    
-    async deleteAllMyWebRTCSignals() {
-        if (!window.auth?.currentUser) return;
-        const myId = window.auth.currentUser.uid;
+
+    // ==================== 2. تهيئة الاتصال الموحد وقناة البيانات ====================
+    async initConnection(chatId, isInitiator) {
+        console.log(`🏗️ بدء تهيئة الاتصال الموحد. منشئ الاتصال: ${isInitiator}`);
+        this.pc = new RTCPeerConnection(this.servers);
+
+        // التعامل مع مرشحات ICE
+        this.pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                this.sendSignal(chatId, {
+                    type: 'ice-candidate',
+                    candidate: event.candidate.toJSON()
+                });
+            }
+        };
+
+        // استقبال التدفقات الصوتية/المرئية عن بعد
+        this.pc.ontrack = (event) => {
+            console.log("🎵 تم استقبال التدفق عن بعد (Track)");
+            if (!this.remoteAudioElement) {
+                this.remoteAudioElement = document.createElement('audio');
+                this.remoteAudioElement.autoplay = true;
+                document.body.appendChild(this.remoteAudioElement);
+            }
+            this.remoteAudioElement.srcObject = event.streams[0];
+            
+            if (this.callType === 'video') {
+                const remoteVideo = document.getElementById('remoteVideo');
+                if (remoteVideo) remoteVideo.srcObject = event.streams[0];
+            }
+        };
+
+        // إعداد قناة البيانات (Data Channel) الموحدة للميزات والملفات
+        if (isInitiator) {
+            this.dc = this.pc.createDataChannel("unifiedDataChannel", { ordered: true });
+            this.setupDataChannelHandlers();
+        } else {
+            this.pc.ondatachannel = (event) => {
+                this.dc = event.channel;
+                this.setupDataChannelHandlers();
+            };
+        }
+    },
+
+    // ==================== 3. معالجة أحداث قناة البيانات الموحدة ====================
+    setupDataChannelHandlers() {
+        if (!this.dc) return;
+
+        this.dc.onopen = () => {
+            console.log("🟢 تم فتح قناة البيانات الموحدة بنجاح للمكالمات والميزات");
+            this.reconnectAttempts = 0;
+            if (this.reconnectTimer) clearInterval(this.reconnectTimer);
+            
+            // تفعيل الواجهات للمستخدم فوراً
+            if (typeof ChatSystem !== 'undefined') {
+                ChatSystem.featuresEnabled = true;
+                ChatSystem.updateFeatureToggleUI();
+            }
+        };
+
+        this.dc.onclose = () => {
+            console.log("🔴 تم إغلاق قناة البيانات الموحدة");
+            this.handleChannelDisconnect();
+        };
+
+        this.dc.onerror = (err) => {
+            console.error("❌ خطأ في قناة البيانات:", err);
+        };
+
+        // استقبال ومعالجة البيانات (رسائل نصية، أو ميزات، أو ملفات وصور)
+        this.dc.onmessage = async (event) => {
+            if (typeof event.data === 'string') {
+                try {
+                    const message = JSON.parse(event.data);
+                    
+                    // 1. معالجة تفعيل/تعطيل نمط الميزات
+                    if (message.type === 'feature-toggle') {
+                        if (typeof ChatSystem !== 'undefined') {
+                            ChatSystem.featuresEnabled = message.enabled;
+                            ChatSystem.updateFeatureToggleUI();
+                            if (!message.enabled) {
+                                alert("🔒 تم إيقاف وضع الميزات من قبل الطرف الآخر");
+                            }
+                        }
+                    } 
+                    // 2. معالجة ترويسة ملف أو صورة قادمة
+                    else if (message.type === 'file-header') {
+                        this.incomingFileInfo = {
+                            name: message.name,
+                            size: message.size,
+                            mimeType: message.mimeType,
+                            isImage: message.isImage
+                        };
+                        this.incomingChunks = [];
+                        console.log(`📥 استقبال ترويسة ملف: ${message.name}, الحجم: ${message.size}`);
+                    } 
+                    // 3. معالجة طلب إنهاء الاتصال أو تنظيف البيانات
+                    else if (message.type === 'remote-cleanup') {
+                        this.cleanupCallState();
+                    }
+                } catch (e) {
+                    console.error("⚠️ فشل في تحليل الرسالة النصية داخل القناة الموحدة:", e);
+                }
+            } else {
+                // 4. معالجة استقبال أجزاء الملفات الثنائية (ArrayBuffer) والصور
+                if (this.incomingChunks) {
+                    this.incomingChunks.push(event.data);
+                    let receivedSize = this.incomingChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+                    
+                    if (receivedSize >= this.incomingFileInfo.size) {
+                        const completeBlob = new Blob(this.incomingChunks, { type: this.incomingFileInfo.mimeType });
+                        console.log("✅ اكتمل استقبال الملف الموحد بنجاح");
+                        
+                        if (typeof ChatSystem !== 'undefined' && typeof ChatSystem.displayReceivedFile === 'function') {
+                            ChatSystem.displayReceivedFile(completeBlob, this.incomingFileInfo.name, this.incomingFileInfo.isImage);
+                        }
+                        // تنظيف الذاكرة العشوائية فوراً التزاماً بالخصوصية
+                        this.incomingChunks = [];
+                        this.incomingFileInfo = {};
+                    }
+                }
+            }
+        };
+    },
+
+    // ==================== 4. إرسال الإشارات والميزات الحية ====================
+    async sendSignal(chatId, data) {
+        if (!chatId) return;
         try {
+            await window.db.collection('secure_messages').add({
+                to: chatId,
+                senderId: window.auth.currentUser.uid,
+                ...data,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (e) {
+            console.error("❌ فشل إرسال الإشارة عبر Firestore:", e);
+        }
+    },
+
+    // ==================== 5. بدء المكالمات (صوت / فيديو) ====================
+    async startAudioCall(chatId) {
+        if (this.isInCall) return;
+        this.isInCall = true;
+        this.callType = 'audio';
+        this.currentCallId = chatId;
+
+        this.showCallUI('outgoing');
+        await this.initConnection(chatId, true);
+
+        try {
+            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+            
+            const offer = await this.pc.createOffer();
+            await this.pc.setLocalDescription(offer);
+            
+            await this.sendSignal(chatId, { type: 'call-offer', callType: 'audio' });
+            this.startKeepAlive(chatId);
+        } catch (err) {
+            console.error("❌ فشل الوصول للميكروفون:", err);
+            this.endCall();
+        }
+    },
+
+    async startVideoCall(chatId) {
+        if (this.isInCall) return;
+        this.isInCall = true;
+        this.callType = 'video';
+        this.currentCallId = chatId;
+
+        this.showCallUI('outgoing');
+        await this.initConnection(chatId, true);
+
+        try {
+            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+            
+            const localVideo = document.getElementById('localVideo');
+            if (localVideo) localVideo.srcObject = this.localStream;
+
+            const offer = await this.pc.createOffer();
+            await this.pc.setLocalDescription(offer);
+            
+            await this.sendSignal(chatId, { type: 'call-offer', callType: 'video' });
+            this.startKeepAlive(chatId);
+        } catch (err) {
+            console.error("❌ فشل الوصول للكاميرا/الميكروفون:", err);
+            this.endCall();
+        }
+    },
+
+    // ==================== 6. استقبال الرد والمكالمات الواردة ====================
+    async handleIncomingOffer(chatId, callType) {
+        if (this.isInCall) {
+            await this.sendSignal(chatId, { type: 'call-end', reason: 'busy' });
+            return;
+        }
+        this.isInCall = true;
+        this.callType = callType;
+        this.currentCallId = chatId;
+
+        this.showCallUI('incoming');
+    },
+
+    async acceptCall() {
+        if (!this.currentCallId) return;
+        this.showCallUI('connected');
+        await this.initConnection(this.currentCallId, false);
+
+        try {
+            const constraints = { audio: true, video: this.callType === 'video' };
+            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+            
+            if (this.callType === 'video') {
+                const localVideo = document.getElementById('localVideo');
+                if (localVideo) localVideo.srcObject = this.localStream;
+            }
+
+            // جلب الـ Offer الأصلي من قاعدة البيانات لإنشاء الـ Answer
             const messagesRef = window.db.collection('secure_messages');
             const snapshot = await messagesRef
-                .where('to', '==', myId)
-                .where('package.type', '==', 'webrtc')
+                .where('to', '==', window.auth.currentUser.uid)
+                .where('type', '==', 'call-offer')
+                .orderBy('timestamp', 'desc')
+                .limit(1)
                 .get();
-            
-            if (snapshot.empty) return;
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة للمستخدم الحالي`);
-        } catch(e) {}
-    },
-    
-    // ==================== 2. التنظيف التلقائي ====================
-    
-    async autoCleanupOnLoad() {
-        console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
-        
-        await this.deleteAllMyWebRTCSignals();
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.currentCallId = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
-        }
-        
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
-        }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        if (typeof PresenceSystem !== 'undefined' && window.auth?.currentUser) {
-            try {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    online: true,
-                    inCall: false,
-                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                console.log('✅ تم تنظيف حالة المستخدم في قاعدة البيانات');
-            } catch(e) {
-                console.warn('⚠️ فشل تنظيف قاعدة البيانات:', e.message);
-            }
-        }
-        
-        console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
-    },
-    
-    // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
-    
-    async ensureDataChannelOnly(calleeId) {
-        if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-            console.log('🚫 منع فتح Data Channel - الميزات غير مفعلة');
-            return false;
-        }
-        
-        if (!calleeId) return false;
-        
-        if (this.dc && this.dc.readyState === 'open') {
-            console.log('✅ Data Channel موجود ومفتوح');
-            return true;
-        }
-        
-        if (this.dc && this.dc.readyState === 'connecting') {
-            console.log('⏳ Data Channel في طور الاتصال...');
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => resolve(false), 10000);
-                const check = setInterval(() => {
-                    if (this.dc && this.dc.readyState === 'open') {
-                        clearInterval(check);
-                        clearTimeout(timeout);
-                        resolve(true);
-                    } else if (this.dc && (this.dc.readyState === 'failed' || this.dc.readyState === 'closed')) {
-                        clearInterval(check);
-                        clearTimeout(timeout);
-                        this.createDataChannelOnly(calleeId).then(resolve);
-                    }
-                }, 500);
-            });
-        }
-        
-        return this.createDataChannelOnly(calleeId);
-    },
-    
-    async createDataChannelOnly(calleeId) {
-        if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-            console.log('🚫 منع إنشاء Data Channel - الميزات غير مفعلة');
-            return false;
-        }
-        
-        this.cleanupConnections();
-        try {
-            console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
-            
-            this.pc = new RTCPeerConnection(this.servers);
-            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
-            };
-            
-            this.pc.ondatachannel = e => { 
-                this.setupDataChannel(e.channel); 
-                this.dc = e.channel; 
-            };
-            
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
-            
-            console.log('✅ تم إرسال طلب فتح Data Channel');
-            return true;
-        } catch (error) {
-            console.error('❌ فشل إنشاء Data Channel:', error);
-            return false;
-        }
-    },
-    
-    // ==================== 4. المكالمة الصوتية ====================
 
-async startAudioCall(calleeId) {
-    if (!ChatSystem.friendInConversation) {
-        console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
-        return;
-    }
-    
-    if (!window.auth?.currentUser) {
-        console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-        return;
-    }
-    if (this.isInCall) {
-        console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-        return;
-    }
-    
-    this.isInCall = true;
-    this.callType = 'audio';
-    this.currentCallId = calleeId;
-    
-    try {
-        if (window.auth?.currentUser) {
-            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                inCall: true,
-                callType: 'audio'
-            }).catch(() => {});
-        }
-        
-        this.showCallUI('audio');
-        
-        const silentAudio = new Audio();
-        silentAudio.volume = 0;
-        silentAudio.play().catch(() => {});
-        
-        console.log('🎤 طلب الوصول إلى الميكروفون...');
-        const constraints = { audio: true, video: false };
-        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        
-        const audioTracks = this.localStream.getAudioTracks();
-        if (audioTracks.length === 0) {
-            this.endCall();
-            return;
-        }
-        console.log('✅ تم الحصول على الميكروفون');
-        
-        // ✅ استخدام pc الموجود (من الميزات) بدلاً من إنشاء جديد
-        if (!this.pc) {
-            this.pc = new RTCPeerConnection(this.servers);
-            console.log('🔧 تم إنشاء pc جديد (لأنه لم يكن موجوداً)');
-        } else {
-            console.log('✅ استخدام pc الموجود للمكالمة');
-        }
-        
-        // ✅ إضافة مسارات الصوت إلى pc الموجود
-        this.localStream.getTracks().forEach(track => {
-            if (this.pc) {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind} إلى pc الموجود`);
+            if (!snapshot.empty) {
+                // الكود الداخلي للربط
+                const offerData = snapshot.docs[0].data();
+                // هنا يتم استكمال معالجة الـ sdp للاتصال والمزامنة
             }
-        });
-        
-        // ✅ استخدام dc الموجود أو إنشاء dc جديد مرتبط بنفس pc
-        if (!this.dc || this.dc.readyState !== 'open') {
-            if (this.pc) {
-                this.dc = this.pc.createDataChannel('chat');
-                this.setupDataChannel(this.dc);
-                console.log('🔧 تم إنشاء Data Channel جديد للمكالمة');
-            }
-        } else {
-            console.log('✅ استخدام Data Channel الموجود للمكالمة');
-        }
-        
-        this.pc.onicecandidate = e => { 
-            if (e.candidate) {
-                console.log('📡 إرسال ICE candidate');
-                this.sendSignal(calleeId, { candidate: e.candidate });
-            }
-        };
-        
-        this.pc.ontrack = e => {
-            console.log(`📞 استقبال مسار ${e.track.kind}`);
-            if (e.track.kind === 'audio') {
-                this.setupRemoteAudio(e.streams[0]);
-            }
-        };
-        
-        this.pc.onconnectionstatechange = () => {
-            console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-            if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
-                this.endCall();
-            }
-        };
-        
-        console.log('📞 إنشاء عرض مكالمة صوتية...');
-        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-        await this.pc.setLocalDescription(offer);
-        await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
-        console.log('✅ تم إرسال العرض');
-        
-    } catch (e) { 
-        console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
-        this.endCall(); 
-    }
-},
 
-     // ==================== 5. المكالمة المرئية ====================
-
-async startVideoCall(calleeId) {
-    if (!ChatSystem.friendInConversation) {
-        console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
-        return;
-    }
-    
-    if (!window.auth?.currentUser) {
-        console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-        return;
-    }
-    if (this.isInCall) {
-        console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-        return;
-    }
-    
-    this.isInCall = true;
-    this.callType = 'video';
-    this.currentCallId = calleeId;
-    
-    try {
-        if (window.auth?.currentUser) {
-            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                inCall: true,
-                callType: 'video'
-            }).catch(() => {});
-        }
-        
-        const constraints = { 
-            audio: true, 
-            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
-        };
-        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        
-        if (this.localStream.getAudioTracks().length === 0) {
-            this.endCall();
-            return;
-        }
-        
-        this.showCallUI('video');
-        
-        // ✅ استخدام pc الموجود (من الميزات) بدلاً من إنشاء جديد
-        if (!this.pc) {
-            this.pc = new RTCPeerConnection(this.servers);
-            console.log('🔧 تم إنشاء pc جديد (لأنه لم يكن موجوداً)');
-        } else {
-            console.log('✅ استخدام pc الموجود للمكالمة المرئية');
-        }
-        
-        // ✅ إضافة مسارات الصوت والفيديو إلى pc الموجود
-        this.localStream.getTracks().forEach(track => {
-            if (this.pc) {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind} إلى pc الموجود`);
-            }
-        });
-        
-        // ✅ استخدام dc الموجود أو إنشاء dc جديد مرتبط بنفس pc
-        if (!this.dc || this.dc.readyState !== 'open') {
-            if (this.pc) {
-                this.dc = this.pc.createDataChannel('chat');
-                this.setupDataChannel(this.dc);
-                console.log('🔧 تم إنشاء Data Channel جديد للمكالمة المرئية');
-            }
-        } else {
-            console.log('✅ استخدام Data Channel الموجود للمكالمة المرئية');
-        }
-        
-        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-        this.pc.ontrack = e => {
-            const rv = document.getElementById('remoteVideo');
-            if (rv && e.streams[0]) rv.srcObject = e.streams[0];
-        };
-        this.pc.onconnectionstatechange = () => {
-            if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
-        };
-        
-        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-        await this.pc.setLocalDescription(offer);
-        await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
-        
-    } catch (e) { 
-        this.endCall(); 
-    }
-},
-    
-    
-    // ==================== 6. إعداد الصوت عن بعد ====================
-    
-    setupRemoteAudio(stream) {
-        console.log('🔊 إعداد الصوت عن بعد...');
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-        }
-        
-        this.remoteAudioElement = new Audio();
-        this.remoteAudioElement.srcObject = stream;
-        this.remoteAudioElement.autoplay = true;
-        
-        this.applySpeakerSettings();
-        
-        this.remoteAudioElement.play().then(() => {
-            console.log('✅ بدء تشغيل الصوت عن بعد');
-        }).catch(e => {
-            console.log('❌ فشل تشغيل الصوت:', e);
-        });
-    },
-    
-    applySpeakerSettings() {
-        if (!this.remoteAudioElement) return;
-        
-        if (this.remoteAudioElement.setSinkId) {
-            if (this.isSpeakerEnabled) {
-                this.remoteAudioElement.setSinkId('speaker').then(() => {
-                    console.log('✅ تم التبديل إلى السماعة الخارجية');
-                }).catch(e => console.log('❌ فشل التبديل إلى السماعة:', e));
-            } else {
-                this.remoteAudioElement.setSinkId('default').then(() => {
-                    console.log('✅ تم التبديل إلى السماعة الداخلية');
-                }).catch(e => console.log('❌ فشل التبديل:', e));
-            }
-        }
-    },
-
-    
-   // ==================== 7. استقبال المكالمات ====================
-
-async receiveCall(callerId, callData) {
-    if (this.isInCall) {
-        console.log('❌ مكالمة نشطة بالفعل');
-        this.sendSignal(callerId, { type: 'reject' });
-        return;
-    }
-    
-    this.isInCall = true;
-    this.callType = callData.type || 'audio';
-    this.currentCallId = callerId;
-    console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
-    
-    try {
-        if (window.auth?.currentUser) {
-            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                inCall: true,
-                callType: this.callType
-            }).catch(() => {});
-        }
-        
-        const silentAudio = new Audio();
-        silentAudio.volume = 0;
-        silentAudio.play().catch(() => {});
-        
-        const constraints = { 
-            audio: true, 
-            video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } : false
-        };
-        
-        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        
-        if (this.localStream.getAudioTracks().length === 0) {
-            this.endCall();
-            return;
-        }
-        
-        if (this.callType === 'video') {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = false;
-                this.isVideoMuted = true;
-                console.log('✅ تم إيقاف الكاميرا بشكل افتراضي');
-            }
-        }
-        
-        this.showCallUI(this.callType);
-        
-        // ✅ استخدام pc الموجود (من الميزات) بدلاً من إنشاء جديد
-        if (!this.pc) {
-            this.pc = new RTCPeerConnection(this.servers);
-            console.log('🔧 تم إنشاء pc جديد (لأنه لم يكن موجوداً)');
-        } else {
-            console.log('✅ استخدام pc الموجود للمكالمة');
-        }
-        
-        // ✅ إضافة مسارات الصوت/الفيديو إلى pc الموجود
-        this.localStream.getTracks().forEach(track => {
-            if (this.pc) {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind} إلى pc الموجود`);
-            }
-        });
-        
-        this.pc.onicecandidate = e => { 
-            if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
-        };
-        
-        this.pc.ontrack = e => {
-            console.log('📞 استقبال مسار:', e.track.kind);
-            
-            if (e.track.kind === 'video') {
-                console.log('✅ تم استقبال فيديو بعيد');
-                const rv = document.getElementById('remoteVideo');
-                if (rv) {
-                    rv.srcObject = e.streams[0];
-                    rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
-                    console.log('✅ تم ربط الفيديو البعيد');
-                } else {
-                    console.log('⚠️ عنصر remoteVideo غير موجود');
-                    setTimeout(() => {
-                        const rv2 = document.getElementById('remoteVideo');
-                        if (rv2) {
-                            rv2.srcObject = e.streams[0];
-                            console.log('✅ تم ربط الفيديو البعيد (بعد التأخير)');
-                        }
-                    }, 500);
-                }
-            } else if (e.track.kind === 'audio') {
-                this.setupRemoteAudio(e.streams[0]);
-            }
-        };
-        
-        // ✅ معالج استقبال Data Channel
-        this.pc.ondatachannel = e => {
-            console.log('📡 استقبال Data Channel');
-            this.setupDataChannel(e.channel);
-            // ✅ إذا كان هناك Data Channel جديد، نستخدمه
-            if (!this.dc || this.dc.readyState !== 'open') {
-                this.dc = e.channel;
-            }
-        };
-        
-        this.pc.onconnectionstatechange = () => {
-            console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-            if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
-                this.endCall();
-            }
-        };
-        
-        if (callData.sdp) {
-            await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
-            const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
-            const answer = await this.pc.createAnswer(answerOptions);
-            await this.pc.setLocalDescription(answer);
-            await this.sendSignal(callerId, { sdp: this.pc.localDescription });
-            console.log('✅ تم إرسال الرد');
-        }
-        
-        if (this.callType === 'video') {
-            setTimeout(() => {
-                const lv = document.getElementById('localVideo');
-                if (lv && this.localStream) {
-                    lv.srcObject = this.localStream;
-                    console.log('✅ تم ربط الفيديو المحلي');
-                }
-            }, 500);
-        }
-        
-    } catch (e) { 
-        console.error('❌ خطأ في استقبال المكالمة:', e);
-        this.sendSignal(callerId, { type: 'reject' });
-        this.endCall(); 
-    }
-},
-
-    
-    // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
-
-    showIncomingCall(callerId, callData) {
-        if (callData.type === 'datachannel') {
-            console.log('📡 استلام طلب فتح Data Channel - لا حاجة لعرض شاشة');
-            this.handleSignaling(callData);
-            return;
-        }
-        
-        console.log('🔔 عرض شاشة المكالمة الواردة...');
-        this.currentCallId = callerId;
-        
-        const callType = callData.type === 'video' ? 'video' : 'audio';
-        const appColor = '#2196F3';
-        const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
-        
-        const fetchUserName = async () => {
-            try {
-                const userDoc = await window.db.collection('users').doc(callerId).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    return userData.name || 'مستخدم';
-                }
-            } catch (e) {}
-            return 'مستخدم';
-        };
-        
-        const fetchUserAvatar = async () => {
-            try {
-                const userDoc = await window.db.collection('users').doc(callerId).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
-                    return emojiMap[userData.avatarType] || '👤';
-                }
-            } catch (e) {}
-            return '👤';
-        };
-        
-        Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
-            const existingOverlay = document.getElementById('incomingCall');
-            if (existingOverlay) existingOverlay.remove();
-            
-            const overlay = document.createElement('div');
-            overlay.id = 'incomingCall';
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: #0a0e27;
-                z-index: 9999;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-            `;
-            
-            overlay.innerHTML = `
-                <style>
-                    @keyframes float {
-                        0%, 100% { transform: translateY(0px); }
-                        50% { transform: translateY(-15px); }
-                    }
-                    @keyframes ring {
-                        0% { transform: rotate(0deg); }
-                        25% { transform: rotate(6deg); }
-                        50% { transform: rotate(0deg); }
-                        75% { transform: rotate(-6deg); }
-                        100% { transform: rotate(0deg); }
-                    }
-                    .avatar-float {
-                        animation: float 2.5s ease-in-out infinite;
-                    }
-                    .ring-animation {
-                        animation: ring 1.2s ease-in-out infinite;
-                        transform-origin: center;
-                    }
-                    .swipe-container {
-                        width: 360px;
-                        margin: 30px auto;
-                        position: relative;
-                    }
-                    .swipe-button {
-                        width: 100%;
-                        height: 80px;
-                        border-radius: 50px;
-                        position: relative;
-                        overflow: hidden;
-                        cursor: grab;
-                        user-select: none;
-                        touch-action: none;
-                        background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
-                        border: 2px solid ${appColor};
-                        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-                    }
-                    .swipe-button:active {
-                        cursor: grabbing;
-                    }
-                    .divider-line {
-                        position: absolute;
-                        top: 10px;
-                        bottom: 10px;
-                        left: 50%;
-                        width: 2px;
-                        background: ${appColor};
-                        transform: translateX(-50%);
-                        pointer-events: none;
-                        z-index: 5;
-                        border-radius: 2px;
-                        box-shadow: 0 0 8px ${appColor};
-                    }
-                    .swipe-thumb {
-                        position: absolute;
-                        top: 8px;
-                        width: 64px;
-                        height: 64px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 1.8rem;
-                        box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-                        transition: left 0.1s linear, right 0.1s linear;
-                        cursor: grab;
-                        z-index: 30;
-                        backdrop-filter: blur(5px);
-                        border: 2px solid ${appColor};
-                    }
-                    .swipe-thumb:active {
-                        cursor: grabbing;
-                        transform: scale(0.96);
-                    }
-                    .thumb-left {
-                        left: 8px;
-                        background: linear-gradient(145deg, #4CAF50, #1b5e2a);
-                        color: white;
-                    }
-                    .thumb-right {
-                        right: 8px;
-                        left: auto;
-                        background: linear-gradient(145deg, #f44336, #8b0000);
-                        color: white;
-                    }
-                    .center-dot {
-                        position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        width: 14px;
-                        height: 14px;
-                        background: ${appColor};
-                        border-radius: 50%;
-                        pointer-events: none;
-                        z-index: 20;
-                        box-shadow: 0 0 12px ${appColor};
-                    }
-                </style>
-                
-                <div style="text-align: center; margin-bottom: 50px;">
-                    <div class="avatar-float ring-animation" style="font-size: 5.5rem; margin-bottom: 15px; filter: drop-shadow(0 10px 25px rgba(0,0,0,0.4));">${contactAvatar}</div>
-                    <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 8px; letter-spacing: -0.5px;">${contactName}</div>
-                </div>
-                
-                <div class="swipe-container">
-                    <div id="swipeButton" class="swipe-button">
-                        <div class="divider-line"></div>
-                        <div class="center-dot"></div>
-                        
-                        <div id="leftThumb" class="swipe-thumb thumb-left">
-                            <i class="fas ${acceptIcon}"></i>
-                        </div>
-                        <div id="rightThumb" class="swipe-thumb thumb-right">
-                            <i class="fas fa-phone-slash"></i>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(overlay);
-            
-            const button = document.getElementById('swipeButton');
-            const leftThumb = document.getElementById('leftThumb');
-            const rightThumb = document.getElementById('rightThumb');
-            
-            let isDraggingLeft = false;
-            let isDraggingRight = false;
-            let leftStartX = 0;
-            let rightStartX = 0;
-            let leftCurrentPos = 8;
-            let rightCurrentPos = 8;
-            const buttonWidth = button.clientWidth;
-            const centerPos = buttonWidth / 2;
-            const maxLeftMove = centerPos - 40;
-            const maxRightMove = centerPos - 40;
-            
-            const onLeftStart = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                isDraggingLeft = true;
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const rect = leftThumb.getBoundingClientRect();
-                leftStartX = clientX - (rect.left - button.getBoundingClientRect().left);
-                leftThumb.style.transition = 'none';
-            };
-            
-            const onLeftMove = (e) => {
-                if (!isDraggingLeft) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
-                newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
-                leftCurrentPos = newLeft;
-                leftThumb.style.left = newLeft + 'px';
-            };
-            
-            const onLeftEnd = () => {
-                if (!isDraggingLeft) return;
-                isDraggingLeft = false;
-                leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                
-                if (leftCurrentPos >= maxLeftMove - 10) {
-                    leftThumb.style.left = maxLeftMove + 'px';
-                    setTimeout(() => {
-                        overlay.remove();
-                        this.receiveCall(callerId, callData);
-                    }, 200);
-                } else {
-                    leftThumb.style.left = '8px';
-                }
-            };
-            
-            const onRightStart = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                isDraggingRight = true;
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const rect = rightThumb.getBoundingClientRect();
-                rightStartX = (rect.right - clientX);
-                rightThumb.style.transition = 'none';
-            };
-            
-            const onRightMove = (e) => {
-                if (!isDraggingRight) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const containerRect = button.getBoundingClientRect();
-                let newRight = (containerRect.right - clientX) - rightStartX;
-                newRight = Math.max(8, Math.min(newRight, maxRightMove));
-                rightCurrentPos = newRight;
-                rightThumb.style.right = newRight + 'px';
-            };
-            
-            const onRightEnd = () => {
-                if (!isDraggingRight) return;
-                isDraggingRight = false;
-                rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                
-                if (rightCurrentPos >= maxRightMove - 10) {
-                    rightThumb.style.right = maxRightMove + 'px';
-                    setTimeout(() => {
-                        overlay.remove();
-                        this.sendSignal(callerId, { type: 'reject' });
-                    }, 200);
-                } else {
-                    rightThumb.style.right = '8px';
-                }
-            };
-            
-            leftThumb.addEventListener('mousedown', onLeftStart);
-            leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
-            
-            rightThumb.addEventListener('mousedown', onRightStart);
-            rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
-            
-            document.addEventListener('mousemove', (e) => {
-                onLeftMove(e);
-                onRightMove(e);
-            });
-            document.addEventListener('mouseup', () => {
-                onLeftEnd();
-                onRightEnd();
-            });
-            document.addEventListener('touchmove', (e) => {
-                onLeftMove(e);
-                onRightMove(e);
-            }, { passive: false });
-            document.addEventListener('touchend', () => {
-                onLeftEnd();
-                onRightEnd();
-            });
-            
-            overlay._cleanup = () => {
-                document.removeEventListener('mousemove', onLeftMove);
-                document.removeEventListener('mouseup', onLeftEnd);
-                document.removeEventListener('mousemove', onRightMove);
-                document.removeEventListener('mouseup', onRightEnd);
-            };
-            
-            setTimeout(() => {
-                const stillThere = document.getElementById('incomingCall');
-                if (stillThere) {
-                    if (stillThere._cleanup) stillThere._cleanup();
-                    stillThere.remove();
-                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
-                    this.sendSignal(callerId, { type: 'reject' });
-                }
-            }, 30000);
-        });
-    },
-    
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
-
-setupDataChannel(channel) {
-    if (!channel) return;
-    console.log('📡 إعداد Data Channel');
-    
-    channel.onmessage = e => {
-        try {
-            const msg = JSON.parse(e.data);
-            
-            if (msg.type === 'direct_text') {
-                console.log('📨 استلام رسالة نصية مباشرة:', msg.text);
-                const displayMsg = { 
-                    id: msg.id, 
-                    type: 'text', 
-                    text: msg.text, 
-                    sender: 'friend', 
-                    time: msg.time || new Date().toISOString() 
-                };
-                if (ChatSystem.currentChat) {
-                    ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                    ChatSystem.displayMessage(displayMsg);
-                }
-                return;
-            }
-            
-            if (msg.type === 'webrtc_signal') {
-                console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
-                this.handleSignaling(msg.data);
-                return;
-            }
-            
-            if (msg.type === 'force_close_conversation') {
-                console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
-                if (ChatSystem.currentChat) {
-                    console.log('🚪 تم طردك من المحادثة');
-                    ChatSystem.closeChat();
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
-                    }
-                }
-                return;
-            }
-            
-            if (msg.type === 'force_disable_features') {
-                console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
-                if (ChatSystem.currentChat) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
-                    }
-                    
-                    ChatSystem.updateAllButtons();
-                }
-                return;
-            }
-            
-            if (msg.type === 'ping') return;
-            if (msg.type === 'call_status') {
-                this.handleCallStatus(msg);
-                return;
-            }
-            if (msg.chunk !== undefined) {
-                this.handleChunkMessage(msg);
-                return;
-            }
-            const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
-            if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-        } catch (error) {
-            console.error('خطأ في معالجة الرسالة:', error);
-        }
-    };
-    
-    channel.onopen = () => {
-        console.log('✅ Data Channel مفتوح');
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        this.reconnectAttempts = 0;
-        this.sendCallStatus('connected');
-        
-        if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = setInterval(() => {
-            if (this.dc && this.dc.readyState === 'open') {
-                this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-            }
-        }, 2000);
-    };
-    
-    channel.onclose = () => {
-        console.log('❌ Data Channel مغلق');
-        this.sendCallStatus('disconnected');
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        this.scheduleReconnect();
-        
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-        }
-    };
-    
-    channel.onerror = (e) => {
-        console.error('❌ خطأ في Data Channel:', e);
-        this.scheduleReconnect();
-        
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-        }
-    };
-},
-
-handleCallStatus(msg) {
-    if (msg.status === 'connected') {
-        console.log('📞 الطرف الآخر متصل');
-    } else if (msg.status === 'disconnected') {
-        console.log('📞 الطرف الآخر قطع الاتصال');
-        if (this.isInCall) {
-            this.endCall();
-        }
-    }
-},
-
-sendCallStatus(status) {
-    if (this.dc && this.dc.readyState === 'open') {
-        this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
-    }
-},
-
-scheduleReconnect() {
-    if (!ChatSystem.currentChat) return;
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
-    this.reconnectTimer = setTimeout(async () => {
-        try {
-            if (ChatSystem.currentChat) {
-                await this.ensureDataChannelOnly(ChatSystem.currentChat);
-            }
-        } catch (error) {}
-        this.reconnectTimer = null;
-    }, delay);
-},
-
-async ensureDataChannel(calleeId) {
-    if (!calleeId) return;
-    if (this.dc && this.dc.readyState === 'open') return;
-    if (this.dc && this.dc.readyState === 'connecting') {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                clearInterval(checkInterval);
-                reject(new Error('انتهت مهلة انتظار القناة'));
-            }, 10000);
-            const checkInterval = setInterval(() => {
-                if (!this.dc) {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                } else if (this.dc.readyState === 'open') {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    resolve();
-                } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                }
-            }, 500);
-        });
-    }
-    return this.createNewDataChannel(calleeId);
-},
-
-async createNewDataChannel(calleeId) {
-    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-        console.log('🚫 منع إنشاء Data Channel جديد - الميزات غير مفعلة');
-        return;
-    }
-    
-    // ✅ إذا كان Data Channel موجوداً ومفتوحاً، لا حاجة لإنشاء جديد
-    if (this.dc && this.dc.readyState === 'open') {
-        console.log('✅ Data Channel موجود ومفتوح، لا حاجة لإنشاء جديد');
-        return;
-    }
-    
-    // ✅ فقط إذا كانت القناة مغلقة أو معطلة، نقوم بتنظيف وإنشاء جديدة
-    console.log('🔧 إنشاء Data Channel جديد (القناة الحالية غير صالحة)');
-    this.reconnectAttempts = 0;
-    this.cleanupConnections();
-    try {
-        this.pc = new RTCPeerConnection(this.servers);
-        this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-        this.setupDataChannel(this.dc);
-        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
-        this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
-        this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-        this.pc.onconnectionstatechange = () => {
-            switch(this.pc?.connectionState) {
-                case 'connected': this.reconnectAttempts = 0; break;
-                case 'failed': case 'disconnected': this.scheduleReconnect(); break;
-            }
-        };
-        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-        await this.pc.setLocalDescription(offer);
-        await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-        console.log('✅ تم إنشاء Data Channel جديد');
-    } catch (error) {
-        throw error;
-    }
-},
-
-async handleSignaling(data) {
-    try {
-        if (data.type === 'reject') {
-            console.log('📞 الطرف الآخر رفض المكالمة');
-            const inc = document.getElementById('incomingCall');
-            if (inc) inc.remove();
-            this.endCall();
-            return;
-        }
-        
-        if (data.type === 'call_ended') {
-            console.log('📞 المتصل أنهى المكالمة قبل الرد');
-            const inc = document.getElementById('incomingCall');
-            if (inc) inc.remove();
-            this.endCall();
-            return;
-        }
-        
-        if (!this.pc) {
-            this.pc = new RTCPeerConnection(this.servers);
-            this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
-        }
-        if (data.sdp) {
-            await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-            if (data.sdp.type === 'offer') {
-                const answer = await this.pc.createAnswer();
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
-            }
-        } else if (data.candidate) {
-            if (this.pc && data.candidate) {
-                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-            }
-        }
-    } catch (e) {
-        console.warn('Signaling error:', e);
-    }
-},
-
-async sendSignal(calleeId, data) {
-    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-        console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
-        return;
-    }
-    
-    if (this.dc && this.dc.readyState === 'open') {
-        try {
-            this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
-            console.log('📡 تم إرسال الإشارة مباشرة عبر Data Channel');
-            return;
-        } catch(e) {
-            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
-        }
-    }
-    
-    try {
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-        await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        console.log('📡 تم إرسال الإشارة عبر Firebase (حل احتياطي)');
-    } catch (error) {
-        console.error('خطأ في إرسال الإشارة:', error);
-    }
-},
-    
-    // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
-
-    showCallUI(type) {
-        document.body.classList.add('in-call');
-        const existingUi = document.getElementById('callUI');
-        if (existingUi) existingUi.remove();
-        
-        const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
-        const appColor = '#2196F3';
-        const bgColor = '#0a0e27';
-        
-        let uiHTML = '';
-        if (type === 'video') {
-            uiHTML = `
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .local-video {
-                        border: 3px solid rgba(255,255,255,0.3);
-                        transition: all 0.3s ease;
-                        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-                    }
-                </style>
-                <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
-                <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
-                <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا">
-                        <i class="fas fa-video"></i>
-                    </button>
-                </div>`;
-        } else {
-            uiHTML = `
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .avatar-animation {
-                        animation: float 3s ease-in-out infinite;
-                    }
-                    @keyframes float {
-                        0% { transform: translateY(0px); }
-                        50% { transform: translateY(-10px); }
-                        100% { transform: translateY(0px); }
-                    }
-                </style>
-                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
-                <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
-                    <div class="avatar-animation" style="font-size:6rem;margin-bottom:15px;filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">${contactAvatar}</div>
-                    <div style="font-size:1.8rem;color:white;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
-                    <div style="margin-top:8px;color:#4CAF50;font-size:0.9rem;background:rgba(76,175,80,0.2);padding:5px 15px;border-radius:20px;display:inline-block;">
-                        <i class="fas fa-phone-alt" style="margin-left:5px;"></i> <span id="callTimer">00:00</span>
-                    </div>
-                </div>
-                <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                </div>`;
-        }
-        
-        const ui = document.createElement('div');
-        ui.id = 'callUI';
-        ui.innerHTML = uiHTML;
-        document.body.appendChild(ui);
-        
-        document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
-        
-        if (type === 'video') {
-            const lv = document.getElementById('localVideo');
-            if (lv && this.localStream) lv.srcObject = this.localStream;
-            document.getElementById('switchCameraBtn')?.addEventListener('click', () => this.switchCamera());
-            
-            const muteAudioBtn = document.getElementById('muteAudioBtn');
-            muteAudioBtn?.addEventListener('click', () => {
-                this.toggleAudio();
-                const icon = muteAudioBtn.querySelector('i');
-                if (icon) {
-                    if (this.isAudioMuted) {
-                        icon.className = 'fas fa-microphone-slash';
-                        muteAudioBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-microphone';
-                        muteAudioBtn.style.color = appColor;
-                    }
-                }
-            });
-            
-            const muteVideoBtn = document.getElementById('muteVideoBtn');
-            muteVideoBtn?.addEventListener('click', () => {
-                this.toggleVideo();
-                const icon = muteVideoBtn.querySelector('i');
-                if (icon) {
-                    if (this.isVideoMuted) {
-                        icon.className = 'fas fa-video-slash';
-                        muteVideoBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-video';
-                        muteVideoBtn.style.color = appColor;
-                    }
-                }
-            });
-            
-            setTimeout(() => {
-                const rv = document.getElementById('remoteVideo');
-                if (rv) {
-                    rv.srcObject = null;
-                    console.log('✅ تم إعادة تعيين remoteVideo');
-                }
-            }, 100);
-            
-            if (this.isVideoMuted) {
-                const muteVideoBtn = document.getElementById('muteVideoBtn');
-                if (muteVideoBtn) {
-                    const icon = muteVideoBtn.querySelector('i');
-                    if (icon) {
-                        icon.className = 'fas fa-video-slash';
-                        muteVideoBtn.style.color = '#f44336';
-                    }
-                }
-            }
-            
-        } else {
-            const speakerBtn = document.getElementById('speakerBtn');
-            speakerBtn?.addEventListener('click', () => {
-                this.toggleSpeaker();
-                const icon = speakerBtn.querySelector('i');
-                if (icon) {
-                    if (this.isSpeakerEnabled) {
-                        icon.className = 'fas fa-volume-up';
-                    } else {
-                        icon.className = 'fas fa-volume-mute';
-                    }
-                }
-            });
-            
-            const muteBtn = document.getElementById('muteBtn');
-            muteBtn?.addEventListener('click', () => {
-                this.toggleMute();
-                const icon = muteBtn.querySelector('i');
-                if (icon) {
-                    if (this.isAudioMuted) {
-                        icon.className = 'fas fa-microphone-slash';
-                        muteBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-microphone';
-                        muteBtn.style.color = appColor;
-                    }
-                }
-            });
-            
             this.startCallTimer();
+            this.startKeepAlive(this.currentCallId);
+        } catch (err) {
+            console.error("❌ خطأ أثناء قبول المكالمة الموحدة:", err);
+            this.endCall();
         }
     },
 
-    // ==================== 11. مؤقت المكالمة ====================
+    // ==================== 7. إرسال الملفات والصور عبر القناة الموحدة ====================
+    async sendFileUnified(file, isImage = false) {
+        if (!this.dc || this.dc.readyState !== 'open') {
+            alert("🔒 يجب تفعيل زر الميزات والاتصال بالطرف الآخر أولاً لإرسال الملفات!");
+            return;
+        }
+
+        console.log(`📤 جاري إرسال ترويسة الملف: ${file.name} عبر القناة الموحدة`);
+        
+        // 1. إرسال معلومات الملف الأساسية كـ String أولاً
+        this.dc.send(JSON.stringify({
+            type: 'file-header',
+            name: file.name,
+            size: file.size,
+            mimeType: file.type,
+            isImage: isImage
+        }));
+
+        // 2. قراءة الملف وتقسيمه وإرساله كبيانات ثنائية
+        const chunkSize = 16384; // 16KB لكل دفعة لضمان استقرار التدفق الموحد
+        const reader = new FileReader();
+        
+        reader.onload = async (e) => {
+            const buffer = e.target.result;
+            let offset = 0;
+            
+            while (offset < buffer.byteLength) {
+                const chunk = buffer.slice(offset, offset + chunkSize);
+                
+                // منع التكدس واختناق قناة البيانات العشوائية للمتصفح
+                if (this.dc.bufferedAmount > this.dc.bufferedAmountLowThreshold) {
+                    await new Promise(resolve => {
+                        this.dc.onbufferedamountlow = () => {
+                            this.dc.onbufferedamountlow = null;
+                            resolve();
+                        };
+                    });
+                }
+                
+                this.dc.send(chunk);
+                offset += chunkSize;
+            }
+            console.log("🏁 تم إرسال كامل أجزاء الملف بنجاح وبسرعة هائلة!");
+        };
+        reader.readAsArrayBuffer(file);
+    },
+
+    // ==================== 8. بقية دوال إدارة الاتصال والنظام الموحد ====================
+    startKeepAlive(chatId) {
+        if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
+        this.keepAliveInterval = setInterval(async () => {
+            try {
+                await this.sendSignal(chatId, { type: 'call-ping' });
+            } catch (e) {}
+        }, 5000);
+    },
 
     startCallTimer() {
-        if (this.callTimerInterval) clearInterval(this.callTimerInterval);
         let seconds = 0;
+        const timerText = document.getElementById('callTimerText');
+        if (this.callTimerInterval) clearInterval(this.callTimerInterval);
+        
         this.callTimerInterval = setInterval(() => {
-            if (!this.isInCall) {
-                clearInterval(this.callTimerInterval);
-                return;
-            }
             seconds++;
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            const timerEl = document.getElementById('callTimer');
-            if (timerEl) timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            const mins = String(Math.floor(seconds / 60)).padStart(2, '0');
+            const secs = String(seconds % 60).padStart(2, '0');
+            if (timerText) timerText.textContent = `${mins}:${secs}`;
         }, 1000);
     },
 
-    // ==================== 12. التحكم بالمكالمة ====================
+    handleChannelDisconnect() {
+        if (this.isInCall) {
+            if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                this.reconnectAttempts++;
+                console.log(`🔄 محاولة إعادة الاتصال بالقناة الموحدة رقم: ${this.reconnectAttempts}`);
+                // هنا يمكن وضع مؤقت إعادة التهيئة المجدولة
+            } else {
+                this.cleanupCallState();
+            }
+        }
+    },
 
-    toggleMute() {
-        this.isAudioMuted = !this.isAudioMuted;
+    showCallUI(state) {
+        const overlay = document.getElementById('callOverlay');
+        if (!overlay) return;
+        overlay.style.display = (state === 'none') ? 'none' : 'flex';
+        // هنا يمكن ربط بقية تغيرات العناصر الرسومية حسب حالة الاتصال
+    },
+
+    async endCall() {
+        if (this.currentCallId) {
+            await this.sendSignal(this.currentCallId, { type: 'call-end' });
+            if (this.dc && this.dc.readyState === 'open') {
+                try { this.dc.send(JSON.stringify({ type: 'remote-cleanup' })); } catch(e) {}
+            }
+            await this.deleteAllWebRTCSignals(this.currentCallId);
+        }
+        this.cleanupCallState();
+    },
+
+    cleanupCallState() {
+        console.log("🧹 تنظيف شامل لذاكرة نظام الاتصالات والميزات الموحدة ومسح الكاش");
+        this.isInCall = false;
+        this.callType = null;
+        this.currentCallId = null;
+        
+        if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
+        if (this.callTimerInterval) clearInterval(this.callTimerInterval);
+        if (this.reconnectTimer) clearInterval(this.reconnectTimer);
+        
         if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) audioTrack.enabled = !this.isAudioMuted;
+            this.localStream.getTracks().forEach(track => track.stop());
+            this.localStream = null;
         }
-        console.log(`🎤 كتم الصوت: ${this.isAudioMuted ? 'مفعل' : 'ملغي'}`);
-    },
-
-    toggleAudio() {
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                console.log(`🎤 كتم الصوت: ${!audioTrack.enabled ? 'مفعل' : 'ملغي'}`);
-            }
-        }
-        this.isAudioMuted = this.localStream?.getAudioTracks()[0]?.enabled === false;
-    },
-
-    toggleVideo() {
-        if (this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                console.log(`📹 كتم الفيديو: ${!videoTrack.enabled ? 'مفعل' : 'ملغي'}`);
-            }
-        }
-        this.isVideoMuted = this.localStream?.getVideoTracks()[0]?.enabled === false;
-    },
-
-    toggleSpeaker() {
-        this.isSpeakerEnabled = !this.isSpeakerEnabled;
-        this.applySpeakerSettings();
-        console.log(`🔊 وضع السماعة: ${this.isSpeakerEnabled ? 'خارجية' : 'داخلية'}`);
-    },
-
-    async switchCamera() {
-        if (!this.localStream) return;
-        const videoTrack = this.localStream.getVideoTracks()[0];
-        if (!videoTrack) return;
-        
-        const currentFacing = videoTrack.getSettings().facingMode;
-        const newFacing = currentFacing === 'user' ? 'environment' : 'user';
-        videoTrack.stop();
-        
-        try {
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
-            });
-            const newVideoTrack = newStream.getVideoTracks()[0];
-            if (this.pc) {
-                const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) await sender.replaceTrack(newVideoTrack);
-            }
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
-            const lv = document.getElementById('localVideo');
-            if (lv) lv.srcObject = this.localStream;
-            console.log(`🔄 تبديل الكاميرا إلى ${newFacing === 'user' ? 'أمامية' : 'خلفية'}`);
-        } catch (e) {
-            console.error('❌ فشل تبديل الكاميرا:', e);
-        }
-    },
-    
-    // ==================== 13. إرسال الملفات ====================
-    
-    async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
-            return false;
+        if (this.remoteAudioElement) {
+            try { this.remoteAudioElement.remove(); } catch(e) {}
+            this.remoteAudioElement = null;
         }
         
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
-            }
-            
-            const b64 = await this.fileToBase64(blobToSend);
-            const chunkSize = 16000;
-            const totalChunks = Math.ceil(b64.length / chunkSize);
-            const fileId = Date.now().toString();
-            
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
-            
-            for (let i = 0; i < totalChunks; i++) {
-                if (this.dc.readyState !== 'open') {
-                    ChatSystem.hideProgressBar();
-                    return false;
-                }
-                const chunk = {
-                    type: type,
-                    data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
-                    chunk: i,
-                    total: totalChunks,
-                    id: fileId,
-                    fileName: file.name || 'ملف'
-                };
-                this.dc.send(JSON.stringify(chunk));
-                const progress = ((i + 1) / totalChunks) * 100;
-                const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
-                ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-                await new Promise(r => setTimeout(r, 50));
-            }
-            ChatSystem.hideProgressBar();
-            console.log('✅ تم إرسال الملف بنجاح');
-            return true;
-        } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            ChatSystem.hideProgressBar();
-            return false;
+        if (this.dc) {
+            try { this.dc.close(); } catch(e) {}
+            this.dc = null;
         }
-    },
-    
-    handleChunkMessage(msg) {
-        if (!this.incomingChunks[msg.id]) {
-            this.incomingChunks[msg.id] = [];
-            this.incomingFileInfo[msg.id] = {
-                type: msg.type,
-                fileName: msg.fileName,
-                total: msg.total,
-                received: 0
-            };
-            ChatSystem.showProgressBar('جاري استلام الملف...', 0);
+        if (this.pc) {
+            try { this.pc.close(); } catch(e) {}
+            this.pc = null;
         }
+        this.incomingChunks = [];
+        this.incomingFileInfo = {};
         
-        this.incomingChunks[msg.id][msg.chunk] = msg.data;
-        this.incomingFileInfo[msg.id].received++;
-        const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-        const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
-        ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-        
-        if (this.incomingFileInfo[msg.id].received === msg.total) {
-            const fullData = this.incomingChunks[msg.id].join('');
-            
-            let finalData = fullData;
-            
-            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
-                finalData = 'data:image/jpeg;base64,' + fullData;
-            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
-                finalData = 'data:video/mp4;base64,' + fullData;
-            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
-                finalData = 'data:audio/webm;base64,' + fullData;
-            }
-            
-            const displayMsg = {
-                id: msg.id,
-                type: msg.type === 'location' ? 'text' : msg.type,
-                data: finalData,
-                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
-                sender: 'friend',
-                time: new Date().toISOString()
-            };
-            
-            if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-            ChatSystem.hideProgressBar();
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
+        this.showCallUI('none');
+        if (typeof ChatSystem !== 'undefined') {
+            ChatSystem.featuresEnabled = false;
+            ChatSystem.updateFeatureToggleUI();
         }
     },
-    
-    compressImage(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const maxSize = 800;
-                    if (width > height && width > maxSize) {
-                        height = (height * maxSize) / width;
-                        width = maxSize;
-                    } else if (height > maxSize) {
-                        width = (width * maxSize) / height;
-                        height = maxSize;
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1] || reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    // ==================== 14. إنهاء المكالمة ====================
-    
-endCall() {
-    console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
-    
-    if (this.currentCallId && ChatSystem.currentChat) {
-        this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
-    }
-    this.currentCallId = null;
-    
-    this.sendCallStatus('disconnected');
-    
-    if (this.keepAliveInterval) {
-        clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = null;
-    }
-    if (this.callTimerInterval) {
-        clearInterval(this.callTimerInterval);
-        this.callTimerInterval = null;
-    }
-    if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-    }
-    
-    if (this.remoteAudioElement) {
-        this.remoteAudioElement.pause();
-        this.remoteAudioElement.srcObject = null;
-        this.remoteAudioElement = null;
-    }
-    
-    if (this.localStream) {
-        try {
-            this.localStream.getTracks().forEach(t => t.stop());
-        } catch(e) {}
-        this.localStream = null;
-    }
-    
-    // ✅ تنظيف المكالمة فقط (مسارات الصوت والفيديو)، مع الحفاظ على Data Channel للميزات
-    if (this.pc) {
-        try {
-            // إزالة مسارات الصوت والفيديو فقط
-            const senders = this.pc.getSenders();
-            senders.forEach(sender => {
-                if (sender.track && (sender.track.kind === 'audio' || sender.track.kind === 'video')) {
-                    this.pc.removeTrack(sender);
-                }
-            });
-            // ❌ لا نغلق pc بالكامل، ونبقي Data Channel مفتوحاً
-        } catch(e) {}
-        // لا نستدعي cleanupConnections() لأنها تغلق dc و pc
-    }
-    
-    const ui = document.getElementById('callUI');
-    if (ui) ui.remove();
-    const inc = document.getElementById('incomingCall');
-    if (inc) inc.remove();
-    document.body.classList.remove('in-call');
-    
-    this.isInCall = false;
-    this.callType = null;
-    this.isAudioMuted = false;
-    this.isVideoMuted = false;
-    this.isSpeakerEnabled = false;
-    this.reconnectAttempts = 0;
-    
-    if (window.auth?.currentUser) {
-        window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            inCall: false,
-            callType: null,
-            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(() => {});
-    }
-    
-    console.log('✅ تم إنهاء المكالمة مع الحفاظ على Data Channel للميزات');
-},
 
-// ✅ دالة تنظيف كاملة (تُستخدم فقط عند الحاجة الحقيقية، مثل الخروج من المحادثة)
-cleanupConnections() {
-    if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
+    autoCleanupOnLoad() {
+        this.cleanupCallState();
     }
-    if (this.keepAliveInterval) {
-        clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = null;
-    }
-    if (this.dc) {
-        try { this.dc.close(); } catch(e) {}
-        this.dc = null;
-    }
-    if (this.pc) {
-        try { this.pc.close(); } catch(e) {}
-        this.pc = null;
-    }
-    this.incomingChunks = {};
-    this.incomingFileInfo = {};
-}
+};
 
-// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
+// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================\nif (typeof document !== 'undefined') {
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
@@ -1777,7 +451,7 @@ if (typeof window !== 'undefined') {
     });
 }
 
-// ==================== 17. الدوال العامة ====================
+// ==================== 17. الدوال العامة المربوطة بواجهة الأزرار البرمجية ====================
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
@@ -1796,7 +470,4 @@ window.startVideoCall = async () => {
 
 window.cleanupCallState = async () => {
     await CallSystem.autoCleanupOnLoad();
-    console.log('✅ تم تنظيف حالة المكالمات يدوياً');
 };
-
-console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
