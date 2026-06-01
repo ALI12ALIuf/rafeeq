@@ -295,6 +295,10 @@ body.conversation-open .conversation-page {
     position: relative !important;
     bottom: 0 !important;
     z-index: 2001 !important;
+    
+    /* 🛡️ الحماية الجديدة: تمنع اللمس المطاطي من سحب الشاشة للأعلى والأسفل */
+    touch-action: none !important; 
+    overscroll-behavior: none !important;
 }
 
 .message-input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--light); border-radius: 30px; padding: 4px 8px; border: 1px solid var(--border); }
