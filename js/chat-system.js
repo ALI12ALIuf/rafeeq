@@ -2297,3 +2297,44 @@ closeChat() {
 
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
+
+
+// ✅ الحل النهائي والثابت للمتصفحات والهواتف عند ظهور واختفاء الكيبورد
+const initVisualViewportFix = () => {
+    if (!window.visualViewport) return;
+
+    const fixViewportHeight = () => {
+        const conversationPage = document.querySelector('.conversation-page');
+        const messagesContainer = document.querySelector('.messages-container');
+        
+        // التحقق من أن المحادثة مفتوحة حالياً وأن العنصر موجود في الواجهة
+        if (conversationPage && document.body.classList.contains('conversation-open')) {
+            // 1. جلب الارتفاع الحقيقي للمساحة المرئية فوق الكيبورد بدقة ملليمترية
+            const currentViewportHeight = window.visualViewport.height;
+            
+            // 2. إجبار حاوية المحادثة الكبرى على أخذ هذا الارتفاع الفعلي فقط
+            conversationPage.style.height = `${currentViewportHeight}px`;
+            
+            // 3. تأمين النزول التلقائي لآخر رسالة عند ظهور الكيبورد لتسهيل القراءة
+            if (messagesContainer) {
+                // استخدام setTimeout بسيط لضمان انتهاء المتصفح من إعادة رسم العناصر
+                setTimeout(() => {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }, 30);
+            }
+        }
+    };
+
+    // الاستماع لحدث تغيير الحجم (عند خروج أو دخول الكيبورد)
+    window.visualViewport.addEventListener('resize', fixViewportHeight);
+    
+    // الاستماع لحدث التمرير لمنع القفز أو الاهتزاز العشوائي في المتصفحات الذكية
+    window.visualViewport.addEventListener('scroll', fixViewportHeight);
+};
+
+// تشغيل دالة التثبيت بمجرد تحميل الصفحة بالكامل
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initVisualViewportFix);
+} else {
+    initVisualViewportFix();
+}
