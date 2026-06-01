@@ -1086,6 +1086,14 @@ async createNewDataChannel(calleeId) {
         return;
     }
     
+    // ✅ إذا كان Data Channel موجوداً ومفتوحاً، لا حاجة لإنشاء جديد
+    if (this.dc && this.dc.readyState === 'open') {
+        console.log('✅ Data Channel موجود ومفتوح، لا حاجة لإنشاء جديد');
+        return;
+    }
+    
+    // ✅ فقط إذا كانت القناة مغلقة أو معطلة، نقوم بتنظيف وإنشاء جديدة
+    console.log('🔧 إنشاء Data Channel جديد (القناة الحالية غير صالحة)');
     this.reconnectAttempts = 0;
     this.cleanupConnections();
     try {
@@ -1104,6 +1112,7 @@ async createNewDataChannel(calleeId) {
         const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
         await this.pc.setLocalDescription(offer);
         await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
+        console.log('✅ تم إنشاء Data Channel جديد');
     } catch (error) {
         throw error;
     }
