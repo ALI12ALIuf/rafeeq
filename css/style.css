@@ -237,6 +237,10 @@ body.conversation-open .conversation-page {
     flex-shrink: 0 !important; /* ضمان عدم التشوه */
     position: relative !important;
     z-index: 2001 !important;
+    
+    /* 🛡️ الحماية الجديدة: منع السحب المطاطي عند لمس الهيدر بالخطأ */
+    touch-action: none !important;
+    overscroll-behavior: none !important;
 }
 
 .conversation-header .back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 12px; }
