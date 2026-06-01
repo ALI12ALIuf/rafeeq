@@ -843,12 +843,61 @@ openChat(friendId, friendName, friendAvatar) {
     }, 1000);
 },
     
+
+    // ==================== القسم 25: displayMessages & toggleFeaturesMode ====================
+displayMessages(friendId) { 
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return; 
+    c.innerHTML = ''; 
+    (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); 
+},
+
+// 🚀 التعديل الجوهري: جعل زر الميزات يتخاطب حياً ومباشرة مع قناة WebRTC دون وسيط Firestore
+toggleFeaturesMode(enabled) {
+    this.featuresEnabled = enabled;
+    this.updateFeatureToggleUI();
+
+    // 🛡️ إرسال حالة تفعيل أو تعطيل الميزات فوراً وبشكل حي عبر الأنبوب الموحد
+    if (typeof CallSystem !== 'undefined' && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        try {
+            CallSystem.dc.send(JSON.stringify({
+                type: 'feature-toggle',
+                enabled: enabled
+            }));
+            console.log(`📡 تم إرسال حالة وضع الميزات للطرف الآخر حياً: ${enabled}`);
+        } catch (e) {
+            console.error("❌ فشل إرسال إشارة الميزات عبر قناة البيانات:", e);
+        }
+    } else {
+        // حماية: منع المستخدم من تشغيل التمرير للميزات إذا لم يكن هناك اتصال مباشر مفتوح
+        if (enabled) {
+            alert("🔒 يجب بدء اتصال (صوتي أو مرئي) مع الطرف الآخر أولاً لتفعيل نقل الملفات والصور حياً!");
+            this.featuresEnabled = false;
+            this.updateFeatureToggleUI();
+        }
+    }
+},
+
+// تحديث الواجهة الرسومية للزر ليبقى متوافقاً مع المنظومة الفورية
+updateFeatureToggleUI() {
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (!toggleInput) return;
     
-    // ==================== القسم 25: displayMessages ====================
-    displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
+    toggleInput.checked = this.featuresEnabled;
+    toggleInput.disabled = false;
+    
+    const featureSwitchLabel = document.getElementById('featureSwitchLabel');
+    if (featureSwitchLabel) {
+        featureSwitchLabel.style.opacity = '1';
+        featureSwitchLabel.style.pointerEvents = 'auto';
+    }
+    
+    console.log(`🎛️ تم تحديث واجهة زر الميزات الفوري: checked=${this.featuresEnabled}`);
+},
+    
 
-
-   // ==================== القسم 26: displayMessage ====================
+    
+    // ==================== القسم 26: displayMessage & displayReceivedFile ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1133,7 +1182,6 @@ displayMessage(msg) {
     } 
     else if (msg.type === 'file') {
         let fileName = msg.fileName || 'ملف';
-        
         let fileSize = '';
         if (msg.data && typeof msg.data === 'string') {
             const sizeInBytes = Math.ceil(msg.data.length * 0.75);
@@ -1168,7 +1216,29 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-}, 
+},
+
+// 🚀 دالة الاستقبال المركزية الحية من قناة WebRTC للصور والملفات دون خادم (استدعاء تلقائي)
+displayReceivedFile(blob, fileName, isImage) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const fileData = e.target.result;
+        const generatedId = 'rtc_' + Date.now();
+        
+        const newMsg = {
+            id: generatedId,
+            sender: 'friend',
+            time: Date.now(),
+            type: isImage ? 'image' : 'file',
+            data: fileData,
+            fileName: fileName
+        };
+
+        // عرض الملف حياً على واجهة المستخدم فوراً
+        this.displayMessage(newMsg);
+    };
+    reader.readAsDataURL(blob);
+},
      
 
     // ==================== القسم 26.1: showImagePreview ====================
@@ -1821,46 +1891,59 @@ async sendMessage(text) {
             } else alert('فشل إرسال الصورة');
         }
     },
+
+    // ==================== القسم 31: sendVideoFile الموحد والمؤمن ====================
+async sendVideoFile(file) { 
+    if (!this.currentChat) return;
     
-    // ==================== القسم 31: sendVideoFile ====================
-    async sendVideoFile(file) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return;
-        }
+    // 🛡️ فحص حالة تفعيل الميزات والاتصال المباشر عبر الأنبوب الموحد
+    if (!this.featuresEnabled || !CallSystem.dc || CallSystem.dc.readyState !== 'open') {
+        alert('🔒 لا يمكن الإرسال - يرجى فتح مكالمة وتفعيل زر الميزات أولاً للاتصال بالطرف الآخر!');
+        return;
+    }
+    
+    // 🛡️ الحفاظ على جدار الحماية الأصلي للتحقق من سلامة وصيغة الفيديو
+    try {
+        await SecureChatSystem.validateVideo(file);
+    } catch (error) {
+        alert(error.message);
+        return;
+    }
+    
+    try {
+        console.log(`🎬 جاري نقل فيديو مباشر عبر الأنبوب الموحد: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
         
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
+        // 🚀 استدعاء دالة الإرسال المركزية الجديدة من ملف webrtc-call.js لنقل الملف كـ Blob حياً وسريعاً
+        // البارامتر الثاني هو false لأن الملف فيديو وليس صورة (تتعامل معه كملف عام ذكي)
+        await CallSystem.sendFileUnified(file, false); 
         
-        await new Promise(r => setTimeout(r, 200));
+        // 🔒 معالجة العرض المحلي للمستخدم وحفظ الرسالة النصية المشفرة بالمتصفح دون رفعها لأي سحاب
+        const b64 = await SecureChatSystem.fileToBase64(file); 
+        const msgId = Date.now().toString();
+        const currentIsoTime = new Date().toISOString();
         
-        try {
-            await SecureChatSystem.validateVideo(file);
-        } catch (error) {
-            alert(error.message);
-            return;
-        }
+        const localMsg = { 
+            id: msgId, 
+            type: 'video', 
+            data: b64, 
+            fileName: file.name, 
+            sender: 'me', 
+            time: currentIsoTime, 
+            status: 'sent' 
+        };
         
-        if (!(await this._ensureChannelReady())) return;
+        // عرض الفيديو على شاشتك فوراً
+        this.displayMessage(localMsg);
         
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
-            const success = await this.sendFileWithRetry(file, 'video');
-            if (success) {
-                try {
-                    const b64 = await SecureChatSystem.fileToBase64(file); 
-                    const msgId = Date.now().toString();
-                    
-                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                    
-                    this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                    
-                } catch (error) { alert('فشل معالجة الفيديو'); }
-            } else alert('فشل إرسال الفيديو');
-        }
-    },
+        // حفظ الرسالة بذاكرة المتصفح للدردشة الحالية
+        this.saveMessage(this.currentChat, localMsg);
+        
+    } catch (error) { 
+        console.error("❌ فشل نقل أو معالجة الفيديو:", error);
+        alert('فشل إرسال الفيديو عبر القناة المباشرة'); 
+    }
+},
+    
     
     // ==================== القسم 32: sendFile ====================
     async sendFile(file) { 
