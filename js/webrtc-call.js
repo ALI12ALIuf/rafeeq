@@ -298,7 +298,7 @@ async startAudioCall(calleeId) {
             if (this.isInCall && this.pc && this.pc.signalingState !== 'stable') {
                 console.log('⏰ انتهت مهلة 30 ثانية بدون رد، إغلاق المحادثة');
                 
-                // إغلاق المحادثة بالكامل
+                // ✅ إرسال إشارة إغلاق المحادثة فقط (بدون closeChat محلياً)
                 if (ChatSystem.currentChat) {
                     if (this.dc && this.dc.readyState === 'open') {
                         try {
@@ -309,7 +309,7 @@ async startAudioCall(calleeId) {
                             console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
                         } catch(e) {}
                     }
-                    ChatSystem.closeChat();
+                    // ❌ تمت إزالة ChatSystem.closeChat() من هنا
                 }
                 this.endCall();
             }
@@ -318,7 +318,7 @@ async startAudioCall(calleeId) {
     } catch (e) { 
         console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
         
-        // ✅ إغلاق المحادثة بالكامل عند حدوث خطأ
+        // ✅ إرسال إشارة إغلاق المحادثة فقط (بدون closeChat محلياً)
         if (ChatSystem.currentChat) {
             if (this.dc && this.dc.readyState === 'open') {
                 try {
@@ -329,7 +329,7 @@ async startAudioCall(calleeId) {
                     console.log('✅ تم إرسال إشارة إغلاق المحادثة (خطأ في المكالمة)');
                 } catch(e) {}
             }
-            ChatSystem.closeChat();
+            // ❌ تمت إزالة ChatSystem.closeChat() من هنا
         }
         
         if (callTimeout) clearTimeout(callTimeout);
