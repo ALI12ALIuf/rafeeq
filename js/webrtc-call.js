@@ -788,7 +788,7 @@ showIncomingCall(callerId, callData) {
             const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             const containerRect = button.getBoundingClientRect();
             let newRight = (containerRect.right - clientX) - rightStartX;
-            newRight = Math.max(8, Math.min(newRight, maxRightMove));
+            newRight = Math.max(8, Math.min(newRight, newRight, maxRightMove));
             rightCurrentPos = newRight;
             rightThumb.style.right = newRight + 'px';
         };
@@ -804,10 +804,13 @@ showIncomingCall(callerId, callData) {
                     overlay.remove();
                     this.sendSignal(callerId, { type: 'reject' });
                     
-                    // ✅ طرد الطرفين عند رفض المكالمة
-                    if (ChatSystem.currentChat) {
-                        console.log('👢 رفض المكالمة - إغلاق المحادثة');
+                    // 🌟 الإصلاح الصارم هنا: الاعتماد على المتغير المحلي callType 
+                    // وحذف شرط isInCall المانع للطرد عند الرنين
+                    if (callType !== 'datachannel' && ChatSystem.currentChat) {
+                        console.log('団 رفض المكالمة الحقيقية أثناء الرنين - إغلاق المحادثة وطرد الطرفين فورا');
                         ChatSystem.closeChat();
+                    } else {
+                        console.log('📡 رفض طلب Data Channel صامت (بدون إغلاق المحادثة)');
                     }
                 }, 200);
             } else {
@@ -850,13 +853,15 @@ showIncomingCall(callerId, callData) {
             if (stillThere) {
                 if (stillThere._cleanup) stillThere._cleanup();
                 stillThere.remove();
-                console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
+                console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً لانتهاء المهلة');
                 this.sendSignal(callerId, { type: 'reject' });
                 
-                // ✅ طرد الطرفين عند عدم الرد (انتهاء المهلة)
-                if (ChatSystem.currentChat) {
-                    console.log('👢 انتهت مهلة المكالمة (عدم الرد) - إغلاق المحادثة');
+                // 🌟 الإصلاح الصارم هنا أيضاً: طرد الطرفين عند تفويت وعدم الرد على مكالمة صوت/فيديو حقيقية
+                if (callType !== 'datachannel' && ChatSystem.currentChat) {
+                    console.log('団 انتهت مهلة الـ 30 ثانية دون رد - طرد وإغلاق المحادثة تلقائياً');
                     ChatSystem.closeChat();
+                } else {
+                    console.log('📡 انتهت مهلة طلب Data Channel (بدون إغلاق المحادثة)');
                 }
             }
         }, 30000);
@@ -1633,6 +1638,12 @@ async sendSignal(calleeId, data) {
 endCall() {
     console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
     
+    // ✅ 1. إذا لم نكن في مكالمة حقيقية، اخرج فوراً دون تدمير المحادثة
+    if (!this.isInCall) {
+        console.log('⚠️ لا توجد مكالمة نشطة، تجاهل طلب الإنهاء');
+        return;
+    }
+    
     if (this.currentCallId && ChatSystem.currentChat) {
         this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
     }
@@ -1674,13 +1685,6 @@ endCall() {
     if (inc) inc.remove();
     document.body.classList.remove('in-call');
     
-    this.isInCall = false;
-    this.callType = null;
-    this.isAudioMuted = false;
-    this.isVideoMuted = false;
-    this.isSpeakerEnabled = false;
-    this.reconnectAttempts = 0;
-    
     if (window.auth?.currentUser) {
         window.db.collection('users').doc(window.auth.currentUser.uid).update({
             inCall: false,
@@ -1688,12 +1692,22 @@ endCall() {
             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
         }).catch(() => {});
     }
-    
-    // ✅ طرد الطرفين عند إنهاء المكالمة
-    if (ChatSystem.currentChat) {
-        console.log('👢 إنهاء المكالمة - إغلاق المحادثة');
+
+    // ✅ 2. الفحص والطرد الشامل للطرفين (يجب أن يتم هنا قبل تصفير المتغير)
+    if (ChatSystem.currentChat && this.callType !== 'datachannel') {
+        console.log('👢 إنهاء المكالمة الحقيقية - إغلاق المحادثة وطرد الطرفين');
         ChatSystem.closeChat();
+    } else {
+        console.log('✅ تم إنهاء عملية صامتة (بدون إغلاق المحادثة)');
     }
+    
+    // ✅ 3. الآن نقوم بتصفير متغيرات الحالة بأمان تام بعد الفحص
+    this.isInCall = false;
+    this.callType = null;
+    this.isAudioMuted = false;
+    this.isVideoMuted = false;
+    this.isSpeakerEnabled = false;
+    this.reconnectAttempts = 0;
     
     console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
 },
