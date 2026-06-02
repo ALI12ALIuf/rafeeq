@@ -412,11 +412,18 @@ async startVideoCall(calleeId) {
     // ==================== 7. استقبال المكالمات ====================
 
 async receiveCall(callerId, callData) {
+    // ✅ إذا كانت ميزات صامتة (datachannel) لا نتعامل معها كمكالمة
+    if (callData.type === 'datachannel') {
+        console.log('📡 طلب فتح Data Channel صامت - لا حاجة لاستقبال كمكالمة');
+        this.handleSignaling(callData);
+        return;
+    }
+    
     if (this.isInCall) {
         console.log('❌ مكالمة نشطة بالفعل');
         this.sendSignal(callerId, { type: 'reject' });
         
-        // ✅ طرد الطرفين من المحادثة
+        // ✅ طرد الطرفين من المحادثة (فقط إذا كانت مكالمة حقيقية نشطة بالخلفية)
         if (ChatSystem.currentChat) {
             console.log('👢 طرد الطرفين بسبب وجود مكالمة نشطة');
             ChatSystem.closeChat();
@@ -471,6 +478,8 @@ async receiveCall(callerId, callData) {
             console.log(`➕ تم إضافة مسار ${track.kind}`);
         });
         
+        // 🌟 الإصلاح هنا: تم حذف الكود المتعارض يدويًا، والاعتماد كليًا على حدث الـ ondatachannel التلقائي بالأسفل
+        
         this.pc.onicecandidate = e => { 
             if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
         };
@@ -500,8 +509,9 @@ async receiveCall(callerId, callData) {
             }
         };
         
+        // ✅ المتصفح هنا يستقبل الـ Data Channel القادمة من الطرف المتصل ويربطها بأمان بدون تجمد
         this.pc.ondatachannel = e => {
-            console.log('📡 استقبال Data Channel');
+            console.log('📡 استقبال Data Channel والربط التلقائي الآمن');
             this.setupDataChannel(e.channel);
             this.dc = e.channel;
         };
@@ -535,7 +545,9 @@ async receiveCall(callerId, callData) {
     } catch (e) { 
         console.error('❌ خطأ في استقبال المكالمة:', e);
         this.sendSignal(callerId, { type: 'reject' });
-        this.endCall(); 
+        
+        // ✅ لا نطرد الطرفين إذا كان الخطأ متعلقاً بالميكروفون/الكاميرا فقط ننهي الاتصال
+        this.endCall();
     }
 },
 
