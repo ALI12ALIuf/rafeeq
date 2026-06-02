@@ -1631,89 +1631,86 @@ async sendSignal(calleeId, data) {
     
     // ==================== 14. إنهاء المكالمة ====================
     
-    endCall() {
-        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
-        
-        if (this.currentCallId && ChatSystem.currentChat) {
-            this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
-        }
-        this.currentCallId = null;
-        
-        this.sendCallStatus('disconnected');
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
-        }
-        
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
-        }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        this.reconnectAttempts = 0;
-        
-        if (window.auth?.currentUser) {
-            window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                inCall: false,
-                callType: null,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            }).catch(() => {});
-        }
-        
-        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
-    },
+endCall() {
+    console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
     
-    cleanupConnections() {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
+    // ✅ إرسال إشارة طرد إلى الطرف الآخر عبر Data Channel فقط
+    if (this.currentCallId && ChatSystem.currentChat) {
+        if (this.dc && this.dc.readyState === 'open') {
+            try {
+                this.dc.send(JSON.stringify({ 
+                    type: 'force_close_conversation',
+                    timestamp: Date.now()
+                }));
+                console.log('✅ تم إرسال إشارة طرد إلى الطرف الآخر عبر Data Channel');
+            } catch(e) {
+                console.error('❌ فشل إرسال إشارة الطرد:', e);
+            }
+        } else {
+            console.log('⚠️ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
         }
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
-        }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
-        }
-        this.incomingChunks = {};
-        this.incomingFileInfo = {};
     }
-};
+    this.currentCallId = null;
+    
+    this.sendCallStatus('disconnected');
+    
+    if (this.keepAliveInterval) {
+        clearInterval(this.keepAliveInterval);
+        this.keepAliveInterval = null;
+    }
+    if (this.callTimerInterval) {
+        clearInterval(this.callTimerInterval);
+        this.callTimerInterval = null;
+    }
+    if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+    }
+    
+    if (this.remoteAudioElement) {
+        this.remoteAudioElement.pause();
+        this.remoteAudioElement.srcObject = null;
+        this.remoteAudioElement = null;
+    }
+    
+    if (this.localStream) {
+        try {
+            this.localStream.getTracks().forEach(t => t.stop());
+        } catch(e) {}
+        this.localStream = null;
+    }
+    
+    this.cleanupConnections();
+    
+    const ui = document.getElementById('callUI');
+    if (ui) ui.remove();
+    const inc = document.getElementById('incomingCall');
+    if (inc) inc.remove();
+    document.body.classList.remove('in-call');
+    
+    this.isInCall = false;
+    this.callType = null;
+    this.isAudioMuted = false;
+    this.isVideoMuted = false;
+    this.isSpeakerEnabled = false;
+    this.reconnectAttempts = 0;
+    
+    if (window.auth?.currentUser) {
+        window.db.collection('users').doc(window.auth.currentUser.uid).update({
+            inCall: false,
+            callType: null,
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(() => {});
+    }
+    
+    // ✅ إغلاق المحادثة محلياً (طرد الطرفين)
+    if (ChatSystem.currentChat) {
+        console.log('👢 طرد الطرفين بعد إنهاء المكالمة');
+        ChatSystem.closeChat();
+    }
+    
+    console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
+},
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
