@@ -495,7 +495,7 @@ async startVideoCall(calleeId) {
         }
     },
 
-    
+
     // ==================== 7. استقبال المكالمات ====================
 
 async receiveCall(callerId, callData) {
@@ -516,10 +516,7 @@ async receiveCall(callerId, callData) {
             }
         }
         
-        // ✅ إغلاق المحادثة محلياً عند الرفض
-        if (ChatSystem.currentChat) {
-            ChatSystem.closeChat();
-        }
+        // ❌ تمت إزالة ChatSystem.closeChat() من هنا (تسبب تجميد)
         return;
     }
     
@@ -647,7 +644,7 @@ async receiveCall(callerId, callData) {
                             console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
                         } catch(e) {}
                     }
-                    ChatSystem.closeChat();
+                    // ❌ تمت إزالة ChatSystem.closeChat() من هنا
                 }
                 this.endCall();
             }
@@ -684,8 +681,7 @@ async receiveCall(callerId, callData) {
         this.endCall(); 
     }
 },
-
-
+    
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
 
