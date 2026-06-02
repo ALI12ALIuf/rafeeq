@@ -1665,67 +1665,30 @@ async sendSignal(calleeId, data) {
         });
     },
     
-    // ==================== 14. إنهاء المكالمة ====================
-    
+    // ==================== 14. إنهاء المكالمة وتنظيف الحالة ====================
+
 endCall() {
-    console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+    console.log('📞 جاري إنهاء الاتصال وتنظيف البيانات...');
     
-    // ✅ إرسال إشارة طرد إلى الطرف الآخر عبر Data Channel فقط
-    if (this.currentCallId && ChatSystem.currentChat) {
-        if (this.dc && this.dc.readyState === 'open') {
-            try {
-                this.dc.send(JSON.stringify({ 
-                    type: 'force_close_conversation',
-                    timestamp: Date.now()
-                }));
-                console.log('✅ تم إرسال إشارة طرد إلى الطرف الآخر عبر Data Channel');
-            } catch(e) {
-                console.error('❌ فشل إرسال إشارة الطرد:', e);
-            }
-        } else {
-            console.log('⚠️ Data Channel غير مفتوح، لا يمكن إرسال إشارة الطرد');
-        }
+    // 🌟 حفظ نوع المكالمة الفعلي في متغير مؤقت قبل تصفيره
+    const previousCallType = this.callType;
+    
+    if (this.callTimerInterval) { 
+        clearInterval(this.callTimerInterval); 
+        this.callTimerInterval = null; 
     }
-    this.currentCallId = null;
-    
-    this.sendCallStatus('disconnected');
-    
-    if (this.keepAliveInterval) {
-        clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = null;
-    }
-    if (this.callTimerInterval) {
-        clearInterval(this.callTimerInterval);
-        this.callTimerInterval = null;
+    if (this.keepAliveInterval) { 
+        clearInterval(this.keepAliveInterval); 
+        this.keepAliveInterval = null; 
     }
     if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
     }
     
-    if (this.remoteAudioElement) {
-        this.remoteAudioElement.pause();
-        this.remoteAudioElement.srcObject = null;
-        this.remoteAudioElement = null;
-    }
-    
-    if (this.localStream) {
-        try {
-            this.localStream.getTracks().forEach(t => t.stop());
-        } catch(e) {}
-        this.localStream = null;
-    }
-    
-    this.cleanupConnections();
-    
-    const ui = document.getElementById('callUI');
-    if (ui) ui.remove();
-    const inc = document.getElementById('incomingCall');
-    if (inc) inc.remove();
-    document.body.classList.remove('in-call');
-    
     this.isInCall = false;
     this.callType = null;
+    this.currentCallId = null;
     this.isAudioMuted = false;
     this.isVideoMuted = false;
     this.isSpeakerEnabled = false;
@@ -1739,13 +1702,64 @@ endCall() {
         }).catch(() => {});
     }
     
-    // ✅ إغلاق المحادثة محلياً (طرد الطرفين)
-    if (ChatSystem.currentChat) {
-        console.log('👢 طرد الطرفين بعد إنهاء المكالمة');
-        ChatSystem.closeChat();
+    // ✅ إخفاء واجهة المكالمة
+    this.hideCallUI();
+    
+    // ✅ تنظيف مسارات الصوت والفيديو
+    if (this.localStream) {
+        this.localStream.getTracks().forEach(track => { 
+            track.stop(); 
+            console.log(`🛑 إيقاف مسار ${track.kind}`); 
+        });
+        this.localStream = null;
     }
     
-    console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
+    // ✅ تنظيف الصوت عن بعد
+    if (this.remoteAudioElement) {
+        this.remoteAudioElement.pause();
+        this.remoteAudioElement.srcObject = null;
+        this.remoteAudioElement = null;
+    }
+    
+    // ✅ تنظيف القنوات
+    if (this.dc) {
+        try { this.dc.close(); } catch(e) {}
+        this.dc = null;
+    }
+    if (this.pc) {
+        try { this.pc.close(); } catch(e) {}
+        this.pc = null;
+    }
+    this.incomingChunks = {};
+    this.incomingFileInfo = {};
+    
+    // ✅ تنظيف عناصر واجهة المستخدم
+    const ui = document.getElementById('callUI');
+    if (ui) ui.remove();
+    const inc = document.getElementById('incomingCall');
+    if (inc) inc.remove();
+    document.body.classList.remove('in-call');
+    
+    // 🌟 الإصلاح الجذري لحل مشكلة التجمد:
+    // نتحقق من نوع المكالمة؛ إذا كانت مكالمة حقيقية (صوت أو فيديو) نقوم بطرد الطرفين وإغلاق المحادثة.
+    // أما إذا كانت صامتة (datachannel) أو فارغة، نقوم بالتنظيف الصامت فقط دون لمس واجهة الشات أو طرد المستخدمين.
+    if (previousCallType !== 'datachannel' && previousCallType !== null && previousCallType !== undefined) {
+        if (ChatSystem.currentChat) {
+            console.log('👢 طرد الطرفين بعد إنهاء مكالمة حقيقية ناجحة أو مرفوضة');
+            ChatSystem.closeChat();
+        }
+    } else {
+        console.log('📡 تنظيف تلقائي معزول للميزات الصامتة (تم حماية الواجهة والأزرار من التجمد)');
+    }
+    
+    console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح وبأمان');
+},
+
+// ✅ دالة مساعدة لإخفاء واجهة المكالمة
+hideCallUI() {
+    const ui = document.getElementById('callUI');
+    if (ui) ui.remove();
+    document.body.classList.remove('in-call');
 },
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
