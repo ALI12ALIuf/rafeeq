@@ -1773,7 +1773,8 @@ async sendSignal(calleeId, data) {
             reader.readAsDataURL(file);
         });
     },
-    
+
+
     // ==================== 14. إنهاء المكالمة ====================
 
 endCall() {
@@ -1861,6 +1862,9 @@ endCall() {
         if (toggleInput) toggleInput.checked = false;
         
         ChatSystem.updateAllButtons();
+        
+        // ✅ إغلاق المحادثة محلياً (يخرج من المحادثة)
+        ChatSystem.closeChat();
     }
     
     console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
@@ -1887,6 +1891,7 @@ cleanupConnections() {
     this.incomingFileInfo = {};
 }
 };
+    
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
