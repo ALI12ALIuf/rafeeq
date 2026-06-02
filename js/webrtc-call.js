@@ -336,7 +336,6 @@ async startAudioCall(calleeId) {
         this.endCall(); 
     }
 },
-    
 
     // ==================== 5. المكالمة المرئية ====================
 
@@ -418,7 +417,7 @@ async startVideoCall(calleeId) {
             if (this.isInCall && this.pc && this.pc.signalingState !== 'stable') {
                 console.log('⏰ انتهت مهلة 30 ثانية بدون رد، إغلاق المحادثة');
                 
-                // إغلاق المحادثة بالكامل
+                // ✅ إرسال إشارة إغلاق المحادثة فقط (بدون closeChat محلياً)
                 if (ChatSystem.currentChat) {
                     if (this.dc && this.dc.readyState === 'open') {
                         try {
@@ -429,7 +428,7 @@ async startVideoCall(calleeId) {
                             console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
                         } catch(e) {}
                     }
-                    ChatSystem.closeChat();
+                    // ❌ تمت إزالة ChatSystem.closeChat() من هنا
                 }
                 this.endCall();
             }
@@ -438,7 +437,7 @@ async startVideoCall(calleeId) {
     } catch (e) { 
         console.error('❌ خطأ في بدء المكالمة المرئية:', e);
         
-        // ✅ إغلاق المحادثة بالكامل عند حدوث خطأ
+        // ✅ إرسال إشارة إغلاق المحادثة فقط (بدون closeChat محلياً)
         if (ChatSystem.currentChat) {
             if (this.dc && this.dc.readyState === 'open') {
                 try {
@@ -449,13 +448,16 @@ async startVideoCall(calleeId) {
                     console.log('✅ تم إرسال إشارة إغلاق المحادثة (خطأ في المكالمة)');
                 } catch(e) {}
             }
-            ChatSystem.closeChat();
+            // ❌ تمت إزالة ChatSystem.closeChat() من هنا
         }
         
         if (callTimeout) clearTimeout(callTimeout);
         this.endCall(); 
     }
-},callerId  // ==================== 6. إعداد الصوت عن بعد ====================
+},
+    
+    
+  // ==================== 6. إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
         console.log('🔊 إعداد الصوت عن بعد...');
