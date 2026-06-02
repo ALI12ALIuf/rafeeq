@@ -338,7 +338,6 @@ async startAudioCall(calleeId) {
 },
 
 
-
     // ==================== 5. المكالمة المرئية ====================
 
 async startVideoCall(calleeId) {
@@ -394,13 +393,13 @@ async startVideoCall(calleeId) {
             if (rv && e.streams[0]) rv.srcObject = e.streams[0];
         };
         
-        // ✅ تعديل onconnectionstatechange لإلغاء المؤقت عند الاتصال
+        // ✅ تعديل onconnectionstatechange لإلغاء المؤقتات عند الاتصال
         this.pc.onconnectionstatechange = () => {
             console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
             if (this.pc?.connectionState === 'connected') {
                 if (callTimeout) {
                     clearTimeout(callTimeout);
-                    console.log('✅ تم الاتصال، إلغاء مؤقت عدم الرد');
+                    console.log('✅ تم الاتصال، إلغاء مؤقتات عدم الرد');
                 }
             }
             if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
@@ -414,22 +413,38 @@ async startVideoCall(calleeId) {
         await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
         console.log('✅ تم إرسال عرض المكالمة المرئية');
         
-        // ✅ إضافة مؤقت 30 ثانية لعدم الرد
+        // ✅ مؤقت 20 ثانية: إرسال إشارة إذا كانت القناة مفتوحة
+        setTimeout(() => {
+            if (this.isInCall && this.pc && this.pc.signalingState !== 'stable') {
+                if (this.dc && this.dc.readyState === 'open') {
+                    try {
+                        this.dc.send(JSON.stringify({ 
+                            type: 'force_close_conversation',
+                            timestamp: Date.now()
+                        }));
+                        console.log('✅ تم إرسال إشارة إغلاق المحادثة (20 ثانية)');
+                    } catch(e) {}
+                }
+            }
+        }, 20000);
+        
+        // ✅ مؤقت 30 ثانية: إغلاق محلي نهائي (تنظيف كامل)
         callTimeout = setTimeout(() => {
             if (this.isInCall && this.pc && this.pc.signalingState !== 'stable') {
-                console.log('⏰ انتهت مهلة 30 ثانية بدون رد، إغلاق المحادثة');
+                console.log('⏰ 30 ثانية بدون رد، إغلاق المحادثة نهائياً');
                 
                 if (ChatSystem.currentChat) {
-                    if (this.dc && this.dc.readyState === 'open') {
-                        try {
-                            this.dc.send(JSON.stringify({ 
-                                type: 'force_close_conversation',
-                                timestamp: Date.now()
-                            }));
-                            console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
-                        } catch(e) {}
-                    }
-                    // ✅ إغلاق المحادثة محلياً عند انتهاء المهلة
+                    // ✅ تنظيف الميزات محلياً
+                    ChatSystem.featuresEnabled = false;
+                    ChatSystem.featureRequestPending = false;
+                    ChatSystem.featureRequestReceived = false;
+                    
+                    const toggleInput = document.getElementById('featureToggleInput');
+                    if (toggleInput) toggleInput.checked = false;
+                    
+                    ChatSystem.updateAllButtons();
+                    
+                    // ✅ إغلاق المحادثة
                     ChatSystem.closeChat();
                 }
                 this.endCall();
