@@ -198,160 +198,264 @@ const CallSystem = {
         }
     },
     
+
     // ==================== 4. المكالمة الصوتية ====================
 
-    async startAudioCall(calleeId) {
-        if (!ChatSystem.friendInConversation) {
-            console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
-            return;
+async startAudioCall(calleeId) {
+    if (!ChatSystem.friendInConversation) {
+        console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
+        return;
+    }
+    
+    if (!window.auth?.currentUser) {
+        console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
+        return;
+    }
+    if (this.isInCall) {
+        console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+        return;
+    }
+    
+    this.isInCall = true;
+    this.callType = 'audio';
+    this.currentCallId = calleeId;
+    
+    // ✅ متغير للمؤقت
+    let callTimeout = null;
+    
+    try {
+        if (window.auth?.currentUser) {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: true,
+                callType: 'audio'
+            }).catch(() => {});
         }
         
-        if (!window.auth?.currentUser) {
-            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
+        this.showCallUI('audio');
+        
+        const silentAudio = new Audio();
+        silentAudio.volume = 0;
+        silentAudio.play().catch(() => {});
+        
+        console.log('🎤 طلب الوصول إلى الميكروفون...');
+        const constraints = { audio: true, video: false };
+        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        const audioTracks = this.localStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+            this.endCall();
             return;
         }
-        if (this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            return;
-        }
+        console.log('✅ تم الحصول على الميكروفون');
         
-        this.isInCall = true;
-        this.callType = 'audio';
-        this.currentCallId = calleeId;
+        this.pc = new RTCPeerConnection(this.servers);
         
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: 'audio'
-                }).catch(() => {});
+        this.localStream.getTracks().forEach(track => {
+            this.pc.addTrack(track, this.localStream);
+            console.log(`➕ تم إضافة مسار ${track.kind}`);
+        });
+        
+        this.dc = this.pc.createDataChannel('chat');
+        this.setupDataChannel(this.dc);
+        
+        this.pc.onicecandidate = e => { 
+            if (e.candidate) {
+                console.log('📡 إرسال ICE candidate');
+                this.sendSignal(calleeId, { candidate: e.candidate });
             }
-            
-            this.showCallUI('audio');
-            
-            const silentAudio = new Audio();
-            silentAudio.volume = 0;
-            silentAudio.play().catch(() => {});
-            
-            console.log('🎤 طلب الوصول إلى الميكروفون...');
-            const constraints = { audio: true, video: false };
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            const audioTracks = this.localStream.getAudioTracks();
-            if (audioTracks.length === 0) {
+        };
+        
+        this.pc.ontrack = e => {
+            console.log(`📞 استقبال مسار ${e.track.kind}`);
+            if (e.track.kind === 'audio') {
+                this.setupRemoteAudio(e.streams[0]);
+            }
+        };
+        
+        // ✅ تعديل onconnectionstatechange لإلغاء المؤقت عند الاتصال
+        this.pc.onconnectionstatechange = () => {
+            console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
+            if (this.pc?.connectionState === 'connected') {
+                if (callTimeout) {
+                    clearTimeout(callTimeout);
+                    console.log('✅ تم الاتصال، إلغاء مؤقت عدم الرد');
+                }
+            }
+            if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                if (callTimeout) clearTimeout(callTimeout);
                 this.endCall();
-                return;
             }
-            console.log('✅ تم الحصول على الميكروفون');
-            
-            this.pc = new RTCPeerConnection(this.servers);
-            
-            this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
-            });
-            
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) {
-                    console.log('📡 إرسال ICE candidate');
-                    this.sendSignal(calleeId, { candidate: e.candidate });
+        };
+        
+        console.log('📞 إنشاء عرض مكالمة صوتية...');
+        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+        await this.pc.setLocalDescription(offer);
+        await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
+        console.log('✅ تم إرسال العرض');
+        
+        // ✅ إضافة مؤقت 30 ثانية لعدم الرد
+        callTimeout = setTimeout(() => {
+            if (this.isInCall && this.pc && this.pc.signalingState !== 'stable') {
+                console.log('⏰ انتهت مهلة 30 ثانية بدون رد، إغلاق المحادثة');
+                
+                // إغلاق المحادثة بالكامل
+                if (ChatSystem.currentChat) {
+                    if (this.dc && this.dc.readyState === 'open') {
+                        try {
+                            this.dc.send(JSON.stringify({ 
+                                type: 'force_close_conversation',
+                                timestamp: Date.now()
+                            }));
+                            console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
+                        } catch(e) {}
+                    }
+                    ChatSystem.closeChat();
                 }
-            };
-            
-            this.pc.ontrack = e => {
-                console.log(`📞 استقبال مسار ${e.track.kind}`);
-                if (e.track.kind === 'audio') {
-                    this.setupRemoteAudio(e.streams[0]);
-                }
-            };
-            
-            this.pc.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
-                    this.endCall();
-                }
-            };
-            
-            console.log('📞 إنشاء عرض مكالمة صوتية...');
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
-            console.log('✅ تم إرسال العرض');
-            
-        } catch (e) { 
-            console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
-            this.endCall(); 
+                this.endCall();
+            }
+        }, 30000);
+        
+    } catch (e) { 
+        console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
+        
+        // ✅ إغلاق المحادثة بالكامل عند حدوث خطأ
+        if (ChatSystem.currentChat) {
+            if (this.dc && this.dc.readyState === 'open') {
+                try {
+                    this.dc.send(JSON.stringify({ 
+                        type: 'force_close_conversation',
+                        timestamp: Date.now()
+                    }));
+                    console.log('✅ تم إرسال إشارة إغلاق المحادثة (خطأ في المكالمة)');
+                } catch(e) {}
+            }
+            ChatSystem.closeChat();
         }
-    },
+        
+        if (callTimeout) clearTimeout(callTimeout);
+        this.endCall(); 
+    }
+},
+    
 
     // ==================== 5. المكالمة المرئية ====================
 
-    async startVideoCall(calleeId) {
-        if (!ChatSystem.friendInConversation) {
-            console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
-            return;
-        }
-        
-        if (!window.auth?.currentUser) {
-            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-            return;
-        }
-        if (this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            return;
-        }
-        
-        this.isInCall = true;
-        this.callType = 'video';
-        this.currentCallId = calleeId;
-        
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: 'video'
-                }).catch(() => {});
-            }
-            
-            const constraints = { 
-                audio: true, 
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
-            };
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
-                return;
-            }
-            
-            this.showCallUI('video');
-            this.pc = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => {
-                const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) rv.srcObject = e.streams[0];
-            };
-            this.pc.onconnectionstatechange = () => {
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
-            };
-            
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
-            
-        } catch (e) { 
-            this.endCall(); 
-        }
-    },
+async startVideoCall(calleeId) {
+    if (!ChatSystem.friendInConversation) {
+        console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
+        return;
+    }
     
-    // ==================== 6. إعداد الصوت عن بعد ====================
+    if (!window.auth?.currentUser) {
+        console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
+        return;
+    }
+    if (this.isInCall) {
+        console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+        return;
+    }
+    
+    this.isInCall = true;
+    this.callType = 'video';
+    this.currentCallId = calleeId;
+    
+    // ✅ متغير للمؤقت
+    let callTimeout = null;
+    
+    try {
+        if (window.auth?.currentUser) {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: true,
+                callType: 'video'
+            }).catch(() => {});
+        }
+        
+        const constraints = { 
+            audio: true, 
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
+        };
+        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (this.localStream.getAudioTracks().length === 0) {
+            this.endCall();
+            return;
+        }
+        
+        this.showCallUI('video');
+        this.pc = new RTCPeerConnection(this.servers);
+        this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+        this.dc = this.pc.createDataChannel('chat');
+        this.setupDataChannel(this.dc);
+        
+        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+        this.pc.ontrack = e => {
+            const rv = document.getElementById('remoteVideo');
+            if (rv && e.streams[0]) rv.srcObject = e.streams[0];
+        };
+        
+        // ✅ تعديل onconnectionstatechange لإلغاء المؤقت عند الاتصال
+        this.pc.onconnectionstatechange = () => {
+            console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
+            if (this.pc?.connectionState === 'connected') {
+                if (callTimeout) {
+                    clearTimeout(callTimeout);
+                    console.log('✅ تم الاتصال، إلغاء مؤقت عدم الرد');
+                }
+            }
+            if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                if (callTimeout) clearTimeout(callTimeout);
+                this.endCall();
+            }
+        };
+        
+        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+        await this.pc.setLocalDescription(offer);
+        await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
+        console.log('✅ تم إرسال عرض المكالمة المرئية');
+        
+        // ✅ إضافة مؤقت 30 ثانية لعدم الرد
+        callTimeout = setTimeout(() => {
+            if (this.isInCall && this.pc && this.pc.signalingState !== 'stable') {
+                console.log('⏰ انتهت مهلة 30 ثانية بدون رد، إغلاق المحادثة');
+                
+                // إغلاق المحادثة بالكامل
+                if (ChatSystem.currentChat) {
+                    if (this.dc && this.dc.readyState === 'open') {
+                        try {
+                            this.dc.send(JSON.stringify({ 
+                                type: 'force_close_conversation',
+                                timestamp: Date.now()
+                            }));
+                            console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
+                        } catch(e) {}
+                    }
+                    ChatSystem.closeChat();
+                }
+                this.endCall();
+            }
+        }, 30000);
+        
+    } catch (e) { 
+        console.error('❌ خطأ في بدء المكالمة المرئية:', e);
+        
+        // ✅ إغلاق المحادثة بالكامل عند حدوث خطأ
+        if (ChatSystem.currentChat) {
+            if (this.dc && this.dc.readyState === 'open') {
+                try {
+                    this.dc.send(JSON.stringify({ 
+                        type: 'force_close_conversation',
+                        timestamp: Date.now()
+                    }));
+                    console.log('✅ تم إرسال إشارة إغلاق المحادثة (خطأ في المكالمة)');
+                } catch(e) {}
+            }
+            ChatSystem.closeChat();
+        }
+        
+        if (callTimeout) clearTimeout(callTimeout);
+        this.endCall(); 
+    }
+},callerId  // ==================== 6. إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
         console.log('🔊 إعداد الصوت عن بعد...');
@@ -409,6 +513,11 @@ async receiveCall(callerId, callData) {
                 console.error('❌ فشل إرسال إشارة الإغلاق:', e);
             }
         }
+        
+        // ✅ إغلاق المحادثة محلياً عند الرفض
+        if (ChatSystem.currentChat) {
+            ChatSystem.closeChat();
+        }
         return;
     }
     
@@ -416,6 +525,9 @@ async receiveCall(callerId, callData) {
     this.callType = callData.type || 'audio';
     this.currentCallId = callerId;
     console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
+    
+    // ✅ متغير للمؤقت
+    let answerTimeout = null;
     
     try {
         if (window.auth?.currentUser) {
@@ -494,9 +606,17 @@ async receiveCall(callerId, callData) {
             this.dc = e.channel;
         };
         
+        // ✅ تعديل onconnectionstatechange لإلغاء المؤقت عند الاتصال
         this.pc.onconnectionstatechange = () => {
             console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
+            if (this.pc?.connectionState === 'connected') {
+                if (answerTimeout) {
+                    clearTimeout(answerTimeout);
+                    console.log('✅ تم الاتصال، إلغاء مؤقت عدم الرد');
+                }
+            }
             if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                if (answerTimeout) clearTimeout(answerTimeout);
                 this.endCall();
             }
         };
@@ -509,6 +629,27 @@ async receiveCall(callerId, callData) {
             await this.sendSignal(callerId, { sdp: this.pc.localDescription });
             console.log('✅ تم إرسال الرد');
         }
+        
+        // ✅ إضافة مؤقت 30 ثانية لعدم الرد (للمستلم)
+        answerTimeout = setTimeout(() => {
+            if (this.isInCall && this.pc && this.pc.signalingState !== 'stable') {
+                console.log('⏰ انتهت مهلة 30 ثانية بدون رد، إغلاق المحادثة');
+                
+                if (ChatSystem.currentChat) {
+                    if (this.dc && this.dc.readyState === 'open') {
+                        try {
+                            this.dc.send(JSON.stringify({ 
+                                type: 'force_close_conversation',
+                                timestamp: Date.now()
+                            }));
+                            console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
+                        } catch(e) {}
+                    }
+                    ChatSystem.closeChat();
+                }
+                this.endCall();
+            }
+        }, 30000);
         
         if (this.callType === 'video') {
             setTimeout(() => {
@@ -537,9 +678,11 @@ async receiveCall(callerId, callData) {
             }
         }
         
+        if (answerTimeout) clearTimeout(answerTimeout);
         this.endCall(); 
     }
 },
+
 
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
