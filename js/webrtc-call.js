@@ -850,6 +850,7 @@ async startVideoCall(calleeId) {
         });
     },
     
+
     // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
@@ -1118,6 +1119,13 @@ async handleSignaling(data) {
             console.log('📞 الطرف الآخر رفض المكالمة');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
+            
+            // ✅ طرد الطرفين عند الرفض
+            if (ChatSystem.currentChat) {
+                console.log('👢 طرد الطرفين بسبب رفض المكالمة');
+                ChatSystem.closeChat();
+            }
+            
             this.endCall();
             return;
         }
@@ -1126,6 +1134,13 @@ async handleSignaling(data) {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
+            
+            // ✅ طرد الطرفين عند إنهاء المكالمة
+            if (ChatSystem.currentChat) {
+                console.log('👢 طرد الطرفين بسبب إنهاء المكالمة');
+                ChatSystem.closeChat();
+            }
+            
             this.endCall();
             return;
         }
