@@ -518,7 +518,10 @@ async receiveCall(callerId, callData) {
             }
         }
         
-        // ❌ تمت إزالة ChatSystem.closeChat() من هنا (تسبب تجميد)
+        // ✅ إغلاق المحادثة محلياً عند الرفض
+        if (ChatSystem.currentChat) {
+            ChatSystem.closeChat();
+        }
         return;
     }
     
@@ -646,7 +649,8 @@ async receiveCall(callerId, callData) {
                             console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
                         } catch(e) {}
                     }
-                    // ❌ تمت إزالة ChatSystem.closeChat() من هنا
+                    // ✅ إغلاق المحادثة محلياً عند انتهاء المهلة
+                    ChatSystem.closeChat();
                 }
                 this.endCall();
             }
@@ -677,6 +681,11 @@ async receiveCall(callerId, callData) {
             } catch(e) {
                 console.error('❌ فشل إرسال إشارة الإغلاق:', e);
             }
+        }
+        
+        // ✅ إغلاق المحادثة محلياً عند الخطأ
+        if (ChatSystem.currentChat) {
+            ChatSystem.closeChat();
         }
         
         if (answerTimeout) clearTimeout(answerTimeout);
