@@ -393,6 +393,14 @@ const CallSystem = {
     // ==================== 7. استقبال المكالمات ====================
 
 async receiveCall(callerId, callData) {
+    // 🌟 جدار الحماية الأول والأهم: إذا كان الطلب صامتاً لتفعيل الميزات (Data Channel)
+    // نمرره فوراً لإشارات الخلفية دون اعتبارها مكالمة ودون فتح كاميرا أو مايك
+    if (callData.type === 'datachannel') {
+        console.log('📡 استقبال إشارة Data Channel صامتة بالقسم 7 - تحويل للإرسال الصامت');
+        this.handleSignaling(callData);
+        return;
+    }
+
     if (this.isInCall) {
         console.log('❌ مكالمة نشطة بالفعل');
         this.sendSignal(callerId, { type: 'reject' });
@@ -403,6 +411,9 @@ async receiveCall(callerId, callData) {
     this.callType = callData.type || 'audio';
     this.currentCallId = callerId;
     console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
+    
+    // حفظ نوع المكالمة في متغير محلي ثابت للرجوع إليه عند حدوث أخطاء داخل الـ catch
+    const currentLocalCallType = this.callType;
     
     try {
         if (window.auth?.currentUser) {
@@ -476,7 +487,7 @@ async receiveCall(callerId, callData) {
         };
         
         this.pc.ondatachannel = e => {
-            console.log('📡 استقبال Data Channel');
+            console.log('📡 استقبال Data Channel للمكالمة الحية');
             this.setupDataChannel(e.channel);
             this.dc = e.channel;
         };
@@ -508,14 +519,17 @@ async receiveCall(callerId, callData) {
         }
         
     } catch (e) { 
-        console.error('❌ خطأ في استقبال المكالمة:', e);
+        console.error('❌ خطأ في استقبال المكالمة الحقيقية:', e);
         this.sendSignal(callerId, { type: 'reject' });
-        this.endCall();
         
-        // ✅ طرد الطرفين من المحادثة عند حدوث خطأ
-        if (ChatSystem.currentChat) {
-            console.log('👢 خطأ في استقبال المكالمة - إغلاق المحادثة');
+        // 🌟 الإصلاح الصارم: نتحقق أولاً عبر المتغير المحلي الآمن لضمان حظر الطرد العشوائي للميزات
+        if (currentLocalCallType !== 'datachannel' && ChatSystem.currentChat) {
+            console.log('👢 خطأ في تهيئة مكالمة حقيقية - إغلاق المحادثة وطرد الطرفين');
+            this.endCall();
             ChatSystem.closeChat();
+        } else {
+            console.log('📡 خطأ معزول في حزمة صامتة (تم التجهيز والتنظيف الصامت بدون طرد)');
+            this.cleanupConnections();
         }
     }
 },
