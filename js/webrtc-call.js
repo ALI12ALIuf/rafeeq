@@ -1109,6 +1109,7 @@ async handleSignaling(data) {
             console.log('📞 الطرف الآخر رفض المكالمة');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
+            this.isClosingDueToCallEnd = true;  // ✅ منع إلغاء الميزات عند الرفض
             this.endCall();
             return;
         }
@@ -1117,6 +1118,7 @@ async handleSignaling(data) {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
+            this.isClosingDueToCallEnd = true;  // ✅ منع إلغاء الميزات عند انتهاء المكالمة
             this.endCall();
             return;
         }
