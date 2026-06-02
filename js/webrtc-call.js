@@ -953,52 +953,14 @@ setupDataChannel(channel) {
         }
         this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-        }
+        // ✅ تم إزالة كود إلغاء تفعيل الميزات (الميزات تبقى مفعلة)
     };
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-        }
+        // ✅ تم إزالة كود إلغاء تفعيل الميزات (الميزات تبقى مفعلة)
     };
 },
 
@@ -1101,18 +1063,7 @@ async handleSignaling(data) {
             if (inc) inc.remove();
             this.endCall();
             
-            // ✅ إلغاء الميزات عند رفض المكالمة
-            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                console.log('📞 تم رفض المكالمة - إلغاء تفعيل الميزات');
-                ChatSystem.featuresEnabled = false;
-                ChatSystem.featureRequestPending = false;
-                ChatSystem.featureRequestReceived = false;
-                
-                const toggleInput = document.getElementById('featureToggleInput');
-                if (toggleInput) toggleInput.checked = false;
-                
-                ChatSystem.updateAllButtons();
-            }
+            // ✅ تم إزالة كود إلغاء الميزات (الميزات تبقى مفعلة)
             return;
         }
         
@@ -1122,18 +1073,7 @@ async handleSignaling(data) {
             if (inc) inc.remove();
             this.endCall();
             
-            // ✅ إلغاء الميزات عند انتهاء المكالمة قبل الرد
-            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-                console.log('📞 انتهت المكالمة قبل الرد - إلغاء تفعيل الميزات');
-                ChatSystem.featuresEnabled = false;
-                ChatSystem.featureRequestPending = false;
-                ChatSystem.featureRequestReceived = false;
-                
-                const toggleInput = document.getElementById('featureToggleInput');
-                if (toggleInput) toggleInput.checked = false;
-                
-                ChatSystem.updateAllButtons();
-            }
+            // ✅ تم إزالة كود إلغاء الميزات (الميزات تبقى مفعلة)
             return;
         }
         
