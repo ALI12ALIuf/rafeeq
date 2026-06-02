@@ -337,6 +337,7 @@ async startAudioCall(calleeId) {
     }
 },
 
+
     // ==================== 5. المكالمة المرئية ====================
 
 async startVideoCall(calleeId) {
@@ -417,7 +418,6 @@ async startVideoCall(calleeId) {
             if (this.isInCall && this.pc && this.pc.signalingState !== 'stable') {
                 console.log('⏰ انتهت مهلة 30 ثانية بدون رد، إغلاق المحادثة');
                 
-                // ✅ إرسال إشارة إغلاق المحادثة فقط (بدون closeChat محلياً)
                 if (ChatSystem.currentChat) {
                     if (this.dc && this.dc.readyState === 'open') {
                         try {
@@ -428,7 +428,8 @@ async startVideoCall(calleeId) {
                             console.log('✅ تم إرسال إشارة إغلاق المحادثة (انتهاء المهلة)');
                         } catch(e) {}
                     }
-                    // ❌ تمت إزالة ChatSystem.closeChat() من هنا
+                    // ✅ إغلاق المحادثة محلياً عند انتهاء المهلة
+                    ChatSystem.closeChat();
                 }
                 this.endCall();
             }
@@ -437,7 +438,6 @@ async startVideoCall(calleeId) {
     } catch (e) { 
         console.error('❌ خطأ في بدء المكالمة المرئية:', e);
         
-        // ✅ إرسال إشارة إغلاق المحادثة فقط (بدون closeChat محلياً)
         if (ChatSystem.currentChat) {
             if (this.dc && this.dc.readyState === 'open') {
                 try {
@@ -448,7 +448,8 @@ async startVideoCall(calleeId) {
                     console.log('✅ تم إرسال إشارة إغلاق المحادثة (خطأ في المكالمة)');
                 } catch(e) {}
             }
-            // ❌ تمت إزالة ChatSystem.closeChat() من هنا
+            // ✅ إغلاق المحادثة محلياً عند حدوث خطأ
+            ChatSystem.closeChat();
         }
         
         if (callTimeout) clearTimeout(callTimeout);
