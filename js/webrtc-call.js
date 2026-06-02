@@ -1100,6 +1100,19 @@ async handleSignaling(data) {
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
             this.endCall();
+            
+            // ✅ إلغاء الميزات عند رفض المكالمة
+            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+                console.log('📞 تم رفض المكالمة - إلغاء تفعيل الميزات');
+                ChatSystem.featuresEnabled = false;
+                ChatSystem.featureRequestPending = false;
+                ChatSystem.featureRequestReceived = false;
+                
+                const toggleInput = document.getElementById('featureToggleInput');
+                if (toggleInput) toggleInput.checked = false;
+                
+                ChatSystem.updateAllButtons();
+            }
             return;
         }
         
@@ -1108,6 +1121,19 @@ async handleSignaling(data) {
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
             this.endCall();
+            
+            // ✅ إلغاء الميزات عند انتهاء المكالمة قبل الرد
+            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+                console.log('📞 انتهت المكالمة قبل الرد - إلغاء تفعيل الميزات');
+                ChatSystem.featuresEnabled = false;
+                ChatSystem.featureRequestPending = false;
+                ChatSystem.featureRequestReceived = false;
+                
+                const toggleInput = document.getElementById('featureToggleInput');
+                if (toggleInput) toggleInput.checked = false;
+                
+                ChatSystem.updateAllButtons();
+            }
             return;
         }
         
@@ -1647,6 +1673,21 @@ async sendSignal(calleeId, data) {
         this.isVideoMuted = false;
         this.isSpeakerEnabled = false;
         this.reconnectAttempts = 0;
+        
+        // ✅ إلغاء الميزات بعد انتهاء المكالمة
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('📞 انتهت المكالمة - إلغاء تفعيل الميزات');
+            ChatSystem.featuresEnabled = false;
+            ChatSystem.featureRequestPending = false;
+            ChatSystem.featureRequestReceived = false;
+            
+            // ✅ تحديث زر التفعيل إلى اللون الأحمر
+            const toggleInput = document.getElementById('featureToggleInput');
+            if (toggleInput) toggleInput.checked = false;
+            
+            // ✅ تحديث واجهة المستخدم
+            ChatSystem.updateAllButtons();
+        }
         
         if (window.auth?.currentUser) {
             window.db.collection('users').doc(window.auth.currentUser.uid).update({
