@@ -133,6 +133,7 @@ const CallSystem = {
         console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
     },
     
+
     // ==================== 3. قناة الملفات فقط (منفصلة تماماً عن المكالمات) ====================
     
     async ensureFileChannelOnly(calleeId) {
@@ -196,7 +197,30 @@ const CallSystem = {
             await this.filePC.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.filePC.localDescription, type: 'file_channel' });
             
-            console.log('✅ تم إرسال طلب فتح قناة الملفات');
+            // ✅ انتظر حتى تفتح القناة قبل العودة
+            if (this.fileDC) {
+                await new Promise((resolve) => {
+                    if (this.fileDC.readyState === 'open') {
+                        resolve();
+                    } else {
+                        const check = setInterval(() => {
+                            if (this.fileDC && this.fileDC.readyState === 'open') {
+                                clearInterval(check);
+                                resolve();
+                            } else if (this.fileDC && (this.fileDC.readyState === 'failed' || this.fileDC.readyState === 'closed')) {
+                                clearInterval(check);
+                                resolve();
+                            }
+                        }, 100);
+                        setTimeout(() => {
+                            clearInterval(check);
+                            resolve();
+                        }, 10000);
+                    }
+                });
+            }
+            
+            console.log('✅ تم إرسال طلب فتح قناة الملفات والقناة جاهزة');
             return true;
         } catch (error) {
             console.error('❌ فشل إنشاء قناة الملفات:', error);
