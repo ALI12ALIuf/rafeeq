@@ -1611,8 +1611,9 @@ async sendSignal(calleeId, data) {
 endCall() {
     console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
     
-    // ✅ تعيين متغير قبل إغلاق القناة للإشارة إلى أن الإغلاق بسبب المكالمة
+    // ✅ تعيين متغيرات لمنع إلغاء الميزات أثناء إنهاء المكالمة
     this.isClosingDueToCallEnd = true;
+    this.isCallEnding = true;
     
     if (this.currentCallId && ChatSystem.currentChat) {
         this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
@@ -1670,8 +1671,11 @@ endCall() {
         }).catch(() => {});
     }
     
-    // ✅ تم إزالة setTimeout (لم نعد نعيد تعيين isClosingDueToCallEnd هنا)
-    // سيتم إعادة تعيينه في channel.onclose بعد إغلاق القناة
+    // ✅ إعادة تعيين المتغيرات بعد 5 ثوانٍ (لضمان مرور onclose)
+    setTimeout(() => {
+        this.isCallEnding = false;
+        this.isClosingDueToCallEnd = false;
+    }, 5000);
     
     console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
 },
@@ -1697,6 +1701,7 @@ cleanupConnections() {
     this.incomingFileInfo = {};
 }
 };
+
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
