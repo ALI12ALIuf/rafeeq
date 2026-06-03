@@ -1619,11 +1619,12 @@ async sendSignal(calleeId, data) {
             reader.readAsDataURL(file);
         });
     },
+
     
-    // ==================== 14. إنهاء المكالمة ====================
+    // ==================== 14. إنهاء المكالمة (يغلق قناة المكالمة فقط) ====================
     
     endCall() {
-        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+        console.log('📞 إنهاء المكالمة - إغلاق قناة المكالمة فقط، قناة الملفات تبقى مفتوحة');
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
@@ -1658,7 +1659,17 @@ async sendSignal(calleeId, data) {
             this.localStream = null;
         }
         
-        this.cleanupConnections();
+        // ✅ إغلاق قناة المكالمة فقط (وليس قناة الملفات)
+        if (this.callDC) {
+            try { this.callDC.close(); } catch(e) {}
+            this.callDC = null;
+        }
+        if (this.callPC) {
+            try { this.callPC.close(); } catch(e) {}
+            this.callPC = null;
+        }
+        
+        // ✅ لا نلمس fileDC أو filePC هنا - قناة الملفات تبقى مفتوحة
         
         const ui = document.getElementById('callUI');
         if (ui) ui.remove();
@@ -1681,10 +1692,14 @@ async sendSignal(calleeId, data) {
             }).catch(() => {});
         }
         
-        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
+        console.log('✅ تم إنهاء المكالمة، قناة الملفات لا تزال مفتوحة للميزات');
+        console.log(`📁 حالة قناة الملفات: ${this.fileDC ? this.fileDC.readyState : 'غير موجودة'}`);
     },
     
+    // ==================== تنظيف جميع الاتصالات (عند الحاجة فقط) ====================
     cleanupConnections() {
+        console.log('🧹 تنظيف شامل لجميع القنوات');
+        
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
@@ -1693,18 +1708,62 @@ async sendSignal(calleeId, data) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
         }
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
+        
+        // تنظيف قناة الملفات
+        if (this.fileDC) {
+            try { this.fileDC.close(); } catch(e) {}
+            this.fileDC = null;
         }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
+        if (this.filePC) {
+            try { this.filePC.close(); } catch(e) {}
+            this.filePC = null;
         }
+        
+        // تنظيف قناة المكالمات
+        if (this.callDC) {
+            try { this.callDC.close(); } catch(e) {}
+            this.callDC = null;
+        }
+        if (this.callPC) {
+            try { this.callPC.close(); } catch(e) {}
+            this.callPC = null;
+        }
+        
         this.incomingChunks = {};
         this.incomingFileInfo = {};
+        
+        console.log('✅ تم تنظيف جميع القنوات');
+    },
+    
+    // ==================== تنظيف قناة الملفات فقط (للاستخدام الداخلي) ====================
+    cleanupFileChannel() {
+        console.log('🧹 تنظيف قناة الملفات فقط');
+        
+        if (this.fileDC) {
+            try { this.fileDC.close(); } catch(e) {}
+            this.fileDC = null;
+        }
+        if (this.filePC) {
+            try { this.filePC.close(); } catch(e) {}
+            this.filePC = null;
+        }
+    },
+    
+    // ==================== تنظيف قناة المكالمات فقط (للاستخدام الداخلي) ====================
+    cleanupCallChannel() {
+        console.log('🧹 تنظيف قناة المكالمات فقط');
+        
+        if (this.callDC) {
+            try { this.callDC.close(); } catch(e) {}
+            this.callDC = null;
+        }
+        if (this.callPC) {
+            try { this.callPC.close(); } catch(e) {}
+            this.callPC = null;
+        }
     }
 };
+    
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
