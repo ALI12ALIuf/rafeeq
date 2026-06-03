@@ -1767,22 +1767,46 @@ async sendMessage(text) {
         this.hideProgressBar(); return false;
     },
     
-    // ==================== القسم 29: _ensureChannelReady ====================
+    // ==================== القسم 29: _ensureChannelReady (معدل) ====================
     async _ensureChannelReady() {
         if (!this.friendInConversation || !this.featuresEnabled) {
             alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
             return false;
         }
         
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            return true;
+        // ✅ انتظر حتى تصبح القناة جاهزة (ليس فقط open)
+        if (CallSystem.dc) {
+            if (CallSystem.dc.readyState === 'open') {
+                return true;
+            }
+            if (CallSystem.dc.readyState === 'connecting') {
+                console.log('⏳ قناة الملفات في طور الاتصال، انتظر قليلاً...');
+                // انتظر حتى تصبح open
+                const success = await new Promise((resolve) => {
+                    const check = setInterval(() => {
+                        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                            clearInterval(check);
+                            resolve(true);
+                        } else if (CallSystem.dc && (CallSystem.dc.readyState === 'failed' || CallSystem.dc.readyState === 'closed')) {
+                            clearInterval(check);
+                            resolve(false);
+                        }
+                    }, 200);
+                    setTimeout(() => {
+                        clearInterval(check);
+                        resolve(false);
+                    }, 10000);
+                });
+                if (success && CallSystem.dc.readyState === 'open') return true;
+            }
         }
         
         try {
             const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
             
             if (success) {
-                await new Promise(r => setTimeout(r, 1000));
+                // ✅ انتظر قليلاً حتى تستقر القناة
+                await new Promise(r => setTimeout(r, 500));
                 return true;
             }
             
