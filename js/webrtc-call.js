@@ -1612,7 +1612,6 @@ async sendSignal(calleeId, data) {
 endCall() {
     console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
     
-    // ✅ تعيين متغيرات لمنع إلغاء الميزات أثناء إنهاء المكالمة
     this.isClosingDueToCallEnd = true;
     this.isCallEnding = true;
     
@@ -1672,7 +1671,6 @@ endCall() {
         }).catch(() => {});
     }
     
-    // ✅ إعادة تعيين المتغيرات بعد 5 ثوانٍ (لضمان مرور onclose)
     setTimeout(() => {
         this.isCallEnding = false;
         this.isClosingDueToCallEnd = false;
@@ -1690,13 +1688,23 @@ cleanupConnections() {
         clearInterval(this.keepAliveInterval);
         this.keepAliveInterval = null;
     }
-    if (this.dc) {
-        try { this.dc.close(); } catch(e) {}
-        this.dc = null;
-    }
-    if (this.pc) {
-        try { this.pc.close(); } catch(e) {}
-        this.pc = null;
+    // ✅ لا نغلق Data Channel إذا كانت الميزات مفعلة والمحادثة لا تزال مفتوحة
+    if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
+        console.log('📡 الميزات مفعلة - إبقاء Data Channel مفتوحاً');
+        // فقط نغلق pc (اتصال WebRTC) ونبقي dc مفتوحاً
+        if (this.pc) {
+            try { this.pc.close(); } catch(e) {}
+            this.pc = null;
+        }
+    } else {
+        if (this.dc) {
+            try { this.dc.close(); } catch(e) {}
+            this.dc = null;
+        }
+        if (this.pc) {
+            try { this.pc.close(); } catch(e) {}
+            this.pc = null;
+        }
     }
     this.incomingChunks = {};
     this.incomingFileInfo = {};
