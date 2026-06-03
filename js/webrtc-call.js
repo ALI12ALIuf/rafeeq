@@ -1571,6 +1571,9 @@ async sendSignal(calleeId, data) {
 endCall() {
     console.log('📞 إنهاء المكالمة - الحفاظ على Data Channel والميزات');
     
+    // ✅ منع أي محاولة إعادة اتصال بعد انتهاء المكالمة
+    this.isCallEnding = true;
+    
     if (this.currentCallId && ChatSystem.currentChat) {
         this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
     }
@@ -1629,6 +1632,12 @@ endCall() {
     }
     
     console.log('✅ تم إنهاء المكالمة، Data Channel لا يزال مفتوحاً، الميزات مفعلة:', ChatSystem.featuresEnabled);
+    
+    // ✅ إعادة تعيين isCallEnding بعد 3 ثواني للسماح بمكالمات جديدة
+    setTimeout(() => {
+        this.isCallEnding = false;
+        console.log('🔄 تم إعادة تعيين isCallEnding - جاهز لمكالمات جديدة');
+    }, 3000);
 },
 
 cleanupConnections() {
