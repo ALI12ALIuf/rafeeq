@@ -831,6 +831,7 @@ const CallSystem = {
         });
     },
     
+
     // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
@@ -984,6 +985,11 @@ sendCallStatus(status) {
 },
 
 scheduleReconnect() {
+    // ✅ منع إعادة الاتصال إذا كانت المكالمة منتهية
+    if (this.isCallEnding) {
+        console.log('🚫 تجاهل إعادة الاتصال - المكالمة منتهية');
+        return;
+    }
     if (!ChatSystem.currentChat) return;
     if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -991,7 +997,7 @@ scheduleReconnect() {
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
     this.reconnectTimer = setTimeout(async () => {
         try {
-            if (ChatSystem.currentChat) {
+            if (ChatSystem.currentChat && !this.isCallEnding) {
                 await this.ensureDataChannelOnly(ChatSystem.currentChat);
             }
         } catch (error) {}
@@ -1125,6 +1131,7 @@ async sendSignal(calleeId, data) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
 },
+
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
