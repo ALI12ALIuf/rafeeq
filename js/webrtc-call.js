@@ -1608,7 +1608,7 @@ async sendSignal(calleeId, data) {
     },
 
 
-  // ==================== 14. إنهاء المكالمة ====================
+// ==================== 14. إنهاء المكالمة ====================
     
 endCall() {
     console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
@@ -1672,14 +1672,6 @@ endCall() {
         }).catch(() => {});
     }
     
-    // ✅ تأكيد أن الميزات لا تزال مفعلة
-    if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-        ChatSystem.friendInConversation = true;
-        console.log('✅ تم إعادة تعيين friendInConversation = true');
-    }
-    
-    // ❌ تم إزالة إعادة فتح Data Channel (نعتمد على إبقائها مفتوحة في cleanupConnections)
-    
     setTimeout(() => {
         this.isCallEnding = false;
         this.isClosingDueToCallEnd = false;
@@ -1689,6 +1681,14 @@ endCall() {
 },
 
 cleanupConnections() {
+    // ✅ تسجيل الحالة قبل أي تغيير (للتحقق من المشكلة)
+    console.log('🔍 [cleanupConnections] الميزات قبل التنظيف:', {
+        featuresEnabled: ChatSystem?.featuresEnabled,
+        currentChat: ChatSystem?.currentChat,
+        friendInConversation: ChatSystem?.friendInConversation,
+        dcState: this.dc?.readyState
+    });
+    
     if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
@@ -1697,7 +1697,8 @@ cleanupConnections() {
         clearInterval(this.keepAliveInterval);
         this.keepAliveInterval = null;
     }
-    // ✅ لا نغلق Data Channel إذا كانت الميزات مفعلة والمحادثة لا تزال مفتوحة
+    
+    // ✅ إبقاء Data Channel مفتوحاً إذا كانت الميزات مفعلة
     if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
         console.log('📡 الميزات مفعلة - إبقاء Data Channel مفتوحاً');
         if (this.pc) {
@@ -1705,6 +1706,7 @@ cleanupConnections() {
             this.pc = null;
         }
     } else {
+        console.log('🔌 الميزات غير مفعلة أو لا توجد محادثة - إغلاق Data Channel');
         if (this.dc) {
             try { this.dc.close(); } catch(e) {}
             this.dc = null;
@@ -1718,6 +1720,61 @@ cleanupConnections() {
     this.incomingFileInfo = {};
 }
 };
+
+// ==================== 18. أداة التحقق من حالة الميزات والقناة (للهاتف) ====================
+window.showDebugInfo = function() {
+    const info = {
+        featuresEnabled: ChatSystem?.featuresEnabled || false,
+        friendInConversation: ChatSystem?.friendInConversation || false,
+        currentChat: ChatSystem?.currentChat || null,
+        dcState: CallSystem?.dc?.readyState || 'no dc',
+        pcState: CallSystem?.pc?.connectionState || 'no pc',
+        isInCall: CallSystem?.isInCall || false,
+        isClosingDueToCallEnd: CallSystem?.isClosingDueToCallEnd || false,
+        isCallEnding: CallSystem?.isCallEnding || false
+    };
+    
+    let message = '═══════════════════════════\n';
+    message += '🔍 حالة النظام بعد المكالمة:\n';
+    message += '═══════════════════════════\n\n';
+    message += `📌 الميزات مفعلة (featuresEnabled): ${info.featuresEnabled ? '✅ نعم' : '❌ لا'}\n`;
+    message += `📌 الطرف الآخر في المحادثة (friendInConversation): ${info.friendInConversation ? '✅ نعم' : '❌ لا'}\n`;
+    message += `📌 معرف المحادثة الحالي (currentChat): ${info.currentChat || '❌ لا يوجد'}\n`;
+    message += `📌 حالة Data Channel (dc.readyState): ${info.dcState}\n`;
+    message += `📌 حالة PeerConnection (pc.connectionState): ${info.pcState}\n`;
+    message += `📌 هل هناك مكالمة نشطة (isInCall): ${info.isInCall ? '✅ نعم' : '❌ لا'}\n`;
+    message += `📌 متغير منع الإلغاء (isClosingDueToCallEnd): ${info.isClosingDueToCallEnd ? '✅ true' : '❌ false'}\n`;
+    message += `📌 متغير إنهاء المكالمة (isCallEnding): ${info.isCallEnding ? '✅ true' : '❌ false'}\n`;
+    
+    alert(message);
+};
+
+// ✅ إضافة زر تحكم في شاشة المحادثة
+window.addDebugButton = function() {
+    const container = document.querySelector('.call-buttons');
+    if (container && !document.getElementById('debugBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 'debugBtn';
+        btn.innerHTML = '<i class="fas fa-bug"></i>';
+        btn.title = 'عرض حالة النظام';
+        btn.style.cssText = 'background:none;border:none;color:#ff9800;font-size:1.3rem;cursor:pointer;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;';
+        btn.onclick = () => window.showDebugInfo();
+        container.appendChild(btn);
+        console.log('✅ تم إضافة زر التحقق');
+    }
+};
+
+// محاولة إضافة الزر عند تحميل الصفحة
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            if (typeof window.addDebugButton === 'function') {
+                window.addDebugButton();
+            }
+        }, 2000);
+    });
+}
+    
  
 
 
