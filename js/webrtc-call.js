@@ -1678,21 +1678,7 @@ endCall() {
         console.log('✅ تم إعادة تعيين friendInConversation = true');
     }
     
-    // ✅ إعادة فتح Data Channel بعد انتهاء المكالمة
-    if (ChatSystem.featuresEnabled && ChatSystem.friendInConversation && ChatSystem.currentChat) {
-        setTimeout(async () => {
-            console.log('🔧 محاولة فتح Data Channel بعد المكالمة...');
-            for (let i = 0; i < 3; i++) {
-                const success = await this.ensureDataChannelOnly(ChatSystem.currentChat);
-                if (success) {
-                    console.log('✅ تم فتح Data Channel بنجاح');
-                    break;
-                }
-                console.log('⚠️ فشلت المحاولة', i + 1, '، إعادة المحاولة...');
-                await new Promise(r => setTimeout(r, 1000));
-            }
-        }, 500);
-    }
+    // ❌ تم إزالة إعادة فتح Data Channel (نعتمد على إبقائها مفتوحة في cleanupConnections)
     
     setTimeout(() => {
         this.isCallEnding = false;
@@ -1711,6 +1697,7 @@ cleanupConnections() {
         clearInterval(this.keepAliveInterval);
         this.keepAliveInterval = null;
     }
+    // ✅ لا نغلق Data Channel إذا كانت الميزات مفعلة والمحادثة لا تزال مفتوحة
     if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
         console.log('📡 الميزات مفعلة - إبقاء Data Channel مفتوحاً');
         if (this.pc) {
@@ -1730,7 +1717,8 @@ cleanupConnections() {
     this.incomingChunks = {};
     this.incomingFileInfo = {};
 }
-}; 
+};
+ 
 
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
