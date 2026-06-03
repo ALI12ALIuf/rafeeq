@@ -1,5 +1,6 @@
-// ========== chat-system.js - النسخة المعدلة للفصل التام بين الملفات والمكالمات ==========
+// ========== chat-system.js ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
+
 
 // ==================== القسم 2: تعريف ChatSystem ====================
 const ChatSystem = {
@@ -22,9 +23,14 @@ updateFeatureToggleUI() {
     const toggleInput = document.getElementById('featureToggleInput');
     if (!toggleInput) return;
     
+    // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
     toggleInput.checked = this.featuresEnabled;
+    
+    // ✅ الزر يكون مفعلاً دائماً (يمكن الضغط عليه لإرسال طلب التفعيل)
+    // بغض النظر عن friendInConversation
     toggleInput.disabled = false;
     
+    // ✅ تحديث الشفافية (الزر دائماً مرئي بالكامل)
     const featureSwitchLabel = document.getElementById('featureSwitchLabel');
     if (featureSwitchLabel) {
         featureSwitchLabel.style.opacity = '1';
@@ -40,6 +46,8 @@ init() {
     this.setupPageFocusListener();
     this.setupFeatureButton();
     this.setupBeforeUnloadListener();
+    
+    // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
     this.cleanMediaMessagesOnLoad();
 },
 
@@ -58,6 +66,7 @@ cleanMediaMessagesOnLoad() {
     console.log('🧹 تم تنظيف جميع الملفات والوسائط من localStorage');
 },
     
+    
     // ==================== القسم 4: setupBeforeUnloadListener ====================
 setupBeforeUnloadListener() {
     window.addEventListener('beforeunload', () => {
@@ -67,8 +76,9 @@ setupBeforeUnloadListener() {
     });
 },
 
-    // ==================== القسم 5: setupFeatureButton ====================
+    // ==================== القسم 5: setupFeatureButton (تبسيط - الأزرار موجودة في HTML) ====================
 setupFeatureButton() {
+    // ✅ الأزرار موجودة بالفعل في HTML، فقط نحدثها ونجعلها مرئية
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     const toggleInput = document.getElementById('featureToggleInput');
@@ -78,6 +88,7 @@ setupFeatureButton() {
         return;
     }
     
+    // ✅ إضافة الأنماط إذا لم تكن موجودة (مرة واحدة)
     if (!document.getElementById('featureToggleStyles')) {
         const style = document.createElement('style');
         style.id = 'featureToggleStyles';
@@ -172,10 +183,14 @@ setupFeatureButton() {
         document.head.appendChild(style);
     }
     
+    // ✅ إظهار الأزرار
     toggleContainer.style.display = 'inline-flex';
     kickBtn.style.display = 'inline-flex';
+    
+    // ✅ حفظ المراجع
     window.featureToggleInput = toggleInput;
     
+    // ✅ إزالة المستمع القديم لتجنب التكرار
     toggleInput.onclick = (e) => {
         console.log('🔘 تم الضغط على زر التفعيل');
         
@@ -194,6 +209,7 @@ setupFeatureButton() {
         }
     };
     
+    // ✅ معالج الضغط لزر الطرد
     if (kickBtn) {
         kickBtn.onclick = (e) => {
             e.preventDefault();
@@ -202,16 +218,19 @@ setupFeatureButton() {
         };
     }
     
+    // ✅ تحديث حالة الزر إذا كانت الميزات مفعلة مسبقاً
     if (this.featuresEnabled && toggleInput) {
         toggleInput.checked = true;
     }
     
+    // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
     this.updateFeatureToggleUI();
     
     console.log('✅ تم تهيئة أزرار التفعيل والطرد');
 },
 
+// ✅ دالة تحديث حالة زر الطرد
 updateKickButtonState() {
     const kickBtn = document.getElementById('kickBtn');
     if (!kickBtn) return;
@@ -227,7 +246,8 @@ updateKickButtonState() {
     }
 },
     
-// ==================== القسم 5.1: إنهاء المحادثة من الطرفين ====================
+
+ // ==================== القسم : 5.1 إنهاء المحادثة من الطرفين ====================
 async kickUserFromConversation() {
     if (!this.currentChat) {
         console.log('❌ لا توجد محادثة نشطة');
@@ -241,10 +261,10 @@ async kickUserFromConversation() {
     
     console.log('👢 إنهاء المحادثة مع المستخدم:', this.currentChat);
     
-    // ✅ استخدام قناة الملفات
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') {
+    // ✅ إرسال إشارة إلى الطرف الآخر لإغلاق المحادثة
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
         try {
-            CallSystem.fileDC.send(JSON.stringify({ 
+            CallSystem.dc.send(JSON.stringify({ 
                 type: 'force_close_conversation',
                 timestamp: Date.now()
             }));
@@ -253,13 +273,15 @@ async kickUserFromConversation() {
             console.error('❌ فشل إرسال إشارة إنهاء المحادثة:', e);
         }
     } else {
-        console.log('❌ قناة الملفات غير مفتوحة، لا يمكن إرسال إشارة');
+        console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة');
     }
     
+    // ✅ إغلاق المحادثة محلياً (عند المرسل أيضاً)
     this.closeChat();
 },   
     
-// ==================== القسم 6: startFeatureBlink ====================
+    
+  // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
     if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
     
@@ -283,10 +305,13 @@ startFeatureBlink() {
             this.featureRequestReceived = false;
             switchLabel.classList.remove('blinking');
             
+            // ✅ إعادة تعيين الزر إلى اللون الأحمر عند انتهاء المهلة
             const toggleInput = document.getElementById('featureToggleInput');
             if (toggleInput) toggleInput.checked = false;
             
+            // ✅ تحديث واجهة المستخدم
             this.updateAllButtons();
+            
             console.log('⏰ انتهت مهلة الانتظار (30 ثانية)، تم إلغاء الطلب');
         }
     }, 500);
@@ -334,9 +359,12 @@ startFeatureBlink() {
         }
     },
 
-// ==================== القسم 8: handleFeatureRequest ====================
+   // ==================== القسم 8: handleFeatureRequest ====================
 async handleFeatureRequest(fromId) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
+    
+    // ✅ تم إزالة القبول التلقائي (لم يعد يتم قبول الطلب تلقائياً)
+    // المستخدم يجب أن يضغط على الزر يدوياً لقبول الطلب
     
     this.featureRequestReceived = true;
     this.startFeatureBlink();
@@ -344,7 +372,8 @@ async handleFeatureRequest(fromId) {
     console.log('✅ تم تفعيل وضع الاستقبال');
 }, 
     
-// ==================== القسم 9: acceptFeatureRequest (معدل) ====================
+    
+    // ==================== القسم 9: acceptFeatureRequest ====================
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
     
@@ -377,12 +406,11 @@ async acceptFeatureRequest() {
     
     if (this.currentChat) {
         try {
-            console.log('🔧 محاولة فتح قناة الملفات...');
-            // ✅ استخدام ensureFileChannelOnly بدلاً من ensureDataChannelOnly
-            await CallSystem.ensureFileChannelOnly(this.currentChat);
-            console.log('✅ تم فتح قناة الملفات بنجاح');
+            console.log('🔧 محاولة فتح Data Channel...');
+            await CallSystem.ensureDataChannelOnly(this.currentChat);
+            console.log('✅ تم فتح Data Channel بنجاح');
         } catch(e) {
-            console.error('❌ خطأ في فتح قناة الملفات:', e);
+            console.error('❌ خطأ في فتح Data Channel:', e);
         }
     }
     
@@ -411,7 +439,7 @@ async acceptFeatureRequest() {
     console.log('✅ تم تفعيل الميزات!');
 },
     
-// ==================== القسم 10: handleFeatureResponse (معدل) ====================
+    // ==================== القسم 10: handleFeatureResponse ====================
 async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
@@ -438,12 +466,11 @@ async handleFeatureResponse(fromId, action) {
         
         if (this.currentChat) {
             try {
-                console.log('🔧 محاولة فتح قناة الملفات بعد قبول الطرف الآخر...');
-                // ✅ استخدام ensureFileChannelOnly بدلاً من ensureDataChannelOnly
-                await CallSystem.ensureFileChannelOnly(this.currentChat);
-                console.log('✅ تم فتح قناة الملفات بنجاح');
+                console.log('🔧 محاولة فتح Data Channel بعد قبول الطرف الآخر...');
+                await CallSystem.ensureDataChannelOnly(this.currentChat);
+                console.log('✅ تم فتح Data Channel بنجاح');
             } catch(e) {
-                console.error('❌ خطأ في فتح قناة الملفات:', e);
+                console.error('❌ خطأ في فتح Data Channel:', e);
             }
         }
         
@@ -499,14 +526,13 @@ async handleFeatureResponse(fromId, action) {
             btn.title = 'تفعيل الميزات';
         }
         
-        // ✅ استخدام قناة الملفات
-        if (CallSystem.fileDC) {
-            try { CallSystem.fileDC.close(); } catch(e) {}
-            CallSystem.fileDC = null;
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
         }
-        if (CallSystem.filePC) {
-            try { CallSystem.filePC.close(); } catch(e) {}
-            CallSystem.filePC = null;
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
         }
         
         this.updateAllButtons();
@@ -514,7 +540,7 @@ async handleFeatureResponse(fromId, action) {
     }
 },
 
-// ==================== القسم 10.1: disableFeatures (معدل) ====================
+     // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
@@ -537,21 +563,20 @@ async disableFeatures() {
     if (toggleInput) toggleInput.checked = false;
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ استخدام قناة الملفات
-    if (CallSystem.fileDC) {
-        try { CallSystem.fileDC.close(); } catch(e) {}
-        CallSystem.fileDC = null;
+    if (CallSystem.dc) {
+        try { CallSystem.dc.close(); } catch(e) {}
+        CallSystem.dc = null;
     }
-    if (CallSystem.filePC) {
-        try { CallSystem.filePC.close(); } catch(e) {}
-        CallSystem.filePC = null;
+    if (CallSystem.pc) {
+        try { CallSystem.pc.close(); } catch(e) {}
+        CallSystem.pc = null;
     }
     
     this.updateAllButtons();
     console.log('✅ تم إلغاء تفعيل الميزات');
 },
     
-// ==================== القسم 12: resetFeatures ====================
+    // ==================== القسم 12: resetFeatures ====================
 resetFeatures() {
     console.log('🔄 resetFeatures - إعادة تعيين الميزات');
     
@@ -578,7 +603,7 @@ resetFeatures() {
     this.updateAllButtons();
 },
     
-// ==================== القسم 13: handleFeatureCancel ====================
+    // ==================== القسم 13: handleFeatureCancel ====================
 handleFeatureCancel() {
     console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
     
@@ -601,7 +626,7 @@ handleFeatureCancel() {
     console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
 },
     
-// ==================== القسم 14: updateAllButtons ====================
+   // ==================== القسم 14: updateAllButtons ====================
 updateAllButtons() {
     const canUse = (this.friendInConversation && this.featuresEnabled);
     
@@ -660,7 +685,7 @@ updateAllButtons() {
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
 },
     
-// ==================== القسم 15: setupPageFocusListener & closeConversation ====================
+   // ==================== القسم 15: setupPageFocusListener & closeConversation ====================
 setupPageFocusListener() {
     window.addEventListener('focus', () => {
         if (this.currentChat && this.featuresEnabled) {
@@ -672,6 +697,7 @@ setupPageFocusListener() {
 closeConversation() {
     console.log("🚪 إغلاق صفحة المحادثة والعودة للقائمة الرئيسية");
     
+    // ✅ السطر المضاف لتنظيف الـ body وإيقاف حسابات الكيبورد فوراً
     document.body.classList.remove('conversation-open');
 
     this.currentChat = null;
@@ -683,6 +709,7 @@ closeConversation() {
     const chatPage = document.querySelector('.page.active') || document.querySelector('.chat-page');
     if (chatPage) chatPage.style.display = 'block';
     
+    // إيقاف الوميض إذا كان شغالاً
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
@@ -690,8 +717,10 @@ closeConversation() {
     const featureSwitch = document.querySelector('.feature-switch');
     if (featureSwitch) featureSwitch.classList.remove('blinking');
     
+    // إعادة تعيين واجهة زر الميزات
     this.updateFeatureToggleUI();
     
+    // إعادة إظهار القائمة السفلية والهيدر العام للموقع
     const bottomNav = document.querySelector('.bottom-nav');
     if (bottomNav) bottomNav.style.setProperty('display', 'flex', 'important');
     
@@ -699,73 +728,76 @@ closeConversation() {
     if (appHeader) appHeader.style.setProperty('display', 'flex', 'important');
 }, 
     
-// ==================== القسم 17: loadAllChats ====================
-loadAllChats() { 
-    for (let i = 0; i < localStorage.length; i++) { 
-        const k = localStorage.key(i); 
-        if (k && k.startsWith('chat_')) { 
-            const fid = k.replace('chat_', ''); 
-            try { this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[fid] = []; } 
+    
+    // ==================== القسم 17: loadAllChats ====================
+    loadAllChats() { 
+        for (let i = 0; i < localStorage.length; i++) { 
+            const k = localStorage.key(i); 
+            if (k && k.startsWith('chat_')) { 
+                const fid = k.replace('chat_', ''); 
+                try { this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; } catch (e) { this.messages[fid] = []; } 
+            } 
         } 
-    } 
-},
+    },
     
-// ==================== القسم 18: showProgressBar ====================
-showProgressBar(message, percent) {
-    let bar = document.getElementById('progressBar');
-    if (!bar) {
-        bar = document.createElement('div'); bar.id = 'progressBar';
-        bar.style.cssText = `
-            position: fixed;
-            top: 70px;
-            left: 0;
-            right: 0;
-            height: 22px;
-            background: rgba(0,0,0,0.3);
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        bar.innerHTML = `
-            <div id="progressFill" style="
-                background: linear-gradient(90deg, #4CAF50, #8BC34A);
-                height: 100%;
-                width: 0%;
-                position: absolute;
+    // ==================== القسم 18: showProgressBar ====================
+    showProgressBar(message, percent) {
+        let bar = document.getElementById('progressBar');
+        if (!bar) {
+            bar = document.createElement('div'); bar.id = 'progressBar';
+            bar.style.cssText = `
+                position: fixed;
+                top: 70px;
                 left: 0;
-                top: 0;
-                transition: width 0.3s;
-                border-radius: 0 2px 2px 0;
-            "></div>
-            <span id="progressPercent" style="
-                position: relative;
-                z-index: 2;
-                font-size: 12px;
-                font-weight: bold;
-                color: white;
-                text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-            ">0%</span>
-        `;
-        document.body.appendChild(bar);
-    }
-},
+                right: 0;
+                height: 22px;
+                background: rgba(0,0,0,0.3);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            bar.innerHTML = `
+                <div id="progressFill" style="
+                    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+                    height: 100%;
+                    width: 0%;
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    transition: width 0.3s;
+                    border-radius: 0 2px 2px 0;
+                "></div>
+                <span id="progressPercent" style="
+                    position: relative;
+                    z-index: 2;
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: white;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                ">0%</span>
+            `;
+            document.body.appendChild(bar);
+        }
+    },
     
-// ==================== القسم 19: updateProgressBar ====================
-updateProgressBar(percent, message) {
-    const fill = document.getElementById('progressFill');
-    const perc = document.getElementById('progressPercent');
-    if (fill) fill.style.width = Math.min(percent, 100) + '%';
-    if (perc) perc.textContent = Math.round(percent) + '%';
-},
+    // ==================== القسم 19: updateProgressBar ====================
+    updateProgressBar(percent, message) {
+        const fill = document.getElementById('progressFill');
+        const perc = document.getElementById('progressPercent');
+        if (fill) fill.style.width = Math.min(percent, 100) + '%';
+        if (perc) perc.textContent = Math.round(percent) + '%';
+    },
     
-// ==================== القسم 20: hideProgressBar ====================
-hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
+    // ==================== القسم 20: hideProgressBar ====================
+    hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
-// ==================== القسم 23: openChat ====================
+    
+    // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
+    // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
     this.friendInConversation = false;
     
     this.resetFeatures();
@@ -777,19 +809,27 @@ openChat(friendId, friendName, friendAvatar) {
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
     
+    // ✅ تم إزالة PresenceSystem.watchFriend (لم نعد نستخدم حالة الاتصال من السيرفر)
+    
+    // ✅ تم إزالة sendConversationStatus و requestConversationStatus (لم نعد نرسلهما)
+    
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
+    // ✅ تم إزالة setupFeatureButton (الأزرار أصبحت دائمة في HTML)
+    
+    // ✅ تحديث حالة الأزرار (إظهار/إخفاء إذا لزم الأمر)
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'flex';
     if (kickBtn) kickBtn.style.display = 'flex';
     
+    // ✅ تحديث حالة الزر فوراً
     this.updateAllButtons();
     
     setTimeout(() => {
-        if (this.featuresEnabled && (!CallSystem.fileDC || CallSystem.fileDC.readyState !== 'open')) {
-            console.log('⚠️ الميزات مفعلة ولكن قناة الملفات مغلقة - إعادة تعيين الميزات');
+        if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
+            console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
             this.featuresEnabled = false;
             this.featureRequestPending = false;
             this.featureRequestReceived = false;
@@ -803,10 +843,12 @@ openChat(friendId, friendName, friendAvatar) {
     }, 1000);
 },
     
-// ==================== القسم 25: displayMessages ====================
-displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
+    
+    // ==================== القسم 25: displayMessages ====================
+    displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
-// ==================== القسم 26: displayMessage (بدون تغيير - يبقى كما هو) ====================
+
+   // ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1127,8 +1169,9 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 }, 
+     
 
-// ==================== القسم 26.1: showImagePreview (بدون تغيير) ====================
+    // ==================== القسم 26.1: showImagePreview ====================
 showImagePreview(imageSrc) {
     const existingPreview = document.getElementById('imagePreviewModal');
     if (existingPreview) existingPreview.remove();
@@ -1380,7 +1423,7 @@ showImagePreview(imageSrc) {
     document.body.appendChild(modal);
 },
 
-// ==================== القسم 26.2: showVideoPreview (بدون تغيير) ====================
+// ==================== القسم 26.2: showVideoPreview ====================
 showVideoPreview(videoSrc) {
     const existingPreview = document.getElementById('videoPreviewModal');
     if (existingPreview) existingPreview.remove();
@@ -1665,13 +1708,12 @@ showVideoPreview(videoSrc) {
     }).catch(() => {});
 },
 
-// ==================== القسم 27: sendMessage (معدل) ====================
+    // ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
     if (!this.currentChat || !text.trim()) return false; 
     const mid = Date.now().toString(); 
     
-    // ✅ استخدام قناة الملفات
-    if (this.featuresEnabled && this.friendInConversation && CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') {
+    if (this.featuresEnabled && this.friendInConversation && CallSystem.dc && CallSystem.dc.readyState === 'open') {
         try {
             const messageData = {
                 type: 'direct_text',
@@ -1680,11 +1722,11 @@ async sendMessage(text) {
                 sender: 'me',
                 time: new Date().toISOString()
             };
-            CallSystem.fileDC.send(JSON.stringify(messageData));
+            CallSystem.dc.send(JSON.stringify(messageData));
             
             this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
             this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            console.log('✅ تم إرسال النص مباشرة عبر قناة الملفات');
+            console.log('✅ تم إرسال النص مباشرة عبر Data Channel');
             return true;
         } catch(e) {
             console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
@@ -1706,186 +1748,177 @@ async sendMessage(text) {
     } 
 },
     
-// ==================== القسم 28: sendFileWithRetry (معدل) ====================
-async sendFileWithRetry(file, type, maxRetries = 3) {
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return false;
-    }
     
-    // ✅ التأكد من وجود قناة الملفات
-    if (!CallSystem.fileDC || CallSystem.fileDC.readyState !== 'open') {
-        console.log('📁 قناة الملفات غير مفتوحة، محاولة فتحها...');
-        await CallSystem.ensureFileChannelOnly(this.currentChat);
-    }
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
-            const success = await CallSystem.sendFileDirect(file, type);
-            if (success) { this.hideProgressBar(); return true; }
-            if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
-        } catch (error) {}
-    }
-    this.hideProgressBar(); 
-    alert('فشل إرسال الملف. حاول مرة أخرى.');
-    return false;
-},
-    
-// ==================== القسم 29: _ensureChannelReady (معدل) ====================
-async _ensureChannelReady() {
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
-        return false;
-    }
-    
-    // ✅ استخدام قناة الملفات
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') {
-        return true;
-    }
-    
-    try {
-        const success = await CallSystem.ensureFileChannelOnly(this.currentChat);
+    // ==================== القسم 28: sendFileWithRetry ====================
+    async sendFileWithRetry(file, type, maxRetries = 3) {
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return false;
+        }
         
-        if (success) {
-            await new Promise(r => setTimeout(r, 1000));
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+                const success = await CallSystem.sendFileDirect(file, type);
+                if (success) { this.hideProgressBar(); return true; }
+                if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
+            } catch (error) {}
+        }
+        this.hideProgressBar(); return false;
+    },
+    
+    // ==================== القسم 29: _ensureChannelReady ====================
+    async _ensureChannelReady() {
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'الطرف الآخر ليس في المحادثة حالياً' : 'الميزات غير مفعلة');
+            return false;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             return true;
         }
         
-        alert('تعذر فتح قناة الاتصال لإرسال الملفات');
-        return false;
-    } catch (e) {
-        alert('فشل الاتصال. حاول مرة أخرى.');
-        return false;
-    }
-},
+        try {
+            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+            
+            if (success) {
+                await new Promise(r => setTimeout(r, 1000));
+                return true;
+            }
+            
+            alert('تعذر فتح قناة الاتصال لإرسال الملفات');
+            return false;
+        } catch (e) {
+            alert('فشل الاتصال. حاول مرة أخرى.');
+            return false;
+        }
+    },
     
-// ==================== القسم 30: sendImage (معدل) ====================
-async sendImage(file) { 
-    if (!this.currentChat) return;
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return;
-    }
+    // ==================== القسم 30: sendImage ====================
+    async sendImage(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'image');
+            if (success) {
+                const comp = await SecureChatSystem.compressImage(file); 
+                const b64 = await SecureChatSystem.fileToBase64(comp); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الصورة');
+        }
+    },
     
-    // ✅ استخدام قناة الملفات
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') {
-        CallSystem.fileDC.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-    }
+    // ==================== القسم 31: sendVideoFile ====================
+    async sendVideoFile(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        try {
+            await SecureChatSystem.validateVideo(file);
+        } catch (error) {
+            alert(error.message);
+            return;
+        }
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            const success = await this.sendFileWithRetry(file, 'video');
+            if (success) {
+                try {
+                    const b64 = await SecureChatSystem.fileToBase64(file); 
+                    const msgId = Date.now().toString();
+                    
+                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
+                    this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    
+                } catch (error) { alert('فشل معالجة الفيديو'); }
+            } else alert('فشل إرسال الفيديو');
+        }
+    },
     
-    await new Promise(r => setTimeout(r, 200));
-    
-    if (!(await this._ensureChannelReady())) return;
-    
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') { 
-        const success = await this.sendFileWithRetry(file, 'image');
-        if (success) {
-            const comp = await SecureChatSystem.compressImage(file); 
-            const b64 = await SecureChatSystem.fileToBase64(comp); 
-            const msgId = Date.now().toString();
-            this.saveMessage(this.currentChat, { id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-        } else alert('فشل إرسال الصورة');
-    }
-},
-    
-// ==================== القسم 31: sendVideoFile (معدل) ====================
-async sendVideoFile(file) { 
-    if (!this.currentChat) return;
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return;
-    }
-    
-    // ✅ استخدام قناة الملفات
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') {
-        CallSystem.fileDC.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-    }
-    
-    await new Promise(r => setTimeout(r, 200));
-    
-    try {
-        await SecureChatSystem.validateVideo(file);
-    } catch (error) {
-        alert(error.message);
-        return;
-    }
-    
-    if (!(await this._ensureChannelReady())) return;
-    
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') { 
-        console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
-        const success = await this.sendFileWithRetry(file, 'video');
-        if (success) {
-            try {
+    // ==================== القسم 32: sendFile ====================
+    async sendFile(file) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(file, 'file');
+            if (success) {
                 const b64 = await SecureChatSystem.fileToBase64(file); 
                 const msgId = Date.now().toString();
-                
-                this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-            } catch (error) { alert('فشل معالجة الفيديو'); }
-        } else alert('فشل إرسال الفيديو');
-    }
-},
+                this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال الملف');
+        }
+    },
     
-// ==================== القسم 32: sendFile (معدل) ====================
-async sendFile(file) { 
-    if (!this.currentChat) return;
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return;
-    }
+    // ==================== القسم 33: sendVoiceNote ====================
+    async sendVoiceNote(audioBlob) { 
+        if (!this.currentChat) return;
+        if (!this.friendInConversation || !this.featuresEnabled) {
+            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+            return;
+        }
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
+        if (!(await this._ensureChannelReady())) return;
+        
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+            const success = await this.sendFileWithRetry(audioBlob, 'voice');
+            if (success) {
+                const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
+                const msgId = Date.now().toString();
+                this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+                this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+            } else alert('فشل إرسال البصمة الصوتية');
+        }
+    },
     
-    // ✅ استخدام قناة الملفات
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') {
-        CallSystem.fileDC.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-    }
+    // ==================== القسم 34: shareLocationDirect ====================
     
-    await new Promise(r => setTimeout(r, 200));
-    
-    if (!(await this._ensureChannelReady())) return;
-    
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') { 
-        const success = await this.sendFileWithRetry(file, 'file');
-        if (success) {
-            const b64 = await SecureChatSystem.fileToBase64(file); 
-            const msgId = Date.now().toString();
-            this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-            this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-        } else alert('فشل إرسال الملف');
-    }
-},
-    
-// ==================== القسم 33: sendVoiceNote (معدل) ====================
-async sendVoiceNote(audioBlob) { 
-    if (!this.currentChat) return;
-    if (!this.friendInConversation || !this.featuresEnabled) {
-        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-        return;
-    }
-    
-    // ✅ استخدام قناة الملفات
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') {
-        CallSystem.fileDC.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-    }
-    
-    await new Promise(r => setTimeout(r, 200));
-    
-    if (!(await this._ensureChannelReady())) return;
-    
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') { 
-        const success = await this.sendFileWithRetry(audioBlob, 'voice');
-        if (success) {
-            const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
-            const msgId = Date.now().toString();
-            this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-        } else alert('فشل إرسال البصمة الصوتية');
-    }
-},
-    
-// ==================== القسم 34: shareLocationDirect (معدل) ====================
-async shareLocationDirect() { 
+   async shareLocationDirect() { 
     if (!this.currentChat) return; 
     if (!this.friendInConversation || !this.featuresEnabled) {
         alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
@@ -1893,8 +1926,7 @@ async shareLocationDirect() {
     }
     if (!(await this._ensureChannelReady())) return;
     
-    // ✅ استخدام قناة الملفات
-    if (CallSystem.fileDC && CallSystem.fileDC.readyState === 'open') { 
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
         
         navigator.geolocation.getCurrentPosition(p => { 
@@ -2142,8 +2174,7 @@ showLocationSwipeModalWithClicks(locationData) {
             locationData.clicksRemaining = maxClicks;
             
             setTimeout(() => {
-                // ✅ استخدام قناة الملفات
-                CallSystem.fileDC.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
+                CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
                 const msgId = Date.now().toString();
                 this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
                 this.displayMessage({ id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' });
@@ -2200,29 +2231,31 @@ showLocationSwipeModalWithClicks(locationData) {
     }, 30000);
 }, 
     
-// ==================== القسم 35: saveMessage ====================
-saveMessage(friendId, message) { 
-    const key = `chat_${friendId}`; 
-    let h = []; 
-    try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
-    h.push(message); 
-    let serialized = JSON.stringify(h);
-    while (serialized.length > 4000000) {
-        let removed = false;
-        for (let i = 0; i < h.length; i++) {
-            if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') { h.splice(i, 1); removed = true; break; }
+    
+    
+    // ==================== القسم 35: saveMessage ====================
+    saveMessage(friendId, message) { 
+        const key = `chat_${friendId}`; 
+        let h = []; 
+        try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
+        h.push(message); 
+        let serialized = JSON.stringify(h);
+        while (serialized.length > 4000000) {
+            let removed = false;
+            for (let i = 0; i < h.length; i++) {
+                if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') { h.splice(i, 1); removed = true; break; }
+            }
+            if (!removed) h.splice(0, 1);
+            serialized = JSON.stringify(h);
         }
-        if (!removed) h.splice(0, 1);
-        serialized = JSON.stringify(h);
-    }
-    try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
-        h = h.slice(Math.floor(h.length * 0.2));
-        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
-    }
-    this.messages[friendId] = h; 
-},
+        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
+            h = h.slice(Math.floor(h.length * 0.2));
+            try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
+        }
+        this.messages[friendId] = h; 
+    },
 
-// ==================== القسم 36: updateLastMessage ====================
+   // ==================== القسم 36: updateLastMessage ====================
 updateLastMessage(friendId, lastMessage) { 
     document.querySelectorAll('.chat-item').forEach(item => { 
         if (item.getAttribute('onclick')?.includes(friendId)) { 
@@ -2233,7 +2266,8 @@ updateLastMessage(friendId, lastMessage) {
     }); 
 },
 
-// ==================== القسم 37: closeChat ====================
+
+    // ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2271,6 +2305,7 @@ closeChat() {
         btn.title = 'تفعيل الميزات';
     }
     
+    // ✅ إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'none';
@@ -2289,12 +2324,14 @@ closeChat() {
     console.log('✅ closeChat - انتهى');
 },
     
-// ==================== القسم 38: escapeHtml ====================
-escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    
+    // ==================== القسم 38: escapeHtml ====================
+    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
+
 
 // ✅ الحل النهائي والثابت للمتصفحات والهواتف عند ظهور واختفاء الكيبورد
 const initVisualViewportFix = () => {
@@ -2304,10 +2341,17 @@ const initVisualViewportFix = () => {
         const conversationPage = document.querySelector('.conversation-page');
         const messagesContainer = document.querySelector('.messages-container');
         
+        // التحقق من أن المحادثة مفتوحة حالياً وأن العنصر موجود في الواجهة
         if (conversationPage && document.body.classList.contains('conversation-open')) {
+            // 1. جلب الارتفاع الحقيقي للمساحة المرئية فوق الكيبورد بدقة ملليمترية
             const currentViewportHeight = window.visualViewport.height;
+            
+            // 2. إجبار حاوية المحادثة الكبرى على أخذ هذا الارتفاع الفعلي فقط
             conversationPage.style.height = `${currentViewportHeight}px`;
+            
+            // 3. تأمين النزول التلقائي لآخر رسالة عند ظهور الكيبورد لتسهيل القراءة
             if (messagesContainer) {
+                // استخدام setTimeout بسيط لضمان انتهاء المتصفح من إعادة رسم العناصر
                 setTimeout(() => {
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }, 30);
@@ -2315,38 +2359,52 @@ const initVisualViewportFix = () => {
         }
     };
 
+    // الاستماع لحدث تغيير الحجم (عند خروج أو دخول الكيبورد)
     window.visualViewport.addEventListener('resize', fixViewportHeight);
+    
+    // الاستماع لحدث التمرير لمنع القفز أو الاهتزاز العشوائي في المتصفحات الذكية
     window.visualViewport.addEventListener('scroll', fixViewportHeight);
 };
 
+// تشغيل دالة التثبيت بمجرد تحميل الصفحة بالكامل
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initVisualViewportFix);
 } else {
     initVisualViewportFix();
 }
 
+
 // 🛡️ تأمين شامل: منع سحب الواجهة بالخطأ للأعلى عند لمس الهيدر أو شريط الكتابة
 document.addEventListener('touchmove', function(e) {
+    // التحقق من أن صفحة المحادثة مفتوحة حالياً
     if (document.body.classList.contains('conversation-open')) {
+        
+        // التحقق مما إذا كان المستخدم يلمس منطقة الرسائل (المسموح لها بالتمرير)
         const isMessagesContainer = e.target.closest('.messages-container');
+        
+        // إذا كان الإصبع يلمس أي مكان آخر (مثل حقل الإدخال أو الهيدر) وسحب للأعلى، امنعه فوراً
         if (!isMessagesContainer) {
             e.preventDefault();
         }
     }
-}, { passive: false });
+}, { passive: false }); // { passive: false } إجبارية لمنع السلوك الافتراضي للمتصفح الذكي
+
 
 // 🛡️ جدار حماية صارم: منع تكبير أو تصغير الموقع نهائياً بالإصبعين أو النقر المزدوج
 document.addEventListener('touchstart', function (e) {
+    // إذا لمس المستخدم الشاشة بأكثر من إصبع (محاولة عمل زووم)
     if (e.touches.length > 1) {
-        e.preventDefault();
+        e.preventDefault(); // إلغاء التكبير فوراً
     }
 }, { passive: false });
 
+// منع التكبير عند النقر المزدوج السريع (Double-tap to zoom)
 let lastTouchEnd = 0;
 document.addEventListener('touchend', function (e) {
     const now = (new Date()).getTime();
     if (now - lastTouchEnd <= 300) {
-        e.preventDefault();
+        e.preventDefault(); // إلغاء تكبير النقر المزدوج
     }
     lastTouchEnd = now;
 }, { passive: false });
+
