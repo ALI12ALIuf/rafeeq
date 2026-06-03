@@ -945,7 +945,7 @@ setupDataChannel(channel) {
     };
     
     channel.onclose = () => {
-        console.log('❌ Data Channel مغلق');
+        console.log('❌ Data Channel مغلق - سيتم إعادة المحاولة مع بقاء الميزات مفعلة');
         this.sendCallStatus('disconnected');
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
@@ -953,52 +953,16 @@ setupDataChannel(channel) {
         }
         this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-        }
+        // ✅ تم إزالة الكود الذي كان يعطل الميزات
+        // الميزات تبقى مفعلة حتى لو انقطعت القناة
     };
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-        }
+        // ✅ تم إزالة الكود الذي كان يعطل الميزات
+        // الميزات تبقى مفعلة حتى لو حدث خطأ في القناة
     };
 },
 
