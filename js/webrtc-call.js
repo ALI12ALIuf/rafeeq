@@ -430,9 +430,16 @@ const CallSystem = {
     },
 
     
-    // ==================== 7. استقبال المكالمات ====================
+    // ==================== 7. استقبال المكالمات (قناة منفصلة عن الملفات) ====================
 
     async receiveCall(callerId, callData) {
+        // ✅ إذا كانت إشارة لفتح قناة ملفات، تعامل معها بشكل منفصل
+        if (callData.type === 'file_channel') {
+            console.log('📁 استلام طلب فتح قناة ملفات');
+            await this.handleFileChannelSignal(callerId, callData);
+            return;
+        }
+        
         if (this.isInCall) {
             console.log('❌ مكالمة نشطة بالفعل');
             this.sendSignal(callerId, { type: 'reject' });
@@ -479,18 +486,19 @@ const CallSystem = {
             
             this.showCallUI(this.callType);
             
-            this.pc = new RTCPeerConnection(this.servers);
+            // ✅ إنشاء PeerConnection خاص بالمكالمة فقط
+            this.callPC = new RTCPeerConnection(this.servers);
             
             this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
+                this.callPC.addTrack(track, this.localStream);
+                console.log(`➕ تم إضافة مسار ${track.kind} إلى قناة المكالمة`);
             });
             
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
+            this.callPC.onicecandidate = e => { 
+                if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate, channel: 'call' });
             };
             
-            this.pc.ontrack = e => {
+            this.callPC.ontrack = e => {
                 console.log('📞 استقبال مسار:', e.track.kind);
                 
                 if (e.track.kind === 'video') {
@@ -515,25 +523,25 @@ const CallSystem = {
                 }
             };
             
-            this.pc.ondatachannel = e => {
-                console.log('📡 استقبال Data Channel');
-                this.setupDataChannel(e.channel);
-                this.dc = e.channel;
+            this.callPC.ondatachannel = e => {
+                console.log('📡 استقبال Data Channel للمكالمة');
+                this.setupCallDataChannel(e.channel);
+                this.callDC = e.channel;
             };
             
-            this.pc.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+            this.callPC.onconnectionstatechange = () => {
+                console.log(`🔄 حالة اتصال المكالمة: ${this.callPC?.connectionState}`);
+                if (this.callPC && (this.callPC.connectionState === 'failed' || this.callPC.connectionState === 'disconnected')) {
                     this.endCall();
                 }
             };
             
             if (callData.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+                await this.callPC.setRemoteDescription(new RTCSessionDescription(callData.sdp));
                 const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
-                const answer = await this.pc.createAnswer(answerOptions);
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
+                const answer = await this.callPC.createAnswer(answerOptions);
+                await this.callPC.setLocalDescription(answer);
+                await this.sendSignal(callerId, { sdp: this.callPC.localDescription });
                 console.log('✅ تم إرسال الرد');
             }
             
@@ -551,6 +559,39 @@ const CallSystem = {
             console.error('❌ خطأ في استقبال المكالمة:', e);
             this.sendSignal(callerId, { type: 'reject' });
             this.endCall(); 
+        }
+    },
+    
+    // ✅ دالة جديدة لمعالجة إشارات قناة الملفات
+    async handleFileChannelSignal(callerId, callData) {
+        if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
+            console.log('🚫 تجاهل طلب فتح قناة ملفات - الميزات غير مفعلة');
+            return;
+        }
+        
+        try {
+            if (callData.sdp) {
+                if (!this.filePC) {
+                    this.filePC = new RTCPeerConnection(this.servers);
+                    this.filePC.ondatachannel = e => {
+                        console.log('📡 استقبال قناة ملفات');
+                        this.setupFileDataChannel(e.channel);
+                        this.fileDC = e.channel;
+                    };
+                    this.filePC.onicecandidate = e => {
+                        if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate, channel: 'file' });
+                    };
+                }
+                await this.filePC.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+                if (callData.sdp.type === 'offer') {
+                    const answer = await this.filePC.createAnswer();
+                    await this.filePC.setLocalDescription(answer);
+                    await this.sendSignal(callerId, { sdp: this.filePC.localDescription, type: 'file_channel' });
+                    console.log('✅ تم قبول طلب فتح قناة الملفات');
+                }
+            }
+        } catch (e) {
+            console.error('❌ خطأ في معالجة قناة الملفات:', e);
         }
     },
 
