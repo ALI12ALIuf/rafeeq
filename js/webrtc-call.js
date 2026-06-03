@@ -1607,7 +1607,7 @@ async sendSignal(calleeId, data) {
             reader.readAsDataURL(file);
         });
     },
-    
+
     // ==================== 14. إنهاء المكالمة ====================
     
 endCall() {
@@ -1672,10 +1672,8 @@ endCall() {
         }).catch(() => {});
     }
     
-    // ✅ إعادة تعيين المتغير بعد انتهاء المكالمة
-    setTimeout(() => {
-        this.isClosingDueToCallEnd = false;
-    }, 1000);
+    // ✅ تم إزالة setTimeout (لم نعد نعيد تعيين isClosingDueToCallEnd هنا)
+    // سيتم إعادة تعيينه في channel.onclose بعد إغلاق القناة
     
     console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
 },
