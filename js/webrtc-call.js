@@ -8,8 +8,6 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
-    isClosingDueToCallEnd: false,  // ✅ متغير لمنع إلغاء الميزات عند انتهاء المكالمة
-    isCallEnding: false,           // ✅ متغير جديد لمنع إلغاء الميزات أثناء إنهاء المكالمة
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -833,8 +831,7 @@ const CallSystem = {
         });
     },
     
-
-  // ==================== 9. Data Channel وإدارة الاتصال ====================
+    // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -956,8 +953,7 @@ setupDataChannel(channel) {
         }
         this.scheduleReconnect();
         
-        // ✅ لا نلغي الميزات إذا كانت مكالمة تنتهي (isCallEnding) أو كان الإغلاق بسبب المكالمة (isClosingDueToCallEnd)
-        if (!this.isCallEnding && !this.isClosingDueToCallEnd && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -976,8 +972,6 @@ setupDataChannel(channel) {
             
             ChatSystem.updateAllButtons();
             console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-        } else {
-            console.log('📞 إغلاق القناة بسبب المكالمة - الميزات تبقى مفعلة');
         }
     };
     
@@ -985,8 +979,7 @@ setupDataChannel(channel) {
         console.error('❌ خطأ في Data Channel:', e);
         this.scheduleReconnect();
         
-        // ✅ لا نلغي الميزات إذا كانت مكالمة تنتهي (isCallEnding) أو كان الإغلاق بسبب المكالمة (isClosingDueToCallEnd)
-        if (!this.isCallEnding && !this.isClosingDueToCallEnd && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -1005,8 +998,6 @@ setupDataChannel(channel) {
             
             ChatSystem.updateAllButtons();
             console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-        } else {
-            console.log('📞 خطأ في القناة بسبب المكالمة - الميزات تبقى مفعلة');
         }
     };
 },
@@ -1108,7 +1099,6 @@ async handleSignaling(data) {
             console.log('📞 الطرف الآخر رفض المكالمة');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
-            this.isClosingDueToCallEnd = true;
             this.endCall();
             return;
         }
@@ -1117,7 +1107,6 @@ async handleSignaling(data) {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
-            this.isClosingDueToCallEnd = true;
             this.endCall();
             return;
         }
@@ -1172,7 +1161,6 @@ async sendSignal(calleeId, data) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
 },
-
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
@@ -1606,107 +1594,80 @@ async sendSignal(calleeId, data) {
             reader.readAsDataURL(file);
         });
     },
-
-
-// ==================== 14. إنهاء المكالمة ====================
     
-endCall() {
-    console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+    // ==================== 14. إنهاء المكالمة ====================
     
-    this.isClosingDueToCallEnd = true;
-    this.isCallEnding = true;
-    
-    if (this.currentCallId && ChatSystem.currentChat) {
-        this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
-    }
-    this.currentCallId = null;
-    
-    this.sendCallStatus('disconnected');
-    
-    if (this.keepAliveInterval) {
-        clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = null;
-    }
-    if (this.callTimerInterval) {
-        clearInterval(this.callTimerInterval);
-        this.callTimerInterval = null;
-    }
-    if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-    }
-    
-    if (this.remoteAudioElement) {
-        this.remoteAudioElement.pause();
-        this.remoteAudioElement.srcObject = null;
-        this.remoteAudioElement = null;
-    }
-    
-    if (this.localStream) {
-        try {
-            this.localStream.getTracks().forEach(t => t.stop());
-        } catch(e) {}
-        this.localStream = null;
-    }
-    
-    this.cleanupConnections();
-    
-    const ui = document.getElementById('callUI');
-    if (ui) ui.remove();
-    const inc = document.getElementById('incomingCall');
-    if (inc) inc.remove();
-    document.body.classList.remove('in-call');
-    
-    this.isInCall = false;
-    this.callType = null;
-    this.isAudioMuted = false;
-    this.isVideoMuted = false;
-    this.isSpeakerEnabled = false;
-    this.reconnectAttempts = 0;
-    
-    if (window.auth?.currentUser) {
-        window.db.collection('users').doc(window.auth.currentUser.uid).update({
-            inCall: false,
-            callType: null,
-            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(() => {});
-    }
-    
-    setTimeout(() => {
-        this.isCallEnding = false;
-        this.isClosingDueToCallEnd = false;
-    }, 5000);
-    
-    console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
-},
-
-cleanupConnections() {
-    // ✅ تسجيل الحالة قبل أي تغيير (للتحقق من المشكلة)
-    console.log('🔍 [cleanupConnections] الميزات قبل التنظيف:', {
-        featuresEnabled: ChatSystem?.featuresEnabled,
-        currentChat: ChatSystem?.currentChat,
-        friendInConversation: ChatSystem?.friendInConversation,
-        dcState: this.dc?.readyState
-    });
-    
-    if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-    }
-    if (this.keepAliveInterval) {
-        clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = null;
-    }
-    
-    // ✅ إبقاء Data Channel مفتوحاً إذا كانت الميزات مفعلة
-    if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
-        console.log('📡 الميزات مفعلة - إبقاء Data Channel مفتوحاً');
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
+    endCall() {
+        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+        
+        if (this.currentCallId && ChatSystem.currentChat) {
+            this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
         }
-    } else {
-        console.log('🔌 الميزات غير مفعلة أو لا توجد محادثة - إغلاق Data Channel');
+        this.currentCallId = null;
+        
+        this.sendCallStatus('disconnected');
+        
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
+        if (this.callTimerInterval) {
+            clearInterval(this.callTimerInterval);
+            this.callTimerInterval = null;
+        }
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        
+        if (this.remoteAudioElement) {
+            this.remoteAudioElement.pause();
+            this.remoteAudioElement.srcObject = null;
+            this.remoteAudioElement = null;
+        }
+        
+        if (this.localStream) {
+            try {
+                this.localStream.getTracks().forEach(t => t.stop());
+            } catch(e) {}
+            this.localStream = null;
+        }
+        
+        this.cleanupConnections();
+        
+        const ui = document.getElementById('callUI');
+        if (ui) ui.remove();
+        const inc = document.getElementById('incomingCall');
+        if (inc) inc.remove();
+        document.body.classList.remove('in-call');
+        
+        this.isInCall = false;
+        this.callType = null;
+        this.isAudioMuted = false;
+        this.isVideoMuted = false;
+        this.isSpeakerEnabled = false;
+        this.reconnectAttempts = 0;
+        
+        if (window.auth?.currentUser) {
+            window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: false,
+                callType: null,
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(() => {});
+        }
+        
+        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
+    },
+    
+    cleanupConnections() {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
         if (this.dc) {
             try { this.dc.close(); } catch(e) {}
             this.dc = null;
@@ -1715,68 +1676,10 @@ cleanupConnections() {
             try { this.pc.close(); } catch(e) {}
             this.pc = null;
         }
-    }
-    this.incomingChunks = {};
-    this.incomingFileInfo = {};
-}
-};
-
-// ==================== 18. أداة التحقق من حالة الميزات والقناة (للهاتف) ====================
-window.showDebugInfo = function() {
-    const info = {
-        featuresEnabled: ChatSystem?.featuresEnabled || false,
-        friendInConversation: ChatSystem?.friendInConversation || false,
-        currentChat: ChatSystem?.currentChat || null,
-        dcState: CallSystem?.dc?.readyState || 'no dc',
-        pcState: CallSystem?.pc?.connectionState || 'no pc',
-        isInCall: CallSystem?.isInCall || false,
-        isClosingDueToCallEnd: CallSystem?.isClosingDueToCallEnd || false,
-        isCallEnding: CallSystem?.isCallEnding || false
-    };
-    
-    let message = '═══════════════════════════\n';
-    message += '🔍 حالة النظام بعد المكالمة:\n';
-    message += '═══════════════════════════\n\n';
-    message += `📌 الميزات مفعلة (featuresEnabled): ${info.featuresEnabled ? '✅ نعم' : '❌ لا'}\n`;
-    message += `📌 الطرف الآخر في المحادثة (friendInConversation): ${info.friendInConversation ? '✅ نعم' : '❌ لا'}\n`;
-    message += `📌 معرف المحادثة الحالي (currentChat): ${info.currentChat || '❌ لا يوجد'}\n`;
-    message += `📌 حالة Data Channel (dc.readyState): ${info.dcState}\n`;
-    message += `📌 حالة PeerConnection (pc.connectionState): ${info.pcState}\n`;
-    message += `📌 هل هناك مكالمة نشطة (isInCall): ${info.isInCall ? '✅ نعم' : '❌ لا'}\n`;
-    message += `📌 متغير منع الإلغاء (isClosingDueToCallEnd): ${info.isClosingDueToCallEnd ? '✅ true' : '❌ false'}\n`;
-    message += `📌 متغير إنهاء المكالمة (isCallEnding): ${info.isCallEnding ? '✅ true' : '❌ false'}\n`;
-    
-    alert(message);
-};
-
-// ✅ إضافة زر تحكم في شاشة المحادثة
-window.addDebugButton = function() {
-    const container = document.querySelector('.call-buttons');
-    if (container && !document.getElementById('debugBtn')) {
-        const btn = document.createElement('button');
-        btn.id = 'debugBtn';
-        btn.innerHTML = '<i class="fas fa-bug"></i>';
-        btn.title = 'عرض حالة النظام';
-        btn.style.cssText = 'background:none;border:none;color:#ff9800;font-size:1.3rem;cursor:pointer;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;';
-        btn.onclick = () => window.showDebugInfo();
-        container.appendChild(btn);
-        console.log('✅ تم إضافة زر التحقق');
+        this.incomingChunks = {};
+        this.incomingFileInfo = {};
     }
 };
-
-// محاولة إضافة الزر عند تحميل الصفحة
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            if (typeof window.addDebugButton === 'function') {
-                window.addDebugButton();
-            }
-        }, 2000);
-    });
-}
-    
- 
-
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
