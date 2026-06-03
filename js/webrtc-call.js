@@ -315,7 +315,7 @@ const CallSystem = {
     },
 
 
-    // ==================== 5. المكالمة المرئية ====================
+    // ==================== 5. المكالمة المرئية (قناة منفصلة عن الملفات) ====================
 
     async startVideoCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -330,6 +330,12 @@ const CallSystem = {
         if (this.isInCall) {
             console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
             return;
+        }
+        
+        // ✅ التأكد من وجود قناة الملفات أولاً (حتى لا تتأثر بالمكالمة)
+        if (!this.fileDC || this.fileDC.readyState !== 'open') {
+            console.log('📁 التأكد من وجود قناة الملفات قبل بدء المكالمة...');
+            await this.ensureFileChannelOnly(calleeId);
         }
         
         this.isInCall = true;
@@ -356,23 +362,29 @@ const CallSystem = {
             }
             
             this.showCallUI('video');
-            this.pc = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
             
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => {
+            // ✅ إنشاء PeerConnection خاص بالمكالمة فقط (منفصل عن قناة الملفات)
+            this.callPC = new RTCPeerConnection(this.servers);
+            this.localStream.getTracks().forEach(track => this.callPC.addTrack(track, this.localStream));
+            
+            // ✅ Data Channel خاص بالمكالمة فقط (للإشارات)
+            this.callDC = this.callPC.createDataChannel('call_chat');
+            this.setupCallDataChannel(this.callDC);
+            
+            this.callPC.onicecandidate = e => { 
+                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate, channel: 'call' }); 
+            };
+            this.callPC.ontrack = e => {
                 const rv = document.getElementById('remoteVideo');
                 if (rv && e.streams[0]) rv.srcObject = e.streams[0];
             };
-            this.pc.onconnectionstatechange = () => {
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
+            this.callPC.onconnectionstatechange = () => {
+                if (this.callPC && (this.callPC.connectionState === 'failed' || this.callPC.connectionState === 'disconnected')) this.endCall();
             };
             
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
+            const offer = await this.callPC.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+            await this.callPC.setLocalDescription(offer);
+            await this.sendSignal(calleeId, { sdp: this.callPC.localDescription, type: 'video' });
             
         } catch (e) { 
             this.endCall(); 
