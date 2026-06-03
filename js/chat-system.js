@@ -2432,3 +2432,290 @@ document.addEventListener('touchend', function (e) {
     lastTouchEnd = now;
 }, { passive: false });
 
+
+
+
+
+
+// ==================== أداة تشخيص WebRTC ====================
+(function() {
+    // انتظر حتى يتم تحميل الصفحة
+    setTimeout(() => {
+        // إنشاء لوحة التشخيص
+        const diagnosticPanel = document.createElement('div');
+        diagnosticPanel.id = 'webrtc-diagnostic-panel';
+        diagnosticPanel.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            max-width: 90vw;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 15px;
+            z-index: 99999;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+            border: 1px solid #4CAF50;
+            transition: all 0.3s ease;
+            cursor: move;
+            user-select: none;
+        `;
+        
+        // رأس اللوحة مع أزرار التحكم
+        const panelHeader = document.createElement('div');
+        panelHeader.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #4CAF50;
+            cursor: move;
+        `;
+        panelHeader.innerHTML = `
+            <strong style="color: #4CAF50;">🔍 تشخيص WebRTC</strong>
+            <div style="display: flex; gap: 8px;">
+                <button id="diag-minimize" style="background: #333; border: none; color: white; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; font-size: 14px;">−</button>
+                <button id="diag-copy" style="background: #2196F3; border: none; color: white; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; font-size: 11px;">📋</button>
+                <button id="diag-close" style="background: #f44336; border: none; color: white; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; font-size: 14px;">✕</button>
+            </div>
+        `;
+        
+        // محتوى اللوحة
+        const panelContent = document.createElement('div');
+        panelContent.id = 'diag-content';
+        panelContent.style.cssText = `
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 10px;
+            line-height: 1.4;
+        `;
+        
+        // منطقة الحالة المصغرة
+        const panelMinimized = document.createElement('div');
+        panelMinimized.id = 'diag-minimized';
+        panelMinimized.style.cssText = `
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 25px;
+            z-index: 99999;
+            color: #4CAF50;
+            font-family: monospace;
+            font-size: 20px;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid #4CAF50;
+        `;
+        panelMinimized.innerHTML = '🔍';
+        
+        document.body.appendChild(diagnosticPanel);
+        document.body.appendChild(panelMinimized);
+        diagnosticPanel.appendChild(panelHeader);
+        diagnosticPanel.appendChild(panelContent);
+        
+        let isMinimized = false;
+        let isDragging = false;
+        let dragStartX, dragStartY, panelStartX, panelStartY;
+        
+        // وظيفة جمع معلومات التشخيص
+        function collectDiagnostics() {
+            let info = '';
+            info += '═══════════════════════════════════════\n';
+            info += `📅 الوقت: ${new Date().toLocaleString()}\n`;
+            info += '═══════════════════════════════════════\n\n';
+            
+            // 1. معلومات عامة
+            info += '【1】 معلومات المتصفح:\n';
+            info += `   • User Agent: ${navigator.userAgent}\n`;
+            info += `   • اللغة: ${navigator.language}\n`;
+            info += `   • على الإنترنت: ${navigator.onLine ? 'نعم' : 'لا'}\n`;
+            info += `   • الـ WebRTC مدعوم: ${!!window.RTCPeerConnection ? 'نعم' : 'لا'}\n\n`;
+            
+            // 2. حالة CallSystem
+            info += '【2】 حالة CallSystem:\n';
+            info += `   • CallSystem موجود: ${typeof CallSystem !== 'undefined' ? 'نعم' : 'لا'}\n`;
+            if (typeof CallSystem !== 'undefined') {
+                info += `   • filePC: ${CallSystem.filePC ? 'موجود' : 'لا'}\n`;
+                info += `   • fileDC: ${CallSystem.fileDC ? 'موجود' : 'لا'}\n`;
+                info += `   • fileDC readyState: ${CallSystem.fileDC?.readyState || 'غير موجود'}\n`;
+                info += `   • callPC: ${CallSystem.callPC ? 'موجود' : 'لا'}\n`;
+                info += `   • callDC: ${CallSystem.callDC ? 'موجود' : 'لا'}\n`;
+                info += `   • isInCall: ${CallSystem.isInCall}\n`;
+                info += `   • callType: ${CallSystem.callType || 'لا'}\n`;
+                info += `   • dc getter: ${CallSystem.dc ? 'يعمل' : 'لا'}\n`;
+                info += `   • dc readyState: ${CallSystem.dc?.readyState || 'غير موجود'}\n`;
+            }
+            info += '\n';
+            
+            // 3. حالة ChatSystem
+            info += '【3】 حالة ChatSystem:\n';
+            if (typeof ChatSystem !== 'undefined') {
+                info += `   • currentChat: ${ChatSystem.currentChat || 'لا'}\n`;
+                info += `   • friendInConversation: ${ChatSystem.friendInConversation}\n`;
+                info += `   • featuresEnabled: ${ChatSystem.featuresEnabled}\n`;
+                info += `   • featureRequestPending: ${ChatSystem.featureRequestPending}\n`;
+                info += `   • featureRequestReceived: ${ChatSystem.featureRequestReceived}\n`;
+            }
+            info += '\n';
+            
+            // 4. معلومات المستخدم
+            info += '【4】 معلومات المستخدم:\n';
+            if (window.auth?.currentUser) {
+                info += `   • UID: ${window.auth.currentUser.uid}\n`;
+                info += `   • البريد: ${window.auth.currentUser.email || 'غير متوفر'}\n`;
+            } else {
+                info += '   • غير مسجل الدخول\n';
+            }
+            info += '\n';
+            
+            // 5. أخطاء JavaScript
+            info += '【5】 أخطاء JavaScript:\n';
+            if (window._caughtErrors && window._caughtErrors.length > 0) {
+                window._caughtErrors.forEach((err, i) => {
+                    info += `   • خطأ ${i+1}: ${err}\n`;
+                });
+            } else {
+                info += '   • لا توجد أخطاء مسجلة\n';
+            }
+            info += '\n';
+            
+            // 6. إشارات WebRTC في Firestore
+            info += '【6】 إشارات WebRTC:\n';
+            if (window.db && ChatSystem.currentChat) {
+                info += '   • جاري فحص Firestore...\n';
+                // سيتم التحديث لاحقاً بشكل غير متزامن
+            } else {
+                info += '   • لا يمكن فحص Firestore\n';
+            }
+            
+            return info;
+        }
+        
+        // عرض المعلومات
+        async function updateDiagnostics() {
+            let info = collectDiagnostics();
+            
+            // محاولة جلب إشارات WebRTC من Firestore
+            if (window.db && ChatSystem.currentChat) {
+                try {
+                    const messagesRef = window.db.collection('secure_messages');
+                    const snapshot = await messagesRef
+                        .where('to', '==', ChatSystem.currentChat)
+                        .where('package.type', '==', 'webrtc')
+                        .limit(5)
+                        .get();
+                    
+                    info += `   • إشارات WebRTC عالقة: ${snapshot.size}\n`;
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        info += `     - ${doc.id}: ${JSON.stringify(data.package?.type)} / ${JSON.stringify(data.package?.data?.type)}\n`;
+                    });
+                } catch(e) {
+                    info += `   • خطأ في جلب الإشارات: ${e.message}\n`;
+                }
+            }
+            
+            panelContent.innerHTML = info.replace(/\n/g, '<br>');
+        }
+        
+        // نسخ المعلومات
+        function copyDiagnostics() {
+            const text = panelContent.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const copyBtn = document.getElementById('diag-copy');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '✓';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                }, 1500);
+            });
+        }
+        
+        // تصغير/تكبير
+        function toggleMinimize() {
+            isMinimized = !isMinimized;
+            diagnosticPanel.style.display = isMinimized ? 'none' : 'block';
+            panelMinimized.style.display = isMinimized ? 'flex' : 'none';
+        }
+        
+        // إغلاق اللوحة
+        function closePanel() {
+            diagnosticPanel.remove();
+            panelMinimized.remove();
+        }
+        
+        // سحب اللوحة
+        function onMouseDown(e) {
+            if (e.target.closest('#diag-minimize') || e.target.closest('#diag-copy') || e.target.closest('#diag-close')) return;
+            isDragging = true;
+            dragStartX = e.clientX - diagnosticPanel.offsetLeft;
+            dragStartY = e.clientY - diagnosticPanel.offsetTop;
+            diagnosticPanel.style.cursor = 'grabbing';
+            e.preventDefault();
+        }
+        
+        function onMouseMove(e) {
+            if (!isDragging) return;
+            let newX = e.clientX - dragStartX;
+            let newY = e.clientY - dragStartY;
+            newX = Math.min(window.innerWidth - diagnosticPanel.offsetWidth - 10, Math.max(10, newX));
+            newY = Math.min(window.innerHeight - diagnosticPanel.offsetHeight - 10, Math.max(10, newY));
+            diagnosticPanel.style.left = newX + 'px';
+            diagnosticPanel.style.top = newY + 'px';
+            diagnosticPanel.style.right = 'auto';
+            diagnosticPanel.style.bottom = 'auto';
+        }
+        
+        function onMouseUp() {
+            isDragging = false;
+            diagnosticPanel.style.cursor = 'move';
+        }
+        
+        // تسجيل الأخطاء
+        window._caughtErrors = [];
+        window.addEventListener('error', function(e) {
+            window._caughtErrors.unshift(`${e.message} (${e.filename}:${e.lineno})`);
+            if (window._caughtErrors.length > 10) window._caughtErrors.pop();
+            updateDiagnostics();
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            window._caughtErrors.unshift(`Promise Rejection: ${e.reason}`);
+            if (window._caughtErrors.length > 10) window._caughtErrors.pop();
+            updateDiagnostics();
+        });
+        
+        // أحداث الأزرار
+        document.getElementById('diag-minimize')?.addEventListener('click', toggleMinimize);
+        document.getElementById('diag-copy')?.addEventListener('click', copyDiagnostics);
+        document.getElementById('diag-close')?.addEventListener('click', closePanel);
+        panelMinimized.addEventListener('click', toggleMinimize);
+        
+        // أحداث السحب
+        panelHeader.addEventListener('mousedown', onMouseDown);
+        panelHeader.addEventListener('touchstart', onMouseDown, { passive: false });
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('touchmove', onMouseMove, { passive: false });
+        document.addEventListener('touchend', onMouseUp);
+        
+        // تحديث كل 3 ثواني
+        updateDiagnostics();
+        setInterval(updateDiagnostics, 3000);
+        
+        console.log('✅ أداة التشخيص WebRTC مفعلة - ابحث عن اللوحة الخضراء في أسفل اليمين');
+    }, 2000);
+})();
