@@ -911,12 +911,14 @@ const CallSystem = {
             }, 30000);
         });
     },
-    
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
 
-setupDataChannel(channel) {
+    
+   // ==================== 9. قنوات Data Channel المنفصلة ====================
+
+// -------------------- قناة الملفات (دائمة) --------------------
+setupFileDataChannel(channel) {
     if (!channel) return;
-    console.log('📡 إعداد Data Channel');
+    console.log('📁 إعداد قناة الملفات');
     
     channel.onmessage = e => {
         try {
@@ -1009,80 +1011,66 @@ setupDataChannel(channel) {
     };
     
     channel.onopen = () => {
-        console.log('✅ Data Channel مفتوح');
+        console.log('✅ قناة الملفات مفتوحة');
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
         this.reconnectAttempts = 0;
-        this.sendCallStatus('connected');
-        
-        if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = setInterval(() => {
-            if (this.dc && this.dc.readyState === 'open') {
-                this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-            }
-        }, 2000);
     };
     
     channel.onclose = () => {
-        console.log('❌ Data Channel مغلق');
-        this.sendCallStatus('disconnected');
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        this.scheduleReconnect();
-        
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-        }
+        console.log('❌ قناة الملفات مغلقة - سيتم محاولة إعادة الفتح مع بقاء الميزات');
+        this.scheduleReconnectFile();
     };
     
     channel.onerror = (e) => {
-        console.error('❌ خطأ في Data Channel:', e);
-        this.scheduleReconnect();
-        
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-        }
+        console.error('❌ خطأ في قناة الملفات:', e);
+        this.scheduleReconnectFile();
     };
 },
 
+// -------------------- قناة المكالمات (مؤقتة) --------------------
+setupCallDataChannel(channel) {
+    if (!channel) return;
+    console.log('📞 إعداد قناة المكالمات');
+    
+    channel.onmessage = e => {
+        try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'webrtc_signal') {
+                this.handleSignaling(msg.data);
+            }
+        } catch(e) {}
+    };
+    
+    channel.onopen = () => {
+        console.log('✅ قناة المكالمات مفتوحة');
+    };
+    
+    channel.onclose = () => {
+        console.log('❌ قناة المكالمات مغلقة');
+    };
+},
+
+// -------------------- إعادة الاتصال لقناة الملفات فقط --------------------
+scheduleReconnectFile() {
+    if (!ChatSystem.currentChat) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
+    this.reconnectTimer = setTimeout(async () => {
+        try {
+            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+                await this.ensureFileChannelOnly(ChatSystem.currentChat);
+            }
+        } catch (error) {}
+        this.reconnectTimer = null;
+    }, delay);
+},
+
+// -------------------- معالجة إشارات WebRTC --------------------
 handleCallStatus(msg) {
     if (msg.status === 'connected') {
         console.log('📞 الطرف الآخر متصل');
@@ -1095,82 +1083,8 @@ handleCallStatus(msg) {
 },
 
 sendCallStatus(status) {
-    if (this.dc && this.dc.readyState === 'open') {
-        this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
-    }
-},
-
-scheduleReconnect() {
-    if (!ChatSystem.currentChat) return;
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
-    this.reconnectTimer = setTimeout(async () => {
-        try {
-            if (ChatSystem.currentChat) {
-                await this.ensureDataChannelOnly(ChatSystem.currentChat);
-            }
-        } catch (error) {}
-        this.reconnectTimer = null;
-    }, delay);
-},
-
-async ensureDataChannel(calleeId) {
-    if (!calleeId) return;
-    if (this.dc && this.dc.readyState === 'open') return;
-    if (this.dc && this.dc.readyState === 'connecting') {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                clearInterval(checkInterval);
-                reject(new Error('انتهت مهلة انتظار القناة'));
-            }, 10000);
-            const checkInterval = setInterval(() => {
-                if (!this.dc) {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                } else if (this.dc.readyState === 'open') {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    resolve();
-                } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                }
-            }, 500);
-        });
-    }
-    return this.createNewDataChannel(calleeId);
-},
-
-async createNewDataChannel(calleeId) {
-    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-        console.log('🚫 منع إنشاء Data Channel جديد - الميزات غير مفعلة');
-        return;
-    }
-    
-    this.reconnectAttempts = 0;
-    this.cleanupConnections();
-    try {
-        this.pc = new RTCPeerConnection(this.servers);
-        this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-        this.setupDataChannel(this.dc);
-        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
-        this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
-        this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-        this.pc.onconnectionstatechange = () => {
-            switch(this.pc?.connectionState) {
-                case 'connected': this.reconnectAttempts = 0; break;
-                case 'failed': case 'disconnected': this.scheduleReconnect(); break;
-            }
-        };
-        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-        await this.pc.setLocalDescription(offer);
-        await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-    } catch (error) {
-        throw error;
+    if (this.callDC && this.callDC.readyState === 'open') {
+        this.callDC.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
     }
 },
 
@@ -1192,21 +1106,51 @@ async handleSignaling(data) {
             return;
         }
         
-        if (!this.pc) {
-            this.pc = new RTCPeerConnection(this.servers);
-            this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
-        }
-        if (data.sdp) {
-            await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-            if (data.sdp.type === 'offer') {
-                const answer = await this.pc.createAnswer();
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
+        // معالجة الإشارات حسب نوع القناة
+        if (data.channel === 'file') {
+            if (!this.filePC) {
+                this.filePC = new RTCPeerConnection(this.servers);
+                this.filePC.ondatachannel = e => {
+                    this.setupFileDataChannel(e.channel);
+                    this.fileDC = e.channel;
+                };
+                this.filePC.onicecandidate = e => {
+                    if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate, channel: 'file' });
+                };
             }
-        } else if (data.candidate) {
-            if (this.pc && data.candidate) {
-                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            if (data.sdp) {
+                await this.filePC.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                if (data.sdp.type === 'offer') {
+                    const answer = await this.filePC.createAnswer();
+                    await this.filePC.setLocalDescription(answer);
+                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.filePC.localDescription, type: 'file_channel' });
+                }
+            } else if (data.candidate) {
+                await this.filePC.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        } else {
+            // قناة المكالمة
+            if (!this.callPC) {
+                this.callPC = new RTCPeerConnection(this.servers);
+                this.callPC.ondatachannel = e => { 
+                    this.callDC = e.channel; 
+                    this.setupCallDataChannel(this.callDC);
+                };
+                this.callPC.onicecandidate = e => { 
+                    if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate, channel: 'call' });
+                };
+            }
+            if (data.sdp) {
+                await this.callPC.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                if (data.sdp.type === 'offer') {
+                    const answer = await this.callPC.createAnswer();
+                    await this.callPC.setLocalDescription(answer);
+                    await this.sendSignal(ChatSystem.currentChat, { sdp: this.callPC.localDescription });
+                }
+            } else if (data.candidate) {
+                if (this.callPC && data.candidate) {
+                    await this.callPC.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
             }
         }
     } catch (e) {
@@ -1220,16 +1164,16 @@ async sendSignal(calleeId, data) {
         return;
     }
     
-    if (this.dc && this.dc.readyState === 'open') {
+    // محاولة الإرسال عبر قناة الملفات أولاً
+    if (this.fileDC && this.fileDC.readyState === 'open') {
         try {
-            this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
-            console.log('📡 تم إرسال الإشارة مباشرة عبر Data Channel');
+            this.fileDC.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
+            console.log('📡 تم إرسال الإشارة عبر قناة الملفات');
             return;
-        } catch(e) {
-            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
-        }
+        } catch(e) {}
     }
     
+    // بديل: الإرسال عبر Firebase
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
@@ -1241,7 +1185,7 @@ async sendSignal(calleeId, data) {
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
-},
+}, 
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
