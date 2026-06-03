@@ -2,7 +2,13 @@
 // جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
 
 const CallSystem = {
-    pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
+    // ========== قناة الملفات (دائمة - لا تتأثر بالمكالمات) ==========
+    filePC: null, fileDC: null,
+    
+    // ========== قناة المكالمات (مؤقتة - تنتهي مع المكالمة) ==========
+    callPC: null, callDC: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
+    
+    // ========== باقي المتغيرات ==========
     incomingChunks: {}, incomingFileInfo: {},
     reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
     callTimerInterval: null, keepAliveInterval: null,
@@ -127,78 +133,91 @@ const CallSystem = {
         console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
     },
     
-    // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
+    // ==================== 3. قناة الملفات فقط (منفصلة تماماً عن المكالمات) ====================
     
-    async ensureDataChannelOnly(calleeId) {
+    async ensureFileChannelOnly(calleeId) {
         if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-            console.log('🚫 منع فتح Data Channel - الميزات غير مفعلة');
+            console.log('🚫 منع فتح قناة الملفات - الميزات غير مفعلة');
             return false;
         }
         
         if (!calleeId) return false;
         
-        if (this.dc && this.dc.readyState === 'open') {
-            console.log('✅ Data Channel موجود ومفتوح');
+        if (this.fileDC && this.fileDC.readyState === 'open') {
+            console.log('✅ قناة الملفات موجودة ومفتوحة');
             return true;
         }
         
-        if (this.dc && this.dc.readyState === 'connecting') {
-            console.log('⏳ Data Channel في طور الاتصال...');
+        if (this.fileDC && this.fileDC.readyState === 'connecting') {
+            console.log('⏳ قناة الملفات في طور الاتصال...');
             return new Promise((resolve) => {
                 const timeout = setTimeout(() => resolve(false), 10000);
                 const check = setInterval(() => {
-                    if (this.dc && this.dc.readyState === 'open') {
+                    if (this.fileDC && this.fileDC.readyState === 'open') {
                         clearInterval(check);
                         clearTimeout(timeout);
                         resolve(true);
-                    } else if (this.dc && (this.dc.readyState === 'failed' || this.dc.readyState === 'closed')) {
+                    } else if (this.fileDC && (this.fileDC.readyState === 'failed' || this.fileDC.readyState === 'closed')) {
                         clearInterval(check);
                         clearTimeout(timeout);
-                        this.createDataChannelOnly(calleeId).then(resolve);
+                        this.createFileChannelOnly(calleeId).then(resolve);
                     }
                 }, 500);
             });
         }
         
-        return this.createDataChannelOnly(calleeId);
+        return this.createFileChannelOnly(calleeId);
     },
     
-    async createDataChannelOnly(calleeId) {
+    async createFileChannelOnly(calleeId) {
         if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-            console.log('🚫 منع إنشاء Data Channel - الميزات غير مفعلة');
+            console.log('🚫 منع إنشاء قناة الملفات - الميزات غير مفعلة');
             return false;
         }
         
-        this.cleanupConnections();
+        this.cleanupFileChannel();
         try {
-            console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
+            console.log('🔧 إنشاء قناة ملفات فقط (منفصلة عن المكالمات)...');
             
-            this.pc = new RTCPeerConnection(this.servers);
-            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-            this.setupDataChannel(this.dc);
+            this.filePC = new RTCPeerConnection(this.servers);
+            this.fileDC = this.filePC.createDataChannel('file_transfer', { ordered: true, maxRetransmits: 3 });
+            this.setupFileDataChannel(this.fileDC);
             
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
+            this.filePC.onicecandidate = e => { 
+                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate, channel: 'file' }).catch(() => {});
             };
             
-            this.pc.ondatachannel = e => { 
-                this.setupDataChannel(e.channel); 
-                this.dc = e.channel; 
+            this.filePC.ondatachannel = e => { 
+                this.setupFileDataChannel(e.channel); 
+                this.fileDC = e.channel; 
             };
             
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
+            const offer = await this.filePC.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+            await this.filePC.setLocalDescription(offer);
+            await this.sendSignal(calleeId, { sdp: this.filePC.localDescription, type: 'file_channel' });
             
-            console.log('✅ تم إرسال طلب فتح Data Channel');
+            console.log('✅ تم إرسال طلب فتح قناة الملفات');
             return true;
         } catch (error) {
-            console.error('❌ فشل إنشاء Data Channel:', error);
+            console.error('❌ فشل إنشاء قناة الملفات:', error);
             return false;
         }
     },
     
-    // ==================== 4. المكالمة الصوتية ====================
+    // دالة تنظيف قناة الملفات فقط
+    cleanupFileChannel() {
+        if (this.fileDC) {
+            try { this.fileDC.close(); } catch(e) {}
+            this.fileDC = null;
+        }
+        if (this.filePC) {
+            try { this.filePC.close(); } catch(e) {}
+            this.filePC = null;
+        }
+    },
+    
+
+    // ==================== 4. المكالمة الصوتية (قناة منفصلة عن الملفات) ====================
 
     async startAudioCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -213,6 +232,12 @@ const CallSystem = {
         if (this.isInCall) {
             console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
             return;
+        }
+        
+        // ✅ التأكد من وجود قناة الملفات أولاً (حتى لا تتأثر بالمكالمة)
+        if (!this.fileDC || this.fileDC.readyState !== 'open') {
+            console.log('📁 التأكد من وجود قناة الملفات قبل بدء المكالمة...');
+            await this.ensureFileChannelOnly(calleeId);
         }
         
         this.isInCall = true;
@@ -244,41 +269,43 @@ const CallSystem = {
             }
             console.log('✅ تم الحصول على الميكروفون');
             
-            this.pc = new RTCPeerConnection(this.servers);
+            // ✅ إنشاء PeerConnection خاص بالمكالمة فقط (منفصل عن قناة الملفات)
+            this.callPC = new RTCPeerConnection(this.servers);
             
             this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
+                this.callPC.addTrack(track, this.localStream);
+                console.log(`➕ تم إضافة مسار ${track.kind} إلى قناة المكالمة`);
             });
             
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
+            // ✅ Data Channel خاص بالمكالمة فقط (للإشارات)
+            this.callDC = this.callPC.createDataChannel('call_chat');
+            this.setupCallDataChannel(this.callDC);
             
-            this.pc.onicecandidate = e => { 
+            this.callPC.onicecandidate = e => { 
                 if (e.candidate) {
-                    console.log('📡 إرسال ICE candidate');
-                    this.sendSignal(calleeId, { candidate: e.candidate });
+                    console.log('📡 إرسال ICE candidate للمكالمة');
+                    this.sendSignal(calleeId, { candidate: e.candidate, channel: 'call' });
                 }
             };
             
-            this.pc.ontrack = e => {
-                console.log(`📞 استقبال مسار ${e.track.kind}`);
+            this.callPC.ontrack = e => {
+                console.log(`📞 استقبال مسار ${e.track.kind} من المكالمة`);
                 if (e.track.kind === 'audio') {
                     this.setupRemoteAudio(e.streams[0]);
                 }
             };
             
-            this.pc.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+            this.callPC.onconnectionstatechange = () => {
+                console.log(`🔄 حالة اتصال المكالمة: ${this.callPC?.connectionState}`);
+                if (this.callPC && (this.callPC.connectionState === 'failed' || this.callPC.connectionState === 'disconnected')) {
                     this.endCall();
                 }
             };
             
             console.log('📞 إنشاء عرض مكالمة صوتية...');
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
+            const offer = await this.callPC.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+            await this.callPC.setLocalDescription(offer);
+            await this.sendSignal(calleeId, { sdp: this.callPC.localDescription, type: 'audio' });
             console.log('✅ تم إرسال العرض');
             
         } catch (e) { 
@@ -286,6 +313,7 @@ const CallSystem = {
             this.endCall(); 
         }
     },
+
 
     // ==================== 5. المكالمة المرئية ====================
 
