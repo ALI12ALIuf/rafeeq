@@ -215,8 +215,36 @@ const CallSystem = {
             this.filePC = null;
         }
     },
-    
 
+    
+    // ==================== 3.5 دوال التوافق مع النسخة الأصلية من chat-system.js ====================
+
+// ✅ للتوافق مع chat-system.js الأصلي
+async ensureDataChannelOnly(calleeId) {
+    console.log('🔄 ensureDataChannelOnly → تحويل إلى ensureFileChannelOnly');
+    return this.ensureFileChannelOnly(calleeId);
+},
+
+// ✅ للتوافق مع الإشارات إلى CallSystem.dc
+get dc() {
+    return this.fileDC;
+},
+
+// ✅ للتوافق مع الإشارات إلى CallSystem.pc
+get pc() {
+    return this.filePC;
+},
+
+// ✅ للتوافق مع عمليات الإغلاق القديمة
+set dc(value) {
+    this.fileDC = value;
+},
+
+// ✅ للتوافق مع عمليات الإغلاق القديمة
+set pc(value) {
+    this.filePC = value;
+},
+    
     // ==================== 4. المكالمة الصوتية (قناة منفصلة عن الملفات) ====================
 
     async startAudioCall(calleeId) {
