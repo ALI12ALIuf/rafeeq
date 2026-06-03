@@ -1595,14 +1595,11 @@ async sendSignal(calleeId, data) {
         });
     },
     
- // ==================== 14. إنهاء المكالمة ====================
+    // ==================== 14. إنهاء المكالمة ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
         
-        // نضع علامة تخبر النظام أننا نقوم بعملية إنهاء مكالمة حقيقية الآن لإعادة بناء ميزات الصور بأمان
-        this._isCompletingCall = true;
-
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
         }
@@ -1636,7 +1633,6 @@ async sendSignal(calleeId, data) {
             this.localStream = null;
         }
         
-        // استدعاء التنظيف
         this.cleanupConnections();
         
         const ui = document.getElementById('callUI');
@@ -1660,12 +1656,10 @@ async sendSignal(calleeId, data) {
             }).catch(() => {});
         }
         
-        console.log('✅ تم إنهاء المكالمة بنجاح وتجهيز إعادة ربط الميزات تلقائياً.');
+        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
     },
-
+    
     cleanupConnections() {
-        console.log('🧹 تنظيف اتصالات المكالمة...');
-        
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
@@ -1674,42 +1668,18 @@ async sendSignal(calleeId, data) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
         }
-
-        // إغلاق قنوات البيانات والمنافذ السابقة بالكامل لتحرير الذاكرة ومنع التداخل
         if (this.dc) {
             try { this.dc.close(); } catch(e) {}
             this.dc = null;
         }
-
         if (this.pc) {
             try { this.pc.close(); } catch(e) {}
-            this.pc = null; 
+            this.pc = null;
         }
-
         this.incomingChunks = {};
         this.incomingFileInfo = {};
-        
-        // 🛡️ الأمان المطلق: لا نعيد البناء التلقائي إلا إذا جئنا من دالة endCall الحقيقية 
-        // هذا يمنع تماماً الـ Infinite Loop والتجمد عند تفعيل الميزات أول مرة
-        if (this._isCompletingCall && typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled && ChatSystem.currentChat) {
-            // تصفير العلم فوراً لضمان عدم التكرار
-            this._isCompletingCall = false; 
-
-            if (this._reconnectTimeoutRef) clearTimeout(this._reconnectTimeoutRef);
-            
-            this._reconnectTimeoutRef = setTimeout(async () => {
-                try {
-                    console.log('⚡ [تلقائي] إعادة بناء اتصال الميزات الصامت لإرسال الصور بنجاح 100%...');
-                    await this.ensureDataChannelOnly(ChatSystem.currentChat);
-                } catch(err) {
-                    console.warn('⚠️ تنبيه أثناء تأمين قناة الصور بعد المكالمة:', err);
-                }
-            }, 1000); // مهلة 1 ثانية كافية لراحة المتصفح والشبكة
-        } else {
-            // للتأكيد في الحالات العادية، نضمن إلغاء العلم
-            this._isCompletingCall = false;
-        }
     }
+};
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
