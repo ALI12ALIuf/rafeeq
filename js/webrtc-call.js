@@ -1607,11 +1607,13 @@ async sendSignal(calleeId, data) {
         });
     },
 
-    // ==================== 14. إنهاء المكالمة ====================
+
+   // ==================== 14. إنهاء المكالمة ====================
     
 endCall() {
     console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
     
+    // ✅ تعيين متغيرات لمنع إلغاء الميزات أثناء إنهاء المكالمة
     this.isClosingDueToCallEnd = true;
     this.isCallEnding = true;
     
@@ -1671,6 +1673,20 @@ endCall() {
         }).catch(() => {});
     }
     
+    // ✅ إعادة فتح Data Channel بعد انتهاء المكالمة إذا كانت الميزات مفعلة
+    if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
+        setTimeout(async () => {
+            console.log('🔧 إعادة فتح Data Channel بعد انتهاء المكالمة...');
+            const success = await this.ensureDataChannelOnly(ChatSystem.currentChat);
+            if (success) {
+                console.log('✅ تم إعادة فتح Data Channel بنجاح');
+            } else {
+                console.log('⚠️ فشل إعادة فتح Data Channel');
+            }
+        }, 500);
+    }
+    
+    // ✅ إعادة تعيين المتغيرات بعد 5 ثوانٍ (لضمان مرور onclose)
     setTimeout(() => {
         this.isCallEnding = false;
         this.isClosingDueToCallEnd = false;
@@ -1709,7 +1725,7 @@ cleanupConnections() {
     this.incomingChunks = {};
     this.incomingFileInfo = {};
 }
-};
+}; 
 
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
