@@ -1469,8 +1469,9 @@ async sendSignal(calleeId, data) {
                 video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
-            if (this.pc) {
-                const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
+            // ✅ استخدام callPC بدلاً من pc
+            if (this.callPC) {
+                const sender = this.callPC.getSenders().find(s => s.track?.kind === 'video');
                 if (sender) await sender.replaceTrack(newVideoTrack);
             }
             const audioTrack = this.localStream.getAudioTracks()[0];
@@ -1486,8 +1487,9 @@ async sendSignal(calleeId, data) {
     // ==================== 13. إرسال الملفات ====================
     
     async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
+        // ✅ استخدام قناة الملفات المنفصلة
+        if (!this.fileDC || this.fileDC.readyState !== 'open') {
+            console.log('❌ قناة الملفات غير مفتوحة');
             return false;
         }
         
@@ -1505,7 +1507,8 @@ async sendSignal(calleeId, data) {
             console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
             
             for (let i = 0; i < totalChunks; i++) {
-                if (this.dc.readyState !== 'open') {
+                // ✅ استخدام fileDC
+                if (this.fileDC.readyState !== 'open') {
                     ChatSystem.hideProgressBar();
                     return false;
                 }
@@ -1517,7 +1520,8 @@ async sendSignal(calleeId, data) {
                     id: fileId,
                     fileName: file.name || 'ملف'
                 };
-                this.dc.send(JSON.stringify(chunk));
+                // ✅ استخدام fileDC
+                this.fileDC.send(JSON.stringify(chunk));
                 const progress = ((i + 1) / totalChunks) * 100;
                 const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
                 ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
