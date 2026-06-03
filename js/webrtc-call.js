@@ -8,6 +8,7 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    isCallEnding: false,  // ✅ أضف هذا السطر هنا
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
