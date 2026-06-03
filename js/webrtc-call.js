@@ -8,7 +8,8 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
-    isClosingDueToCallEnd: false,  // ✅ متغير جديد لمنع إلغاء الميزات عند انتهاء المكالمة
+    isClosingDueToCallEnd: false,  // ✅ متغير لمنع إلغاء الميزات عند انتهاء المكالمة
+    isCallEnding: false,           // ✅ متغير جديد لمنع إلغاء الميزات أثناء إنهاء المكالمة
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
