@@ -1608,12 +1608,11 @@ async sendSignal(calleeId, data) {
     },
 
 
-   // ==================== 14. إنهاء المكالمة ====================
+  // ==================== 14. إنهاء المكالمة ====================
     
 endCall() {
     console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
     
-    // ✅ تعيين متغيرات لمنع إلغاء الميزات أثناء إنهاء المكالمة
     this.isClosingDueToCallEnd = true;
     this.isCallEnding = true;
     
@@ -1673,20 +1672,28 @@ endCall() {
         }).catch(() => {});
     }
     
-    // ✅ إعادة فتح Data Channel بعد انتهاء المكالمة إذا كانت الميزات مفعلة
-    if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
+    // ✅ تأكيد أن الميزات لا تزال مفعلة
+    if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        ChatSystem.friendInConversation = true;
+        console.log('✅ تم إعادة تعيين friendInConversation = true');
+    }
+    
+    // ✅ إعادة فتح Data Channel بعد انتهاء المكالمة
+    if (ChatSystem.featuresEnabled && ChatSystem.friendInConversation && ChatSystem.currentChat) {
         setTimeout(async () => {
-            console.log('🔧 إعادة فتح Data Channel بعد انتهاء المكالمة...');
-            const success = await this.ensureDataChannelOnly(ChatSystem.currentChat);
-            if (success) {
-                console.log('✅ تم إعادة فتح Data Channel بنجاح');
-            } else {
-                console.log('⚠️ فشل إعادة فتح Data Channel');
+            console.log('🔧 محاولة فتح Data Channel بعد المكالمة...');
+            for (let i = 0; i < 3; i++) {
+                const success = await this.ensureDataChannelOnly(ChatSystem.currentChat);
+                if (success) {
+                    console.log('✅ تم فتح Data Channel بنجاح');
+                    break;
+                }
+                console.log('⚠️ فشلت المحاولة', i + 1, '، إعادة المحاولة...');
+                await new Promise(r => setTimeout(r, 1000));
             }
         }, 500);
     }
     
-    // ✅ إعادة تعيين المتغيرات بعد 5 ثوانٍ (لضمان مرور onclose)
     setTimeout(() => {
         this.isCallEnding = false;
         this.isClosingDueToCallEnd = false;
@@ -1704,10 +1711,8 @@ cleanupConnections() {
         clearInterval(this.keepAliveInterval);
         this.keepAliveInterval = null;
     }
-    // ✅ لا نغلق Data Channel إذا كانت الميزات مفعلة والمحادثة لا تزال مفتوحة
     if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
         console.log('📡 الميزات مفعلة - إبقاء Data Channel مفتوحاً');
-        // فقط نغلق pc (اتصال WebRTC) ونبقي dc مفتوحاً
         if (this.pc) {
             try { this.pc.close(); } catch(e) {}
             this.pc = null;
