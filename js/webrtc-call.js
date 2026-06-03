@@ -955,8 +955,8 @@ setupDataChannel(channel) {
         }
         this.scheduleReconnect();
         
-        // ✅ لا نلغي الميزات إذا كان الإغلاق بسبب المكالمة
-        if (!this.isClosingDueToCallEnd && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        // ✅ لا نلغي الميزات إذا كان الإغلاق بسبب المكالمة أو كانت مكالمة نشطة
+        if (!this.isClosingDueToCallEnd && !this.isInCall && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -975,18 +975,20 @@ setupDataChannel(channel) {
             
             ChatSystem.updateAllButtons();
             console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-        } else if (this.isClosingDueToCallEnd) {
-            console.log('📞 إغلاق القناة بسبب انتهاء المكالمة - الميزات تبقى مفعلة');
-            this.isClosingDueToCallEnd = false; // إعادة تعيين
+        } else {
+            console.log('📞 إغلاق القناة بسبب المكالمة - الميزات تبقى مفعلة');
         }
+        
+        // ✅ إعادة تعيين المتغير
+        this.isClosingDueToCallEnd = false;
     };
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         this.scheduleReconnect();
         
-        // ✅ لا نلغي الميزات إذا كان الإغلاق بسبب المكالمة
-        if (!this.isClosingDueToCallEnd && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        // ✅ لا نلغي الميزات إذا كان الإغلاق بسبب المكالمة أو كانت مكالمة نشطة
+        if (!this.isClosingDueToCallEnd && !this.isInCall && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -1005,10 +1007,12 @@ setupDataChannel(channel) {
             
             ChatSystem.updateAllButtons();
             console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-        } else if (this.isClosingDueToCallEnd) {
+        } else {
             console.log('📞 خطأ في القناة بسبب المكالمة - الميزات تبقى مفعلة');
-            this.isClosingDueToCallEnd = false; // إعادة تعيين
         }
+        
+        // ✅ إعادة تعيين المتغير
+        this.isClosingDueToCallEnd = false;
     };
 },
 
@@ -1109,7 +1113,7 @@ async handleSignaling(data) {
             console.log('📞 الطرف الآخر رفض المكالمة');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
-            this.isClosingDueToCallEnd = true;  // ✅ منع إلغاء الميزات عند الرفض
+            this.isClosingDueToCallEnd = true;
             this.endCall();
             return;
         }
@@ -1118,7 +1122,7 @@ async handleSignaling(data) {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
-            this.isClosingDueToCallEnd = true;  // ✅ منع إلغاء الميزات عند انتهاء المكالمة
+            this.isClosingDueToCallEnd = true;
             this.endCall();
             return;
         }
