@@ -1,5 +1,5 @@
-// ========== secure-chat.js ==========
-// نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
+// ========== secure-chat.js - النسخة المعدلة بالكامل ==========
+// نظام التشفير E2EE + ضغط الصور + فحص الفيديو
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -15,7 +15,6 @@ const SecureChatSystem = {
             console.error('❌ لا يوجد مستخدم مسجل');
             return false; 
         }
-        
         try {
             console.log('🔐 بدء تهيئة نظام التشفير...');
             await this.setupKeys();
@@ -44,13 +43,11 @@ const SecureChatSystem = {
             });
             
             const privateExport = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
-            
             localStorage.setItem(`enc_private_key_${uid}`, btoa(String.fromCharCode(...new Uint8Array(privateExport))));
             this.keyCache.set(uid, keyPair.privateKey);
             console.log('✅ تم إنشاء المفاتيح بنجاح');
         } else {
             const doc = await window.db.collection('users').doc(uid).get();
-            
             if (!doc.exists || !doc.data()?.publicKey) {
                 console.log('⚠️ المفتاح العام مفقود، إعادة إنشاء المفاتيح...');
                 const keyPair = await this.generateKeyPair();
@@ -176,11 +173,7 @@ const SecureChatSystem = {
             if (duration > this.VIDEO_MAX_DURATION) {
                 const warnMins = Math.floor(this.VIDEO_WARNING_DURATION / 60);
                 const warnSecs = this.VIDEO_WARNING_DURATION % 60;
-                throw new Error(
-                    `❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\n` +
-                    `الحد الأقصى: ${warnMins}:${warnSecs.toString().padStart(2, '0')} دقائق\n` +
-                    `💡 قم بقص الفيديو قبل الإرسال`
-                );
+                throw new Error(`❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\nالحد الأقصى: ${warnMins}:${warnSecs.toString().padStart(2, '0')} دقائق`);
             }
             
             if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
@@ -188,7 +181,7 @@ const SecureChatSystem = {
                 throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
             }
             
-            console.log(`⚡ فيديو جاهز للإرسال المباشر: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            console.log(`⚡ فيديو جاهز للإرسال: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
             return file;
         });
     },
@@ -205,21 +198,19 @@ const SecureChatSystem = {
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
         
-        // ✅ تحديد مدة الصلاحية حسب نوع الإشارة
-        let expiryHours = 24; // الافتراضي 24 ساعة
         let expirySeconds = null;
-        
-        if (encryptedPackage.type === 'webrtc' || 
-            encryptedPackage.type === 'feature_request' || 
-            encryptedPackage.type === 'feature_response') {
-            expirySeconds = 30; // 30 ثانية فقط
+        if (encryptedPackage.type === 'call_offer' || encryptedPackage.type === 'call_answer' || 
+            encryptedPackage.type === 'call_ice' || encryptedPackage.type === 'file_offer' ||
+            encryptedPackage.type === 'file_answer' || encryptedPackage.type === 'file_ice' ||
+            encryptedPackage.type === 'feature_request' || encryptedPackage.type === 'feature_response') {
+            expirySeconds = 30;
         }
         
         let expiresAt;
         if (expirySeconds) {
             expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expirySeconds * 1000));
         } else {
-            expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
+            expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 3600000));
         }
         
         try {
@@ -247,7 +238,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (تم إزالة conversation_status, conversation_status_request, feature_cancel) ==========
+    // ========== الدالة المعدلة بالكامل ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -255,50 +246,59 @@ const SecureChatSystem = {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
+            // رسائل نصية
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } 
-            else if (msg.package.type === 'webrtc') { 
-                // ✅ تجاهل إشارات WebRTC تماماً إذا:
-                // 1. الميزات غير مفعلة
-                // 2. أو الطرف الآخر ليس في المحادثة
-                // 3. أو المستخدم الحالي ليس في محادثة مع المرسل
+            }
+            
+            // ==================== إشارات المكالمات (VoiceVideoSystem) ====================
+            else if (msg.package.type === 'call_offer' || 
+                     msg.package.type === 'call_answer' || 
+                     msg.package.type === 'call_ice' ||
+                     msg.package.type === 'call_ended' ||
+                     msg.package.type === 'reject') {
+                
                 if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
-                        featuresEnabled: ChatSystem.featuresEnabled,
-                        friendInConversation: ChatSystem.friendInConversation,
-                        currentChat: ChatSystem.currentChat,
-                        sender: msg.from
-                    });
+                    console.log('📞 تجاهل إشارة مكالمة');
                     return;
                 }
                 
                 const signalData = await this.decryptData(msg.package.data, sharedKey);
                 const parsedData = JSON.parse(signalData);
                 
-                console.log('📞 استلام إشارة WebRTC من:', msg.from);
-                console.log('📞 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
+                console.log('📞 استلام إشارة مكالمة من:', msg.from, 'نوع:', msg.package.type);
                 
-                if (parsedData.sdp && parsedData.sdp.type === 'offer') {
-                    console.log('📞 مكالمة واردة جديدة من:', msg.from, 'نوع:', parsedData.type || 'audio');
-                    if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
-                        CallSystem.showIncomingCall(msg.from, parsedData);
-                    } else {
-                        console.error('❌ CallSystem.showIncomingCall غير موجود');
-                    }
-                } 
-                else {
-                    if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
-                        CallSystem.handleSignaling(parsedData);
-                    }
+                if (typeof VoiceVideoSystem !== 'undefined' && VoiceVideoSystem.handleIncomingSignal) {
+                    await VoiceVideoSystem.handleIncomingSignal(msg.from, parsedData);
                 }
             }
+            
+            // ==================== إشارات الملفات (ChatDataSystem) ====================
+            else if (msg.package.type === 'file_offer' || 
+                     msg.package.type === 'file_answer' || 
+                     msg.package.type === 'file_ice' ||
+                     msg.package.type === 'file_signal') {
+                
+                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
+                    console.log('📁 تجاهل إشارة ملف');
+                    return;
+                }
+                
+                const signalData = await this.decryptData(msg.package.data, sharedKey);
+                const parsedData = JSON.parse(signalData);
+                
+                console.log('📁 استلام إشارة ملف من:', msg.from, 'نوع:', msg.package.type);
+                
+                if (typeof ChatDataSystem !== 'undefined' && ChatDataSystem.handleSignaling) {
+                    await ChatDataSystem.handleSignaling(parsedData);
+                }
+            }
+            
+            // ==================== طلبات الميزات ====================
             else if (msg.package.type === 'feature_request') {
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                const requestData = JSON.parse(decryptedData);
                 console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
                     ChatSystem.handleFeatureRequest(msg.from);
@@ -312,37 +312,26 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
-            // ==================== القسم 100: معالجة إشارة إلغاء الميزات (force_disable_features) ====================
             else if (msg.package.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
-                
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
-                    
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
-                    }
-                    
-                    ChatSystem.updateAllButtons();
+                    ChatSystem.disableFeatures();
                 }
             }
+            
+            // ==================== إشارات قديمة (للتوافق) ====================
+            else if (msg.package.type === 'webrtc') {
+                console.log('⚠️ تجاهل إشارة WebRTC قديمة من:', msg.from);
+            }
+            
+            // ==================== الملفات والوسائط ====================
             else if (msg.package.type === 'location') {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'location', data: locationData, sender: 'friend', time: new Date().toISOString() });
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
             }
-            else if (msg.package.type === 'file' || msg.package.type === 'image' || msg.package.type === 'video') {
+            else if (msg.package.type === 'file' || msg.package.type === 'image' || msg.package.type === 'video' || msg.package.type === 'voice') {
                 const decryptedFile = await this.decryptData(msg.package.data, sharedKey);
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: msg.package.type, data: decryptedFile, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() });
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
