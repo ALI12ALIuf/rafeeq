@@ -8,6 +8,7 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    isCallEndingNormally: false,  // ✅ متغير جديد للتمييز بين إنهاء المكالمة الطبيعي والانقطاع المفاجئ
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
