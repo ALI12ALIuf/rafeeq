@@ -1,6 +1,6 @@
-// ========== 1. webrtc-call.js - النسخة النهائية المعدلة ==========
-// CallSystem: الميزات والملفات فقط (DataChannel)
-// MediaCallSystem: المكالمات الصوتية والمرئية فقط (منفصل تماماً)
+// ========== webrtc-call.js - النسخة النهائية المعدلة بالكامل ==========
+// CallSystem: للميزات والملفات فقط (DataChannel)
+// MediaCallSystem: للمكالمات الصوتية والمرئية فقط (منفصل تماماً)
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
@@ -26,9 +26,7 @@ const CallSystem = {
                 .where('to', '==', chatId)
                 .where('package.type', '==', 'webrtc')
                 .get();
-            
             if (snapshot.empty) return;
-            
             const batch = window.db.batch();
             snapshot.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
@@ -44,9 +42,7 @@ const CallSystem = {
                 .where('to', '==', myId)
                 .where('package.type', '==', 'webrtc')
                 .get();
-            
             if (snapshot.empty) return;
-            
             const batch = window.db.batch();
             snapshot.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
@@ -55,16 +51,13 @@ const CallSystem = {
     
     async autoCleanupOnLoad() {
         console.log('🧹 تشغيل التنظيف التلقائي للميزات العالقة...');
-        
         await this.deleteAllMyWebRTCSignals();
-        
         this.isInCall = false;
         this.callType = null;
         this.currentCallId = null;
         this.isAudioMuted = false;
         this.isVideoMuted = false;
         this.isSpeakerEnabled = false;
-        
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
@@ -77,22 +70,18 @@ const CallSystem = {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
-        
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
             this.remoteAudioElement.srcObject = null;
             this.remoteAudioElement = null;
         }
-        
         if (this.localStream) {
             try {
                 this.localStream.getTracks().forEach(t => t.stop());
             } catch(e) {}
             this.localStream = null;
         }
-        
         this.cleanupConnections();
-        
         if (typeof PresenceSystem !== 'undefined' && window.auth?.currentUser) {
             try {
                 await window.db.collection('users').doc(window.auth.currentUser.uid).update({
@@ -102,7 +91,6 @@ const CallSystem = {
                 });
             } catch(e) {}
         }
-        
         console.log('✅ اكتمل التنظيف التلقائي للميزات');
     },
     
@@ -111,16 +99,12 @@ const CallSystem = {
             console.log('🚫 منع فتح Data Channel - الميزات غير مفعلة');
             return false;
         }
-        
         if (!calleeId) return false;
-        
         if (this.dc && this.dc.readyState === 'open') {
             console.log('✅ Data Channel موجود ومفتوح');
             return true;
         }
-        
         if (this.dc && this.dc.readyState === 'connecting') {
-            console.log('⏳ Data Channel في طور الاتصال...');
             return new Promise((resolve) => {
                 const timeout = setTimeout(() => resolve(false), 10000);
                 const check = setInterval(() => {
@@ -136,7 +120,6 @@ const CallSystem = {
                 }, 500);
             });
         }
-        
         return this.createDataChannelOnly(calleeId);
     },
     
@@ -145,28 +128,22 @@ const CallSystem = {
             console.log('🚫 منع إنشاء Data Channel - الميزات غير مفعلة');
             return false;
         }
-        
         this.cleanupConnections();
         try {
             console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
-            
             this.pc = new RTCPeerConnection(this.servers);
             this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
             this.setupDataChannel(this.dc);
-            
             this.pc.onicecandidate = e => { 
                 if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
             };
-            
             this.pc.ondatachannel = e => { 
                 this.setupDataChannel(e.channel); 
                 this.dc = e.channel; 
             };
-            
             const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
             await this.pc.setLocalDescription(offer);
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
-            
             console.log('✅ تم إرسال طلب فتح Data Channel');
             return true;
         } catch (error) {
@@ -178,44 +155,29 @@ const CallSystem = {
     setupDataChannel(channel) {
         if (!channel) return;
         console.log('📡 إعداد Data Channel للميزات والملفات');
-        
         channel.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
-                
                 if (msg.type === 'direct_text') {
-                    console.log('📨 استلام رسالة نصية مباشرة:', msg.text);
-                    const displayMsg = { 
-                        id: msg.id, 
-                        type: 'text', 
-                        text: msg.text, 
-                        sender: 'friend', 
-                        time: msg.time || new Date().toISOString() 
-                    };
+                    const displayMsg = { id: msg.id, type: 'text', text: msg.text, sender: 'friend', time: msg.time || new Date().toISOString() };
                     if (ChatSystem.currentChat) {
                         ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
                         ChatSystem.displayMessage(displayMsg);
                     }
                     return;
                 }
-                
                 if (msg.type === 'webrtc_signal') {
-                    console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
                     this.handleSignaling(msg.data);
                     return;
                 }
-                
                 if (msg.type === 'force_close_conversation') {
-                    console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
                     if (ChatSystem.currentChat) {
                         ChatSystem.closeChat();
                         ChatSystem.featuresEnabled = false;
                         ChatSystem.featureRequestPending = false;
                         ChatSystem.featureRequestReceived = false;
-                        
                         const toggleInput = document.getElementById('featureToggleInput');
                         if (toggleInput) toggleInput.checked = false;
-                        
                         const kickBtn = document.getElementById('kickBtn');
                         if (kickBtn) {
                             kickBtn.classList.remove('active');
@@ -225,29 +187,23 @@ const CallSystem = {
                     }
                     return;
                 }
-                
                 if (msg.type === 'force_disable_features') {
-                    console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                     if (ChatSystem.currentChat) {
                         ChatSystem.featuresEnabled = false;
                         ChatSystem.featureRequestPending = false;
                         ChatSystem.featureRequestReceived = false;
-                        
                         const toggleInput = document.getElementById('featureToggleInput');
                         if (toggleInput) toggleInput.checked = false;
-                        
                         const kickBtn = document.getElementById('kickBtn');
                         if (kickBtn) {
                             kickBtn.classList.remove('active');
                             kickBtn.style.opacity = '0.5';
                             kickBtn.style.pointerEvents = 'none';
                         }
-                        
                         ChatSystem.updateAllButtons();
                     }
                     return;
                 }
-                
                 if (msg.type === 'ping') return;
                 if (msg.type === 'call_status') {
                     this.handleCallStatus(msg);
@@ -266,7 +222,6 @@ const CallSystem = {
                 console.error('خطأ في معالجة الرسالة:', error);
             }
         };
-        
         channel.onopen = () => {
             console.log('✅ Data Channel مفتوح للميزات');
             if (this.reconnectTimer) {
@@ -275,7 +230,6 @@ const CallSystem = {
             }
             this.reconnectAttempts = 0;
             this.sendCallStatus('connected');
-            
             if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = setInterval(() => {
                 if (this.dc && this.dc.readyState === 'open') {
@@ -283,7 +237,6 @@ const CallSystem = {
                 }
             }, 2000);
         };
-        
         channel.onclose = () => {
             console.log('❌ Data Channel مغلق للميزات');
             this.sendCallStatus('disconnected');
@@ -292,47 +245,38 @@ const CallSystem = {
                 this.keepAliveInterval = null;
             }
             this.scheduleReconnect();
-            
             if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
                 ChatSystem.featuresEnabled = false;
                 ChatSystem.featureRequestPending = false;
                 ChatSystem.featureRequestReceived = false;
-                
                 if (ChatSystem.featureBlinkInterval) {
                     clearInterval(ChatSystem.featureBlinkInterval);
                     ChatSystem.featureBlinkInterval = null;
                 }
-                
                 const btn = document.getElementById('enableFeaturesBtn');
                 if (btn) {
                     btn.style.background = '#f44336';
                     btn.title = 'تفعيل الميزات';
                 }
-                
                 ChatSystem.updateAllButtons();
             }
         };
-        
         channel.onerror = (e) => {
             console.error('❌ خطأ في Data Channel:', e);
             this.scheduleReconnect();
-            
             if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
                 ChatSystem.featuresEnabled = false;
                 ChatSystem.featureRequestPending = false;
                 ChatSystem.featureRequestReceived = false;
-                
                 if (ChatSystem.featureBlinkInterval) {
                     clearInterval(ChatSystem.featureBlinkInterval);
                     ChatSystem.featureBlinkInterval = null;
                 }
-                
                 const btn = document.getElementById('enableFeaturesBtn');
                 if (btn) {
                     btn.style.background = '#f44336';
                     btn.title = 'تفعيل الميزات';
                 }
-                
                 ChatSystem.updateAllButtons();
             }
         };
@@ -402,7 +346,6 @@ const CallSystem = {
             console.log('🚫 منع إنشاء Data Channel جديد - الميزات غير مفعلة');
             return;
         }
-        
         this.reconnectAttempts = 0;
         this.cleanupConnections();
         try {
@@ -432,12 +375,10 @@ const CallSystem = {
                 console.log('📞 الطرف الآخر رفض المكالمة (ميزات)');
                 return;
             }
-            
             if (data.type === 'call_ended') {
                 console.log('📞 المتصل أنهى المكالمة قبل الرد (ميزات)');
                 return;
             }
-            
             if (!this.pc) {
                 this.pc = new RTCPeerConnection(this.servers);
                 this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
@@ -465,7 +406,6 @@ const CallSystem = {
             console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة');
             return;
         }
-        
         if (this.dc && this.dc.readyState === 'open') {
             try {
                 this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
@@ -475,7 +415,6 @@ const CallSystem = {
                 console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
             }
         }
-        
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
@@ -489,26 +428,21 @@ const CallSystem = {
         }
     },
     
-    // دوال إرسال الملفات (مهمة جداً - لا يتم لمسها)
     async sendFileDirect(file, type) {
         if (!this.dc || this.dc.readyState !== 'open') {
             console.log('❌ Data Channel غير مفتوح');
             return false;
         }
-        
         try {
             let blobToSend = file;
             if (type === 'image') {
                 blobToSend = await this.compressImage(file);
             }
-            
             const b64 = await this.fileToBase64(blobToSend);
             const chunkSize = 16000;
             const totalChunks = Math.ceil(b64.length / chunkSize);
             const fileId = Date.now().toString();
-            
             console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
-            
             for (let i = 0; i < totalChunks; i++) {
                 if (this.dc.readyState !== 'open') {
                     ChatSystem.hideProgressBar();
@@ -549,18 +483,14 @@ const CallSystem = {
             };
             ChatSystem.showProgressBar('جاري استلام الملف...', 0);
         }
-        
         this.incomingChunks[msg.id][msg.chunk] = msg.data;
         this.incomingFileInfo[msg.id].received++;
         const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
         const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
         ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-        
         if (this.incomingFileInfo[msg.id].received === msg.total) {
             const fullData = this.incomingChunks[msg.id].join('');
-            
             let finalData = fullData;
-            
             if (msg.type === 'image' && !fullData.startsWith('data:image')) {
                 finalData = 'data:image/jpeg;base64,' + fullData;
             } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
@@ -568,7 +498,6 @@ const CallSystem = {
             } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
                 finalData = 'data:audio/webm;base64,' + fullData;
             }
-            
             const displayMsg = {
                 id: msg.id,
                 type: msg.type === 'location' ? 'text' : msg.type,
@@ -577,7 +506,6 @@ const CallSystem = {
                 sender: 'friend',
                 time: new Date().toISOString()
             };
-            
             if (ChatSystem.currentChat) {
                 ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
                 ChatSystem.displayMessage(displayMsg);
@@ -662,12 +590,46 @@ const MediaCallSystem = {
     
     servers: CallSystem.servers,
     
+    // دالة إرسال الإشارات مع تشفير كامل
+    async sendSignalingMessage(chatId, data) {
+        if (!window.db || !window.auth?.currentUser) {
+            console.error('❌ Firebase أو المستخدم غير متاح');
+            return;
+        }
+        
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
+            if (!myPrivateKey || !receiverPublicKey) {
+                console.error('❌ فشل الحصول على المفاتيح للتشفير');
+                return;
+            }
+            
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encryptedData = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
+            
+            await window.db.collection('secure_messages').add({
+                to: chatId,
+                from: window.auth.currentUser.uid,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                package: {
+                    type: 'media_call',
+                    data: encryptedData,
+                    mediaCall: true
+                },
+                expiresAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 30000))
+            });
+            console.log('📡 تم إرسال إشارة المكالمة:', data.type);
+        } catch (e) {
+            console.error('❌ فشل إرسال إشارة المكالمة:', e);
+        }
+    },
+    
     async startCall(chatId, type) {
         if (this.isInCall) {
             console.log('❌ مكالمة نشطة بالفعل');
             return;
         }
-        
         if (!ChatSystem.friendInConversation) {
             console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
             return;
@@ -678,7 +640,7 @@ const MediaCallSystem = {
         this.currentCallId = chatId;
         
         try {
-            console.log(`📞 بدء مكالمة ${type === 'video' ? 'فيديو' : 'صوتية'} باستخدام MediaCallSystem المنفصل...`);
+            console.log(`📞 بدء مكالمة ${type === 'video' ? 'فيديو' : 'صوتية'} باستخدام MediaCallSystem...`);
             
             if (window.auth?.currentUser) {
                 await window.db.collection('users').doc(window.auth.currentUser.uid).update({
@@ -720,7 +682,6 @@ const MediaCallSystem = {
             
             this.pc.ontrack = e => {
                 console.log(`📞 استقبال مسار ${e.track.kind} في MediaCallSystem`);
-                
                 if (e.track.kind === 'video') {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
@@ -831,7 +792,6 @@ const MediaCallSystem = {
             
             this.pc.ontrack = e => {
                 console.log(`📞 استقبال مسار ${e.track.kind} في MediaCallSystem`);
-                
                 if (e.track.kind === 'video') {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
@@ -888,13 +848,10 @@ const MediaCallSystem = {
             this.remoteAudioElementForCall.pause();
             this.remoteAudioElementForCall.srcObject = null;
         }
-        
         this.remoteAudioElementForCall = new Audio();
         this.remoteAudioElementForCall.srcObject = stream;
         this.remoteAudioElementForCall.autoplay = true;
-        
         this.applySpeakerSettings();
-        
         this.remoteAudioElementForCall.play().then(() => {
             console.log('✅ بدء تشغيل الصوت عن بعد');
         }).catch(e => {
@@ -904,7 +861,6 @@ const MediaCallSystem = {
     
     applySpeakerSettings() {
         if (!this.remoteAudioElementForCall) return;
-        
         if (this.remoteAudioElementForCall.setSinkId) {
             if (this.isSpeakerEnabled) {
                 this.remoteAudioElementForCall.setSinkId('speaker').then(() => {
@@ -948,11 +904,9 @@ const MediaCallSystem = {
         if (!this.localStream) return;
         const videoTrack = this.localStream.getVideoTracks()[0];
         if (!videoTrack) return;
-        
         const currentFacing = videoTrack.getSettings().facingMode;
         const newFacing = currentFacing === 'user' ? 'environment' : 'user';
         videoTrack.stop();
-        
         try {
             const newStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
@@ -985,85 +939,31 @@ const MediaCallSystem = {
         if (type === 'video') {
             uiHTML = `
                 <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .local-video {
-                        border: 3px solid rgba(255,255,255,0.3);
-                        transition: all 0.3s ease;
-                        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-                    }
+                    @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); } 70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); } }
+                    .call-btn { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); backdrop-filter: blur(10px); background: rgba(30, 30, 40, 0.85) !important; border: 1px solid rgba(255,255,255,0.15) !important; }
+                    .call-btn:active { transform: scale(1.1); background: rgba(50, 50, 60, 0.95) !important; }
+                    .end-call-btn { background: linear-gradient(135deg, #f44336, #d32f2f) !important; animation: pulse 1.5s infinite; }
+                    .end-call-btn:active { transform: scale(1.1); background: linear-gradient(135deg, #ff6659, #e53935) !important; }
+                    .local-video { border: 3px solid rgba(255,255,255,0.3); transition: all 0.3s ease; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
                 </style>
                 <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
                 <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
                 <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا">
-                        <i class="fas fa-video"></i>
-                    </button>
+                    <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا"><i class="fas fa-sync-alt"></i></button>
+                    <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون"><i class="fas fa-microphone"></i></button>
+                    <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة"><i class="fas fa-phone-slash"></i></button>
+                    <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا"><i class="fas fa-video"></i></button>
                 </div>`;
         } else {
             uiHTML = `
                 <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .avatar-animation {
-                        animation: float 3s ease-in-out infinite;
-                    }
-                    @keyframes float {
-                        0% { transform: translateY(0px); }
-                        50% { transform: translateY(-10px); }
-                        100% { transform: translateY(0px); }
-                    }
+                    @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); } 70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); } }
+                    .call-btn { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); backdrop-filter: blur(10px); background: rgba(30, 30, 40, 0.85) !important; border: 1px solid rgba(255,255,255,0.15) !important; }
+                    .call-btn:active { transform: scale(1.1); background: rgba(50, 50, 60, 0.95) !important; }
+                    .end-call-btn { background: linear-gradient(135deg, #f44336, #d32f2f) !important; animation: pulse 1.5s infinite; }
+                    .end-call-btn:active { transform: scale(1.1); background: linear-gradient(135deg, #ff6659, #e53935) !important; }
+                    .avatar-animation { animation: float 3s ease-in-out infinite; }
+                    @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
                 </style>
                 <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
                 <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
@@ -1074,15 +974,9 @@ const MediaCallSystem = {
                     </div>
                 </div>
                 <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
+                    <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة"><i class="fas fa-volume-up"></i></button>
+                    <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة"><i class="fas fa-phone-slash"></i></button>
+                    <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون"><i class="fas fa-microphone"></i></button>
                 </div>`;
         }
         
@@ -1138,7 +1032,6 @@ const MediaCallSystem = {
                     }
                 }
             }
-            
         } else {
             const speakerBtn = document.getElementById('speakerBtn');
             speakerBtn?.addEventListener('click', () => {
@@ -1207,139 +1100,34 @@ const MediaCallSystem = {
             
             const overlay = document.createElement('div');
             overlay.id = 'incomingCall';
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: #0a0e27;
-                z-index: 9999;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-            `;
+            overlay.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0e27;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;`;
             
             overlay.innerHTML = `
                 <style>
-                    @keyframes float {
-                        0%, 100% { transform: translateY(0px); }
-                        50% { transform: translateY(-15px); }
-                    }
-                    @keyframes ring {
-                        0% { transform: rotate(0deg); }
-                        25% { transform: rotate(6deg); }
-                        50% { transform: rotate(0deg); }
-                        75% { transform: rotate(-6deg); }
-                        100% { transform: rotate(0deg); }
-                    }
-                    .avatar-float {
-                        animation: float 2.5s ease-in-out infinite;
-                    }
-                    .ring-animation {
-                        animation: ring 1.2s ease-in-out infinite;
-                        transform-origin: center;
-                    }
-                    .swipe-container {
-                        width: 360px;
-                        margin: 30px auto;
-                        position: relative;
-                    }
-                    .swipe-button {
-                        width: 100%;
-                        height: 80px;
-                        border-radius: 50px;
-                        position: relative;
-                        overflow: hidden;
-                        cursor: grab;
-                        user-select: none;
-                        touch-action: none;
-                        background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
-                        border: 2px solid ${appColor};
-                        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-                    }
-                    .swipe-button:active {
-                        cursor: grabbing;
-                    }
-                    .divider-line {
-                        position: absolute;
-                        top: 10px;
-                        bottom: 10px;
-                        left: 50%;
-                        width: 2px;
-                        background: ${appColor};
-                        transform: translateX(-50%);
-                        pointer-events: none;
-                        z-index: 5;
-                        border-radius: 2px;
-                        box-shadow: 0 0 8px ${appColor};
-                    }
-                    .swipe-thumb {
-                        position: absolute;
-                        top: 8px;
-                        width: 64px;
-                        height: 64px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 1.8rem;
-                        box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-                        transition: left 0.1s linear, right 0.1s linear;
-                        cursor: grab;
-                        z-index: 30;
-                        backdrop-filter: blur(5px);
-                        border: 2px solid ${appColor};
-                    }
-                    .swipe-thumb:active {
-                        cursor: grabbing;
-                        transform: scale(0.96);
-                    }
-                    .thumb-left {
-                        left: 8px;
-                        background: linear-gradient(145deg, #4CAF50, #1b5e2a);
-                        color: white;
-                    }
-                    .thumb-right {
-                        right: 8px;
-                        left: auto;
-                        background: linear-gradient(145deg, #f44336, #8b0000);
-                        color: white;
-                    }
-                    .center-dot {
-                        position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        width: 14px;
-                        height: 14px;
-                        background: ${appColor};
-                        border-radius: 50%;
-                        pointer-events: none;
-                        z-index: 20;
-                        box-shadow: 0 0 12px ${appColor};
-                    }
+                    @keyframes float { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-15px); } }
+                    @keyframes ring { 0% { transform: rotate(0deg); } 25% { transform: rotate(6deg); } 50% { transform: rotate(0deg); } 75% { transform: rotate(-6deg); } 100% { transform: rotate(0deg); } }
+                    .avatar-float { animation: float 2.5s ease-in-out infinite; }
+                    .ring-animation { animation: ring 1.2s ease-in-out infinite; transform-origin: center; }
+                    .swipe-container { width: 360px; margin: 30px auto; position: relative; }
+                    .swipe-button { width: 100%; height: 80px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor}; box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
+                    .swipe-button:active { cursor: grabbing; }
+                    .divider-line { position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%); pointer-events: none; z-index: 5; border-radius: 2px; box-shadow: 0 0 8px ${appColor}; }
+                    .swipe-thumb { position: absolute; top: 8px; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 8px 25px rgba(0,0,0,0.5); transition: left 0.1s linear, right 0.1s linear; cursor: grab; z-index: 30; backdrop-filter: blur(5px); border: 2px solid ${appColor}; }
+                    .swipe-thumb:active { cursor: grabbing; transform: scale(0.96); }
+                    .thumb-left { left: 8px; background: linear-gradient(145deg, #4CAF50, #1b5e2a); color: white; }
+                    .thumb-right { right: 8px; left: auto; background: linear-gradient(145deg, #f44336, #8b0000); color: white; }
+                    .center-dot { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; background: ${appColor}; border-radius: 50%; pointer-events: none; z-index: 20; box-shadow: 0 0 12px ${appColor}; }
                 </style>
-                
                 <div style="text-align: center; margin-bottom: 50px;">
                     <div class="avatar-float ring-animation" style="font-size: 5.5rem; margin-bottom: 15px; filter: drop-shadow(0 10px 25px rgba(0,0,0,0.4));">${contactAvatar}</div>
                     <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 8px; letter-spacing: -0.5px;">${contactName}</div>
                 </div>
-                
                 <div class="swipe-container">
                     <div id="swipeButton" class="swipe-button">
                         <div class="divider-line"></div>
                         <div class="center-dot"></div>
-                        
-                        <div id="leftThumb" class="swipe-thumb thumb-left">
-                            <i class="fas ${acceptIcon}"></i>
-                        </div>
-                        <div id="rightThumb" class="swipe-thumb thumb-right">
-                            <i class="fas fa-phone-slash"></i>
-                        </div>
+                        <div id="leftThumb" class="swipe-thumb thumb-left"><i class="fas ${acceptIcon}"></i></div>
+                        <div id="rightThumb" class="swipe-thumb thumb-right"><i class="fas fa-phone-slash"></i></div>
                     </div>
                 </div>
             `;
@@ -1350,12 +1138,9 @@ const MediaCallSystem = {
             const leftThumb = document.getElementById('leftThumb');
             const rightThumb = document.getElementById('rightThumb');
             
-            let isDraggingLeft = false;
-            let isDraggingRight = false;
-            let leftStartX = 0;
-            let rightStartX = 0;
-            let leftCurrentPos = 8;
-            let rightCurrentPos = 8;
+            let isDraggingLeft = false, isDraggingRight = false;
+            let leftStartX = 0, rightStartX = 0;
+            let leftCurrentPos = 8, rightCurrentPos = 8;
             const buttonWidth = button.clientWidth;
             const centerPos = buttonWidth / 2;
             const maxLeftMove = centerPos - 40;
@@ -1363,7 +1148,6 @@ const MediaCallSystem = {
             
             const onLeftStart = (e) => {
                 e.preventDefault();
-                e.stopPropagation();
                 isDraggingLeft = true;
                 const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
                 const rect = leftThumb.getBoundingClientRect();
@@ -1374,7 +1158,6 @@ const MediaCallSystem = {
             const onLeftMove = (e) => {
                 if (!isDraggingLeft) return;
                 e.preventDefault();
-                e.stopPropagation();
                 const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
                 let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
                 newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
@@ -1386,7 +1169,6 @@ const MediaCallSystem = {
                 if (!isDraggingLeft) return;
                 isDraggingLeft = false;
                 leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                
                 if (leftCurrentPos >= maxLeftMove - 10) {
                     leftThumb.style.left = maxLeftMove + 'px';
                     setTimeout(() => {
@@ -1400,7 +1182,6 @@ const MediaCallSystem = {
             
             const onRightStart = (e) => {
                 e.preventDefault();
-                e.stopPropagation();
                 isDraggingRight = true;
                 const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
                 const rect = rightThumb.getBoundingClientRect();
@@ -1411,7 +1192,6 @@ const MediaCallSystem = {
             const onRightMove = (e) => {
                 if (!isDraggingRight) return;
                 e.preventDefault();
-                e.stopPropagation();
                 const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
                 const containerRect = button.getBoundingClientRect();
                 let newRight = (containerRect.right - clientX) - rightStartX;
@@ -1424,7 +1204,6 @@ const MediaCallSystem = {
                 if (!isDraggingRight) return;
                 isDraggingRight = false;
                 rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                
                 if (rightCurrentPos >= maxRightMove - 10) {
                     rightThumb.style.right = maxRightMove + 'px';
                     setTimeout(() => {
@@ -1438,26 +1217,13 @@ const MediaCallSystem = {
             
             leftThumb.addEventListener('mousedown', onLeftStart);
             leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
-            
             rightThumb.addEventListener('mousedown', onRightStart);
             rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
             
-            document.addEventListener('mousemove', (e) => {
-                onLeftMove(e);
-                onRightMove(e);
-            });
-            document.addEventListener('mouseup', () => {
-                onLeftEnd();
-                onRightEnd();
-            });
-            document.addEventListener('touchmove', (e) => {
-                onLeftMove(e);
-                onRightMove(e);
-            }, { passive: false });
-            document.addEventListener('touchend', () => {
-                onLeftEnd();
-                onRightEnd();
-            });
+            document.addEventListener('mousemove', (e) => { onLeftMove(e); onRightMove(e); });
+            document.addEventListener('mouseup', () => { onLeftEnd(); onRightEnd(); });
+            document.addEventListener('touchmove', (e) => { onLeftMove(e); onRightMove(e); }, { passive: false });
+            document.addEventListener('touchend', () => { onLeftEnd(); onRightEnd(); });
             
             overlay._cleanup = () => {
                 document.removeEventListener('mousemove', onLeftMove);
@@ -1471,30 +1237,10 @@ const MediaCallSystem = {
                 if (stillThere) {
                     if (stillThere._cleanup) stillThere._cleanup();
                     stillThere.remove();
-                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
                     this.sendSignalingMessage(callerId, { type: 'reject', mediaCall: true });
                 }
             }, 30000);
         });
-    },
-    
-    sendSignalingMessage(chatId, data) {
-        if (!window.db) {
-            console.error('❌ Firebase غير متاح');
-            return;
-        }
-        
-        try {
-            window.db.collection('secure_messages').add({
-                to: chatId,
-                from: window.auth?.currentUser?.uid,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                package: data
-            }).catch(err => console.error('خطأ في إرسال إشارة المكالمة:', err));
-            console.log('📡 تم إرسال إشارة المكالمة:', data.type);
-        } catch (e) {
-            console.error('❌ فشل إرسال الإشارة:', e);
-        }
     },
     
     startCallTimer() {
@@ -1517,7 +1263,7 @@ const MediaCallSystem = {
         console.log('📞 إنهاء المكالمة من MediaCallSystem - الميزات والملفات ستبقى نشطة');
         
         if (this.currentCallId && ChatSystem.currentChat) {
-            this.sendSignalingMessage(ChatSystem.currentChat, { type: 'call_ended', mediaCall: true });
+            this.sendSignalingMessage(this.currentCallId, { type: 'call_ended', mediaCall: true });
         }
         this.currentCallId = null;
         
@@ -1564,11 +1310,11 @@ const MediaCallSystem = {
             }).catch(() => {});
         }
         
-        console.log('✅ تم إنهاء المكالمة - مازالت الميزات والملفات تعمل في الخلفية');
+        console.log('✅ تم إنهاء المكالمة - مازالت الميزات والملفات تعمل');
     }
 };
 
-// ==================== تحديث أزرار الاتصال لتوجيهها إلى MediaCallSystem ====================
+// ==================== تحديث أزرار الاتصال ====================
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
@@ -1600,6 +1346,10 @@ window.cleanupCallState = async () => {
     }
     console.log('✅ تم تنظيف حالة المكالمات يدوياً');
 };
+
+// تعريف الكائنات كمتغيرات عامة
+window.CallSystem = CallSystem;
+window.MediaCallSystem = MediaCallSystem;
 
 // ==================== التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
