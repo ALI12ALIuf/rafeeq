@@ -954,72 +954,22 @@ setupDataChannel(channel) {
         }
         this.scheduleReconnect();
         
-        // ✅ نلغي الميزات فقط إذا:
-        // 1. هناك محادثة مفتوحة
-        // 2. الميزات مفعلة
-        // 3. لا توجد مكالمة نشطة (isInCall = false)
-        // 4. ليست مكالمة تنتهي طبيعياً (isCallEndingNormally = false)
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled && !this.isInCall && !this.isCallEndingNormally) {
-            console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-        } else if (this.isInCall) {
-            console.log('📞 انقطاع القناة أثناء المكالمة - لا نلغي الميزات');
-        } else if (this.isCallEndingNormally) {
-            console.log('📞 انتهاء المكالمة طبيعياً - لا نلغي الميزات');
-        }
+        // ✅ لا نلغي الميزات هنا أبداً
+        // إلغاء الميزات يتم فقط عبر:
+        // 1. الطرد (force_close_conversation)
+        // 2. تحميل الصفحة (autoCleanupOnLoad)
+        // 3. الخروج من المحادثة (closeChat)
+        // 4. إغلاق المتصفح (beforeunload)
+        // 5. إيقاف يدوي (disableFeatures)
+        console.log('📡 انقطاع القناة - لا نلغي الميزات (يتم إلغاؤها فقط عبر الآليات المخصصة)');
     };
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         this.scheduleReconnect();
         
-        // ✅ نفس الشرط: لا نلغي الميزات إذا كانت مكالمة نشطة أو تنتهي طبيعياً
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled && !this.isInCall && !this.isCallEndingNormally) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-        } else if (this.isInCall) {
-            console.log('📞 خطأ في القناة أثناء المكالمة - لا نلغي الميزات');
-        } else if (this.isCallEndingNormally) {
-            console.log('📞 خطأ في القناة أثناء انتهاء المكالمة - لا نلغي الميزات');
-        }
+        // ✅ لا نلغي الميزات هنا أبداً
+        console.log('📡 خطأ في القناة - لا نلغي الميزات');
     };
 },
 
