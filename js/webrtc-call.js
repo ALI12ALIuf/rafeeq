@@ -953,7 +953,12 @@ setupDataChannel(channel) {
         }
         this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        // ✅ نلغي الميزات فقط إذا:
+        // 1. هناك محادثة مفتوحة
+        // 2. الميزات مفعلة
+        // 3. لا توجد مكالمة نشطة (isInCall = false)
+        // 4. ليست مكالمة تنتهي طبيعياً (isCallEndingNormally = false)
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled && !this.isInCall && !this.isCallEndingNormally) {
             console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -970,8 +975,15 @@ setupDataChannel(channel) {
                 btn.title = 'تفعيل الميزات';
             }
             
+            const toggleInput = document.getElementById('featureToggleInput');
+            if (toggleInput) toggleInput.checked = false;
+            
             ChatSystem.updateAllButtons();
             console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
+        } else if (this.isInCall) {
+            console.log('📞 انقطاع القناة أثناء المكالمة - لا نلغي الميزات');
+        } else if (this.isCallEndingNormally) {
+            console.log('📞 انتهاء المكالمة طبيعياً - لا نلغي الميزات');
         }
     };
     
@@ -979,7 +991,8 @@ setupDataChannel(channel) {
         console.error('❌ خطأ في Data Channel:', e);
         this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        // ✅ نفس الشرط: لا نلغي الميزات إذا كانت مكالمة نشطة أو تنتهي طبيعياً
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled && !this.isInCall && !this.isCallEndingNormally) {
             console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -996,8 +1009,15 @@ setupDataChannel(channel) {
                 btn.title = 'تفعيل الميزات';
             }
             
+            const toggleInput = document.getElementById('featureToggleInput');
+            if (toggleInput) toggleInput.checked = false;
+            
             ChatSystem.updateAllButtons();
             console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
+        } else if (this.isInCall) {
+            console.log('📞 خطأ في القناة أثناء المكالمة - لا نلغي الميزات');
+        } else if (this.isCallEndingNormally) {
+            console.log('📞 خطأ في القناة أثناء انتهاء المكالمة - لا نلغي الميزات');
         }
     };
 },
