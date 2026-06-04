@@ -1,342 +1,6 @@
 // ========== chat-system.js ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
-// ========== PermanentChannel - قناة دائمة للميزات (مضافة حديثاً) ==========
-const PermanentChannel = {
-    dc: null,
-    pc: null,
-    isActive: false,
-    currentChatId: null,
-    reconnectAttempts: 0,
-    maxReconnect: 5,
-    
-    async init(chatId) {
-        this.currentChatId = chatId;
-        return this.create();
-    },
-    
-    async create() {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.isActive = true;
-            return true;
-        }
-        
-        this.cleanup();
-        
-        try {
-            this.pc = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-                    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-                ]
-            });
-            
-            this.dc = this.pc.createDataChannel('permanent', {
-                ordered: true,
-                maxRetransmits: 3
-            });
-            
-            this.setupEvents();
-            
-            this.pc.onicecandidate = e => {
-                if (e.candidate) this.sendSignal({ candidate: e.candidate });
-            };
-            
-            this.pc.oniceconnectionstatechange = () => {
-                if (this.pc && this.pc.iceConnectionState === 'failed') {
-                    this.scheduleReconnect();
-                }
-            };
-            
-            const offer = await this.pc.createOffer({
-                offerToReceiveAudio: false,
-                offerToReceiveVideo: false
-            });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal({ sdp: this.pc.localDescription });
-            
-            console.log('🔧 جاري إنشاء القناة الدائمة...');
-            return true;
-        } catch(e) {
-            console.error('❌ فشل إنشاء القناة الدائمة:', e);
-            return false;
-        }
-    },
-    
-    setupEvents() {
-        this.dc.onopen = () => {
-            console.log('✅ القناة الدائمة مفتوحة');
-            this.isActive = true;
-            this.reconnectAttempts = 0;
-            
-            if (typeof ChatSystem !== 'undefined') {
-                ChatSystem.friendInConversation = true;
-                ChatSystem.featuresEnabled = true;
-                ChatSystem.updateAllButtons();
-                
-                // إيقاف الوميض إذا كان موجوداً
-                if (ChatSystem.featureBlinkInterval) {
-                    clearInterval(ChatSystem.featureBlinkInterval);
-                    ChatSystem.featureBlinkInterval = null;
-                }
-                
-                const toggleInput = document.getElementById('featureToggleInput');
-                if (toggleInput) toggleInput.checked = true;
-                
-                const switchLabel = document.getElementById('featureSwitchLabel');
-                if (switchLabel) switchLabel.classList.remove('blinking');
-            }
-        };
-        
-        this.dc.onclose = () => {
-            console.log('⚠️ القناة الدائمة مغلقة');
-            this.isActive = false;
-            
-            if (this.reconnectAttempts === 0 && typeof ChatSystem !== 'undefined') {
-                ChatSystem.friendInConversation = false;
-                ChatSystem.featuresEnabled = false;
-                ChatSystem.updateAllButtons();
-                
-                const toggleInput = document.getElementById('featureToggleInput');
-                if (toggleInput) toggleInput.checked = false;
-            }
-            
-            this.scheduleReconnect();
-        };
-        
-        this.dc.onerror = (e) => {
-            console.error('❌ خطأ في القناة الدائمة:', e);
-        };
-        
-        this.dc.onmessage = (e) => {
-            try {
-                const msg = JSON.parse(e.data);
-                this.handleMessage(msg);
-            } catch(err) {
-                console.error('خطأ في معالجة رسالة القناة الدائمة:', err);
-            }
-        };
-    },
-    
-    handleMessage(msg) {
-        switch(msg.type) {
-            case 'direct_text':
-                const displayMsg = {
-                    id: msg.id,
-                    type: 'text',
-                    text: msg.text,
-                    sender: 'friend',
-                    time: msg.time || new Date().toISOString()
-                };
-                if (ChatSystem.currentChat) {
-                    ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                    ChatSystem.displayMessage(displayMsg);
-                }
-                break;
-                
-            case 'file_chunk':
-                if (typeof CallSystem !== 'undefined') {
-                    CallSystem.handleChunkMessage(msg);
-                }
-                break;
-                
-            case 'location':
-                const locationMsg = {
-                    id: msg.id,
-                    type: 'location',
-                    data: msg.data,
-                    sender: 'friend',
-                    time: new Date().toISOString()
-                };
-                if (ChatSystem.currentChat) {
-                    ChatSystem.saveMessage(ChatSystem.currentChat, locationMsg);
-                    ChatSystem.displayMessage(locationMsg);
-                }
-                break;
-                
-            case 'webrtc_signal':
-                if (typeof CallSystem !== 'undefined') {
-                    CallSystem.handleSignaling(msg.data);
-                }
-                break;
-                
-            case 'force_close_conversation':
-                console.log('👢 تم استلام إشارة طرد');
-                if (typeof ChatSystem !== 'undefined') {
-                    ChatSystem.closeChat();
-                }
-                break;
-                
-            case 'force_disable_features':
-                console.log('🔴 تم استلام إشارة إلغاء الميزات');
-                if (typeof ChatSystem !== 'undefined') {
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.friendInConversation = false;
-                    ChatSystem.updateAllButtons();
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                }
-                break;
-                
-            case 'ping':
-                // رد على الـ ping للحفاظ على الاتصال
-                if (this.dc && this.dc.readyState === 'open') {
-                    this.dc.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-                }
-                break;
-                
-            case 'pong':
-                // استلام رد، لا حاجة لفعل شيء
-                break;
-        }
-    },
-    
-    async sendSignal(data) {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ type: 'webrtc_signal', data }));
-        } else if (typeof CallSystem !== 'undefined' && this.currentChatId) {
-            await CallSystem.sendSignal(this.currentChatId, data);
-        }
-    },
-    
-    async sendDirectText(text) {
-        if (!this.dc || this.dc.readyState !== 'open') return false;
-        
-        this.dc.send(JSON.stringify({
-            type: 'direct_text',
-            id: Date.now().toString(),
-            text: text,
-            time: new Date().toISOString()
-        }));
-        return true;
-    },
-    
-    async sendLocation(locationData) {
-        if (!this.dc || this.dc.readyState !== 'open') return false;
-        
-        this.dc.send(JSON.stringify({
-            type: 'location',
-            id: Date.now().toString(),
-            data: locationData,
-            time: new Date().toISOString()
-        }));
-        return true;
-    },
-    
-    async sendFile(file, type, onProgress) {
-        if (!this.dc || this.dc.readyState !== 'open') return false;
-        
-        const b64 = await this.fileToBase64(file);
-        const chunkSize = 16000;
-        const totalChunks = Math.ceil(b64.length / chunkSize);
-        const fileId = Date.now().toString();
-        
-        for (let i = 0; i < totalChunks; i++) {
-            if (this.dc.readyState !== 'open') return false;
-            
-            const chunk = {
-                type: 'file_chunk',
-                fileType: type,
-                data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
-                chunk: i,
-                total: totalChunks,
-                id: fileId,
-                fileName: file.name || 'ملف'
-            };
-            
-            this.dc.send(JSON.stringify(chunk));
-            
-            if (onProgress) {
-                onProgress(((i + 1) / totalChunks) * 100);
-            }
-            
-            await new Promise(r => setTimeout(r, 50));
-        }
-        
-        return true;
-    },
-    
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1] || reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    scheduleReconnect() {
-        if (this.reconnectAttempts >= this.maxReconnect) {
-            console.log('❌ فشل إعادة الاتصال بعد عدة محاولات');
-            if (typeof ChatSystem !== 'undefined') {
-                ChatSystem.friendInConversation = false;
-                ChatSystem.featuresEnabled = false;
-                ChatSystem.updateAllButtons();
-            }
-            return;
-        }
-        
-        this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-        
-        setTimeout(async () => {
-            if (this.currentChatId && ChatSystem.currentChat === this.currentChatId) {
-                console.log(`🔄 محاولة إعادة الاتصال ${this.reconnectAttempts}/${this.maxReconnect}`);
-                await this.create();
-            }
-        }, delay);
-    },
-    
-    cleanup() {
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
-        }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
-        }
-        this.isActive = false;
-    },
-    
-    close() {
-        this.cleanup();
-        this.currentChatId = null;
-        this.reconnectAttempts = 0;
-    },
-    
-    // إرسال إشارة طرد
-    sendForceClose() {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({
-                type: 'force_close_conversation',
-                timestamp: Date.now()
-            }));
-        }
-    },
-    
-    // إرسال إشارة إلغاء الميزات
-    sendForceDisable() {
-        if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({
-                type: 'force_disable_features',
-                timestamp: Date.now()
-            }));
-        }
-    },
-    
-    startKeepAlive() {
-        if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = setInterval(() => {
-            if (this.dc && this.dc.readyState === 'open') {
-                this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-            }
-        }, 15000);
-    }
-};
 
 // ==================== القسم 2: تعريف ChatSystem ====================
 const ChatSystem = {
@@ -597,8 +261,20 @@ async kickUserFromConversation() {
     
     console.log('👢 إنهاء المحادثة مع المستخدم:', this.currentChat);
     
-    // ✅ إرسال إشارة إلى الطرف الآخر لإغلاق المحادثة عبر القناة الدائمة
-    PermanentChannel.sendForceClose();
+    // ✅ إرسال إشارة إلى الطرف الآخر لإغلاق المحادثة
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        try {
+            CallSystem.dc.send(JSON.stringify({ 
+                type: 'force_close_conversation',
+                timestamp: Date.now()
+            }));
+            console.log('✅ تم إرسال إشارة إنهاء المحادثة إلى:', this.currentChat);
+        } catch(e) {
+            console.error('❌ فشل إرسال إشارة إنهاء المحادثة:', e);
+        }
+    } else {
+        console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة');
+    }
     
     // ✅ إغلاق المحادثة محلياً (عند المرسل أيضاً)
     this.closeChat();
@@ -687,9 +363,13 @@ startFeatureBlink() {
 async handleFeatureRequest(fromId) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
+    // ✅ تم إزالة القبول التلقائي (لم يعد يتم قبول الطلب تلقائياً)
+    // المستخدم يجب أن يضغط على الزر يدوياً لقبول الطلب
+    
     this.featureRequestReceived = true;
     this.startFeatureBlink();
     console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
+    console.log('✅ تم تفعيل وضع الاستقبال');
 }, 
     
     
@@ -701,9 +381,6 @@ async acceptFeatureRequest() {
         console.log('⚠️ لا يوجد طلب معلق');
         return;
     }
-    
-    // ✅ إنشاء القناة الدائمة بدلاً من Data Channel القديم
-    await PermanentChannel.init(this.currentChat);
     
     this.featuresEnabled = true;
     this.featureRequestPending = false;
@@ -726,6 +403,16 @@ async acceptFeatureRequest() {
     
     if (toggleInput) toggleInput.checked = true;
     if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    if (this.currentChat) {
+        try {
+            console.log('🔧 محاولة فتح Data Channel...');
+            await CallSystem.ensureDataChannelOnly(this.currentChat);
+            console.log('✅ تم فتح Data Channel بنجاح');
+        } catch(e) {
+            console.error('❌ خطأ في فتح Data Channel:', e);
+        }
+    }
     
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -757,9 +444,6 @@ async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
     if (action === 'accepted') {
-        // ✅ إنشاء القناة الدائمة
-        await PermanentChannel.init(this.currentChat);
-        
         this.featuresEnabled = true;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -779,6 +463,16 @@ async handleFeatureResponse(fromId, action) {
         
         if (toggleInput) toggleInput.checked = true;
         if (switchLabel) switchLabel.classList.remove('blinking');
+        
+        if (this.currentChat) {
+            try {
+                console.log('🔧 محاولة فتح Data Channel بعد قبول الطرف الآخر...');
+                await CallSystem.ensureDataChannelOnly(this.currentChat);
+                console.log('✅ تم فتح Data Channel بنجاح');
+            } catch(e) {
+                console.error('❌ خطأ في فتح Data Channel:', e);
+            }
+        }
         
         const btn = document.getElementById('enableFeaturesBtn');
         if (btn) {
@@ -832,8 +526,14 @@ async handleFeatureResponse(fromId, action) {
             btn.title = 'تفعيل الميزات';
         }
         
-        // ✅ إغلاق القناة الدائمة
-        PermanentChannel.close();
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
+        }
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
+        }
         
         this.updateAllButtons();
         console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
@@ -844,11 +544,9 @@ async handleFeatureResponse(fromId, action) {
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
-    // ✅ إرسال إشارة إلغاء للطرف الآخر عبر القناة الدائمة
-    PermanentChannel.sendForceDisable();
-    
-    // ✅ إغلاق القناة الدائمة
-    PermanentChannel.close();
+    if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
+        await CallSystem.deleteAllWebRTCSignals(this.currentChat);
+    }
     
     this.featuresEnabled = false;
     this.featureRequestPending = false;
@@ -864,6 +562,15 @@ async disableFeatures() {
     
     if (toggleInput) toggleInput.checked = false;
     if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    if (CallSystem.dc) {
+        try { CallSystem.dc.close(); } catch(e) {}
+        CallSystem.dc = null;
+    }
+    if (CallSystem.pc) {
+        try { CallSystem.pc.close(); } catch(e) {}
+        CallSystem.pc = null;
+    }
     
     this.updateAllButtons();
     console.log('✅ تم إلغاء تفعيل الميزات');
@@ -914,9 +621,6 @@ handleFeatureCancel() {
     
     if (toggleInput) toggleInput.checked = false;
     if (switchLabel) switchLabel.classList.remove('blinking');
-    
-    // ✅ إغلاق القناة الدائمة
-    PermanentChannel.close();
     
     this.updateAllButtons();
     console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
@@ -993,6 +697,7 @@ setupPageFocusListener() {
 closeConversation() {
     console.log("🚪 إغلاق صفحة المحادثة والعودة للقائمة الرئيسية");
     
+    // ✅ السطر المضاف لتنظيف الـ body وإيقاف حسابات الكيبورد فوراً
     document.body.classList.remove('conversation-open');
 
     this.currentChat = null;
@@ -1004,6 +709,7 @@ closeConversation() {
     const chatPage = document.querySelector('.page.active') || document.querySelector('.chat-page');
     if (chatPage) chatPage.style.display = 'block';
     
+    // إيقاف الوميض إذا كان شغالاً
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
@@ -1011,8 +717,10 @@ closeConversation() {
     const featureSwitch = document.querySelector('.feature-switch');
     if (featureSwitch) featureSwitch.classList.remove('blinking');
     
+    // إعادة تعيين واجهة زر الميزات
     this.updateFeatureToggleUI();
     
+    // إعادة إظهار القائمة السفلية والهيدر العام للموقع
     const bottomNav = document.querySelector('.bottom-nav');
     if (bottomNav) bottomNav.style.setProperty('display', 'flex', 'important');
     
@@ -1089,6 +797,7 @@ closeConversation() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
+    // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
     this.friendInConversation = false;
     
     this.resetFeatures();
@@ -1100,17 +809,38 @@ openChat(friendId, friendName, friendAvatar) {
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
     
+    // ✅ تم إزالة PresenceSystem.watchFriend (لم نعد نستخدم حالة الاتصال من السيرفر)
+    
+    // ✅ تم إزالة sendConversationStatus و requestConversationStatus (لم نعد نرسلهما)
+    
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
+    // ✅ تم إزالة setupFeatureButton (الأزرار أصبحت دائمة في HTML)
+    
+    // ✅ تحديث حالة الأزرار (إظهار/إخفاء إذا لزم الأمر)
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'flex';
     if (kickBtn) kickBtn.style.display = 'flex';
     
+    // ✅ تحديث حالة الزر فوراً
     this.updateAllButtons();
     
-    // ✅ لا ننشئ القناة الدائمة تلقائياً هنا، تنتظر قبول الميزات
+    setTimeout(() => {
+        if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
+            console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
+            this.featuresEnabled = false;
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            
+            const toggleInput = document.getElementById('featureToggleInput');
+            if (toggleInput) toggleInput.checked = false;
+            
+            this.updateAllButtons();
+            console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
+        }
+    }, 1000);
 },
     
     
@@ -1983,21 +1713,26 @@ async sendMessage(text) {
     if (!this.currentChat || !text.trim()) return false; 
     const mid = Date.now().toString(); 
     
-    // ✅ أولوية الإرسال عبر القناة الدائمة
-    if (PermanentChannel.isActive && PermanentChannel.dc && PermanentChannel.dc.readyState === 'open') {
+    if (this.featuresEnabled && this.friendInConversation && CallSystem.dc && CallSystem.dc.readyState === 'open') {
         try {
-            await PermanentChannel.sendDirectText(text.trim());
+            const messageData = {
+                type: 'direct_text',
+                id: mid,
+                text: text.trim(),
+                sender: 'me',
+                time: new Date().toISOString()
+            };
+            CallSystem.dc.send(JSON.stringify(messageData));
             
             this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
             this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            console.log('✅ تم إرسال النص عبر القناة الدائمة');
+            console.log('✅ تم إرسال النص مباشرة عبر Data Channel');
             return true;
         } catch(e) {
-            console.log('⚠️ فشل الإرسال عبر القناة الدائمة:', e);
+            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
         }
     }
     
-    // حل احتياطي: الإرسال عبر Firebase
     try { 
         const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
         if (!pr || !pu) return false;
@@ -2024,12 +1759,7 @@ async sendMessage(text) {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
-                
-                // ✅ استخدام القناة الدائمة لإرسال الملفات
-                const success = await PermanentChannel.sendFile(file, type, (progress) => {
-                    this.updateProgressBar(progress, `جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`);
-                });
-                
+                const success = await CallSystem.sendFileDirect(file, type);
                 if (success) { this.hideProgressBar(); return true; }
                 if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
             } catch (error) {}
@@ -2044,18 +1774,18 @@ async sendMessage(text) {
             return false;
         }
         
-        // ✅ التحقق من القناة الدائمة
-        if (PermanentChannel.dc && PermanentChannel.dc.readyState === 'open') {
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             return true;
         }
         
-        // إذا كانت القناة الدائمة غير جاهزة، نحاول إنشائها
         try {
-            const success = await PermanentChannel.init(this.currentChat);
+            const success = await CallSystem.ensureDataChannelOnly(this.currentChat);
+            
             if (success) {
                 await new Promise(r => setTimeout(r, 1000));
                 return true;
             }
+            
             alert('تعذر فتح قناة الاتصال لإرسال الملفات');
             return false;
         } catch (e) {
@@ -2072,9 +1802,15 @@ async sendMessage(text) {
             return;
         }
         
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
         if (!(await this._ensureChannelReady())) return;
         
-        if (PermanentChannel.dc && PermanentChannel.dc.readyState === 'open') { 
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'image');
             if (success) {
                 const comp = await SecureChatSystem.compressImage(file); 
@@ -2094,6 +1830,12 @@ async sendMessage(text) {
             return;
         }
         
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
         try {
             await SecureChatSystem.validateVideo(file);
         } catch (error) {
@@ -2103,7 +1845,7 @@ async sendMessage(text) {
         
         if (!(await this._ensureChannelReady())) return;
         
-        if (PermanentChannel.dc && PermanentChannel.dc.readyState === 'open') { 
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
             const success = await this.sendFileWithRetry(file, 'video');
             if (success) {
@@ -2128,9 +1870,15 @@ async sendMessage(text) {
             return;
         }
         
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
         if (!(await this._ensureChannelReady())) return;
         
-        if (PermanentChannel.dc && PermanentChannel.dc.readyState === 'open') { 
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'file');
             if (success) {
                 const b64 = await SecureChatSystem.fileToBase64(file); 
@@ -2149,9 +1897,15 @@ async sendMessage(text) {
             return;
         }
         
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+        }
+        
+        await new Promise(r => setTimeout(r, 200));
+        
         if (!(await this._ensureChannelReady())) return;
         
-        if (PermanentChannel.dc && PermanentChannel.dc.readyState === 'open') { 
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(audioBlob, 'voice');
             if (success) {
                 const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
@@ -2172,7 +1926,7 @@ async sendMessage(text) {
     }
     if (!(await this._ensureChannelReady())) return;
     
-    if (PermanentChannel.dc && PermanentChannel.dc.readyState === 'open') { 
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         if (!navigator.geolocation) { alert('المتصفح لا يدعم تحديد الموقع'); return; }
         
         navigator.geolocation.getCurrentPosition(p => { 
@@ -2420,8 +2174,7 @@ showLocationSwipeModalWithClicks(locationData) {
             locationData.clicksRemaining = maxClicks;
             
             setTimeout(() => {
-                // ✅ إرسال الموقع عبر القناة الدائمة
-                PermanentChannel.sendLocation(locationData);
+                CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
                 const msgId = Date.now().toString();
                 this.saveMessage(this.currentChat, { id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
                 this.displayMessage({ id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' });
@@ -2546,9 +2299,6 @@ closeChat() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ إغلاق القناة الدائمة
-    PermanentChannel.close();
-    
     const btn = document.getElementById('enableFeaturesBtn');
     if (btn) {
         btn.style.background = '#f44336';
@@ -2657,3 +2407,4 @@ document.addEventListener('touchend', function (e) {
     }
     lastTouchEnd = now;
 }, { passive: false });
+
