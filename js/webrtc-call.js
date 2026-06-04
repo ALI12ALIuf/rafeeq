@@ -1,5 +1,6 @@
 // ========== 1. webrtc-call.js - النسخة النهائية المتكاملة ==========
 // جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
+// تم الفصل التام بين إشارات المكالمات (call_*) وإشارات الملفات (file_*)
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
@@ -19,39 +20,14 @@ const CallSystem = {
     
     // ==================== 1.5 حذف إشارات WebRTC من Firestore ====================
     
-    async deleteAllWebRTCSignals(chatId) {
-        if (!chatId) return;
+    // ✅ دالة مخصصة لتنظيف إشارات المكالمات فقط
+    async deleteCallSignals(chatId) {
+        if (!chatId || !window.db) return;
         try {
             const messagesRef = window.db.collection('secure_messages');
             const snapshot = await messagesRef
                 .where('to', '==', chatId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) {
-                console.log('📡 لا توجد إشارات WebRTC عالقة للمحادثة', chatId);
-                return;
-            }
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة من Firestore للمحادثة ${chatId}`);
-        } catch(e) {
-            console.warn('⚠️ فشل حذف الإشارات العالقة:', e);
-        }
-    },
-    
-    async deleteAllMyWebRTCSignals() {
-        if (!window.auth?.currentUser) return;
-        const myId = window.auth.currentUser.uid;
-        try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', myId)
-                .where('package.type', '==', 'webrtc')
+                .where('package.type', 'in', ['call_offer', 'call_answer', 'call_ice', 'call_reject'])
                 .get();
             
             if (snapshot.empty) return;
@@ -59,7 +35,62 @@ const CallSystem = {
             const batch = window.db.batch();
             snapshot.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة للمستخدم الحالي`);
+            console.log(`✅ تم حذف ${snapshot.size} إشارة مكالمات عالقة للمحادثة ${chatId}`);
+        } catch(e) {
+            console.warn('⚠️ فشل حذف إشارات المكالمات:', e);
+        }
+    },
+    
+    // ✅ دالة مخصصة لتنظيف إشارات الملفات فقط
+    async deleteFileSignals(chatId) {
+        if (!chatId || !window.db) return;
+        try {
+            const messagesRef = window.db.collection('secure_messages');
+            const snapshot = await messagesRef
+                .where('to', '==', chatId)
+                .where('package.type', 'in', ['file_offer', 'file_answer', 'file_ice'])
+                .get();
+            
+            if (snapshot.empty) return;
+            
+            const batch = window.db.batch();
+            snapshot.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            console.log(`✅ تم حذف ${snapshot.size} إشارة ملفات عالقة للمحادثة ${chatId}`);
+        } catch(e) {
+            console.warn('⚠️ فشل حذف إشارات الملفات:', e);
+        }
+    },
+    
+    async deleteAllWebRTCSignals(chatId) {
+        if (!chatId) return;
+        // تم استبدال هذه الدالة بدالتين منفصلتين
+        await this.deleteCallSignals(chatId);
+        await this.deleteFileSignals(chatId);
+    },
+    
+    async deleteAllMyWebRTCSignals() {
+        if (!window.auth?.currentUser) return;
+        const myId = window.auth.currentUser.uid;
+        try {
+            const messagesRef = window.db.collection('secure_messages');
+            // حذف إشارات المكالمات الخاصة بي
+            const callSnapshot = await messagesRef
+                .where('to', '==', myId)
+                .where('package.type', 'in', ['call_offer', 'call_answer', 'call_ice', 'call_reject'])
+                .get();
+            
+            // حذف إشارات الملفات الخاصة بي
+            const fileSnapshot = await messagesRef
+                .where('to', '==', myId)
+                .where('package.type', 'in', ['file_offer', 'file_answer', 'file_ice'])
+                .get();
+            
+            const batch = window.db.batch();
+            callSnapshot.forEach(doc => batch.delete(doc.ref));
+            fileSnapshot.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            console.log(`✅ تم حذف ${callSnapshot.size + fileSnapshot.size} إشارة عالقة للمستخدم الحالي`);
         } catch(e) {}
     },
     
@@ -178,7 +209,7 @@ const CallSystem = {
             this.setupDataChannel(this.dc);
             
             this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
+                if (e.candidate) this.sendFileSignal(calleeId, { candidate: e.candidate });
             };
             
             this.pc.ondatachannel = e => { 
@@ -188,7 +219,9 @@ const CallSystem = {
             
             const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
             await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
+            
+            // ✅ إرسال إشارة ملفات (file_offer) وليس call_offer
+            await this.sendFileSignal(calleeId, { sdp: this.pc.localDescription, type: 'file_offer' });
             
             console.log('✅ تم إرسال طلب فتح Data Channel');
             return true;
@@ -256,8 +289,8 @@ const CallSystem = {
             
             this.pc.onicecandidate = e => { 
                 if (e.candidate) {
-                    console.log('📡 إرسال ICE candidate');
-                    this.sendSignal(calleeId, { candidate: e.candidate });
+                    console.log('📡 إرسال ICE candidate للمكالمة');
+                    this.sendCallSignal(calleeId, { candidate: e.candidate, type: 'call_ice' });
                 }
             };
             
@@ -278,7 +311,9 @@ const CallSystem = {
             console.log('📞 إنشاء عرض مكالمة صوتية...');
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
             await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
+            
+            // ✅ إرسال إشارة مكالمة (call_offer)
+            await this.sendCallSignal(calleeId, { sdp: this.pc.localDescription, callType: 'audio', type: 'call_offer' });
             console.log('✅ تم إرسال العرض');
             
         } catch (e) { 
@@ -333,7 +368,9 @@ const CallSystem = {
             this.dc = this.pc.createDataChannel('chat');
             this.setupDataChannel(this.dc);
             
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+            this.pc.onicecandidate = e => { 
+                if (e.candidate) this.sendCallSignal(calleeId, { candidate: e.candidate, type: 'call_ice' }); 
+            };
             this.pc.ontrack = e => {
                 const rv = document.getElementById('remoteVideo');
                 if (rv && e.streams[0]) rv.srcObject = e.streams[0];
@@ -344,7 +381,9 @@ const CallSystem = {
             
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
             await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
+            
+            // ✅ إرسال إشارة مكالمة (call_offer)
+            await this.sendCallSignal(calleeId, { sdp: this.pc.localDescription, callType: 'video', type: 'call_offer' });
             
         } catch (e) { 
             this.endCall(); 
@@ -395,12 +434,12 @@ const CallSystem = {
     async receiveCall(callerId, callData) {
         if (this.isInCall) {
             console.log('❌ مكالمة نشطة بالفعل');
-            this.sendSignal(callerId, { type: 'reject' });
+            this.sendCallSignal(callerId, { type: 'call_reject' });
             return;
         }
         
         this.isInCall = true;
-        this.callType = callData.type || 'audio';
+        this.callType = callData.callType || 'audio';
         this.currentCallId = callerId;
         console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
         
@@ -447,7 +486,7 @@ const CallSystem = {
             });
             
             this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
+                if (e.candidate) this.sendCallSignal(callerId, { candidate: e.candidate, type: 'call_ice' });
             };
             
             this.pc.ontrack = e => {
@@ -493,7 +532,8 @@ const CallSystem = {
                 const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
                 const answer = await this.pc.createAnswer(answerOptions);
                 await this.pc.setLocalDescription(answer);
-                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
+                // ✅ إرسال إجابة المكالمة (call_answer)
+                await this.sendCallSignal(callerId, { sdp: this.pc.localDescription, type: 'call_answer' });
                 console.log('✅ تم إرسال الرد');
             }
             
@@ -509,7 +549,7 @@ const CallSystem = {
             
         } catch (e) { 
             console.error('❌ خطأ في استقبال المكالمة:', e);
-            this.sendSignal(callerId, { type: 'reject' });
+            this.sendCallSignal(callerId, { type: 'call_reject' });
             this.endCall(); 
         }
     },
@@ -518,16 +558,16 @@ const CallSystem = {
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
 
     showIncomingCall(callerId, callData) {
-        if (callData.type === 'datachannel') {
-            console.log('📡 استلام طلب فتح Data Channel - لا حاجة لعرض شاشة');
-            this.handleSignaling(callData);
+        if (callData.type === 'file_offer') {
+            console.log('📡 استلام طلب فتح Data Channel للملفات - معالجة كملف');
+            this.handleSignal({ package: callData, from: callerId });
             return;
         }
         
         console.log('🔔 عرض شاشة المكالمة الواردة...');
         this.currentCallId = callerId;
         
-        const callType = callData.type === 'video' ? 'video' : 'audio';
+        const callType = callData.callType === 'video' ? 'video' : 'audio';
         const appColor = '#2196F3';
         const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
         
@@ -782,7 +822,7 @@ const CallSystem = {
                     rightThumb.style.right = maxRightMove + 'px';
                     setTimeout(() => {
                         overlay.remove();
-                        this.sendSignal(callerId, { type: 'reject' });
+                        this.sendCallSignal(callerId, { type: 'call_reject' });
                     }, 200);
                 } else {
                     rightThumb.style.right = '8px';
@@ -825,7 +865,7 @@ const CallSystem = {
                     if (stillThere._cleanup) stillThere._cleanup();
                     stillThere.remove();
                     console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
-                    this.sendSignal(callerId, { type: 'reject' });
+                    this.sendCallSignal(callerId, { type: 'call_reject' });
                 }
             }, 30000);
         });
@@ -859,7 +899,7 @@ setupDataChannel(channel) {
             
             if (msg.type === 'webrtc_signal') {
                 console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
-                this.handleSignaling(msg.data);
+                this.handleSignal({ package: msg.data });
                 return;
             }
             
@@ -1076,7 +1116,7 @@ async createNewDataChannel(calleeId) {
         this.pc = new RTCPeerConnection(this.servers);
         this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
         this.setupDataChannel(this.dc);
-        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
+        this.pc.onicecandidate = e => { if (e.candidate) this.sendFileSignal(calleeId, { candidate: e.candidate }); };
         this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
         this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
         this.pc.onconnectionstatechange = () => {
@@ -1087,62 +1127,23 @@ async createNewDataChannel(calleeId) {
         };
         const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
         await this.pc.setLocalDescription(offer);
-        await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
+        await this.sendFileSignal(calleeId, { sdp: this.pc.localDescription, type: 'file_offer' });
     } catch (error) {
         throw error;
     }
 },
 
-async handleSignaling(data) {
-    try {
-        if (data.type === 'reject') {
-            console.log('📞 الطرف الآخر رفض المكالمة');
-            const inc = document.getElementById('incomingCall');
-            if (inc) inc.remove();
-            this.endCall();
-            return;
-        }
-        
-        if (data.type === 'call_ended') {
-            console.log('📞 المتصل أنهى المكالمة قبل الرد');
-            const inc = document.getElementById('incomingCall');
-            if (inc) inc.remove();
-            this.endCall();
-            return;
-        }
-        
-        if (!this.pc) {
-            this.pc = new RTCPeerConnection(this.servers);
-            this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
-        }
-        if (data.sdp) {
-            await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-            if (data.sdp.type === 'offer') {
-                const answer = await this.pc.createAnswer();
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
-            }
-        } else if (data.candidate) {
-            if (this.pc && data.candidate) {
-                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-            }
-        }
-    } catch (e) {
-        console.warn('Signaling error:', e);
-    }
-},
-
-async sendSignal(calleeId, data) {
+// ✅ دالة خاصة بإرسال إشارات المكالمات فقط
+async sendCallSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-        console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+        console.log('📡 تجاهل إرسال إشارة مكالمة - الميزات غير مفعلة');
         return;
     }
     
     if (this.dc && this.dc.readyState === 'open') {
         try {
             this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
-            console.log('📡 تم إرسال الإشارة مباشرة عبر Data Channel');
+            console.log('📡 تم إرسال إشارة المكالمة مباشرة عبر Data Channel');
             return;
         } catch(e) {
             console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
@@ -1155,10 +1156,130 @@ async sendSignal(calleeId, data) {
         if (!myPrivateKey || !receiverPublicKey) return;
         const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
         const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-        await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        console.log('📡 تم إرسال الإشارة عبر Firebase (حل احتياطي)');
+        await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: data.type || 'call_signal', data: encrypted, timestamp: Date.now() });
+        console.log('📡 تم إرسال إشارة المكالمة عبر Firebase (حل احتياطي)');
     } catch (error) {
-        console.error('خطأ في إرسال الإشارة:', error);
+        console.error('خطأ في إرسال إشارة المكالمة:', error);
+    }
+},
+
+// ✅ دالة خاصة بإرسال إشارات الملفات فقط
+async sendFileSignal(calleeId, data) {
+    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
+        console.log('📡 تجاهل إرسال إشارة ملف - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (this.dc && this.dc.readyState === 'open') {
+        try {
+            this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
+            console.log('📡 تم إرسال إشارة الملف مباشرة عبر Data Channel');
+            return;
+        } catch(e) {
+            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
+        }
+    }
+    
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
+        await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: data.type || 'file_signal', data: encrypted, timestamp: Date.now() });
+        console.log('📡 تم إرسال إشارة الملف عبر Firebase (حل احتياطي)');
+    } catch (error) {
+        console.error('خطأ في إرسال إشارة الملف:', error);
+    }
+},
+
+// ✅ دالة معالجة الإشارات المستقبلة (الفصل التام)
+async handleSignal(msg) {
+    const pack = msg.package;
+    if (!pack) return;
+    
+    console.log('📡 استلام إشارة:', pack.type);
+    
+    // 📞 1. قنوات معالجة إشارات المكالمات فقط
+    if (pack.type === 'call_offer') {
+        console.log('📞 استلام طلب مكالمة');
+        this.showIncomingCall(msg.from, pack);
+    } 
+    else if (pack.type === 'call_answer') {
+        console.log('📞 استلام إجابة مكالمة');
+        if (this.pc && this.pc.remoteDescription === null && pack.sdp) {
+            try {
+                await this.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(pack.sdp)));
+                console.log('✅ تم تعيين Remote Description من الإجابة');
+            } catch(e) {
+                console.warn('خطأ في تعيين Remote Description:', e);
+            }
+        }
+    } 
+    else if (pack.type === 'call_ice') {
+        console.log('📞 استلام ICE Candidate للمكالمة');
+        if (this.pc && pack.candidate) {
+            try {
+                await this.pc.addIceCandidate(new RTCIceCandidate(JSON.parse(pack.candidate)));
+                console.log('✅ تم إضافة ICE Candidate');
+            } catch(e) {
+                console.warn('خطأ في إضافة ICE Candidate:', e);
+            }
+        }
+    }
+    else if (pack.type === 'call_reject') {
+        console.log('📞 تم رفض المكالمة');
+        const inc = document.getElementById('incomingCall');
+        if (inc) inc.remove();
+        this.endCall();
+    }
+    
+    // 📦 2. قنوات معالجة إشارات الملفات والداتا شانيل فقط
+    else if (pack.type === 'file_offer') {
+        console.log('📦 استلام طلب فتح Data Channel للملفات');
+        if (!this.pc) {
+            this.pc = new RTCPeerConnection(this.servers);
+            this.pc.ondatachannel = e => { 
+                this.setupDataChannel(e.channel); 
+                this.dc = e.channel; 
+            };
+            this.pc.onicecandidate = e => { 
+                if (e.candidate) this.sendFileSignal(msg.from, { candidate: e.candidate }); 
+            };
+        }
+        if (pack.sdp) {
+            try {
+                await this.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(pack.sdp)));
+                const answer = await this.pc.createAnswer();
+                await this.pc.setLocalDescription(answer);
+                await this.sendFileSignal(msg.from, { sdp: this.pc.localDescription, type: 'file_answer' });
+                console.log('✅ تم إرسال إجابة ملف');
+            } catch(e) {
+                console.warn('خطأ في معالجة file_offer:', e);
+            }
+        }
+    }
+    else if (pack.type === 'file_answer') {
+        console.log('📦 استلام إجابة ملف');
+        if (this.pc && this.pc.remoteDescription === null && pack.sdp) {
+            try {
+                await this.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(pack.sdp)));
+                console.log('✅ تم تعيين Remote Description للملفات');
+            } catch(e) {
+                console.warn('خطأ في تعيين Remote Description للملفات:', e);
+            }
+        }
+    }
+    else if (pack.type === 'file_ice') {
+        console.log('📦 استلام ICE Candidate للملفات');
+        if (this.pc && pack.candidate) {
+            try {
+                await this.pc.addIceCandidate(new RTCIceCandidate(JSON.parse(pack.candidate)));
+                console.log('✅ تم إضافة ICE Candidate للملفات');
+            } catch(e) {
+                console.warn('خطأ في إضافة ICE Candidate للملفات:', e);
+            }
+        }
     }
 },
     
@@ -1601,7 +1722,7 @@ async sendSignal(calleeId, data) {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
         
         if (this.currentCallId && ChatSystem.currentChat) {
-            this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
+            this.sendCallSignal(ChatSystem.currentChat, { type: 'call_reject' });
         }
         this.currentCallId = null;
         
@@ -1723,4 +1844,4 @@ window.cleanupCallState = async () => {
     console.log('✅ تم تنظيف حالة المكالمات يدوياً');
 };
 
-console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
+console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات - تم الفصل التام بين إشارات المكالمات والملفات');
