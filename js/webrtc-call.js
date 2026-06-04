@@ -1565,7 +1565,7 @@ async sendSignal(calleeId, data) {
             reader.readAsDataURL(file);
         });
     },
-    
+
     // ==================== 14. إنهاء المكالمة ====================
     
 endCall() {
@@ -1607,7 +1607,8 @@ endCall() {
         this.localStream = null;
     }
     
-    this.cleanupConnections();
+    // ✅ تنظيف الاتصال (بدون إغلاق Data Channel)
+    this.cleanupConnectionsKeepDataChannel();
     
     const ui = document.getElementById('callUI');
     if (ui) ui.remove();
@@ -1633,9 +1634,46 @@ endCall() {
     // ✅ إعادة تعيين علامة انتهاء المكالمة
     this.isCallEndingNormally = false;
     
-    console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
+    console.log('✅ تم إنهاء المكالمة - Data Channel لا يزال مفتوحاً للملفات والرسائل');
 },
+
+// ✅ دالة جديدة: تنظيف الاتصال مع الحفاظ على Data Channel مفتوح
+cleanupConnectionsKeepDataChannel() {
+    if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+    }
+    if (this.keepAliveInterval) {
+        clearInterval(this.keepAliveInterval);
+        this.keepAliveInterval = null;
+    }
+    // ✅ لا نغلق Data Channel هنا
+    // if (this.dc) {
+    //     try { this.dc.close(); } catch(e) {}
+    //     this.dc = null;
+    // }
     
+    // ✅ نغلق PeerConnection فقط (ونفصل مسارات الصوت والفيديو)
+    if (this.pc) {
+        // نزيل مسارات الصوت والفيديو فقط
+        const senders = this.pc.getSenders();
+        senders.forEach(sender => {
+            if (sender.track) {
+                try {
+                    this.pc.removeTrack(sender);
+                } catch(e) {}
+            }
+        });
+        // لا نغلق الـ PC بالكامل إذا كان Data Channel لا يزال مستخدماً
+        // لكن في حالتنا، يمكن إعادة تعيينه
+        try { this.pc.close(); } catch(e) {}
+        this.pc = null;
+    }
+    this.incomingChunks = {};
+    this.incomingFileInfo = {};
+},
+
+// ✅ الدالة الأصلية (إذا احتجنا إغلاق كامل)
 cleanupConnections() {
     if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
@@ -1657,6 +1695,7 @@ cleanupConnections() {
     this.incomingFileInfo = {};
 }
 };
+    
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
