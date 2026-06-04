@@ -1,4 +1,4 @@
-// ========== secure-chat.js - النسخة المعدلة بالكامل ==========
+// ========== secure-chat.js - النسخة المتوافقة مع الفصل ==========
 // نظام التشفير E2EE + ضغط الصور + فحص الفيديو
 
 const SecureChatSystem = {
@@ -19,7 +19,7 @@ const SecureChatSystem = {
             console.log('🔐 بدء تهيئة نظام التشفير...');
             await this.setupKeys();
             this.startReceiving();
-            PresenceSystem.setOnline();
+            if (typeof PresenceSystem !== 'undefined') PresenceSystem.setOnline();
             console.log('✅ تم تهيئة نظام التشفير بنجاح');
             return true;
         } catch (error) {
@@ -199,10 +199,12 @@ const SecureChatSystem = {
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
         
         let expirySeconds = null;
-        if (encryptedPackage.type === 'call_offer' || encryptedPackage.type === 'call_answer' || 
-            encryptedPackage.type === 'call_ice' || encryptedPackage.type === 'file_offer' ||
-            encryptedPackage.type === 'file_answer' || encryptedPackage.type === 'file_ice' ||
-            encryptedPackage.type === 'feature_request' || encryptedPackage.type === 'feature_response') {
+        if (encryptedPackage.type === 'webrtc' || 
+            encryptedPackage.type === 'file_offer' ||
+            encryptedPackage.type === 'file_answer' || 
+            encryptedPackage.type === 'file_ice' ||
+            encryptedPackage.type === 'feature_request' || 
+            encryptedPackage.type === 'feature_response') {
             expirySeconds = 30;
         }
         
@@ -238,7 +240,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة بالكامل ==========
+    // ========== الدالة الرئيسية لمعالجة الرسائل ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -254,29 +256,36 @@ const SecureChatSystem = {
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             }
             
-            // ==================== إشارات المكالمات (VoiceVideoSystem) ====================
-            else if (msg.package.type === 'call_offer' || 
-                     msg.package.type === 'call_answer' || 
-                     msg.package.type === 'call_ice' ||
-                     msg.package.type === 'call_ended' ||
-                     msg.package.type === 'reject') {
-                
+            // ==================== إشارات WebRTC (للمكالمات - تبقى على النظام القديم) ====================
+            else if (msg.package.type === 'webrtc') { 
                 if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة مكالمة');
+                    console.log('📞 تجاهل إشارة WebRTC - الميزات غير مفعلة');
                     return;
                 }
                 
                 const signalData = await this.decryptData(msg.package.data, sharedKey);
                 const parsedData = JSON.parse(signalData);
                 
-                console.log('📞 استلام إشارة مكالمة من:', msg.from, 'نوع:', msg.package.type);
+                console.log('📞 استلام إشارة WebRTC من:', msg.from);
+                console.log('📞 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
                 
-                if (typeof VoiceVideoSystem !== 'undefined' && VoiceVideoSystem.handleIncomingSignal) {
-                    await VoiceVideoSystem.handleIncomingSignal(msg.from, parsedData);
+                // ✅ استخدام CallSystem الأصلي للمكالمات
+                if (parsedData.sdp && parsedData.sdp.type === 'offer') {
+                    console.log('📞 مكالمة واردة جديدة من:', msg.from);
+                    if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
+                        CallSystem.showIncomingCall(msg.from, parsedData);
+                    } else {
+                        console.error('❌ CallSystem.showIncomingCall غير موجود');
+                    }
+                } 
+                else {
+                    if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
+                        CallSystem.handleSignaling(parsedData);
+                    }
                 }
             }
             
-            // ==================== إشارات الملفات (ChatDataSystem) ====================
+            // ==================== إشارات الملفات (ChatDataSystem - نظام جديد) ====================
             else if (msg.package.type === 'file_offer' || 
                      msg.package.type === 'file_answer' || 
                      msg.package.type === 'file_ice' ||
@@ -294,6 +303,8 @@ const SecureChatSystem = {
                 
                 if (typeof ChatDataSystem !== 'undefined' && ChatDataSystem.handleSignaling) {
                     await ChatDataSystem.handleSignaling(parsedData);
+                } else {
+                    console.error('❌ ChatDataSystem.handleSignaling غير موجود');
                 }
             }
             
@@ -317,11 +328,6 @@ const SecureChatSystem = {
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
                     ChatSystem.disableFeatures();
                 }
-            }
-            
-            // ==================== إشارات قديمة (للتوافق) ====================
-            else if (msg.package.type === 'webrtc') {
-                console.log('⚠️ تجاهل إشارة WebRTC قديمة من:', msg.from);
             }
             
             // ==================== الملفات والوسائط ====================
