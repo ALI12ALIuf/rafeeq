@@ -1,5 +1,6 @@
 // ========== secure-chat.js ==========
 // نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
+// مع دعم فصل المكالمات (MediaCallSystem) عن الميزات (CallSystem)
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -205,14 +206,13 @@ const SecureChatSystem = {
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
         
-        // ✅ تحديد مدة الصلاحية حسب نوع الإشارة
-        let expiryHours = 24; // الافتراضي 24 ساعة
+        let expiryHours = 24;
         let expirySeconds = null;
         
         if (encryptedPackage.type === 'webrtc' || 
             encryptedPackage.type === 'feature_request' || 
             encryptedPackage.type === 'feature_response') {
-            expirySeconds = 30; // 30 ثانية فقط
+            expirySeconds = 30;
         }
         
         let expiresAt;
@@ -247,7 +247,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (تم إزالة conversation_status, conversation_status_request, feature_cancel) ==========
+    // ==================== الدالة المعدلة بالكامل مع التوجيه الصحيح ====================
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -261,38 +261,89 @@ const SecureChatSystem = {
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
+            // ==================== القسم المعدل: توجيه إشارات WebRTC ====================
             else if (msg.package.type === 'webrtc') { 
-                // ✅ تجاهل إشارات WebRTC تماماً إذا:
-                // 1. الميزات غير مفعلة
-                // 2. أو الطرف الآخر ليس في المحادثة
-                // 3. أو المستخدم الحالي ليس في محادثة مع المرسل
-                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
-                        featuresEnabled: ChatSystem.featuresEnabled,
-                        friendInConversation: ChatSystem.friendInConversation,
-                        currentChat: ChatSystem.currentChat,
-                        sender: msg.from
-                    });
-                    return;
-                }
-                
+                // فك التشفير أولاً
                 const signalData = await this.decryptData(msg.package.data, sharedKey);
                 const parsedData = JSON.parse(signalData);
                 
-                console.log('📞 استلام إشارة WebRTC من:', msg.from);
-                console.log('📞 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
+                console.log('📡 استلام إشارة WebRTC من:', msg.from);
+                console.log('📡 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
+                console.log('📡 mediaCall flag:', parsedData.mediaCall);
                 
-                if (parsedData.sdp && parsedData.sdp.type === 'offer') {
-                    console.log('📞 مكالمة واردة جديدة من:', msg.from, 'نوع:', parsedData.type || 'audio');
-                    if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
-                        CallSystem.showIncomingCall(msg.from, parsedData);
-                    } else {
-                        console.error('❌ CallSystem.showIncomingCall غير موجود');
+                // 💡 التوجيه الذكي: التحقق من وجود وسم mediaCall
+                if (parsedData.mediaCall === true) {
+                    // ========== توجيه إلى MediaCallSystem (المكالمات الصوتية والمرئية) ==========
+                    console.log('📞 توجيه الإشارة إلى MediaCallSystem (مكالمة منفصلة)');
+                    
+                    if (parsedData.type === 'offer') {
+                        // عرض شاشة المكالمة الواردة
+                        if (typeof MediaCallSystem !== 'undefined' && MediaCallSystem.showIncomingCall) {
+                            MediaCallSystem.showIncomingCall(msg.from, parsedData);
+                        } else {
+                            console.error('❌ MediaCallSystem.showIncomingCall غير موجود');
+                        }
+                    } 
+                    else if (parsedData.type === 'answer') {
+                        // معالجة الرد على المكالمة
+                        if (typeof MediaCallSystem !== 'undefined' && MediaCallSystem.pc) {
+                            try {
+                                await MediaCallSystem.pc.setRemoteDescription(new RTCSessionDescription(parsedData.answer));
+                                console.log('✅ تم تعيين Remote Description (answer) لـ MediaCallSystem');
+                            } catch(e) {
+                                console.error('❌ فشل تعيين answer:', e);
+                            }
+                        }
+                    }
+                    else if (parsedData.type === 'candidate') {
+                        // معالجة ICE candidates
+                        if (typeof MediaCallSystem !== 'undefined' && MediaCallSystem.pc && parsedData.candidate) {
+                            try {
+                                await MediaCallSystem.pc.addIceCandidate(new RTCIceCandidate(parsedData.candidate));
+                                console.log('✅ تم إضافة ICE candidate لـ MediaCallSystem');
+                            } catch(e) {
+                                console.error('❌ فشل إضافة ICE candidate:', e);
+                            }
+                        }
+                    }
+                    else if (parsedData.type === 'reject') {
+                        // رفض المكالمة
+                        if (typeof MediaCallSystem !== 'undefined') {
+                            MediaCallSystem.endCall();
+                        }
+                    }
+                    else if (parsedData.type === 'call_ended') {
+                        // إنهاء المكالمة
+                        if (typeof MediaCallSystem !== 'undefined') {
+                            MediaCallSystem.endCall();
+                        }
                     }
                 } 
                 else {
-                    if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
-                        CallSystem.handleSignaling(parsedData);
+                    // ========== توجيه إلى CallSystem (الميزات والملفات فقط) ==========
+                    // التحقق من شروط الميزات قبل معالجة الإشارة
+                    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
+                        console.log('📡 تجاهل إشارة WebRTC للميزات - سبب:', {
+                            featuresEnabled: ChatSystem.featuresEnabled,
+                            friendInConversation: ChatSystem.friendInConversation,
+                            currentChat: ChatSystem.currentChat,
+                            sender: msg.from
+                        });
+                        return;
+                    }
+                    
+                    console.log('🔧 توجيه الإشارة إلى CallSystem (ميزات/ملفات)');
+                    
+                    if (parsedData.sdp && parsedData.sdp.type === 'offer') {
+                        // عرض طلب فتح DataChannel للميزات
+                        if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
+                            CallSystem.handleSignaling(parsedData);
+                        }
+                    } 
+                    else {
+                        if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
+                            CallSystem.handleSignaling(parsedData);
+                        }
                     }
                 }
             }
@@ -312,7 +363,6 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
-            // ==================== القسم 100: معالجة إشارة إلغاء الميزات (force_disable_features) ====================
             else if (msg.package.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
@@ -354,3 +404,5 @@ const SecureChatSystem = {
         }
     }
 };
+
+console.log('✅ SecureChatSystem جاهز مع توجيه ذكي لـ MediaCallSystem و CallSystem');
