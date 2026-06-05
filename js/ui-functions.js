@@ -61,50 +61,23 @@ window.shareLocation = () => {
     document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
-// ========== إغلاق المحادثة - نسخة معدلة بالكامل ==========
+// ========== إغلاق المحادثة (بسيطة ونظيفة) ==========
 window.closeConversation = () => { 
     console.log('🚪 بدء إغلاق المحادثة...');
     
-    // 1. إرسال إشارة إلغاء الميزات إلى الطرف الآخر (إذا كانت الميزات مفعلة)
+    // 1. إرسال إشارة إلغاء الميزات إذا كانت مفعلة
     if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
-        // المحاولة الأولى: عبر Data Channel المباشر
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
             try {
                 CallSystem.dc.send(JSON.stringify({ 
                     type: 'force_disable_features',
                     timestamp: Date.now()
                 }));
-                console.log('📤 تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر (عبر Data Channel)');
+                console.log('📤 تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر');
             } catch(e) {
-                console.error('❌ فشل إرسال إشارة الإلغاء عبر Data Channel:', e);
+                console.error('❌ فشل إرسال إشارة الإلغاء:', e);
             }
-        } else {
-            console.log('⚠️ Data Channel غير مفتوح، لم يتم إرسال إشارة الإلغاء');
         }
-        
-        // المحاولة الثانية: عبر Firebase (حل احتياطي)
-        (async () => {
-            try {
-                const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-                const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(ChatSystem.currentChat);
-                if (myPrivateKey && receiverPublicKey) {
-                    const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-                    const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-                        type: 'force_disable_features',
-                        timestamp: Date.now()
-                    }), sharedKey);
-                    await SecureChatSystem.sendToServer(ChatSystem.currentChat, { 
-                        id: Date.now().toString(), 
-                        type: 'force_disable_features', 
-                        data: encrypted, 
-                        timestamp: Date.now() 
-                    });
-                    console.log('📤 تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر (عبر Firebase)');
-                }
-            } catch(e) {
-                console.error('❌ فشل إرسال إشارة الإلغاء عبر Firebase:', e);
-            }
-        })();
     }
     
     // 2. إنهاء أي مكالمة نشطة (من MediaCallSystem)
@@ -122,35 +95,37 @@ window.closeConversation = () => {
     console.log('✅ تم إغلاق المحادثة بنجاح');
 };
 
-// ========== منع وإدارة زر الرجوع المادي في الهاتف ==========
-// نضيف حدث popstate للتعامل مع زر الرجوع المادي
-history.pushState(null, null, location.href);
-window.addEventListener('popstate', function(event) {
+// ========== تنظيف المحادثة والميزات عند تحميل الصفحة ==========
+// هذا يحل مشكلة الطرف الآخر عندما يضغط المستخدم على زر الرجوع المادي في الهاتف
+// لأن الضغط على زر الرجوع المادي يعيد تحميل الصفحة، وهنا نستغل ذلك
+window.addEventListener('load', function() {
+    // التحقق: هل المحادثة مفتوحة؟ (بعد تحميل الصفحة)
     if (document.body.classList.contains('conversation-open') && ChatSystem.currentChat) {
-        console.log('📱 تم الضغط على زر الرجوع المادي في الهاتف');
+        console.log('🔄 تم تحميل الصفحة والمحادثة مفتوحة - سيتم إلغاء الميزات عن الطرف الآخر');
         
-        // إرسال إشارة إلغاء الميزات فوراً
+        // إرسال إشارة إلغاء الميزات إلى الطرف الآخر
         if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
+            // المحاولة الأولى: عبر Data Channel إذا كان مفتوحاً
             if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
                 try {
                     CallSystem.dc.send(JSON.stringify({ 
                         type: 'force_disable_features',
                         timestamp: Date.now()
                     }));
-                    console.log('📤 تم إرسال إشارة إلغاء الميزات (عبر زر الرجوع المادي)');
-                } catch(e) {}
+                    console.log('📤 تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر (عبر Data Channel)');
+                } catch(e) {
+                    console.error('❌ فشل الإرسال عبر Data Channel:', e);
+                }
             }
         }
         
-        // إغلاق المحادثة
-        ChatSystem.closeChat();
+        // إغلاق المحادثة محلياً وإعادة تعيين الحالة
+        if (typeof ChatSystem !== 'undefined') {
+            ChatSystem.closeChat();
+        }
         
-        // نمنع الخروج الفعلي ونعيد pushState
-        history.pushState(null, null, location.href);
-        return;
+        console.log('✅ تم إغلاق المحادثة وإلغاء الميزات');
     }
-    // إذا لم تكن محادثة مفتوحة، نسمح بالرجوع الطبيعي
-    window.location.reload();
 });
 
 window.openImage = (data) => { const win = window.open('', '_blank'); if (win) win.document.write(`<img src="${data}" style="max-width:100%;height:auto;">`); };
