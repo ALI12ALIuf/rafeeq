@@ -61,40 +61,22 @@ window.shareLocation = () => {
     document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
-// ========== إغلاق المحادثة - يرجع لآخر صفحة في المكدس ==========
+// ========== إغلاق المحادثة - نسخة مبسطة ومستقرة (تم الإصلاح) ==========
 window.closeConversation = () => { 
-    CallSystem.endCall(); 
-    ChatSystem.closeChat();
+    // 1. إنهاء أي مكالمة نشطة (من MediaCallSystem)
+    if (typeof MediaCallSystem !== 'undefined' && MediaCallSystem.isInCall) {
+        MediaCallSystem.endCall();
+    }
     
-    setTimeout(() => {
-        const lastPage = popPage(); // نجيب آخر صفحة من المكدس
-        
-        // إخفاء الكل أولاً
-        document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
-        document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
-        document.body.classList.remove('profile-subpage-open');
-        
-        if (lastPage && lastPage.type === 'subpage') {
-            // رجوع لصفحة فرعية (مثلاً الأصدقاء)
-            document.body.classList.add('profile-subpage-open');
-            document.querySelector('.profile-page').style.display = 'none';
-            if (lastPage.id && document.getElementById(lastPage.id)) {
-                document.getElementById(lastPage.id).style.display = 'block';
-            }
-            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
-        } else if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
-            // رجوع للملف الشخصي
-            document.querySelector('.profile-page').classList.add('active');
-            document.querySelector('.profile-page').style.display = 'block';
-            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
-        } else {
-            // رجوع للدردشة (الافتراضي)
-            document.querySelector('.chat-page').classList.add('active');
-            document.querySelector('.chat-page').style.display = 'block';
-            loadChats();
-            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'chat') n.classList.add('active'); });
-        }
-    }, 200);
+    // 2. إغلاق المحادثة عبر ChatSystem (هذا سيتولى تنظيف كل شيء: الميزات، الأزرار، localStorage)
+    if (typeof ChatSystem !== 'undefined') {
+        ChatSystem.closeChat();
+    }
+    
+    // 3. لا حاجة لـ setTimeout معقد أو إعادة ترتيب يدوي للصفحات،
+    //    لأن ChatSystem.closeChat() يتولى إظهار صفحة الدردشة وإخفاء أزرار التفعيل.
+    
+    console.log('✅ تم إغلاق المحادثة والعودة إلى قائمة الدردشات');
 };
 
 window.openImage = (data) => { const win = window.open('', '_blank'); if (win) win.document.write(`<img src="${data}" style="max-width:100%;height:auto;">`); };
