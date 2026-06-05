@@ -1822,45 +1822,71 @@ async sendMessage(text) {
         }
     },
     
-    // ==================== القسم 31: sendVideoFile ====================
-    async sendVideoFile(file) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return;
+    // ==================== القسم 31: sendVideoFile (تم الإصلاح) ====================
+async sendVideoFile(file) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    try {
+        await SecureChatSystem.validateVideo(file);
+    } catch (error) {
+        alert(error.message);
+        return;
+    }
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
+        
+        // ✅ الخطوة 1: إرسال الفيديو أولاً
+        const success = await this.sendFileWithRetry(file, 'video');
+        
+        // ✅ الخطوة 2: إذا نجح الإرسال، قم بمعالجته وعرضه محلياً
+        if (success) {
+            try {
+                const b64 = await SecureChatSystem.fileToBase64(file); 
+                const msgId = Date.now().toString();
+                
+                // ✅ عرض الرسالة فوراً للمستخدم المرسل
+                this.displayMessage({ 
+                    id: msgId, 
+                    type: 'video', 
+                    data: b64, 
+                    fileName: file.name, 
+                    sender: 'me', 
+                    time: new Date().toISOString(), 
+                    status: 'sent' 
+                });
+                
+                this.saveMessage(this.currentChat, { 
+                    id: msgId, 
+                    type: 'video', 
+                    data: b64, 
+                    fileName: file.name, 
+                    sender: 'me', 
+                    time: new Date().toISOString(), 
+                    status: 'sent' 
+                });
+                
+            } catch (error) { 
+                console.error('فشل معالجة الفيديو محلياً:', error);
+                alert('تم إرسال الفيديو ولكن فشل عرضه محلياً');
+            }
+        } else {
+            alert('فشل إرسال الفيديو');
         }
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        try {
-            await SecureChatSystem.validateVideo(file);
-        } catch (error) {
-            alert(error.message);
-            return;
-        }
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
-            const success = await this.sendFileWithRetry(file, 'video');
-            if (success) {
-                try {
-                    const b64 = await SecureChatSystem.fileToBase64(file); 
-                    const msgId = Date.now().toString();
-                    
-                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                    
-                    this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                    
-                } catch (error) { alert('فشل معالجة الفيديو'); }
-            } else alert('فشل إرسال الفيديو');
-        }
-    },
+    }
+},
     
     // ==================== القسم 32: sendFile ====================
     async sendFile(file) { 
