@@ -80,7 +80,7 @@
             
             <!-- ==================== القسم 4.3.1: رأس المحادثة ==================== -->
             <div class="conversation-header">
-                <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
+                <button class="back-btn" id="backBtn"><i class="fas fa-arrow-right"></i></button>
                 <div class="conversation-user-info">
                     <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
                     <div class="conversation-user-details">
@@ -282,20 +282,28 @@
     window.googleProvider = new firebase.auth.GoogleAuthProvider();
 </script>
 
-<!-- ==================== القسم 8: ملفات الجافاسكريبت ==================== -->
-<script src="js/i18n.js?v=2"></script>
-<script src="js/theme.js?v=2"></script>
+<!-- ==================== القسم 8: ملفات الجافاسكريبت (الترتيب الصحيح - مهم جداً) ==================== -->
 
-<!-- القسم 8.1: ملفات النظام الأساسية (الترتيب مهم جداً) -->
-<script src="js/secure-chat.js?v=3"></script>
-<script src="js/webrtc-call.js?v=3"></script>
-<script src="js/chat-system.js?v=3"></script>
-<script src="js/ui-functions.js?v=3"></script>
+<!-- القسم 8.1: الأساسيات -->
+<script src="js/i18n.js?v=4"></script>
+<script src="js/theme.js?v=4"></script>
 
-<!-- القسم 8.2: ملفات المصادقة والكابتشا والصداقة -->
-<script src="js/captcha.js?v=3"></script>
-<script src="js/auth.js?v=3"></script>
-<script src="js/friends.js?v=3"></script>
+<!-- القسم 8.2: WebRTC أولاً (يعرف CallSystem و MediaCallSystem) -->
+<script src="js/webrtc-call.js?v=4"></script>
+
+<!-- القسم 8.3: نظام الدردشة (يعرف ChatSystem) -->
+<script src="js/chat-system.js?v=4"></script>
+
+<!-- القسم 8.4: نظام التشفير (يستخدم ChatSystem و CallSystem) -->
+<script src="js/secure-chat.js?v=4"></script>
+
+<!-- القسم 8.5: وظائف الواجهة -->
+<script src="js/ui-functions.js?v=4"></script>
+
+<!-- القسم 8.6: المصادقة والصداقة -->
+<script src="js/captcha.js?v=4"></script>
+<script src="js/auth.js?v=4"></script>
+<script src="js/friends.js?v=4"></script>
 
 <!-- ==================== القسم 9: كود التشغيل والإعدادات ==================== -->
 <script>
@@ -326,6 +334,43 @@ window.addEventListener('load', function() {
 });
 
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
+
+// ==================== دالة زر الرجوع العامة ====================
+window.goBack = function() {
+    console.log('🔙 زر الرجوع تم النقر عليه');
+    const conversationPage = document.getElementById('conversationPage');
+    const chatsList = document.getElementById('chatsList');
+    const chatPage = document.querySelector('.chat-page');
+    
+    if (conversationPage) conversationPage.style.display = 'none';
+    if (chatsList) chatsList.style.display = 'block';
+    if (chatPage) chatPage.style.display = 'block';
+    
+    if (typeof ChatSystem !== 'undefined') {
+        ChatSystem.currentChat = null;
+        ChatSystem.friendInConversation = false;
+    }
+    
+    if (typeof loadChats === 'function') {
+        loadChats();
+    }
+};
+
+// ربط زر الرجوع
+document.addEventListener('DOMContentLoaded', function() {
+    const backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+        const newBackBtn = backBtn.cloneNode(true);
+        backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+        
+        newBackBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.goBack();
+        });
+        console.log('✅ تم ربط زر الرجوع بنجاح');
+    }
+});
 </script>
 
 </body>
