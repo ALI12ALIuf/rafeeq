@@ -61,23 +61,97 @@ window.shareLocation = () => {
     document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
-// ========== إغلاق المحادثة - نسخة مبسطة ومستقرة (تم الإصلاح) ==========
+// ========== إغلاق المحادثة - نسخة معدلة بالكامل ==========
 window.closeConversation = () => { 
-    // 1. إنهاء أي مكالمة نشطة (من MediaCallSystem)
+    console.log('🚪 بدء إغلاق المحادثة...');
+    
+    // 1. إرسال إشارة إلغاء الميزات إلى الطرف الآخر (إذا كانت الميزات مفعلة)
+    if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
+        // المحاولة الأولى: عبر Data Channel المباشر
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            try {
+                CallSystem.dc.send(JSON.stringify({ 
+                    type: 'force_disable_features',
+                    timestamp: Date.now()
+                }));
+                console.log('📤 تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر (عبر Data Channel)');
+            } catch(e) {
+                console.error('❌ فشل إرسال إشارة الإلغاء عبر Data Channel:', e);
+            }
+        } else {
+            console.log('⚠️ Data Channel غير مفتوح، لم يتم إرسال إشارة الإلغاء');
+        }
+        
+        // المحاولة الثانية: عبر Firebase (حل احتياطي)
+        (async () => {
+            try {
+                const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+                const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(ChatSystem.currentChat);
+                if (myPrivateKey && receiverPublicKey) {
+                    const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+                    const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                        type: 'force_disable_features',
+                        timestamp: Date.now()
+                    }), sharedKey);
+                    await SecureChatSystem.sendToServer(ChatSystem.currentChat, { 
+                        id: Date.now().toString(), 
+                        type: 'force_disable_features', 
+                        data: encrypted, 
+                        timestamp: Date.now() 
+                    });
+                    console.log('📤 تم إرسال إشارة إلغاء الميزات إلى الطرف الآخر (عبر Firebase)');
+                }
+            } catch(e) {
+                console.error('❌ فشل إرسال إشارة الإلغاء عبر Firebase:', e);
+            }
+        })();
+    }
+    
+    // 2. إنهاء أي مكالمة نشطة (من MediaCallSystem)
     if (typeof MediaCallSystem !== 'undefined' && MediaCallSystem.isInCall) {
         MediaCallSystem.endCall();
+        console.log('📞 تم إنهاء المكالمة النشطة');
     }
     
-    // 2. إغلاق المحادثة عبر ChatSystem (هذا سيتولى تنظيف كل شيء: الميزات، الأزرار، localStorage)
+    // 3. إغلاق المحادثة عبر ChatSystem (يتولى تنظيف كل شيء)
     if (typeof ChatSystem !== 'undefined') {
         ChatSystem.closeChat();
+        console.log('✅ تم إغلاق المحادثة عبر ChatSystem');
     }
     
-    // 3. لا حاجة لـ setTimeout معقد أو إعادة ترتيب يدوي للصفحات،
-    //    لأن ChatSystem.closeChat() يتولى إظهار صفحة الدردشة وإخفاء أزرار التفعيل.
-    
-    console.log('✅ تم إغلاق المحادثة والعودة إلى قائمة الدردشات');
+    console.log('✅ تم إغلاق المحادثة بنجاح');
 };
+
+// ========== منع وإدارة زر الرجوع المادي في الهاتف ==========
+// نضيف حدث popstate للتعامل مع زر الرجوع المادي
+history.pushState(null, null, location.href);
+window.addEventListener('popstate', function(event) {
+    if (document.body.classList.contains('conversation-open') && ChatSystem.currentChat) {
+        console.log('📱 تم الضغط على زر الرجوع المادي في الهاتف');
+        
+        // إرسال إشارة إلغاء الميزات فوراً
+        if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
+            if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                try {
+                    CallSystem.dc.send(JSON.stringify({ 
+                        type: 'force_disable_features',
+                        timestamp: Date.now()
+                    }));
+                    console.log('📤 تم إرسال إشارة إلغاء الميزات (عبر زر الرجوع المادي)');
+                } catch(e) {}
+            }
+        }
+        
+        // إغلاق المحادثة
+        ChatSystem.closeChat();
+        
+        // نمنع الخروج الفعلي ونعيد pushState
+        history.pushState(null, null, location.href);
+        return;
+    }
+    // إذا لم تكن محادثة مفتوحة، نسمح بالرجوع الطبيعي
+    window.location.reload();
+});
 
 window.openImage = (data) => { const win = window.open('', '_blank'); if (win) win.document.write(`<img src="${data}" style="max-width:100%;height:auto;">`); };
 window.openFile = (data, fileName) => { const link = document.createElement('a'); link.href = data; link.download = fileName || 'file'; link.click(); };
@@ -137,7 +211,19 @@ function setupModals() { window.openLanguageModal = () => document.getElementByI
 
 document.addEventListener('DOMContentLoaded', () => { ensureSinglePage(); setupNavigation(); setupModals(); loadChats(); setupChatListeners(); updateTripsCount(); });
 window.addEventListener('authReady', async () => { if (window.auth?.currentUser) await SecureChatSystem.init(); });
-window.addEventListener('beforeunload', () => { PresenceSystem.setOffline(); });
+window.addEventListener('beforeunload', () => { 
+    // عند إغلاق التبويب أو المتصفح، نحاول إرسال إشارة إلغاء الميزات
+    if (ChatSystem.currentChat && ChatSystem.featuresEnabled && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        try {
+            CallSystem.dc.send(JSON.stringify({ 
+                type: 'force_disable_features',
+                timestamp: Date.now()
+            }));
+            console.log('📤 تم إرسال إشارة إلغاء الميزات (قبل إغلاق الصفحة)');
+        } catch(e) {}
+    }
+    PresenceSystem.setOffline(); 
+});
 document.addEventListener('visibilitychange', () => { if (document.hidden) PresenceSystem.setOffline(); else { PresenceSystem.setOnline(); if (ChatSystem.currentChat && ChatSystem.friendOnline) setTimeout(() => CallSystem.ensureDataChannel(ChatSystem.currentChat).catch(() => {}), 1000); } });
 if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
 window.addEventListener('error', (event) => { console.error('❌ خطأ عام:', event.error); });
