@@ -1613,7 +1613,7 @@ async sendSignal(calleeId, data) {
         });
     },
     
-      // ==================== 14. إنهاء المكالمة ====================
+         // ==================== 14. إنهاء المكالمة ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
@@ -1677,6 +1677,20 @@ async sendSignal(calleeId, data) {
             }).catch(() => {});
         }
         
+        // ✅ إعادة فتح Data Channel فوراً بعد انتهاء المكالمة
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled && ChatSystem.friendInConversation) {
+            console.log('🔄 إعادة فتح Data Channel فوراً بعد المكالمة...');
+            (async () => {
+                try {
+                    await this.ensureDataChannelOnly(ChatSystem.currentChat);
+                    console.log('✅ تم إعادة فتح Data Channel بنجاح بعد المكالمة');
+                } catch(e) {
+                    console.log('⚠️ فشل إعادة فتح Data Channel، سيتم المحاولة لاحقاً:', e);
+                    this.scheduleReconnect();
+                }
+            })();
+        }
+        
         // ✅ إعادة تعيين العلامة بعد انتهاء عملية الإغلاق
         setTimeout(() => {
             this.isEndingCall = false;
@@ -1705,7 +1719,7 @@ async sendSignal(calleeId, data) {
         this.incomingChunks = {};
         this.incomingFileInfo = {};
     }
-};
+};   
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
