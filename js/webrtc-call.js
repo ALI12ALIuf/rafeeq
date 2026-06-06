@@ -834,7 +834,9 @@ const CallSystem = {
         });
     },
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+    
+
+// ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -954,53 +956,38 @@ setupDataChannel(channel) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
         }
+        
+        // ✅ إذا كان الإغلاق متعمداً (انتهاء مكالمة)، لا نعطل الميزات ولا نحاول إعادة الاتصال
+        if (this.isGracefulClose) {
+            console.log('✅ إغلاق متعمد للمكالمة - الميزات تبقى مفعلة، لا حاجة لإعادة الاتصال');
+            return;
+        }
+        
         this.scheduleReconnect();
         
+        // ✅ فقط إذا كان الإغلاق غير متعمد (انقطاع مفاجئ) نعطل الميزات
         if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
+            console.log('⚠️ انقطاع مفاجئ للقناة - محاولة إعادة الاتصال...');
+            // لا نعطل الميزات هنا، فقط نعلم المستخدم
             ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
         }
     };
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
+        
+        // ✅ إذا كنا في إغلاق متعمد، نتجاهل الخطأ
+        if (this.isGracefulClose) {
+            console.log('✅ تجاهل الخطأ - إغلاق متعمد للمكالمة');
+            return;
+        }
+        
         this.scheduleReconnect();
         
         if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
+            console.log('⚠️ خطأ في القناة - محاولة إعادة الاتصال...');
+            // لا نعطل الميزات هنا
             ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
         }
     };
 },
@@ -1024,17 +1011,35 @@ sendCallStatus(status) {
 
 scheduleReconnect() {
     if (!ChatSystem.currentChat) return;
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+    // ✅ لا نحاول إعادة الاتصال إذا كانت الميزات غير مفعلة أو إغلاق متعمد
+    if (!ChatSystem.featuresEnabled) {
+        console.log('🚫 الميزات غير مفعلة، لن تتم إعادة الاتصال');
+        return;
+    }
+    if (this.isGracefulClose) {
+        console.log('🚫 إغلاق متعمد، لن تتم إعادة الاتصال');
+        return;
+    }
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.log('⚠️ فشلت إعادة الاتصال بعد عدة محاولات');
+        return;
+    }
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
+    console.log(`🔄 محاولة إعادة الاتصال ${this.reconnectAttempts}/${this.maxReconnectAttempts} بعد ${delay}ms`);
     this.reconnectTimer = setTimeout(async () => {
         try {
-            if (ChatSystem.currentChat) {
+            if (ChatSystem.currentChat && ChatSystem.featuresEnabled && ChatSystem.friendInConversation) {
                 await this.ensureDataChannelOnly(ChatSystem.currentChat);
+                this.reconnectAttempts = 0;
+                console.log('✅ تم إعادة الاتصال بنجاح');
             }
-        } catch (error) {}
-        this.reconnectTimer = null;
+        } catch (error) {
+            console.log('⚠️ فشلت محاولة إعادة الاتصال:', error);
+            this.reconnectTimer = null;
+            this.scheduleReconnect();
+        }
     }, delay);
 },
 
@@ -1603,6 +1608,9 @@ async sendSignal(calleeId, data) {
     endCall() {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
         
+        // ✅ وضع علامة أن هذا إغلاق متعمد للمكالمة
+        this.isGracefulClose = true;
+        
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
         }
@@ -1659,7 +1667,26 @@ async sendSignal(calleeId, data) {
             }).catch(() => {});
         }
         
-        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
+        // ✅ ✅ ✅ إعادة فتح Data Channel بعد انتهاء المكالمة (إذا كانت الميزات لا تزال مفعلة)
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled && ChatSystem.friendInConversation) {
+            console.log('🔄 إعادة فتح Data Channel بعد انتهاء المكالمة...');
+            setTimeout(async () => {
+                try {
+                    await this.ensureDataChannelOnly(ChatSystem.currentChat);
+                    console.log('✅ تم إعادة فتح Data Channel بنجاح');
+                } catch(e) {
+                    console.log('⚠️ فشل إعادة فتح Data Channel، سيتم المحاولة لاحقاً:', e);
+                    this.scheduleReconnect();
+                }
+            }, 1000);
+        }
+        
+        // ✅ إعادة تعيين علامة الإغلاق المتعمد بعد فترة
+        setTimeout(() => {
+            this.isGracefulClose = false;
+        }, 2000);
+        
+        console.log('✅ تم إنهاء المكالمة - الميزات تبقى مفعلة');
     },
     
     cleanupConnections() {
