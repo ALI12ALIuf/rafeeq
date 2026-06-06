@@ -857,17 +857,67 @@ async autoCleanupOnLoad() {
                 document.removeEventListener('mouseup', onRightEnd);
             };
             
-            setTimeout(() => {
-                const stillThere = document.getElementById('incomingCall');
-                if (stillThere) {
-                    if (stillThere._cleanup) stillThere._cleanup();
-                    stillThere.remove();
-                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
-                    this.sendSignal(callerId, { type: 'reject' });
+            setTimeout(async () => {
+    const stillThere = document.getElementById('incomingCall');
+    if (stillThere) {
+        if (stillThere._cleanup) stillThere._cleanup();
+        stillThere.remove();
+        console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
+        this.sendSignal(callerId, { type: 'reject' });
+        
+        // ✅ إصلاح مشكلة Data Channel بعد انتهاء المهلة
+        if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('🔄 إعادة فتح Data Channel بعد انتهاء المهلة...');
+            
+            // تنظيف الاتصال العالق
+            if (this.pc) {
+                try {
+                    this.pc.close();
+                } catch(e) {}
+                this.pc = null;
+            }
+            if (this.dc) {
+                try {
+                    this.dc.close();
+                } catch(e) {}
+                this.dc = null;
+            }
+            
+            // إعادة تعيين محاولات إعادة الاتصال
+            this.reconnectAttempts = 0;
+            
+            // إيقاف المؤقتات العالقة
+            if (this.keepAliveInterval) {
+                clearInterval(this.keepAliveInterval);
+                this.keepAliveInterval = null;
+            }
+            if (this.reconnectTimer) {
+                clearTimeout(this.reconnectTimer);
+                this.reconnectTimer = null;
+            }
+            
+            // انتظر قليلاً ثم أعد فتح Data Channel
+            setTimeout(async () => {
+                try {
+                    await this.ensureDataChannelOnly(ChatSystem.currentChat);
+                    console.log('✅ تم إعادة فتح Data Channel بنجاح بعد المهلة');
+                } catch(e) {
+                    console.error('❌ فشل إعادة فتح Data Channel:', e);
+                    // إذا فشل، نطلب إعادة تفعيل الميزات
+                    if (typeof ChatSystem !== 'undefined') {
+                        ChatSystem.featuresEnabled = false;
+                        ChatSystem.featureRequestPending = false;
+                        ChatSystem.featureRequestReceived = false;
+                        const toggleInput = document.getElementById('featureToggleInput');
+                        if (toggleInput) toggleInput.checked = false;
+                        ChatSystem.updateAllButtons();
+                        console.log('✅ تم إعادة تعيين الميزات بسبب فشل إعادة فتح القناة');
+                    }
                 }
-            }, 30000);
-        });
-    },
+            }, 500);
+        }
+    }
+}, 30000);
     
     // ==================== 9. Data Channel وإدارة الاتصال ====================
 
