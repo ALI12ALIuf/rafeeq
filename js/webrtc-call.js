@@ -17,51 +17,89 @@ const CallSystem = {
         ] 
     },
     
-    // ==================== 1.5 حذف إشارات WebRTC من Firestore ====================
-    
-    async deleteAllWebRTCSignals(chatId) {
-        if (!chatId) return;
-        try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', chatId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) {
-                console.log('📡 لا توجد إشارات WebRTC عالقة للمحادثة', chatId);
-                return;
-            }
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة من Firestore للمحادثة ${chatId}`);
-        } catch(e) {
-            console.warn('⚠️ فشل حذف الإشارات العالقة:', e);
+// ==================== 1.5 حذف إشارات WebRTC من Firestore ====================
+
+async deleteAllWebRTCSignals(chatId) {
+    if (!chatId) return;
+    try {
+        const messagesRef = window.db.collection('secure_messages');
+        const snapshot = await messagesRef
+            .where('to', '==', chatId)
+            .where('package.type', '==', 'webrtc')
+            .get();
+        
+        if (snapshot.empty) {
+            console.log('📡 لا توجد إشارات WebRTC عالقة للمحادثة', chatId);
+            return;
         }
-    },
+        
+        const batch = window.db.batch();
+        snapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة من Firestore للمحادثة ${chatId}`);
+    } catch(e) {
+        console.warn('⚠️ فشل حذف الإشارات العالقة:', e);
+    }
+},
+
+async deleteAllMyWebRTCSignals() {
+    if (!window.auth?.currentUser) return;
+    const myId = window.auth.currentUser.uid;
+    try {
+        const messagesRef = window.db.collection('secure_messages');
+        const snapshot = await messagesRef
+            .where('to', '==', myId)
+            .where('package.type', '==', 'webrtc')
+            .get();
+        
+        if (snapshot.empty) return;
+        
+        const batch = window.db.batch();
+        snapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة للمستخدم الحالي`);
+    } catch(e) {}
+},
+
+// ==================== 1.6 التنظيف التلقائي عند التحميل (معدل) ====================
+
+async autoCleanupOnLoad() {
+    console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
     
-    async deleteAllMyWebRTCSignals() {
-        if (!window.auth?.currentUser) return;
-        const myId = window.auth.currentUser.uid;
+    // ✅ تنظيف الإشارات العالقة فقط
+    await this.deleteAllMyWebRTCSignals();
+    
+    // ✅ تنظيف واجهة المكالمة إذا كانت موجودة (قديمة من جلسة سابقة)
+    const ui = document.getElementById('callUI');
+    if (ui) ui.remove();
+    const inc = document.getElementById('incomingCall');
+    if (inc) inc.remove();
+    document.body.classList.remove('in-call');
+    
+    // ✅ تحديث حالة المستخدم في قاعدة البيانات إذا كان في مكالمة سابقة
+    if (window.auth?.currentUser) {
         try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', myId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) return;
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة للمستخدم الحالي`);
-        } catch(e) {}
-    },
+            const userDoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
+            if (userDoc.exists && userDoc.data().inCall === true) {
+                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    inCall: false,
+                    callType: null,
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('✅ تم تصحيح حالة المستخدم في قاعدة البيانات');
+            }
+        } catch(e) {
+            console.warn('⚠️ فشل تصحيح حالة المستخدم:', e);
+        }
+    }
+    
+    // ✅ ملاحظة مهمة: لا نقوم بإغلاق this.dc أو this.pc هنا
+    // لأن ذلك سيدمر الميزات إذا كانت مفعلة مسبقاً
+    
+    console.log('✅ اكتمل التنظيف التلقائي - تم حذف الإشارات العالقة فقط');
+},
     
     // ==================== 2. التنظيف التلقائي ====================
     
