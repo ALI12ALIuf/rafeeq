@@ -944,6 +944,7 @@ setupDataChannel(channel) {
         }, 2000);
     };
     
+    // ✅ تعديل: إزالة تعطيل الميزات عند انقطاع القناة
     channel.onclose = () => {
         console.log('❌ Data Channel مغلق');
         this.sendCallStatus('disconnected');
@@ -953,52 +954,18 @@ setupDataChannel(channel) {
         }
         this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
-        }
+        // ✅ تم الإزالة: لا نقوم بتعطيل الميزات تلقائياً عند انقطاع القناة
+        // الميزات تبقى فعالة، وسيتم إعادة فتح القناة تلقائياً عبر scheduleReconnect()
+        console.log('🔌 انقطاع قناة الاتصال، سيتم إعادة المحاولة دون تعطيل الميزات');
     };
     
+    // ✅ تعديل: إزالة تعطيل الميزات عند خطأ القناة
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
-            ChatSystem.featuresEnabled = false;
-            ChatSystem.featureRequestPending = false;
-            ChatSystem.featureRequestReceived = false;
-            
-            if (ChatSystem.featureBlinkInterval) {
-                clearInterval(ChatSystem.featureBlinkInterval);
-                ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
-            ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
-        }
+        // ✅ تم الإزالة: لا نقوم بتعطيل الميزات تلقائياً
+        console.log('⚠️ خطأ في القناة، سيتم إعادة المحاولة دون تعطيل الميزات');
     };
 },
 
@@ -1019,18 +986,46 @@ sendCallStatus(status) {
     }
 },
 
+// ==================== 9.1 إعادة فتح Data Channel فقط (دون تعطيل الميزات) ====================
+async reconnectDataChannelOnly() {
+    if (!ChatSystem.currentChat) return false;
+    if (!ChatSystem.featuresEnabled) return false;
+    
+    if (this.dc && this.dc.readyState === 'open') return true;
+    
+    console.log('🔄 محاولة إعادة فتح Data Channel فقط (دون تعطيل الميزات)...');
+    
+    if (this.dc) {
+        try { this.dc.close(); } catch(e) {}
+        this.dc = null;
+    }
+    if (this.pc) {
+        try { this.pc.close(); } catch(e) {}
+        this.pc = null;
+    }
+    
+    return this.createDataChannelOnly(ChatSystem.currentChat);
+},
+
+// ✅ تعديل: تحديث دالة scheduleReconnect لاستخدام reconnectDataChannelOnly
 scheduleReconnect() {
     if (!ChatSystem.currentChat) return;
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.log('⚠️ فشلت إعادة المحاولة بعد ' + this.maxReconnectAttempts + ' مرات');
+        return;
+    }
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
     this.reconnectTimer = setTimeout(async () => {
         try {
-            if (ChatSystem.currentChat) {
-                await this.ensureDataChannelOnly(ChatSystem.currentChat);
+            if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+                console.log('🔄 محاولة إعادة فتح القناة رقم ' + this.reconnectAttempts);
+                await this.reconnectDataChannelOnly();
             }
-        } catch (error) {}
+        } catch (error) {
+            console.log('⚠️ فشل إعادة فتح القناة:', error);
+        }
         this.reconnectTimer = null;
     }, delay);
 },
@@ -1654,6 +1649,14 @@ async sendSignal(calleeId, data) {
                 callType: null,
                 lastSeen: firebase.firestore.FieldValue.serverTimestamp()
             }).catch(() => {});
+        }
+        
+        // ✅ بعد تنظيف المكالمة، أعد فتح Data Channel فقط إذا كانت الميزات مفعلة
+        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('📞 انتهت المكالمة، إعادة فتح Data Channel للميزات...');
+            setTimeout(() => {
+                this.reconnectDataChannelOnly();
+            }, 500);
         }
         
         console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
