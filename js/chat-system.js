@@ -439,8 +439,8 @@ async acceptFeatureRequest() {
     console.log('✅ تم تفعيل الميزات!');
 },
     
-    // ==================== القسم 10: handleFeatureResponse ====================
-async handleFeatureResponse(fromId, action) {
+        // ==================== القسم 10: handleFeatureResponse ====================
+async handleFeatureResponse(fromId, action, msg = {}) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
     if (action === 'accepted') {
@@ -505,6 +505,9 @@ async handleFeatureResponse(fromId, action) {
     } else if (action === 'disable') {
         console.log('🔴 استلام إشارة إيقاف من الطرف الآخر');
         
+        // ✅ قراءة حقول التنظيف من الرسالة
+        const shouldClearMedia = msg.shouldClearMedia === true;
+        
         this.featuresEnabled = false;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -524,6 +527,16 @@ async handleFeatureResponse(fromId, action) {
         if (btn) {
             btn.style.background = '#f44336';
             btn.title = 'تفعيل الميزات';
+        }
+        
+        // ✅ تنظيف الملفات والوسائط إذا طلب الطرف الآخر
+        if (shouldClearMedia && this.currentChat) {
+            const key = `chat_${this.currentChat}`;
+            const messages = this.messages[this.currentChat] || [];
+            const filteredMessages = messages.filter(msg => msg.type === 'text');
+            this.messages[this.currentChat] = filteredMessages;
+            localStorage.setItem(key, JSON.stringify(filteredMessages));
+            console.log('✅ تم تنظيف الملفات والوسائط من localStorage بناءً على طلب الطرف الآخر');
         }
         
         if (CallSystem.dc) {
