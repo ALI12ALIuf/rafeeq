@@ -1598,40 +1598,34 @@ async sendSignal(calleeId, data) {
     // ==================== 14. إنهاء المكالمة ====================
     
 endCall() {
-    console.log('📞 إنهاء المكالمة - الميزات والملفات تبقى نشطة');
+    console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
     
-    // ✅ إرسال إشارة إنهاء المكالمة للطرف الآخر (إذا كانت القناة مفتوحة)
-    if (this.currentCallId && ChatSystem.currentChat && this.dc && this.dc.readyState === 'open') {
-        try {
-            this.dc.send(JSON.stringify({ 
-                type: 'webrtc_signal', 
-                data: { type: 'call_ended' }
-            }));
-        } catch(e) {}
+    if (this.currentCallId && ChatSystem.currentChat) {
+        this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
     }
     this.currentCallId = null;
     
-    // ✅ إرسال حالة قطع الاتصال (للمكالمة فقط)
-    if (this.dc && this.dc.readyState === 'open') {
-        try {
-            this.dc.send(JSON.stringify({ type: 'call_status', status: 'disconnected', timestamp: Date.now() }));
-        } catch(e) {}
-    }
+    this.sendCallStatus('disconnected');
     
-    // ✅ إيقاف مؤقت المكالمة فقط (لا نوقف keepAliveInterval و reconnectTimer)
+    if (this.keepAliveInterval) {
+        clearInterval(this.keepAliveInterval);
+        this.keepAliveInterval = null;
+    }
     if (this.callTimerInterval) {
         clearInterval(this.callTimerInterval);
         this.callTimerInterval = null;
     }
+    if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+    }
     
-    // ✅ تنظيف الصوت البعيد
     if (this.remoteAudioElement) {
         this.remoteAudioElement.pause();
         this.remoteAudioElement.srcObject = null;
         this.remoteAudioElement = null;
     }
     
-    // ✅ إيقاف الميكروفون والكاميرا (MediaStream فقط)
     if (this.localStream) {
         try {
             this.localStream.getTracks().forEach(t => t.stop());
@@ -1639,25 +1633,22 @@ endCall() {
         this.localStream = null;
     }
     
-    // ✅ تنظيف اتصال المكالمة فقط (بدون لمس dc و pc الخاصين بالميزات)
-    this.cleanupCallConnection();
+    // ❌ هذا السطر تم حذفه - كان يغلق dc و pc الخاصين بالميزات
+    // this.cleanupConnections();
     
-    // ✅ إزالة واجهة المكالمة
     const ui = document.getElementById('callUI');
     if (ui) ui.remove();
     const inc = document.getElementById('incomingCall');
     if (inc) inc.remove();
     document.body.classList.remove('in-call');
     
-    // ✅ إعادة تعيين متغيرات المكالمة فقط
     this.isInCall = false;
     this.callType = null;
     this.isAudioMuted = false;
     this.isVideoMuted = false;
     this.isSpeakerEnabled = false;
-    // ❌ لا نعيد تعيين reconnectAttempts (يبقى كما هو للميزات)
+    this.reconnectAttempts = 0;
     
-    // ✅ تحديث حالة المستخدم في قاعدة البيانات
     if (window.auth?.currentUser) {
         window.db.collection('users').doc(window.auth.currentUser.uid).update({
             inCall: false,
@@ -1666,36 +1657,9 @@ endCall() {
         }).catch(() => {});
     }
     
-    console.log('✅ انتهت المكالمة - DataChannel والميزات ما زالت تعمل');
-    
-    // ✅ التحقق من أن قناة الميزات ما زالت مفتوحة
-    if (this.dc && this.dc.readyState === 'open') {
-        console.log('✅ DC مفتوح - يمكنك إرسال الملفات والنصوص');
-    } else {
-        console.log('⚠️ DC مغلق - جاري إعادة الاتصال');
-        this.scheduleReconnect();
-    }
+    console.log('✅ تم إنهاء المكالمة - DataChannel يبقى مفتوحاً للميزات');
 },
 
-// ✅ دالة جديدة لتنظيف اتصال المكالمة فقط (بدون التأثير على الميزات)
-cleanupCallConnection() {
-    // ✅ ننظف فقط متغيرات المكالمة المؤقتة
-    // لا نلمس this.dc و this.pc (لأنهما خاصين بالميزات)
-    
-    // إذا كان هناك PeerConnection منفصل للمكالمات (في حالة استخدام قناتين)
-    if (this.callPc) {
-        try { this.callPc.close(); } catch(e) {}
-        this.callPc = null;
-    }
-    
-    // إذا كان هناك DataChannel منفصل للمكالمات
-    if (this.callDc) {
-        try { this.callDc.close(); } catch(e) {}
-        this.callDc = null;
-    }
-},
-
-// ✅ ملاحظة: cleanupConnections() تبقى كما هي ولكن ستُستخدم فقط عند إلغاء الميزات
 cleanupConnections() {
     if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
