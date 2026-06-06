@@ -12,6 +12,7 @@ const ChatSystem = {
     featureRequestPending: false,
     featureRequestReceived: false,
     featureBlinkInterval: null,
+    _pendingDisable: false,  // ✅ جديد: تخزين طلب إيقاف معلق أثناء المكالمة
     
     // ✅ متغيرات المؤقت 120 ثانية
     offlineStartTime: null,
@@ -196,7 +197,7 @@ setupFeatureButton() {
         
         if (this.featuresEnabled) {
             console.log('⚠️ الميزات مفعلة، جاري إلغاء التفعيل');
-            this.disableFeatures();
+            this.disableFeatures(false);  // ✅ false = لا نتجاهل إذا كان في مكالمة
             return;
         }
         
@@ -505,48 +506,20 @@ async handleFeatureResponse(fromId, action) {
     } else if (action === 'disable') {
         console.log('🔴 استلام إشارة إيقاف من الطرف الآخر');
         
-        this.featuresEnabled = false;
-        this.featureRequestPending = false;
-        this.featureRequestReceived = false;
-        
-        if (this.featureBlinkInterval) {
-            clearInterval(this.featureBlinkInterval);
-            this.featureBlinkInterval = null;
+        // ✅ إذا كان في مكالمة، لا نوقف الميزات فوراً
+        if (typeof CallSystem !== 'undefined' && CallSystem.isInCall) {
+            console.log('⚠️ يوجد مكالمة نشطة، سيتم إيقاف الميزات بعد انتهائها');
+            this._pendingDisable = true;
+            return;
         }
         
-        const toggleInput = document.getElementById('featureToggleInput');
-        const switchLabel = document.getElementById('featureSwitchLabel');
-        
-        if (toggleInput) toggleInput.checked = false;
-        if (switchLabel) switchLabel.classList.remove('blinking');
-        
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) {
-            btn.style.background = '#f44336';
-            btn.title = 'تفعيل الميزات';
-        }
-        
-        if (CallSystem.dc) {
-            try { CallSystem.dc.close(); } catch(e) {}
-            CallSystem.dc = null;
-        }
-        if (CallSystem.pc) {
-            try { CallSystem.pc.close(); } catch(e) {}
-            CallSystem.pc = null;
-        }
-        
-        this.updateAllButtons();
-        console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
+        this.performDisableFeatures();
     }
 },
 
-     // ==================== القسم 10.1: disableFeatures ====================
-async disableFeatures() {
-    console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
-    
-    if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
-        await CallSystem.deleteAllWebRTCSignals(this.currentChat);
-    }
+// ✅ دالة منفصلة لتنفيذ إيقاف الميزات فعلياً
+performDisableFeatures() {
+    console.log('🔴 performDisableFeatures - تنفيذ إيقاف الميزات');
     
     this.featuresEnabled = false;
     this.featureRequestPending = false;
@@ -573,6 +546,55 @@ async disableFeatures() {
     }
     
     this.updateAllButtons();
+    console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
+},
+
+     // ==================== القسم 10.1: disableFeatures (معدلة) ====================
+async disableFeatures(skipIfInCall = false) {
+    console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
+    
+    // ✅ إذا كان هناك مكالمة نشطة ولا نريد إجبار الإيقاف
+    if (skipIfInCall && typeof CallSystem !== 'undefined' && CallSystem.isInCall) {
+        console.log('⚠️ لا يمكن إيقاف الميزات أثناء مكالمة نشطة');
+        return;
+    }
+    
+    // ✅ فقط نحذف الإشارات من Firestore، لكن لا نغلق القنوات مباشرة إذا كانت مكالمة نشطة
+    if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
+        await CallSystem.deleteAllWebRTCSignals(this.currentChat);
+    }
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    this._pendingDisable = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    // ✅ فقط نغلق القنوات إذا لم تكن هناك مكالمة نشطة
+    if (!CallSystem.isInCall) {
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
+        }
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
+        }
+    } else {
+        console.log('⚠️ مكالمة نشطة، لن نغلق القنوات الآن');
+    }
+    
+    this.updateAllButtons();
     console.log('✅ تم إلغاء تفعيل الميزات');
 },
     
@@ -585,6 +607,7 @@ resetFeatures() {
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
+    this._pendingDisable = false;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -610,6 +633,7 @@ handleFeatureCancel() {
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
+    this._pendingDisable = false;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -702,6 +726,7 @@ closeConversation() {
 
     this.currentChat = null;
     this.friendInConversation = false;
+    this._pendingDisable = false;
     
     const conversationPage = document.querySelector('.conversation-page');
     if (conversationPage) conversationPage.style.display = 'none';
@@ -799,6 +824,7 @@ openChat(friendId, friendName, friendAvatar) {
     
     // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
     this.friendInConversation = false;
+    this._pendingDisable = false;
     
     this.resetFeatures();
     document.body.classList.add('conversation-open');
@@ -2293,6 +2319,7 @@ closeChat() {
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
+    this._pendingDisable = false;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -2407,4 +2434,3 @@ document.addEventListener('touchend', function (e) {
     }
     lastTouchEnd = now;
 }, { passive: false });
-
