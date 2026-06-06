@@ -2278,6 +2278,21 @@ closeChat() {
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
         
+        // ✅ إرسال إشارة للطرف الآخر لإلغاء الميزات وتنظيف البيانات عند الرجوع
+        if (typeof CallSystem !== 'undefined' && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            try {
+                CallSystem.dc.send(JSON.stringify({ 
+                    type: 'force_disable_features',
+                    action: 'full_cleanup',
+                    shouldClearMedia: true,
+                    timestamp: Date.now()
+                }));
+                console.log('✅ تم إرسال إشارة إلغاء الميزات والتنظيف للطرف الآخر');
+            } catch(e) {
+                console.warn('⚠️ فشل إرسال إشارة الإلغاء:', e);
+            }
+        }
+        
         if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
             CallSystem.deleteAllWebRTCSignals(chatId);
         }
@@ -2305,7 +2320,6 @@ closeChat() {
         btn.title = 'تفعيل الميزات';
     }
     
-    // ✅ إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'none';
@@ -2318,14 +2332,10 @@ closeChat() {
     document.querySelector('.chat-page').style.display = 'block';
     PresenceSystem.stopAll();
     
-    // ✅ تعديل هنا: إغلاق كامل لجميع الاتصالات (بما في ذلك Data Channel)
-    // لأن المحادثة تغلق بالكامل، يجب تنظيف كل شيء
     if (typeof CallSystem !== 'undefined') {
         if (!CallSystem.isInCall) {
-            // تمرير false لإغلاق Data Channel أيضاً
             CallSystem.cleanupConnections(false);
         } else {
-            // إذا كان في مكالمة، ننهي المكالمة أولاً ثم ننظف
             CallSystem.endCall();
             setTimeout(() => {
                 CallSystem.cleanupConnections(false);
