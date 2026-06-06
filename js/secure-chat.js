@@ -1,6 +1,7 @@
 // ========== secure-chat.js ==========
 // نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
 
+// ==================== القسم 1: تعريف SecureChatSystem ====================
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
     keyCache: new Map(),
@@ -10,6 +11,7 @@ const SecureChatSystem = {
     VIDEO_WARNING_DURATION: 170,
     VIDEO_MAX_INPUT_SIZE: 250 * 1024 * 1024,
     
+    // ==================== القسم 2: init ====================
     async init() {
         if (!window.auth?.currentUser) { 
             console.error('❌ لا يوجد مستخدم مسجل');
@@ -29,6 +31,7 @@ const SecureChatSystem = {
         }
     },
     
+    // ==================== القسم 3: setupKeys ====================
     async setupKeys() {
         const uid = window.auth.currentUser.uid;
         const existingKey = localStorage.getItem(`enc_private_key_${uid}`);
@@ -68,6 +71,7 @@ const SecureChatSystem = {
         }
     },
     
+    // ==================== القسم 4: دوال المفاتيح ====================
     async generateKeyPair() { return await window.crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']); },
     async exportPublicKey(key) { const raw = await window.crypto.subtle.exportKey('raw', key); return btoa(String.fromCharCode(...new Uint8Array(raw))); },
     
@@ -104,6 +108,7 @@ const SecureChatSystem = {
         } catch (error) { return null; }
     },
     
+    // ==================== القسم 5: تشفير وفك التشفير ====================
     async deriveSharedKey(privateKey, publicKey) {
         const cacheKey = `${window.auth.currentUser.uid}_${await this.exportPublicKey(publicKey)}`;
         if (this.sharedKeyCache.has(cacheKey)) return this.sharedKeyCache.get(cacheKey);
@@ -139,6 +144,7 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
+    // ==================== القسم 6: ضغط الصور ====================
     async compressImage(file) { 
         return new Promise((resolve, reject) => { 
             const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
@@ -155,6 +161,7 @@ const SecureChatSystem = {
         }); 
     },
     
+    // ==================== القسم 7: فحص الفيديو ====================
     getVideoDuration(file) {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
@@ -193,6 +200,7 @@ const SecureChatSystem = {
         });
     },
     
+    // ==================== القسم 8: تحويل الملف إلى Base64 ====================
     fileToBase64(blob) { 
         return new Promise((resolve, reject) => { 
             const reader = new FileReader(); 
@@ -202,17 +210,17 @@ const SecureChatSystem = {
         }); 
     },
     
+    // ==================== القسم 9: إرسال إلى السيرفر ====================
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
         
-        // ✅ تحديد مدة الصلاحية حسب نوع الإشارة
-        let expiryHours = 24; // الافتراضي 24 ساعة
+        let expiryHours = 24;
         let expirySeconds = null;
         
         if (encryptedPackage.type === 'webrtc' || 
             encryptedPackage.type === 'feature_request' || 
             encryptedPackage.type === 'feature_response') {
-            expirySeconds = 30; // 30 ثانية فقط
+            expirySeconds = 30;
         }
         
         let expiresAt;
@@ -233,6 +241,7 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
+    // ==================== القسم 10: بدء استلام الرسائل ====================
     startReceiving() { 
         if (!window.auth?.currentUser) return null;
         const uid = window.auth.currentUser.uid;
@@ -247,7 +256,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (تم إزالة conversation_status, conversation_status_request, feature_cancel) ==========
+    // ==================== القسم 11: معالجة الرسائل المستلمة (المعدل) ====================
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -262,10 +271,6 @@ const SecureChatSystem = {
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
             else if (msg.package.type === 'webrtc') { 
-                // ✅ تجاهل إشارات WebRTC تماماً إذا:
-                // 1. الميزات غير مفعلة
-                // 2. أو الطرف الآخر ليس في المحادثة
-                // 3. أو المستخدم الحالي ليس في محادثة مع المرسل
                 if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
                     console.log('📞 تجاهل إشارة WebRTC - سبب:', {
                         featuresEnabled: ChatSystem.featuresEnabled,
@@ -304,36 +309,32 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureRequest(msg.from);
                 }
             }
+            // ==================== القسم 11.1: معالجة feature_response (معدل) ====================
             else if (msg.package.type === 'feature_response') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const responseData = JSON.parse(decryptedData);
                 console.log('🔓 استلام رد على طلب التفعيل من:', msg.from, '| الحالة:', responseData.action);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                    ChatSystem.handleFeatureResponse(msg.from, responseData.action);
+                    // ✅ تمرير responseData كامل كمعامل ثالث
+                    ChatSystem.handleFeatureResponse(msg.from, responseData.action, responseData);
                 }
             }
-            // ==================== القسم 100: معالجة إشارة إلغاء الميزات (force_disable_features) ====================
+            // ==================== القسم 11.2: معالجة force_disable_features (معدل) ====================
             else if (msg.package.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر');
                     
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
+                    if (typeof ChatSystem.handleFeatureResponse === 'function') {
+                        // ✅ إنشاء كائن disable كامل مع shouldClearMedia
+                        const disableData = { 
+                            action: 'disable', 
+                            shouldClearMedia: true,
+                            timestamp: Date.now()
+                        };
+                        ChatSystem.handleFeatureResponse(msg.from, 'disable', disableData);
                     }
-                    
-                    ChatSystem.updateAllButtons();
                 }
             }
             else if (msg.package.type === 'location') {
