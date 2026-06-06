@@ -2317,7 +2317,22 @@ closeChat() {
     document.getElementById('conversationPage').style.display = 'none';
     document.querySelector('.chat-page').style.display = 'block';
     PresenceSystem.stopAll();
-    if (!CallSystem.isInCall) CallSystem.cleanupConnections();
+    
+    // ✅ تعديل هنا: إغلاق كامل لجميع الاتصالات (بما في ذلك Data Channel)
+    // لأن المحادثة تغلق بالكامل، يجب تنظيف كل شيء
+    if (typeof CallSystem !== 'undefined') {
+        if (!CallSystem.isInCall) {
+            // تمرير false لإغلاق Data Channel أيضاً
+            CallSystem.cleanupConnections(false);
+        } else {
+            // إذا كان في مكالمة، ننهي المكالمة أولاً ثم ننظف
+            CallSystem.endCall();
+            setTimeout(() => {
+                CallSystem.cleanupConnections(false);
+            }, 500);
+        }
+    }
+    
     this.currentChat = null;
     this.friendInConversation = false;
     
