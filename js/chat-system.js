@@ -544,9 +544,8 @@ async handleFeatureResponse(fromId, action) {
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
-    if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
-        await CallSystem.deleteAllWebRTCSignals(this.currentChat);
-    }
+    // ✅ تم إزالة deleteAllWebRTCSignals من هنا - لا نحذف الإشارات عند إلغاء الميزات
+    // ✅ تم إزالة إغلاق dc و pc من هنا - لا نلمس قنوات WebRTC
     
     this.featuresEnabled = false;
     this.featureRequestPending = false;
@@ -563,17 +562,9 @@ async disableFeatures() {
     if (toggleInput) toggleInput.checked = false;
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    if (CallSystem.dc) {
-        try { CallSystem.dc.close(); } catch(e) {}
-        CallSystem.dc = null;
-    }
-    if (CallSystem.pc) {
-        try { CallSystem.pc.close(); } catch(e) {}
-        CallSystem.pc = null;
-    }
-    
+    // ✅ فقط تحديث واجهة المستخدم
     this.updateAllButtons();
-    console.log('✅ تم إلغاء تفعيل الميزات');
+    console.log('✅ تم إلغاء تفعيل الميزات (قنوات WebRTC لم تمس، الإشارات بقيت في Firestore)');
 },
     
     // ==================== القسم 12: resetFeatures ====================
