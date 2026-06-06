@@ -8,6 +8,9 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    // ✅ المتغيرات الجديدة لمنع تعطيل الميزات عند انتهاء المكالمة
+    isGracefulClose: false,
+    shouldKeepFeatures: true,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
