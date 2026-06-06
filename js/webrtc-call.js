@@ -1597,89 +1597,125 @@ async sendSignal(calleeId, data) {
     
     // ==================== 14. إنهاء المكالمة ====================
     
-    endCall() {
-        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
-        
-        if (this.currentCallId && ChatSystem.currentChat) {
-            this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
-        }
-        this.currentCallId = null;
-        
-        this.sendCallStatus('disconnected');
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
-        }
-        
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
-        }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        this.reconnectAttempts = 0;
-        
-        if (window.auth?.currentUser) {
-            window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                inCall: false,
-                callType: null,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            }).catch(() => {});
-        }
-        
-        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
-    },
+endCall() {
+    console.log('📞 إنهاء المكالمة - الميزات والملفات تبقى نشطة');
     
-    cleanupConnections() {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
-        }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
-        }
-        this.incomingChunks = {};
-        this.incomingFileInfo = {};
+    // ✅ إرسال إشارة إنهاء المكالمة للطرف الآخر (إذا كانت القناة مفتوحة)
+    if (this.currentCallId && ChatSystem.currentChat && this.dc && this.dc.readyState === 'open') {
+        try {
+            this.dc.send(JSON.stringify({ 
+                type: 'webrtc_signal', 
+                data: { type: 'call_ended' }
+            }));
+        } catch(e) {}
     }
-};
+    this.currentCallId = null;
+    
+    // ✅ إرسال حالة قطع الاتصال (للمكالمة فقط)
+    if (this.dc && this.dc.readyState === 'open') {
+        try {
+            this.dc.send(JSON.stringify({ type: 'call_status', status: 'disconnected', timestamp: Date.now() }));
+        } catch(e) {}
+    }
+    
+    // ✅ إيقاف مؤقت المكالمة فقط (لا نوقف keepAliveInterval و reconnectTimer)
+    if (this.callTimerInterval) {
+        clearInterval(this.callTimerInterval);
+        this.callTimerInterval = null;
+    }
+    
+    // ✅ تنظيف الصوت البعيد
+    if (this.remoteAudioElement) {
+        this.remoteAudioElement.pause();
+        this.remoteAudioElement.srcObject = null;
+        this.remoteAudioElement = null;
+    }
+    
+    // ✅ إيقاف الميكروفون والكاميرا (MediaStream فقط)
+    if (this.localStream) {
+        try {
+            this.localStream.getTracks().forEach(t => t.stop());
+        } catch(e) {}
+        this.localStream = null;
+    }
+    
+    // ✅ تنظيف اتصال المكالمة فقط (بدون لمس dc و pc الخاصين بالميزات)
+    this.cleanupCallConnection();
+    
+    // ✅ إزالة واجهة المكالمة
+    const ui = document.getElementById('callUI');
+    if (ui) ui.remove();
+    const inc = document.getElementById('incomingCall');
+    if (inc) inc.remove();
+    document.body.classList.remove('in-call');
+    
+    // ✅ إعادة تعيين متغيرات المكالمة فقط
+    this.isInCall = false;
+    this.callType = null;
+    this.isAudioMuted = false;
+    this.isVideoMuted = false;
+    this.isSpeakerEnabled = false;
+    // ❌ لا نعيد تعيين reconnectAttempts (يبقى كما هو للميزات)
+    
+    // ✅ تحديث حالة المستخدم في قاعدة البيانات
+    if (window.auth?.currentUser) {
+        window.db.collection('users').doc(window.auth.currentUser.uid).update({
+            inCall: false,
+            callType: null,
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(() => {});
+    }
+    
+    console.log('✅ انتهت المكالمة - DataChannel والميزات ما زالت تعمل');
+    
+    // ✅ التحقق من أن قناة الميزات ما زالت مفتوحة
+    if (this.dc && this.dc.readyState === 'open') {
+        console.log('✅ DC مفتوح - يمكنك إرسال الملفات والنصوص');
+    } else {
+        console.log('⚠️ DC مغلق - جاري إعادة الاتصال');
+        this.scheduleReconnect();
+    }
+},
+
+// ✅ دالة جديدة لتنظيف اتصال المكالمة فقط (بدون التأثير على الميزات)
+cleanupCallConnection() {
+    // ✅ ننظف فقط متغيرات المكالمة المؤقتة
+    // لا نلمس this.dc و this.pc (لأنهما خاصين بالميزات)
+    
+    // إذا كان هناك PeerConnection منفصل للمكالمات (في حالة استخدام قناتين)
+    if (this.callPc) {
+        try { this.callPc.close(); } catch(e) {}
+        this.callPc = null;
+    }
+    
+    // إذا كان هناك DataChannel منفصل للمكالمات
+    if (this.callDc) {
+        try { this.callDc.close(); } catch(e) {}
+        this.callDc = null;
+    }
+},
+
+// ✅ ملاحظة: cleanupConnections() تبقى كما هي ولكن ستُستخدم فقط عند إلغاء الميزات
+cleanupConnections() {
+    if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+    }
+    if (this.keepAliveInterval) {
+        clearInterval(this.keepAliveInterval);
+        this.keepAliveInterval = null;
+    }
+    if (this.dc) {
+        try { this.dc.close(); } catch(e) {}
+        this.dc = null;
+    }
+    if (this.pc) {
+        try { this.pc.close(); } catch(e) {}
+        this.pc = null;
+    }
+    this.incomingChunks = {};
+    this.incomingFileInfo = {};
+}
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
