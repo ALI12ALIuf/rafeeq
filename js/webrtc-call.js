@@ -831,7 +831,9 @@ const CallSystem = {
         });
     },
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+    
+
+// ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -951,6 +953,13 @@ setupDataChannel(channel) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
         }
+        
+        // ✅ التعديل المطلوب: إذا كانت مكالمة نشطة، لا نعطل الميزات
+        if (this.isInCall) {
+            console.log('📞 مكالمة نشطة تنتهي - الميزات تبقى مفعلة');
+            return;
+        }
+        
         this.scheduleReconnect();
         
         if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
