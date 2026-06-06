@@ -8,6 +8,8 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    // ✅ المتغير الجديد للحل الجذري
+    isEndingCall: false,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -832,7 +834,6 @@ const CallSystem = {
     },
     
     
-
 // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
@@ -954,9 +955,9 @@ setupDataChannel(channel) {
             this.keepAliveInterval = null;
         }
         
-        // ✅ التعديل المطلوب: إذا كانت مكالمة نشطة، لا نعطل الميزات
-        if (this.isInCall) {
-            console.log('📞 مكالمة نشطة تنتهي - الميزات تبقى مفعلة');
+        // ✅ التعديل الجذري: إذا كنا في طور إنهاء المكالمة، لا نعطل الميزات
+        if (this.isEndingCall) {
+            console.log('📞 جاري إنهاء المكالمة - الميزات تبقى مفعلة');
             return;
         }
         
@@ -986,6 +987,13 @@ setupDataChannel(channel) {
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
+        
+        // ✅ إذا كنا في طور إنهاء المكالمة، نتجاهل الخطأ
+        if (this.isEndingCall) {
+            console.log('📞 تجاهل الخطأ - جاري إنهاء المكالمة');
+            return;
+        }
+        
         this.scheduleReconnect();
         
         if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
@@ -1170,6 +1178,7 @@ async sendSignal(calleeId, data) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
 },
+
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
@@ -1604,10 +1613,13 @@ async sendSignal(calleeId, data) {
         });
     },
     
-    // ==================== 14. إنهاء المكالمة ====================
+      // ==================== 14. إنهاء المكالمة ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+        
+        // ✅ الحل الجذري: وضع علامة أننا بصدد إنهاء المكالمة
+        this.isEndingCall = true;
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
@@ -1664,6 +1676,11 @@ async sendSignal(calleeId, data) {
                 lastSeen: firebase.firestore.FieldValue.serverTimestamp()
             }).catch(() => {});
         }
+        
+        // ✅ إعادة تعيين العلامة بعد انتهاء عملية الإغلاق
+        setTimeout(() => {
+            this.isEndingCall = false;
+        }, 2000);
         
         console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
     },
