@@ -1595,30 +1595,35 @@ async sendSignal(calleeId, data) {
         });
     },
     
-    // ==================== 14. إنهاء المكالمة ====================
+  // ==================== 14. إنهاء المكالمة (التعديل الصحيح) ====================
     
 endCall() {
-    console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+    console.log('📞 إنهاء المكالمة - الميزات تبقى نشطة');
     
     if (this.currentCallId && ChatSystem.currentChat) {
         this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
     }
     this.currentCallId = null;
     
-    this.sendCallStatus('disconnected');
+    // ✅ لا نرسل call_status disconnected لأنها تؤثر على الميزات
+    // this.sendCallStatus('disconnected');
     
-    if (this.keepAliveInterval) {
-        clearInterval(this.keepAliveInterval);
-        this.keepAliveInterval = null;
-    }
+    // ✅ لا نوقف keepAliveInterval (يحتاجه Data Channel)
+    // if (this.keepAliveInterval) {
+    //     clearInterval(this.keepAliveInterval);
+    //     this.keepAliveInterval = null;
+    // }
+    
     if (this.callTimerInterval) {
         clearInterval(this.callTimerInterval);
         this.callTimerInterval = null;
     }
-    if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-    }
+    
+    // ✅ لا نوقف reconnectTimer
+    // if (this.reconnectTimer) {
+    //     clearTimeout(this.reconnectTimer);
+    //     this.reconnectTimer = null;
+    // }
     
     if (this.remoteAudioElement) {
         this.remoteAudioElement.pause();
@@ -1633,8 +1638,9 @@ endCall() {
         this.localStream = null;
     }
     
-    // ❌ هذا السطر تم حذفه - كان يغلق dc و pc الخاصين بالميزات
-    // this.cleanupConnections();
+    // ✅ بدلاً من cleanupConnections() كاملة، ننظف فقط chunks
+    this.incomingChunks = {};
+    this.incomingFileInfo = {};
     
     const ui = document.getElementById('callUI');
     if (ui) ui.remove();
@@ -1647,7 +1653,8 @@ endCall() {
     this.isAudioMuted = false;
     this.isVideoMuted = false;
     this.isSpeakerEnabled = false;
-    this.reconnectAttempts = 0;
+    // ✅ لا نغير reconnectAttempts
+    // this.reconnectAttempts = 0;
     
     if (window.auth?.currentUser) {
         window.db.collection('users').doc(window.auth.currentUser.uid).update({
@@ -1657,9 +1664,10 @@ endCall() {
         }).catch(() => {});
     }
     
-    console.log('✅ تم إنهاء المكالمة - DataChannel يبقى مفتوحاً للميزات');
+    console.log('✅ انتهت المكالمة - DataChannel والميزات ما زالت تعمل');
 },
 
+// ✅ تبقي cleanupConnections كما هي (تستخدم فقط عند إلغاء الميزات)
 cleanupConnections() {
     if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
@@ -1679,7 +1687,7 @@ cleanupConnections() {
     }
     this.incomingChunks = {};
     this.incomingFileInfo = {};
-}
+}  
 
 // ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
 if (typeof document !== 'undefined') {
