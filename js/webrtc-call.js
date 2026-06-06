@@ -63,9 +63,9 @@ const CallSystem = {
         } catch(e) {}
     },
     
-    // ==================== 2. التنظيف التلقائي ====================
-    
-    async autoCleanupOnLoad() {
+   // ==================== 2. التنظيف التلقائي ====================
+
+async autoCleanupOnLoad() {
         console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
         
         await this.deleteAllMyWebRTCSignals();
@@ -118,14 +118,20 @@ const CallSystem = {
                     inCall: false,
                     lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                console.log('✅ تم تنظيف حالة المستخدم في قاعدة البيانات');
+                console.log('✅ تم تنظيف حالة المكالمة في قاعدة البيانات بنجاح');
             } catch(e) {
-                console.warn('⚠️ فشل تنظيف قاعدة البيانات:', e.message);
+                console.warn('⚠️ فشل تحديث قاعدة البيانات:', e.message);
             }
         }
         
-        console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
-    },
+        // 🔥 جدار الحماية المضاف لحماية أزرار وميزات المستخدم اليدوية
+        if (typeof ChatSystem !== 'undefined' && typeof ChatSystem.updateFeatureToggleUI === 'function') {
+            console.log('🛡️ جدار حماية: الحفاظ على حالة الميزات اليدوية للمسخدم:', ChatSystem.featuresEnabled);
+            ChatSystem.updateFeatureToggleUI(); 
+        }
+        
+        console.log('✅ اكتمل التنظيف التلقائي للمكالمة - الزر مستقر وآمن');
+    }, 
     
     // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
     
