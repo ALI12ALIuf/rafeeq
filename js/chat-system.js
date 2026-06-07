@@ -49,11 +49,11 @@ init() {
     this.setupBeforeUnloadListener();
 },
     
-    // ==================== القسم 4: setupBeforeUnloadListener ====================
+// ==================== القسم 4: setupBeforeUnloadListener ====================
 setupBeforeUnloadListener() {
     window.addEventListener('beforeunload', () => {
         if (this.currentChat && this.featuresEnabled) {
-            console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات القسم
+            console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات');
         }
     });
 },
