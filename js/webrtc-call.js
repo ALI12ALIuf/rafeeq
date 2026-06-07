@@ -1458,6 +1458,7 @@ async sendSignal(calleeId, data) {
         }
     },
     
+
     // ==================== 13. إرسال الملفات ====================
 
 async sendFileDirect(file, type) {
@@ -1472,7 +1473,6 @@ async sendFileDirect(file, type) {
             blobToSend = await this.compressImage(file);
         }
         
-        // ✅ تم التعديل: استخدام ArrayBuffer بدلاً من base64
         const arrayBuffer = await blobToSend.arrayBuffer();
         const chunkSize = 16000;
         const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize);
@@ -1525,7 +1525,6 @@ handleChunkMessage(msg) {
         ChatSystem.showProgressBar('جاري استلام الملف...', 0);
     }
     
-    // ✅ تم التعديل: استقبال كـ Uint8Array بدلاً من base64
     const chunkData = new Uint8Array(msg.data);
     this.incomingChunks[msg.id][msg.chunk] = chunkData;
     this.incomingFileInfo[msg.id].received++;
@@ -1534,7 +1533,6 @@ handleChunkMessage(msg) {
     ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
     
     if (this.incomingFileInfo[msg.id].received === msg.total) {
-        // ✅ تم التعديل: دمج الأجزاء كـ Uint8Array
         let totalLength = 0;
         for (let i = 0; i < msg.total; i++) {
             totalLength += this.incomingChunks[msg.id][i].length;
@@ -1547,7 +1545,6 @@ handleChunkMessage(msg) {
             offset += this.incomingChunks[msg.id][i].length;
         }
         
-        // ✅ تحديد نوع MIME المناسب
         let mimeType = 'application/octet-stream';
         if (msg.type === 'image') mimeType = 'image/jpeg';
         else if (msg.type === 'video') mimeType = 'video/mp4';
@@ -1559,31 +1556,17 @@ handleChunkMessage(msg) {
         const displayMsg = {
             id: msg.id,
             type: msg.type === 'location' ? 'text' : msg.type,
-            data: objectUrl,  // ✅ blob URL بدلاً من base64
+            data: objectUrl,
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _blobUrl: objectUrl  // ✅ للحفظ لتنظيفه لاحقًا
+            _blobUrl: objectUrl
         };
         
         if (ChatSystem.currentChat) {
-            // ✅ عرض فقط، بدون حفظ (تم إزالة saveMessage)
             ChatSystem.displayMessage(displayMsg);
         }
         ChatSystem.hideProgressBar();
-        
-        // ✅ تنظيف blob URL بعد 30 ثانية
-        setTimeout(() => {
-            URL.revokeObjectURL(objectUrl);
-            const msgElement = document.getElementById(`msg-${msg.id}`);
-            if (msgElement) {
-                msgElement.style.opacity = '0.5';
-                const notice = document.createElement('div');
-                notice.style.cssText = 'font-size: 0.6rem; color: #f44336; text-align: center; margin-top: 5px;';
-                notice.innerHTML = '⏰ انتهت صلاحية الوسائط (لم تُحفظ)';
-                msgElement.appendChild(notice);
-            }
-        }, 30000);
         
         delete this.incomingChunks[msg.id];
         delete this.incomingFileInfo[msg.id];
