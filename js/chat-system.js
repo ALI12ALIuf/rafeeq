@@ -1643,7 +1643,7 @@ showVideoPreview(videoSrc) {
     }).catch(() => {});
 },
 
-    // ==================== القسم 27: sendMessage ====================
+ // ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
     if (!this.currentChat || !text.trim()) return false; 
     const mid = Date.now().toString(); 
@@ -1681,7 +1681,7 @@ async sendMessage(text) {
         console.error('❌ فشل إرسال النص:', e);
         return false; 
     } 
-},
+},   
     
     
     // ==================== القسم 28: sendFileWithRetry ====================
