@@ -734,65 +734,37 @@ closeConversation() {
 
     // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
-    console.log('🔍 openChat - فتح المحادثة:', friendId, friendName);
-    
-    // التحقق من وجود العناصر الضرورية
-    const conversationPage = document.getElementById('conversationPage');
-    const chatPage = document.querySelector('.chat-page');
-    const messagesContainer = document.getElementById('messagesContainer');
-    
-    if (!conversationPage) {
-        console.error('❌ عنصر conversationPage غير موجود');
-        return;
-    }
-    if (!chatPage) {
-        console.error('❌ عنصر chat-page غير موجود');
-        return;
-    }
-    if (!messagesContainer) {
-        console.error('❌ عنصر messagesContainer غير موجود');
-        return;
-    }
-    
     this.currentChat = friendId;
+    
+    // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
     this.friendInConversation = false;
     
     document.body.classList.add('conversation-open');
-    
-    const nameEl = document.getElementById('conversationName');
-    const avatarEl = document.getElementById('conversationAvatar');
+    const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
     if (nameEl) nameEl.textContent = friendName;
     if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
-    
-    // إخفاء صفحة الدردشة الرئيسية وإظهار صفحة المحادثة
-    chatPage.style.display = 'none';
-    conversationPage.style.display = 'flex';
-    
-    // عرض الرسائل المحفوظة
+    document.querySelector('.chat-page').style.display = 'none'; 
+    document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
     
-    // التركيز على حقل الإدخال
-    setTimeout(() => {
-        const inp = document.getElementById('messageInput');
-        if (inp) inp.focus();
-    }, 300);
+    // ✅ تم إزالة PresenceSystem.watchFriend (لم نعد نستخدم حالة الاتصال من السيرفر)
     
-    // التمرير إلى آخر رسالة
-    setTimeout(() => {
-        const c = document.getElementById('messagesContainer');
-        if (c) c.scrollTop = c.scrollHeight;
-    }, 100);
+    // ✅ تم إزالة sendConversationStatus و requestConversationStatus (لم نعد نرسلهما)
     
-    // إظهار أزرار التفعيل والطرد
+    setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
+    setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+    
+    // ✅ تم إزالة setupFeatureButton (الأزرار أصبحت دائمة في HTML)
+    
+    // ✅ تحديث حالة الأزرار (إظهار/إخفاء إذا لزم الأمر)
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'flex';
     if (kickBtn) kickBtn.style.display = 'flex';
     
-    // تحديث حالة الأزرار
+    // ✅ تحديث حالة الزر فوراً
     this.updateAllButtons();
     
-    // التحقق من حالة القناة إذا كانت الميزات مفعلة
     setTimeout(() => {
         if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
             console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
@@ -807,9 +779,7 @@ openChat(friendId, friendName, friendAvatar) {
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
     }, 1000);
-    
-    console.log('✅ openChat - تم فتح المحادثة بنجاح');
-},
+}, 
     
     
     // ==================== القسم 25: displayMessages ====================
@@ -2195,6 +2165,33 @@ showLocationSwipeModalWithClicks(locationData) {
     }, 30000);
 }, 
 
+    // ==================== القسم 35: saveMessage ====================
+saveMessage(friendId, message) { 
+    // فقط النصوص تُحفظ محليًا
+    if (message.type !== 'text') {
+        console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
+        return;
+    }
+    
+    const key = `chat_${friendId}`; 
+    let h = []; 
+    try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
+    h.push(message); 
+    let serialized = JSON.stringify(h);
+    while (serialized.length > 4000000) {
+        h.shift();
+        serialized = JSON.stringify(h);
+    }
+    try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
+        h = h.slice(Math.floor(h.length * 0.2));
+        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { 
+            h = h.slice(-10); 
+            try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} 
+        }
+    }
+    this.messages[friendId] = h; 
+},
+    
     
    // ==================== القسم 36: updateLastMessage ====================
 updateLastMessage(friendId, lastMessage) { 
