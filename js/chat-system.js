@@ -2239,6 +2239,125 @@ updateLastMessage(friendId, lastMessage) {
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 
+// ==================== نظام الفحص والتصحيح المتكامل ====================
+
+// إضافة أدوات الفحص إلى النافذة
+window.debugChat = {
+    // فحص حالة المحادثة
+    checkOpenChat: function() {
+        console.log('=== فحص نظام المحادثة ===');
+        console.log('currentChat:', ChatSystem.currentChat);
+        console.log('friendInConversation:', ChatSystem.friendInConversation);
+        console.log('featuresEnabled:', ChatSystem.featuresEnabled);
+        console.log('messages:', ChatSystem.messages);
+        
+        // فحص العناصر في DOM
+        const conversationPage = document.getElementById('conversationPage');
+        const chatPage = document.querySelector('.chat-page');
+        const messagesContainer = document.getElementById('messagesContainer');
+        
+        console.log('conversationPage موجود:', !!conversationPage);
+        console.log('chat-page موجود:', !!chatPage);
+        console.log('messagesContainer موجود:', !!messagesContainer);
+        if (conversationPage) console.log('conversationPage display:', conversationPage.style.display);
+        if (chatPage) console.log('chat-page display:', chatPage.style.display);
+        
+        return 'تم الفحص';
+    },
+    
+    // فحص localStorage
+    checkStorage: function() {
+        console.log('=== فحص التخزين المحلي ===');
+        let chatKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('chat_')) {
+                chatKeys.push(key);
+                try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    console.log(`${key}: ${data.length} رسالة`);
+                } catch(e) {}
+            }
+        }
+        console.log('مفاتيح المحادثات:', chatKeys);
+        return chatKeys;
+    },
+    
+    // الفحص الشامل
+    fullCheck: function() {
+        this.checkOpenChat();
+        this.checkStorage();
+        console.log('=== انتهى الفحص ===');
+        alert('✅ تم الفحص - راجع الـ Console');
+    }
+};
+
+// إضافة زر فحص عائم
+(function addDebugButton() {
+    const btn = document.createElement('div');
+    btn.innerHTML = '🐞';
+    btn.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        right: 10px;
+        width: 50px;
+        height: 50px;
+        background: linear-gradient(135deg, #f44336, #c62828);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: bold;
+        cursor: pointer;
+        z-index: 99999;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+        border: 2px solid white;
+    `;
+    btn.onclick = () => window.debugChat.fullCheck();
+    btn.onmouseover = () => btn.style.transform = 'scale(1.1)';
+    btn.onmouseout = () => btn.style.transform = 'scale(1)';
+    
+    // انتظر تحميل الصفحة
+    if (document.body) {
+        document.body.appendChild(btn);
+    } else {
+        document.addEventListener('DOMContentLoaded', () => document.body.appendChild(btn));
+    }
+})();
+
+// منع التكبير والتصغير نهائياً
+document.addEventListener('touchstart', function(e) {
+    if (e.touches.length > 1) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(e) {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+    }
+    lastTouchEnd = now;
+}, { passive: false });
+
+// منع سحب الصفحة عند لمس المناطق غير المسموحة
+document.addEventListener('touchmove', function(e) {
+    if (document.body.classList.contains('conversation-open')) {
+        const isMessagesContainer = e.target.closest('.messages-container');
+        const isInputArea = e.target.closest('.message-input-container');
+        if (!isMessagesContainer && !isInputArea) {
+            e.preventDefault();
+        }
+    }
+}, { passive: false });
+
+console.log('✅ نظام الفحص والتصحيح يعمل - اضغط على الزر الأحمر 🐞');
+
+
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
 
