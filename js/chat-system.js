@@ -2437,3 +2437,20 @@ document.addEventListener('touchend', function (e) {
     lastTouchEnd = now;
 }, { passive: false });
 
+
+// زر فحص بسيط - يظهر بعد 2 ثانية
+setTimeout(function() {
+    const testBtn = document.createElement('button');
+    testBtn.innerHTML = '🐞 فحص';
+    testBtn.style.cssText = 'position:fixed;bottom:10px;left:10px;z-index:999999;background:#f44336;color:white;border:none;border-radius:20px;padding:8px 15px;font-size:14px;cursor:pointer;box-shadow:0 2px 10px black;';
+    testBtn.onclick = function() {
+        alert('تم الفحص - انظر الـ Console');
+        console.log('=== فحص سريع ===');
+        console.log('currentChat:', ChatSystem.currentChat);
+        console.log('conversationPage:', document.getElementById('conversationPage'));
+        console.log('messagesContainer:', document.getElementById('messagesContainer'));
+        console.log('messages:', ChatSystem.messages);
+    };
+    document.body.appendChild(testBtn);
+    console.log('✅ زر الفحص ظهر في الزاوية اليسرى السفلية');
+}, 2000);
