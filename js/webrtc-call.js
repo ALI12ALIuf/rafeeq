@@ -1486,6 +1486,77 @@ compressImage(file) {
     });
 },
 
+// ==================== cleanupConnections: إغلاق الاتصالات ====================
+cleanupConnections() {
+    console.log('🧹 cleanupConnections - إغلاق الاتصالات');
+    
+    if (this.dc) {
+        try { this.dc.close(); } catch(e) {}
+        this.dc = null;
+    }
+    if (this.pc) {
+        try { this.pc.close(); } catch(e) {}
+        this.pc = null;
+    }
+    this.incomingChunks = {};
+    this.incomingFileInfo = {};
+},
+
+// ==================== endCall: إنهاء المكالمة ====================
+endCall() {
+    console.log('📞 endCall - إنهاء المكالمة');
+    
+    if (this.currentCallId && ChatSystem.currentChat) {
+        this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
+    }
+    this.currentCallId = null;
+    
+    this.sendCallStatus('disconnected');
+    
+    if (this.keepAliveInterval) {
+        clearInterval(this.keepAliveInterval);
+        this.keepAliveInterval = null;
+    }
+    if (this.callTimerInterval) {
+        clearInterval(this.callTimerInterval);
+        this.callTimerInterval = null;
+    }
+    if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+    }
+    
+    if (this.remoteAudioElement) {
+        this.remoteAudioElement.pause();
+        this.remoteAudioElement.srcObject = null;
+        this.remoteAudioElement = null;
+    }
+    
+    if (this.localStream) {
+        try {
+            this.localStream.getTracks().forEach(t => t.stop());
+        } catch(e) {}
+        this.localStream = null;
+    }
+    
+    this.cleanupConnections();
+    
+    const ui = document.getElementById('callUI');
+    if (ui) ui.remove();
+    const inc = document.getElementById('incomingCall');
+    if (inc) inc.remove();
+    document.body.classList.remove('in-call');
+    
+    this.isInCall = false;
+    this.callType = null;
+    this.isAudioMuted = false;
+    this.isVideoMuted = false;
+    this.isSpeakerEnabled = false;
+    this.reconnectAttempts = 0;
+    
+    console.log('✅ تم إنهاء المكالمة');
+},
+    
 // ==================== 17. الدوال العامة ====================
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) {
