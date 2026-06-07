@@ -732,39 +732,67 @@ closeConversation() {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
 
-    // ==================== القسم 23: openChat ====================
+   // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
-    this.currentChat = friendId;
+    console.log('🔍 openChat - فتح المحادثة:', friendId, friendName);
     
-    // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
+    // التحقق من وجود العناصر الضرورية
+    const conversationPage = document.getElementById('conversationPage');
+    const chatPage = document.querySelector('.chat-page');
+    const messagesContainer = document.getElementById('messagesContainer');
+    
+    if (!conversationPage) {
+        console.error('❌ عنصر conversationPage غير موجود في HTML');
+        return;
+    }
+    if (!chatPage) {
+        console.error('❌ عنصر chat-page غير موجود في HTML');
+        return;
+    }
+    if (!messagesContainer) {
+        console.error('❌ عنصر messagesContainer غير موجود في HTML');
+        return;
+    }
+    
+    this.currentChat = friendId;
     this.friendInConversation = false;
     
     document.body.classList.add('conversation-open');
-    const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
+    
+    const nameEl = document.getElementById('conversationName');
+    const avatarEl = document.getElementById('conversationAvatar');
     if (nameEl) nameEl.textContent = friendName;
     if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
-    document.querySelector('.chat-page').style.display = 'none'; 
-    document.getElementById('conversationPage').style.display = 'flex';
+    
+    // إخفاء صفحة الدردشة الرئيسية وإظهار صفحة المحادثة
+    chatPage.style.display = 'none';
+    conversationPage.style.display = 'flex';
+    
+    // عرض الرسائل المحفوظة
     this.displayMessages(friendId);
     
-    // ✅ تم إزالة PresenceSystem.watchFriend (لم نعد نستخدم حالة الاتصال من السيرفر)
+    // التركيز على حقل الإدخال
+    setTimeout(() => {
+        const inp = document.getElementById('messageInput');
+        if (inp) inp.focus();
+    }, 300);
     
-    // ✅ تم إزالة sendConversationStatus و requestConversationStatus (لم نعد نرسلهما)
+    // التمرير إلى آخر رسالة
+    setTimeout(() => {
+        const c = document.getElementById('messagesContainer');
+        if (c) c.scrollTop = c.scrollHeight;
+    }, 100);
     
-    setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
-    setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
-    
-    // ✅ تم إزالة setupFeatureButton (الأزرار أصبحت دائمة في HTML)
-    
-    // ✅ تحديث حالة الأزرار (إظهار/إخفاء إذا لزم الأمر)
+    // إظهار أزرار التفعيل والطرد
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'flex';
     if (kickBtn) kickBtn.style.display = 'flex';
     
-    // ✅ تحديث حالة الزر فوراً
+    // تحديث حالة الأزرار
     this.updateAllButtons();
     
+    // التحقق من حالة القناة إذا كانت الميزات مفعلة
     setTimeout(() => {
         if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
             console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
@@ -779,6 +807,8 @@ openChat(friendId, friendName, friendAvatar) {
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
     }, 1000);
+    
+    console.log('✅ openChat - تم فتح المحادثة بنجاح');
 }, 
     
     
