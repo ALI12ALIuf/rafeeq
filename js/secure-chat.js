@@ -20,7 +20,6 @@ const SecureChatSystem = {
             console.log('🔐 بدء تهيئة نظام التشفير...');
             await this.setupKeys();
             this.startReceiving();
-            PresenceSystem.setOnline();
             console.log('✅ تم تهيئة نظام التشفير بنجاح');
             return true;
         } catch (error) {
@@ -205,14 +204,13 @@ const SecureChatSystem = {
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
         
-        // ✅ تحديد مدة الصلاحية حسب نوع الإشارة
-        let expiryHours = 24; // الافتراضي 24 ساعة
+        let expiryHours = 24;
         let expirySeconds = null;
         
         if (encryptedPackage.type === 'webrtc' || 
             encryptedPackage.type === 'feature_request' || 
             encryptedPackage.type === 'feature_response') {
-            expirySeconds = 30; // 30 ثانية فقط
+            expirySeconds = 30;
         }
         
         let expiresAt;
@@ -247,7 +245,6 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (تم إزالة conversation_status, conversation_status_request, feature_cancel) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -262,10 +259,6 @@ const SecureChatSystem = {
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
             else if (msg.package.type === 'webrtc') { 
-                // ✅ تجاهل إشارات WebRTC تماماً إذا:
-                // 1. الميزات غير مفعلة
-                // 2. أو الطرف الآخر ليس في المحادثة
-                // 3. أو المستخدم الحالي ليس في محادثة مع المرسل
                 if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
                     console.log('📞 تجاهل إشارة WebRTC - سبب:', {
                         featuresEnabled: ChatSystem.featuresEnabled,
@@ -312,7 +305,6 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
-            // ==================== القسم 100: معالجة إشارة إلغاء الميزات (force_disable_features) ====================
             else if (msg.package.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
@@ -348,7 +340,6 @@ const SecureChatSystem = {
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
             }
             
-            if (typeof loadChats === 'function') loadChats();
         } catch (error) {
             console.error('❌ خطأ في معالجة الرسالة:', error);
         }
