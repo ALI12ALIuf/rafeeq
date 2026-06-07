@@ -954,11 +954,6 @@ displayMessage(msg) {
     }
     else if (msg.type === 'image') {
         let imageSrc = msg.data;
-        if (imageSrc && typeof imageSrc === 'string') {
-            if (!imageSrc.startsWith('data:image') && !imageSrc.startsWith('http')) {
-                imageSrc = 'data:image/jpeg;base64,' + imageSrc;
-            }
-        }
         
         const imageDiv = document.createElement('div');
         imageDiv.className = 'message-image-wrapper';
@@ -987,12 +982,21 @@ displayMessage(msg) {
         
         imageDiv.appendChild(img);
         div.appendChild(imageDiv);
+        
+        const downloadBtn = document.createElement('button');
+        downloadBtn.innerHTML = '<i class="fas fa-download"></i> تحميل';
+        downloadBtn.style.cssText = 'margin-top: 5px; background: #2196F3; border: none; border-radius: 8px; padding: 5px 10px; color: white; cursor: pointer; font-size: 0.7rem; width: 100%;';
+        downloadBtn.onclick = (e) => {
+            e.stopPropagation();
+            const link = document.createElement('a');
+            link.href = imageSrc;
+            link.download = msg.fileName || 'image.jpg';
+            link.click();
+        };
+        div.appendChild(downloadBtn);
     } 
     else if (msg.type === 'voice') {
         let audioSrc = msg.data;
-        if (audioSrc && typeof audioSrc === 'string' && !audioSrc.startsWith('data:audio')) {
-            audioSrc = 'data:audio/webm;base64,' + audioSrc;
-        }
         
         const audioId = `audio_${msg.id}`;
         let audioDuration = 0;
@@ -1100,11 +1104,6 @@ displayMessage(msg) {
     } 
     else if (msg.type === 'video') {
         let videoSrc = msg.data;
-        if (videoSrc && typeof videoSrc === 'string') {
-            if (!videoSrc.startsWith('data:video') && !videoSrc.startsWith('http')) {
-                videoSrc = 'data:video/mp4;base64,' + videoSrc;
-            }
-        }
         
         const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
         
@@ -1130,17 +1129,24 @@ displayMessage(msg) {
             e.stopPropagation();
             this.showVideoPreview(videoSrc);
         };
+        
+        const downloadBtn = document.createElement('button');
+        downloadBtn.innerHTML = '<i class="fas fa-download"></i> تحميل';
+        downloadBtn.style.cssText = 'margin-top: 5px; background: #2196F3; border: none; border-radius: 8px; padding: 5px 10px; color: white; cursor: pointer; font-size: 0.7rem; width: 100%;';
+        downloadBtn.onclick = (e) => {
+            e.stopPropagation();
+            const link = document.createElement('a');
+            link.href = videoSrc;
+            link.download = msg.fileName || 'video.mp4';
+            link.click();
+        };
+        div.appendChild(downloadBtn);
     } 
     else if (msg.type === 'file') {
         let fileName = msg.fileName || 'ملف';
+        let fileUrl = msg.data;
         
         let fileSize = '';
-        if (msg.data && typeof msg.data === 'string') {
-            const sizeInBytes = Math.ceil(msg.data.length * 0.75);
-            if (sizeInBytes < 1024) fileSize = sizeInBytes + ' B';
-            else if (sizeInBytes < 1024 * 1024) fileSize = (sizeInBytes / 1024).toFixed(1) + ' KB';
-            else fileSize = (sizeInBytes / (1024 * 1024)).toFixed(1) + ' MB';
-        }
         
         let displayName = fileName;
         const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
@@ -1157,18 +1163,33 @@ displayMessage(msg) {
                 </div>
                 
                 <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
-                     onclick="event.stopPropagation(); window.openFile('${msg.data}', '${msg.fileName || 'ملف'}')"
+                     class="download-file-btn"
+                     data-url="${fileUrl}"
+                     data-name="${msg.fileName || 'ملف'}"
                      onmouseover="this.style.background='rgba(255,255,255,0.3)'"
                      onmouseout="this.style.background='rgba(255,255,255,0.2)'">
                     <i class="fas fa-download" style="font-size: 1rem; pointer-events: none;"></i>
                 </div>
             </div>
         `;
+        
+        const downloadBtnDiv = div.querySelector('.download-file-btn');
+        if (downloadBtnDiv) {
+            downloadBtnDiv.onclick = (e) => {
+                e.stopPropagation();
+                const url = downloadBtnDiv.getAttribute('data-url');
+                const name = downloadBtnDiv.getAttribute('data-name');
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = name;
+                link.click();
+            };
+        }
     }
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-}, 
+},
      
 
     // ==================== القسم 26.1: showImagePreview ====================
@@ -1813,11 +1834,10 @@ async sendMessage(text) {
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'image');
             if (success) {
-                const comp = await SecureChatSystem.compressImage(file); 
-                const b64 = await SecureChatSystem.fileToBase64(comp); 
                 const msgId = Date.now().toString();
-                this.saveMessage(this.currentChat, { id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-                this.displayMessage({ id: msgId, type: 'image', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                const tempUrl = URL.createObjectURL(file);
+                this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
             } else alert('فشل إرسال الصورة');
         }
     },
@@ -1850,12 +1870,12 @@ async sendMessage(text) {
             const success = await this.sendFileWithRetry(file, 'video');
             if (success) {
                 try {
-                    const b64 = await SecureChatSystem.fileToBase64(file); 
                     const msgId = Date.now().toString();
+                    const tempUrl = URL.createObjectURL(file);
                     
-                    this.displayMessage({ id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    this.displayMessage({ id: msgId, type: 'video', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
                     
-                    this.saveMessage(this.currentChat, { id: msgId, type: 'video', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                    setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
                     
                 } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
@@ -1881,10 +1901,10 @@ async sendMessage(text) {
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(file, 'file');
             if (success) {
-                const b64 = await SecureChatSystem.fileToBase64(file); 
                 const msgId = Date.now().toString();
-                this.saveMessage(this.currentChat, { id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                this.displayMessage({ id: msgId, type: 'file', data: b64, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                const tempUrl = URL.createObjectURL(file);
+                this.displayMessage({ id: msgId, type: 'file', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
             } else alert('فشل إرسال الملف');
         }
     },
@@ -1908,10 +1928,10 @@ async sendMessage(text) {
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
             const success = await this.sendFileWithRetry(audioBlob, 'voice');
             if (success) {
-                const b64 = await SecureChatSystem.fileToBase64(audioBlob); 
                 const msgId = Date.now().toString();
-                this.saveMessage(this.currentChat, { id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-                this.displayMessage({ id: msgId, type: 'voice', data: b64, sender: 'me', time: new Date().toISOString(), status: 'sent' });
+                const tempUrl = URL.createObjectURL(audioBlob);
+                this.displayMessage({ id: msgId, type: 'voice', data: tempUrl, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
             } else alert('فشل إرسال البصمة الصوتية');
         }
     },
@@ -2232,20 +2252,21 @@ showLocationSwipeModalWithClicks(locationData) {
 }, 
     
     
-    
     // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
+        // فقط النصوص تُحفظ محليًا
+        if (message.type !== 'text') {
+            console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
+            return;
+        }
+        
         const key = `chat_${friendId}`; 
         let h = []; 
         try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
         h.push(message); 
         let serialized = JSON.stringify(h);
         while (serialized.length > 4000000) {
-            let removed = false;
-            for (let i = 0; i < h.length; i++) {
-                if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') { h.splice(i, 1); removed = true; break; }
-            }
-            if (!removed) h.splice(0, 1);
+            h.shift();
             serialized = JSON.stringify(h);
         }
         try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
@@ -2254,6 +2275,7 @@ showLocationSwipeModalWithClicks(locationData) {
         }
         this.messages[friendId] = h; 
     },
+    
 
    // ==================== القسم 36: updateLastMessage ====================
 updateLastMessage(friendId, lastMessage) { 
