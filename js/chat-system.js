@@ -50,22 +50,7 @@ init() {
     // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
     this.cleanMediaMessagesOnLoad();
 },
-
-// ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
-cleanMediaMessagesOnLoad() {
-    for (const friendId in this.messages) {
-        const messages = this.messages[friendId] || [];
-        const filteredMessages = messages.filter(msg => msg.type === 'text');
-        if (filteredMessages.length !== messages.length) {
-            this.messages[friendId] = filteredMessages;
-            const key = `chat_${friendId}`;
-            localStorage.setItem(key, JSON.stringify(filteredMessages));
-            console.log(`✅ تم تنظيف الوسائط من محادثة ${friendId}`);
-        }
-    }
-    console.log('🧹 تم تنظيف جميع الملفات والوسائط من localStorage');
-},
-    
+   
     
     // ==================== القسم 4: setupBeforeUnloadListener ====================
 setupBeforeUnloadListener() {
@@ -540,13 +525,9 @@ async handleFeatureResponse(fromId, action) {
     }
 },
 
-     // ==================== القسم 10.1: disableFeatures ====================
+    // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
-    
-    if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
-        await CallSystem.deleteAllWebRTCSignals(this.currentChat);
-    }
     
     this.featuresEnabled = false;
     this.featureRequestPending = false;
@@ -574,7 +555,7 @@ async disableFeatures() {
     
     this.updateAllButtons();
     console.log('✅ تم إلغاء تفعيل الميزات');
-},
+}, 
     
     // ==================== القسم 12: resetFeatures ====================
 resetFeatures() {
@@ -2265,7 +2246,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-    // ==================== القسم 37: closeChat ====================
+   // ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2275,10 +2256,6 @@ closeChat() {
     
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
-        
-        if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
-            CallSystem.deleteAllWebRTCSignals(chatId);
-        }
         
         const key = `chat_${chatId}`;
         const messages = this.messages[chatId] || [];
@@ -2314,13 +2291,11 @@ closeChat() {
     document.body.classList.remove('conversation-open');
     document.getElementById('conversationPage').style.display = 'none';
     document.querySelector('.chat-page').style.display = 'block';
-    PresenceSystem.stopAll();
-    if (!CallSystem.isInCall) CallSystem.cleanupConnections();
     this.currentChat = null;
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
-},
+}, 
     
     
     // ==================== القسم 38: escapeHtml ====================
