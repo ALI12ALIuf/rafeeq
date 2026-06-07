@@ -732,27 +732,9 @@ closeConversation() {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
 
-   // ==================== القسم 23: openChat ====================
+// ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     console.log('🔍 openChat - فتح المحادثة:', friendId, friendName);
-    
-    // التحقق من وجود العناصر الضرورية
-    const conversationPage = document.getElementById('conversationPage');
-    const chatPage = document.querySelector('.chat-page');
-    const messagesContainer = document.getElementById('messagesContainer');
-    
-    if (!conversationPage) {
-        console.error('❌ عنصر conversationPage غير موجود في HTML');
-        return;
-    }
-    if (!chatPage) {
-        console.error('❌ عنصر chat-page غير موجود في HTML');
-        return;
-    }
-    if (!messagesContainer) {
-        console.error('❌ عنصر messagesContainer غير موجود في HTML');
-        return;
-    }
     
     this.currentChat = friendId;
     this.friendInConversation = false;
@@ -764,23 +746,24 @@ openChat(friendId, friendName, friendAvatar) {
     if (nameEl) nameEl.textContent = friendName;
     if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
     
-    // إخفاء صفحة الدردشة الرئيسية وإظهار صفحة المحادثة
-    chatPage.style.display = 'none';
-    conversationPage.style.display = 'flex';
+    // إخفاء صفحة الدردشة وإظهار صفحة المحادثة
+    const chatPage = document.querySelector('.chat-page');
+    const conversationPage = document.getElementById('conversationPage');
+    
+    if (chatPage) chatPage.style.display = 'none';
+    if (conversationPage) conversationPage.style.display = 'flex';
     
     // عرض الرسائل المحفوظة
     this.displayMessages(friendId);
     
-    // التركيز على حقل الإدخال
-    setTimeout(() => {
-        const inp = document.getElementById('messageInput');
-        if (inp) inp.focus();
+    setTimeout(() => { 
+        const inp = document.getElementById('messageInput'); 
+        if (inp) inp.focus(); 
     }, 300);
     
-    // التمرير إلى آخر رسالة
-    setTimeout(() => {
-        const c = document.getElementById('messagesContainer');
-        if (c) c.scrollTop = c.scrollHeight;
+    setTimeout(() => { 
+        const c = document.getElementById('messagesContainer'); 
+        if (c) c.scrollTop = c.scrollHeight; 
     }, 100);
     
     // إظهار أزرار التفعيل والطرد
@@ -792,7 +775,6 @@ openChat(friendId, friendName, friendAvatar) {
     // تحديث حالة الأزرار
     this.updateAllButtons();
     
-    // التحقق من حالة القناة إذا كانت الميزات مفعلة
     setTimeout(() => {
         if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
             console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
@@ -809,7 +791,7 @@ openChat(friendId, friendName, friendAvatar) {
     }, 1000);
     
     console.log('✅ openChat - تم فتح المحادثة بنجاح');
-}, 
+},
     
     
     // ==================== القسم 25: displayMessages ====================
