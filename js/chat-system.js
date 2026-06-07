@@ -848,7 +848,7 @@ openChat(friendId, friendName, friendAvatar) {
     displayMessages(friendId) { const c = document.getElementById('messagesContainer'); if (!c) return; c.innerHTML = ''; (this.messages[friendId] || []).forEach(m => this.displayMessage(m)); },
 
 
-   // ==================== القسم 26: displayMessage ====================
+// ==================== القسم 26: displayMessage ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -982,18 +982,6 @@ displayMessage(msg) {
         
         imageDiv.appendChild(img);
         div.appendChild(imageDiv);
-        
-        const downloadBtn = document.createElement('button');
-        downloadBtn.innerHTML = '<i class="fas fa-download"></i> تحميل';
-        downloadBtn.style.cssText = 'margin-top: 5px; background: #2196F3; border: none; border-radius: 8px; padding: 5px 10px; color: white; cursor: pointer; font-size: 0.7rem; width: 100%;';
-        downloadBtn.onclick = (e) => {
-            e.stopPropagation();
-            const link = document.createElement('a');
-            link.href = imageSrc;
-            link.download = msg.fileName || 'image.jpg';
-            link.click();
-        };
-        div.appendChild(downloadBtn);
     } 
     else if (msg.type === 'voice') {
         let audioSrc = msg.data;
@@ -1129,18 +1117,6 @@ displayMessage(msg) {
             e.stopPropagation();
             this.showVideoPreview(videoSrc);
         };
-        
-        const downloadBtn = document.createElement('button');
-        downloadBtn.innerHTML = '<i class="fas fa-download"></i> تحميل';
-        downloadBtn.style.cssText = 'margin-top: 5px; background: #2196F3; border: none; border-radius: 8px; padding: 5px 10px; color: white; cursor: pointer; font-size: 0.7rem; width: 100%;';
-        downloadBtn.onclick = (e) => {
-            e.stopPropagation();
-            const link = document.createElement('a');
-            link.href = videoSrc;
-            link.download = msg.fileName || 'video.mp4';
-            link.click();
-        };
-        div.appendChild(downloadBtn);
     } 
     else if (msg.type === 'file') {
         let fileName = msg.fileName || 'ملف';
