@@ -525,64 +525,6 @@ async handleFeatureResponse(fromId, action) {
     }
 },
 
-    // ==================== القسم 10.1: disableFeatures ====================
-async disableFeatures() {
-    console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
-    
-    this.featuresEnabled = false;
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-        this.featureBlinkInterval = null;
-    }
-    
-    const toggleInput = document.getElementById('featureToggleInput');
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) toggleInput.checked = false;
-    if (switchLabel) switchLabel.classList.remove('blinking');
-    
-    if (CallSystem.dc) {
-        try { CallSystem.dc.close(); } catch(e) {}
-        CallSystem.dc = null;
-    }
-    if (CallSystem.pc) {
-        try { CallSystem.pc.close(); } catch(e) {}
-        CallSystem.pc = null;
-    }
-    
-    this.updateAllButtons();
-    console.log('✅ تم إلغاء تفعيل الميزات');
-}, 
-    
-    // ==================== القسم 12: resetFeatures ====================
-resetFeatures() {
-    console.log('🔄 resetFeatures - إعادة تعيين الميزات');
-    
-    const chatId = this.currentChat;
-    
-    this.featuresEnabled = false;
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-    }
-    
-    const toggleInput = document.getElementById('featureToggleInput');
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) toggleInput.checked = false;
-    if (switchLabel) switchLabel.classList.remove('blinking');
-    
-    if (chatId) {
-        console.log('📤 تم إلغاء الميزات محلياً');
-    }
-    
-    this.updateAllButtons();
-},
     
     // ==================== القسم 13: handleFeatureCancel ====================
 handleFeatureCancel() {
@@ -2207,33 +2149,8 @@ showLocationSwipeModalWithClicks(locationData) {
         if (document.getElementById('locationSwipeModal')) overlay.remove();
     }, 30000);
 }, 
-    
-    
-    // ==================== القسم 35: saveMessage ====================
-    saveMessage(friendId, message) { 
-        // فقط النصوص تُحفظ محليًا
-        if (message.type !== 'text') {
-            console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
-            return;
-        }
-        
-        const key = `chat_${friendId}`; 
-        let h = []; 
-        try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
-        h.push(message); 
-        let serialized = JSON.stringify(h);
-        while (serialized.length > 4000000) {
-            h.shift();
-            serialized = JSON.stringify(h);
-        }
-        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
-            h = h.slice(Math.floor(h.length * 0.2));
-            try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
-        }
-        this.messages[friendId] = h; 
-    },
-    
 
+    
    // ==================== القسم 36: updateLastMessage ====================
 updateLastMessage(friendId, lastMessage) { 
     document.querySelectorAll('.chat-item').forEach(item => { 
@@ -2245,58 +2162,6 @@ updateLastMessage(friendId, lastMessage) {
     }); 
 },
 
-
-   // ==================== القسم 37: closeChat ====================
-closeChat() {
-    console.log('🔴 closeChat - بدء إغلاق المحادثة');
-    console.log('currentChat:', this.currentChat);
-    console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
-    
-    const chatId = this.currentChat;
-    
-    if (chatId) {
-        console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
-        
-        const key = `chat_${chatId}`;
-        const messages = this.messages[chatId] || [];
-        const filteredMessages = messages.filter(msg => msg.type === 'text');
-        this.messages[chatId] = filteredMessages;
-        localStorage.setItem(key, JSON.stringify(filteredMessages));
-        console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
-    }
-    
-    this.featuresEnabled = false;
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-        this.featureBlinkInterval = null;
-    }
-    
-    const btn = document.getElementById('enableFeaturesBtn');
-    if (btn) {
-        btn.style.background = '#f44336';
-        btn.title = 'تفعيل الميزات';
-    }
-    
-    // ✅ إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
-    const toggleContainer = document.getElementById('featureToggleContainer');
-    const kickBtn = document.getElementById('kickBtn');
-    if (toggleContainer) toggleContainer.style.display = 'none';
-    if (kickBtn) kickBtn.style.display = 'none';
-    
-    this.updateAllButtons();
-    
-    document.body.classList.remove('conversation-open');
-    document.getElementById('conversationPage').style.display = 'none';
-    document.querySelector('.chat-page').style.display = 'block';
-    this.currentChat = null;
-    this.friendInConversation = false;
-    
-    console.log('✅ closeChat - انتهى');
-}, 
-    
     
     // ==================== القسم 38: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
