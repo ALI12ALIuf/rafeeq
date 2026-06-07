@@ -40,28 +40,25 @@ updateFeatureToggleUI() {
     console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=false`);
 },
     
-    // ==================== القسم 3: init ====================
+    
+   // ==================== القسم 3: init ====================
 init() { 
     this.loadAllChats(); 
     this.setupPageFocusListener();
     this.setupFeatureButton();
     this.setupBeforeUnloadListener();
-    
-    // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
-    this.cleanMediaMessagesOnLoad();
 },
-   
     
     // ==================== القسم 4: setupBeforeUnloadListener ====================
 setupBeforeUnloadListener() {
     window.addEventListener('beforeunload', () => {
         if (this.currentChat && this.featuresEnabled) {
-            console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات محلياً');
+            console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات القسم
         }
     });
 },
 
-    // ==================== القسم 5: setupFeatureButton (تبسيط - الأزرار موجودة في HTML) ====================
+   // ==================== القسم 5: setupFeatureButton (تبسيط - الأزرار موجودة في HTML) ====================
 setupFeatureButton() {
     // ✅ الأزرار موجودة بالفعل في HTML، فقط نحدثها ونجعلها مرئية
     const toggleContainer = document.getElementById('featureToggleContainer');
@@ -180,8 +177,12 @@ setupFeatureButton() {
         console.log('🔘 تم الضغط على زر التفعيل');
         
         if (this.featuresEnabled) {
-            console.log('⚠️ الميزات مفعلة، جاري إلغاء التفعيل');
-            this.disableFeatures();
+            console.log('⚠️ الميزات مفعلة، سيتم إلغاء التفعيل');
+            this.featuresEnabled = false;
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            if (toggleInput) toggleInput.checked = false;
+            this.updateAllButtons();
             return;
         }
         
@@ -229,10 +230,10 @@ updateKickButtonState() {
         kickBtn.classList.remove('active');
         kickBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
     }
-},
+}, 
     
 
- // ==================== القسم : 5.1 إنهاء المحادثة من الطرفين ====================
+// ==================== القسم : 5.1 إنهاء المحادثة من الطرفين ====================
 async kickUserFromConversation() {
     if (!this.currentChat) {
         console.log('❌ لا توجد محادثة نشطة');
@@ -262,8 +263,32 @@ async kickUserFromConversation() {
     }
     
     // ✅ إغلاق المحادثة محلياً (عند المرسل أيضاً)
-    this.closeChat();
-},   
+    this.currentChat = null;
+    this.friendInConversation = false;
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (toggleInput) toggleInput.checked = false;
+    
+    const toggleContainer = document.getElementById('featureToggleContainer');
+    const kickBtn = document.getElementById('kickBtn');
+    if (toggleContainer) toggleContainer.style.display = 'none';
+    if (kickBtn) kickBtn.style.display = 'none';
+    
+    document.body.classList.remove('conversation-open');
+    document.getElementById('conversationPage').style.display = 'none';
+    document.querySelector('.chat-page').style.display = 'block';
+    
+    this.updateAllButtons();
+    console.log('✅ تم إنهاء المحادثة');
+}, 
     
     
   // ==================== القسم 6: startFeatureBlink ====================
@@ -424,7 +449,7 @@ async acceptFeatureRequest() {
     console.log('✅ تم تفعيل الميزات!');
 },
     
-    // ==================== القسم 10: handleFeatureResponse ====================
+ // ==================== القسم 10: handleFeatureResponse ====================
 async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
     
@@ -509,15 +534,6 @@ async handleFeatureResponse(fromId, action) {
         if (btn) {
             btn.style.background = '#f44336';
             btn.title = 'تفعيل الميزات';
-        }
-        
-        if (CallSystem.dc) {
-            try { CallSystem.dc.close(); } catch(e) {}
-            CallSystem.dc = null;
-        }
-        if (CallSystem.pc) {
-            try { CallSystem.pc.close(); } catch(e) {}
-            CallSystem.pc = null;
         }
         
         this.updateAllButtons();
@@ -716,14 +732,13 @@ closeConversation() {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
     
-    // ==================== القسم 23: openChat ====================
+   // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
     // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
     this.friendInConversation = false;
     
-    this.resetFeatures();
     document.body.classList.add('conversation-open');
     const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
     if (nameEl) nameEl.textContent = friendName;
@@ -764,7 +779,7 @@ openChat(friendId, friendName, friendAvatar) {
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
     }, 1000);
-},
+}, 
     
     
     // ==================== القسم 25: displayMessages ====================
