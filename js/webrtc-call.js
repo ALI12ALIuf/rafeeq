@@ -1491,26 +1491,6 @@ compressImage(file) {
     });
 },
 
-// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            if (typeof CallSystem !== 'undefined') {
-                CallSystem.autoCleanupOnLoad();
-            }
-        }, 1500);
-    });
-}
-
-// ==================== 16. التنظيف قبل إغلاق الصفحة ====================
-if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', () => {
-        if (CallSystem.isInCall) {
-            CallSystem.endCall();
-        }
-    });
-}
-
 // ==================== 17. الدوال العامة ====================
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) {
@@ -1528,9 +1508,5 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-window.cleanupCallState = async () => {
-    await CallSystem.autoCleanupOnLoad();
-    console.log('✅ تم تنظيف حالة المكالمات يدوياً');
-};
-
 console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
+
