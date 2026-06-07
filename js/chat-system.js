@@ -2301,3 +2301,35 @@ document.addEventListener('touchend', function (e) {
     lastTouchEnd = now;
 }, { passive: false });
 
+
+
+
+// ==================== نظام فحص وتصحيح أخطاء المحادثة (نسخة التنبيهات) ====================
+(function setupChatDebugger() {
+    const originalOpenChat = ChatSystem.openChat;
+    
+    ChatSystem.openChat = function(friendId, friendName, friendAvatar) {
+        // تنبيه 1
+        alert('🔍 1. تم الضغط على المحادثة: ' + friendName);
+        
+        const conversationPage = document.getElementById('conversationPage');
+        const chatPage = document.querySelector('.chat-page');
+        
+        if (!conversationPage) {
+            alert('❌ خطأ: conversationPage غير موجود');
+            return;
+        }
+        if (!chatPage) {
+            alert('❌ خطأ: chat-page غير موجود');
+            return;
+        }
+        
+        alert('✅ 2. العناصر موجودة - سيتم فتح المحادثة');
+        
+        originalOpenChat.call(this, friendId, friendName, friendAvatar);
+        
+        alert('✅ 3. تم فتح المحادثة بنجاح');
+    };
+    
+    alert('✅ نظام فحص المحادثة تم تفعيله');
+})();
