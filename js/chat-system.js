@@ -49,11 +49,11 @@ init() {
     this.setupBeforeUnloadListener();
 },
     
-// ==================== القسم 4: setupBeforeUnloadListener ====================
+    // ==================== القسم 4: setupBeforeUnloadListener ====================
 setupBeforeUnloadListener() {
     window.addEventListener('beforeunload', () => {
         if (this.currentChat && this.featuresEnabled) {
-            console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات');
+            console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات القسم
         }
     });
 },
@@ -2204,124 +2204,6 @@ saveMessage(friendId, message) {
     this.messages[friendId] = h; 
 },
     
-
-// ==================== نظام فحص الأخطاء ====================
-(function() {
-    // إنشاء لوحة الفحص
-    const debugDiv = document.createElement('div');
-    debugDiv.id = 'debugPanel';
-    debugDiv.style.cssText = `
-        position: fixed;
-        bottom: 10px;
-        left: 10px;
-        right: 10px;
-        background: #1e1e2e;
-        border-radius: 16px;
-        z-index: 99999;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        font-family: monospace;
-        font-size: 12px;
-        border: 1px solid #4CAF50;
-        direction: ltr;
-    `;
-    debugDiv.innerHTML = `
-        <div style="background: #4CAF50; padding: 8px 12px; border-radius: 14px 14px 0 0; display: flex; justify-content: space-between; align-items: center; cursor: move;">
-            <span style="color: white; font-size: 13px;">🐛 فحص المحادثات</span>
-            <div style="display: flex; gap: 6px;">
-                <button id="copyDebugLogs" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 3px 8px; border-radius: 5px; cursor: pointer;">نسخ</button>
-                <button id="clearDebugLogs" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 3px 8px; border-radius: 5px; cursor: pointer;">مسح</button>
-                <button id="minimizeDebug" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 3px 8px; border-radius: 5px; cursor: pointer;">─</button>
-                <button id="closeDebug" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 3px 8px; border-radius: 5px; cursor: pointer;">✕</button>
-            </div>
-        </div>
-        <div id="debugContent" style="max-height: 180px; overflow-y: auto; padding: 8px; background: #0a0e27; border-radius: 0 0 14px 14px; color: #0f0; font-size: 11px;">
-            <div style="color: #4d9eff;">🟢 بدء الفحص...</div>
-        </div>
-    `;
-    document.body.appendChild(debugDiv);
-    
-    const content = document.getElementById('debugContent');
-    
-    function addLog(msg, type = 'info') {
-        const div = document.createElement('div');
-        div.style.cssText = `border-bottom: 1px solid #333; padding: 5px; word-break: break-word; white-space: pre-wrap; color: ${type === 'error' ? '#ff6b6b' : type === 'success' ? '#6bcb77' : type === 'warning' ? '#ffd93d' : '#4d9eff'}`;
-        div.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        content.appendChild(div);
-        div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        if (type === 'error') console.error(msg);
-        else console.log(msg);
-    }
-    
-    // فحص العناصر عند التحميل
-    setTimeout(() => {
-        addLog('📋 فحص العناصر:', 'info');
-        const ids = ['conversationPage', 'messagesContainer', 'conversationName', 'messageInput'];
-        ids.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) addLog(`  ✅ ${id}: موجود`, 'success');
-            else addLog(`  ❌ ${id}: غير موجود!`, 'error');
-        });
-        const chatPage = document.querySelector('.chat-page');
-        if (chatPage) addLog(`  ✅ chat-page: موجود`, 'success');
-        else addLog(`  ❌ chat-page: غير موجود!`, 'error');
-    }, 1000);
-    
-    // تتبع استدعاء openChat الأصلي
-    const originalOpenChat = ChatSystem.openChat;
-    ChatSystem.openChat = function(friendId, friendName, friendAvatar) {
-        addLog(`📞 تم استدعاء openChat("${friendId}", "${friendName}")`, 'info');
-        try {
-            if (!friendId) addLog(`⚠️ تحذير: friendId فارغ!`, 'warning');
-            if (!document.getElementById('conversationPage')) addLog(`❌ conversationPage غير موجود!`, 'error');
-            const result = originalOpenChat.call(this, friendId, friendName, friendAvatar);
-            addLog(`✅ openChat اكتملت بنجاح`, 'success');
-            return result;
-        } catch(err) {
-            addLog(`❌ خطأ في openChat: ${err.message}`, 'error');
-            throw err;
-        }
-    };
-    addLog(`✅ تم تثبيت مراقبة openChat`, 'success');
-    
-    // تتبع الضغط على أي زر في قائمة المحادثات
-    document.addEventListener('click', function(e) {
-        let target = e.target.closest('[onclick]');
-        if (target) {
-            let onclickText = target.getAttribute('onclick');
-            if (onclickText && (onclickText.includes('openChat') || onclickText.includes('ChatSystem.openChat'))) {
-                addLog(`🔘 تم الضغط على زر المحادثة: ${onclickText.substring(0, 80)}`, 'info');
-            }
-        }
-        target = e.target.closest('.chat-item');
-        if (target) {
-            addLog(`🔘 تم الضغط على عنصر chat-item`, 'info');
-        }
-    });
-    
-    // أزرار التحكم
-    document.getElementById('copyDebugLogs').onclick = () => {
-        let logs = '';
-        content.querySelectorAll('div').forEach(d => logs += d.innerText + '\n');
-        navigator.clipboard.writeText(logs);
-        addLog(`📋 تم نسخ السجل`, 'success');
-    };
-    document.getElementById('clearDebugLogs').onclick = () => {
-        content.innerHTML = '';
-        addLog(`🧹 تم مسح السجل`, 'info');
-    };
-    let minimized = false;
-    document.getElementById('minimizeDebug').onclick = () => {
-        minimized = !minimized;
-        const contentDiv = document.getElementById('debugContent');
-        contentDiv.style.display = minimized ? 'none' : 'block';
-        document.getElementById('minimizeDebug').textContent = minimized ? '□' : '─';
-    };
-    document.getElementById('closeDebug').onclick = () => {
-        debugDiv.style.display = 'none';
-    };
-    
-    addLog(`🟢 نظام الفحص جاهز - اضغط على أي محادثة`, 'success');
-})();
     
    // ==================== القسم 36: updateLastMessage ====================
 updateLastMessage(friendId, lastMessage) { 
@@ -2334,7 +2216,40 @@ updateLastMessage(friendId, lastMessage) {
     }); 
 },
 
+   // ==================== closeChat: إغلاق المحادثة ====================
+closeChat() {
+    console.log('🔴 closeChat - إغلاق المحادثة');
     
+    this.currentChat = null;
+    this.friendInConversation = false;
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (toggleInput) toggleInput.checked = false;
+    
+    const toggleContainer = document.getElementById('featureToggleContainer');
+    const kickBtn = document.getElementById('kickBtn');
+    if (toggleContainer) toggleContainer.style.display = 'none';
+    if (kickBtn) kickBtn.style.display = 'none';
+    
+    document.body.classList.remove('conversation-open');
+    const conversationPage = document.getElementById('conversationPage');
+    if (conversationPage) conversationPage.style.display = 'none';
+    
+    const chatPage = document.querySelector('.chat-page');
+    if (chatPage) chatPage.style.display = 'block';
+    
+    this.updateAllButtons();
+    console.log('✅ تم إغلاق المحادثة');
+}, 
+
     // ==================== القسم 38: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
@@ -2418,6 +2333,4 @@ document.addEventListener('touchend', function (e) {
     }
     lastTouchEnd = now;
 }, { passive: false });
-
-
 
