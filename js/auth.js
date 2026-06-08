@@ -38,6 +38,18 @@ function showApp() {
     if (captchaScreen) captchaScreen.remove();
     if (splash) { splash.style.display = 'none'; }
     if (app) { app.style.display = 'flex'; }
+    
+    // ✅ إضافة استدعاء نظام PIN بعد فتح التطبيق
+    (async () => {
+        if (typeof PINSystem !== 'undefined') {
+            const pinSuccess = await PINSystem.init();
+            if (!pinSuccess) {
+                console.warn('⚠️ لم يتم التحقق من PIN بنجاح');
+            }
+        } else {
+            console.warn('⚠️ PINSystem غير موجود');
+        }
+    })();
 }
 
 function showLoginScreen() {
@@ -130,7 +142,10 @@ async function logout() {
     } catch (e) {}
     
     sessionStorage.removeItem('_captchaVerified');
-    PresenceSystem.stopAll();
+    
+    if (typeof PresenceSystem !== 'undefined' && PresenceSystem.stopAll) {
+        PresenceSystem.stopAll();
+    }
     
     try { await window.auth.signOut(); } catch (e) {}
     window.location.reload(); 
