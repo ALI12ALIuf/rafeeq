@@ -241,7 +241,22 @@ window.verifyCaptcha = function() {
                 inputs.forEach(input => { input.style.borderColor = '#4CAF50'; input.style.background = 'rgba(76,175,80,0.2)'; });
                 const onSuccess = captchaScreen._onSuccess;
                 captchaScreen.remove();
-                if (onSuccess) onSuccess();
+                
+                // ✅ إضافة نظام PIN بعد نجاح CAPTCHA
+                (async () => {
+                    if (typeof PINSystem !== 'undefined') {
+                        const pinSuccess = await PINSystem.init();
+                        if (pinSuccess) {
+                            if (onSuccess) onSuccess();
+                        } else {
+                            alert('❌ فشل التحقق من رمز الحماية');
+                            // إعادة محاولة CAPTCHA
+                            showCaptchaScreen(onSuccess);
+                        }
+                    } else {
+                        if (onSuccess) onSuccess();
+                    }
+                })();
             }
         } else {
             _captchaAttempts++;
