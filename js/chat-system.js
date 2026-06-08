@@ -380,7 +380,7 @@ sendOfferSignal(data) {
 },
 
     
-   // ==================== القسم 8: handleFeatureRequest ====================
+// ==================== القسم 8: handleFeatureRequest ====================
 async handleFeatureRequest(fromId, encryptedData) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
@@ -406,30 +406,15 @@ async handleFeatureRequest(fromId, encryptedData) {
         timestamp: Date.now()
     };
     
-    // ✅ إذا كان Offer، نعرض شاشة الموافقة
+    // ✅ إذا كان Offer، نبدأ الـ blinking فوراً (بدون confirm)
     if (requestData.action === 'offer' && requestData.sdp) {
         console.log('📡 استلام Offer WebRTC من', fromId);
+        
+        // ✅ تفعيل blinking فوراً - المستخدم يرى الزر يرمش
         this.featureRequestReceived = true;
         this.startFeatureBlink();
         
-        // ✅ عرض إشعار للمستخدم
-        const contactName = await this.getContactName(fromId);
-        const confirmAccept = confirm(`${contactName} يريد تفعيل الميزات (مكالمات وملفات مباشرة). هل توافق؟`);
-        
-        if (confirmAccept) {
-            await this.acceptOffer(fromId, this._pendingOffer[fromId]);
-        } else {
-            // رفض الطلب
-            await this.sendOfferResponse(fromId, 'reject');
-            this.featureRequestReceived = false;
-            this.featureRequestPending = false;
-            if (this.featureBlinkInterval) {
-                clearInterval(this.featureBlinkInterval);
-                this.featureBlinkInterval = null;
-            }
-            const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
-        }
+        console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
     }
     // ✅ إذا كان ICE candidate، نضيفه إلى PeerConnection
     else if (requestData.action === 'ice' && requestData.candidate) {
@@ -447,8 +432,6 @@ async handleFeatureRequest(fromId, encryptedData) {
             }
         }
     }
-    
-    console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
 },
 
 // ✅ دالة مساعدة لقبول الـ Offer
@@ -554,7 +537,7 @@ async sendOfferResponse(toId, action, data = null) {
     } catch(e) {
         console.error('❌ فشل إرسال الرد:', e);
     }
-}, 
+},
 
     
     // ==================== القسم 9: acceptFeatureRequest ====================
