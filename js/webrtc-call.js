@@ -729,7 +729,7 @@ const CallSystem = {
         });
     },
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+ // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -1031,28 +1031,18 @@ async sendSignal(calleeId, data) {
         return;
     }
     
-    if (this.dc && this.dc.readyState === 'open') {
-        try {
-            this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
-            console.log('📡 تم إرسال الإشارة مباشرة عبر Data Channel');
-            return;
-        } catch(e) {
-            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
-        }
+    if (!this.dc || this.dc.readyState !== 'open') {
+        console.error('❌ فشل إرسال الإشارة - Data Channel غير مفتوح');
+        return;
     }
     
     try {
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-        await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        console.log('📡 تم إرسال الإشارة عبر Firebase (حل احتياطي)');
-    } catch (error) {
-        console.error('خطأ في إرسال الإشارة:', error);
+        this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
+        console.log('📡 تم إرسال الإشارة مباشرة عبر Data Channel');
+    } catch(e) {
+        console.error('❌ فشل إرسال الإشارة:', e);
     }
-},
+}, 
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
