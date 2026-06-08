@@ -334,12 +334,39 @@ async requestEnableFeatures() {
             CallSystem.dc = null;
         }
         
-        CallSystem.pc = new RTCPeerConnection(CallSystem.servers);
+        // ✅ إعداد ICE servers بشكل كامل ومستقل
+        const iceServersConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
+            ]
+        };
+        
+        CallSystem.pc = new RTCPeerConnection(iceServersConfig);
         CallSystem.dc = CallSystem.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
         CallSystem.setupDataChannel(CallSystem.dc);
         
         CallSystem.pc.onicecandidate = e => {
             if (e.candidate) {
+                console.log('📡 إرسال ICE candidate من المرسل');
                 this.sendOfferSignal({ candidate: e.candidate });
             }
         };
@@ -347,7 +374,41 @@ async requestEnableFeatures() {
         const offer = await CallSystem.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
         await CallSystem.pc.setLocalDescription(offer);
         
-        // ✅ إرسال Offer بدلاً من طلب تفعيل عادي
+        // ✅ انتظر حتى يكتمل الـ localDescription
+        await new Promise(resolve => {
+            if (CallSystem.pc.localDescription && CallSystem.pc.localDescription.sdp) {
+                resolve();
+            } else {
+                const checkInterval = setInterval(() => {
+                    if (CallSystem.pc.localDescription && CallSystem.pc.localDescription.sdp) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    resolve();
+                }, 2000);
+            }
+        });
+        
+        console.log('📡 الـ localDescription جاهز:', {
+            type: CallSystem.pc.localDescription?.type,
+            hasSdp: !!CallSystem.pc.localDescription?.sdp,
+            sdpLength: CallSystem.pc.localDescription?.sdp?.length
+        });
+        
+        // ✅ التحقق من صحة الـ localDescription
+        if (!CallSystem.pc.localDescription || !CallSystem.pc.localDescription.sdp) {
+            throw new Error('فشل إنشاء SDP صالح');
+        }
+        
+        // ✅ إرسال Offer مع SDP كامل
+        const sdpToSend = {
+            type: CallSystem.pc.localDescription.type,
+            sdp: CallSystem.pc.localDescription.sdp
+        };
+        
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
         if (!myPrivateKey || !receiverPublicKey) return;
@@ -355,7 +416,7 @@ async requestEnableFeatures() {
         const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
             type: 'feature_request',
             action: 'offer',
-            sdp: CallSystem.pc.localDescription,
+            sdp: sdpToSend,
             timestamp: Date.now()
         }), sharedKey);
         await SecureChatSystem.sendToServer(this.currentChat, { 
@@ -369,6 +430,7 @@ async requestEnableFeatures() {
         this.featureRequestPending = false;
         this.startFeatureBlink();
         console.log('❌ فشل إرسال الطلب:', e);
+        alert('فشل إرسال طلب التفعيل: ' + (e.message || 'خطأ غير معروف'));
     }
 },
 
@@ -393,9 +455,9 @@ sendOfferSignal(data) {
         });
     }).catch(console.error);
 },
-
     
-  // ==================== القسم 8: handleFeatureRequest ====================
+
+    // ==================== القسم 8: handleFeatureRequest ====================
 async handleFeatureRequest(fromId, encryptedData) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
@@ -424,27 +486,31 @@ async handleFeatureRequest(fromId, encryptedData) {
     // ✅ إذا كان Offer، نعرض شاشة الموافقة
     if (requestData.action === 'offer' && requestData.sdp) {
         console.log('📡 استلام Offer WebRTC من', fromId);
+        
+        // ✅ التحقق من صحة SDP
+        if (!requestData.sdp.type || requestData.sdp.type !== 'offer') {
+            console.error('❌ SDP غير صالح - type:', requestData.sdp.type);
+            return;
+        }
+        
+        if (!requestData.sdp.sdp || requestData.sdp.sdp.length < 10) {
+            console.error('❌ SDP فارغ أو غير مكتمل - length:', requestData.sdp.sdp?.length);
+            return;
+        }
+        
+        console.log('📡 SDP صالح - type:', requestData.sdp.type, 'length:', requestData.sdp.sdp.length);
+        
+        // ✅ تحويل SDP إلى كائن RTCSessionDescription صحيح
+        this._pendingOffer[fromId].sdp = new RTCSessionDescription({
+            type: requestData.sdp.type,
+            sdp: requestData.sdp.sdp
+        });
+        
         this.featureRequestReceived = true;
         this.startFeatureBlink();
         
-        // ✅ عرض إشعار للمستخدم
-        const contactName = await this.getContactName(fromId);
-        const confirmAccept = confirm(`${contactName} يريد تفعيل الميزات (مكالمات وملفات مباشرة). هل توافق؟`);
-        
-        if (confirmAccept) {
-            await this.acceptOffer(fromId, this._pendingOffer[fromId]);
-        } else {
-            // رفض الطلب
-            await this.sendOfferResponse(fromId, 'reject');
-            this.featureRequestReceived = false;
-            this.featureRequestPending = false;
-            if (this.featureBlinkInterval) {
-                clearInterval(this.featureBlinkInterval);
-                this.featureBlinkInterval = null;
-            }
-            const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
-        }
+        // ✅ عرض إشعار للمستخدم (بدون confirm تلقائي)
+        console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
     }
     // ✅ إذا كان ICE candidate، نضيفه إلى PeerConnection
     else if (requestData.action === 'ice' && requestData.candidate) {
@@ -462,8 +528,6 @@ async handleFeatureRequest(fromId, encryptedData) {
             }
         }
     }
-    
-    console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
 },
 
 // ✅ دالة مساعدة لقبول الـ Offer (معدلة بالكامل مع خوادم ICE مستقلة)
@@ -531,9 +595,15 @@ async acceptOffer(fromId, offerData) {
             }
         };
         
-        // تعيين الـ Remote Description (Offer)
-        console.log('📡 تعيين Remote Description من Offer');
-        await CallSystem.pc.setRemoteDescription(new RTCSessionDescription(offerData.sdp));
+        // ✅ تعيين الـ Remote Description (Offer) مع التحقق من الصحة
+        const offerSdp = offerData.sdp;
+        console.log('📡 تعيين Remote Description - type:', offerSdp.type, 'sdp length:', offerSdp.sdp?.length);
+        
+        if (!offerSdp.type || !offerSdp.sdp) {
+            throw new Error('SDP غير صالح للاستخدام - type: ' + offerSdp.type);
+        }
+        
+        await CallSystem.pc.setRemoteDescription(offerSdp);
         
         // إضافة أي ICE candidates مخزنة
         for (const ice of offerData.iceCandidates) {
@@ -604,7 +674,7 @@ async sendOfferResponse(toId, action, data = null) {
     } catch(e) {
         console.error('❌ فشل إرسال الرد:', e);
     }
-}, 
+},
 
     
     // ==================== القسم 9: acceptFeatureRequest ====================
