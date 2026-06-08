@@ -1,5 +1,5 @@
-// ========== 1. webrtc-call.js - النسخة النهائية المتكاملة ==========
-// جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
+// ========== 1. webrtc-call.js - النسخة المعدلة (تم إزالة جميع دوال التنظيف) ==========
+// جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
@@ -15,116 +15,6 @@ const CallSystem = {
             { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
             { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
         ] 
-    },
-    
-    // ==================== 1.5 حذف إشارات WebRTC من Firestore ====================
-    
-    async deleteAllWebRTCSignals(chatId) {
-        if (!chatId) return;
-        try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', chatId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) {
-                console.log('📡 لا توجد إشارات WebRTC عالقة للمحادثة', chatId);
-                return;
-            }
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة من Firestore للمحادثة ${chatId}`);
-        } catch(e) {
-            console.warn('⚠️ فشل حذف الإشارات العالقة:', e);
-        }
-    },
-    
-    async deleteAllMyWebRTCSignals() {
-        if (!window.auth?.currentUser) return;
-        const myId = window.auth.currentUser.uid;
-        try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', myId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) return;
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة للمستخدم الحالي`);
-        } catch(e) {}
-    },
-    
-    // ==================== 2. التنظيف التلقائي ====================
-    
-    async autoCleanupOnLoad() {
-        console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
-        
-        await this.deleteAllMyWebRTCSignals();
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.currentCallId = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
-        }
-        
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
-        }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        if (typeof PresenceSystem !== 'undefined' && window.auth?.currentUser) {
-            try {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    online: true,
-                    inCall: false,
-                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                console.log('✅ تم تنظيف حالة المستخدم في قاعدة البيانات');
-            } catch(e) {
-                console.warn('⚠️ فشل تنظيف قاعدة البيانات:', e.message);
-            }
-        }
-        
-        console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
     },
     
     // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
@@ -169,7 +59,15 @@ const CallSystem = {
             return false;
         }
         
-        this.cleanupConnections();
+        if (this.pc) {
+            try { this.pc.close(); } catch(e) {}
+            this.pc = null;
+        }
+        if (this.dc) {
+            try { this.dc.close(); } catch(e) {}
+            this.dc = null;
+        }
+        
         try {
             console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
             
@@ -950,7 +848,7 @@ setupDataChannel(channel) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
         }
-        this.scheduleReconnect();
+        // تم إزالة scheduleReconnect
         
         if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
@@ -976,7 +874,7 @@ setupDataChannel(channel) {
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
-        this.scheduleReconnect();
+        // تم إزالة scheduleReconnect
         
         if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
@@ -1018,21 +916,7 @@ sendCallStatus(status) {
     }
 },
 
-scheduleReconnect() {
-    if (!ChatSystem.currentChat) return;
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
-    this.reconnectTimer = setTimeout(async () => {
-        try {
-            if (ChatSystem.currentChat) {
-                await this.ensureDataChannelOnly(ChatSystem.currentChat);
-            }
-        } catch (error) {}
-        this.reconnectTimer = null;
-    }, delay);
-},
+// تم إزالة scheduleReconnect بالكامل
 
 async ensureDataChannel(calleeId) {
     if (!calleeId) return;
@@ -1070,7 +954,15 @@ async createNewDataChannel(calleeId) {
     }
     
     this.reconnectAttempts = 0;
-    this.cleanupConnections();
+    if (this.pc) {
+        try { this.pc.close(); } catch(e) {}
+        this.pc = null;
+    }
+    if (this.dc) {
+        try { this.dc.close(); } catch(e) {}
+        this.dc = null;
+    }
+    
     try {
         this.pc = new RTCPeerConnection(this.servers);
         this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
@@ -1081,7 +973,8 @@ async createNewDataChannel(calleeId) {
         this.pc.onconnectionstatechange = () => {
             switch(this.pc?.connectionState) {
                 case 'connected': this.reconnectAttempts = 0; break;
-                case 'failed': case 'disconnected': this.scheduleReconnect(); break;
+                case 'failed': case 'disconnected': // تم إزالة scheduleReconnect
+                break;
             }
         };
         const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
@@ -1603,7 +1496,7 @@ compressImage(file) {
     // ==================== 14. إنهاء المكالمة ====================
     
     endCall() {
-        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+        console.log('📞 إنهاء المكالمة...');
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
@@ -1638,7 +1531,16 @@ compressImage(file) {
             this.localStream = null;
         }
         
-        this.cleanupConnections();
+        if (this.dc) {
+            try { this.dc.close(); } catch(e) {}
+            this.dc = null;
+        }
+        if (this.pc) {
+            try { this.pc.close(); } catch(e) {}
+            this.pc = null;
+        }
+        this.incomingChunks = {};
+        this.incomingFileInfo = {};
         
         const ui = document.getElementById('callUI');
         if (ui) ui.remove();
@@ -1661,52 +1563,11 @@ compressImage(file) {
             }).catch(() => {});
         }
         
-        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
-    },
-    
-    cleanupConnections() {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
-        }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
-        }
-        this.incomingChunks = {};
-        this.incomingFileInfo = {};
+        console.log('✅ تم إنهاء المكالمة');
     }
 };
 
-// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            if (typeof CallSystem !== 'undefined') {
-                CallSystem.autoCleanupOnLoad();
-            }
-        }, 1500);
-    });
-}
-
-// ==================== 16. التنظيف قبل إغلاق الصفحة ====================
-if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', () => {
-        if (CallSystem.isInCall) {
-            CallSystem.endCall();
-        }
-    });
-}
-
-// ==================== 17. الدوال العامة ====================
+// ==================== 15. الدوال العامة ====================
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
@@ -1721,11 +1582,6 @@ window.startVideoCall = async () => {
         return;
     }
     await CallSystem.startVideoCall(ChatSystem.currentChat);
-};
-
-window.cleanupCallState = async () => {
-    await CallSystem.autoCleanupOnLoad();
-    console.log('✅ تم تنظيف حالة المكالمات يدوياً');
 };
 
 console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
