@@ -393,7 +393,7 @@ sendOfferSignal(data) {
 },
 
     
-   // ==================== القسم 8: handleFeatureRequest ====================
+ // ==================== القسم 8: handleFeatureRequest ====================
 async handleFeatureRequest(fromId, encryptedData) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
@@ -419,30 +419,37 @@ async handleFeatureRequest(fromId, encryptedData) {
         timestamp: Date.now()
     };
     
-    // ✅ إذا كان Offer، نعرض شاشة الموافقة
+    // ✅ إذا كان Offer، نبدأ الـ blinking أولاً ثم نعرض الـ confirm
     if (requestData.action === 'offer' && requestData.sdp) {
         console.log('📡 استلام Offer WebRTC من', fromId);
+        
+        // ✅ 1. تفعيل blinking فوراً (بدون انتظار)
         this.featureRequestReceived = true;
         this.startFeatureBlink();
         
-        // ✅ عرض إشعار للمستخدم
+        // ✅ 2. الحصول على اسم المستخدم
         const contactName = await this.getContactName(fromId);
-        const confirmAccept = confirm(`${contactName} يريد تفعيل الميزات (مكالمات وملفات مباشرة). هل توافق؟`);
         
-        if (confirmAccept) {
-            await this.acceptOffer(fromId, this._pendingOffer[fromId]);
-        } else {
-            // رفض الطلب
-            await this.sendOfferResponse(fromId, 'reject');
-            this.featureRequestReceived = false;
-            this.featureRequestPending = false;
-            if (this.featureBlinkInterval) {
-                clearInterval(this.featureBlinkInterval);
-                this.featureBlinkInterval = null;
+        // ✅ 3. تأخير بسيط لضمان ظهور الوميض قبل الـ confirm
+        setTimeout(async () => {
+            const confirmAccept = confirm(`${contactName} يريد تفعيل الميزات (مكالمات وملفات مباشرة). هل توافق؟`);
+            
+            if (confirmAccept) {
+                await this.acceptOffer(fromId, this._pendingOffer[fromId]);
+            } else {
+                await this.sendOfferResponse(fromId, 'reject');
+                this.featureRequestReceived = false;
+                this.featureRequestPending = false;
+                if (this.featureBlinkInterval) {
+                    clearInterval(this.featureBlinkInterval);
+                    this.featureBlinkInterval = null;
+                }
+                const toggleInput = document.getElementById('featureToggleInput');
+                if (toggleInput) toggleInput.checked = false;
+                const switchLabel = document.getElementById('featureSwitchLabel');
+                if (switchLabel) switchLabel.classList.remove('blinking');
             }
-            const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
-        }
+        }, 100);
     }
     // ✅ إذا كان ICE candidate، نضيفه إلى PeerConnection
     else if (requestData.action === 'ice' && requestData.candidate) {
@@ -454,14 +461,11 @@ async handleFeatureRequest(fromId, encryptedData) {
                 console.warn('فشل إضافة ICE candidate:', e);
             }
         } else {
-            // تخزين الـ ICE candidates لحين إنشاء PeerConnection
             if (this._pendingOffer[fromId]) {
                 this._pendingOffer[fromId].iceCandidates.push(requestData.candidate);
             }
         }
     }
-    
-    console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
 },
 
 // ✅ دالة مساعدة لقبول الـ Offer
@@ -567,7 +571,7 @@ async sendOfferResponse(toId, action, data = null) {
     } catch(e) {
         console.error('❌ فشل إرسال الرد:', e);
     }
-}, 
+},  
 
     
     // ==================== القسم 9: acceptFeatureRequest ====================
