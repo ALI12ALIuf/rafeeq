@@ -291,60 +291,271 @@ startFeatureBlink() {
 },  
     
     // ==================== القسم 7: requestEnableFeatures ====================
-    async requestEnableFeatures() {
-        if (!this.currentChat) {
-            alert('الرجاء اختيار محادثة أولاً');
-            return;
+async requestEnableFeatures() {
+    if (!this.currentChat) {
+        alert('الرجاء اختيار محادثة أولاً');
+        return;
+    }
+    if (this.featuresEnabled) {
+        alert('الميزات مفعلة بالفعل');
+        return;
+    }
+    if (this.featureRequestPending) {
+        alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+        return;
+    }
+    
+    this.featureRequestPending = true;
+    this.startFeatureBlink();
+    
+    try {
+        // ✅ إنشاء PeerConnection و Offer مباشرة (بدلاً من إرسال طلب نصي)
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
         }
-        if (this.featuresEnabled) {
-            alert('الميزات مفعلة بالفعل');
-            return;
-        }
-        if (this.featureRequestPending) {
-            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
-            return;
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
         }
         
-        this.featureRequestPending = true;
+        CallSystem.pc = new RTCPeerConnection(CallSystem.servers);
+        CallSystem.dc = CallSystem.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
+        CallSystem.setupDataChannel(CallSystem.dc);
+        
+        CallSystem.pc.onicecandidate = e => {
+            if (e.candidate) {
+                this.sendOfferSignal({ candidate: e.candidate });
+            }
+        };
+        
+        const offer = await CallSystem.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+        await CallSystem.pc.setLocalDescription(offer);
+        
+        // ✅ إرسال Offer بدلاً من طلب تفعيل عادي
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+            type: 'feature_request',
+            action: 'offer',
+            sdp: CallSystem.pc.localDescription,
+            timestamp: Date.now()
+        }), sharedKey);
+        await SecureChatSystem.sendToServer(this.currentChat, { 
+            id: Date.now().toString(), 
+            type: 'feature_request', 
+            data: encrypted, 
+            timestamp: Date.now() 
+        });
+        console.log('📨 تم إرسال Offer WebRTC لفتح القناة مباشرة');
+    } catch(e) {
+        this.featureRequestPending = false;
         this.startFeatureBlink();
-        
-        try {
-            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!myPrivateKey || !receiverPublicKey) return;
-            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-                type: 'feature_request',
-                action: 'enable',
-                timestamp: Date.now()
-            }), sharedKey);
-            await SecureChatSystem.sendToServer(this.currentChat, { 
-                id: Date.now().toString(), 
-                type: 'feature_request', 
-                data: encrypted, 
-                timestamp: Date.now() 
-            });
-            console.log('📨 تم إرسال طلب تفعيل الميزات إلى الطرف الآخر');
-        } catch(e) {
-            this.featureRequestPending = false;
-            this.startFeatureBlink();
-            console.log('❌ فشل إرسال الطلب');
-        }
-    },
+        console.log('❌ فشل إرسال الطلب:', e);
+    }
+},
 
+// دالة مساعدة لإرسال إشارات ICE
+sendOfferSignal(data) {
+    if (!this.currentChat) return;
+    SecureChatSystem.getMyPrivateKey().then(async (myPrivateKey) => {
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+            type: 'feature_request',
+            action: 'ice',
+            candidate: data,
+            timestamp: Date.now()
+        }), sharedKey);
+        await SecureChatSystem.sendToServer(this.currentChat, { 
+            id: Date.now().toString(), 
+            type: 'feature_request', 
+            data: encrypted, 
+            timestamp: Date.now() 
+        });
+    }).catch(console.error);
+},
+
+    
    // ==================== القسم 8: handleFeatureRequest ====================
-async handleFeatureRequest(fromId) {
+async handleFeatureRequest(fromId, encryptedData) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
-    // ✅ تم إزالة القبول التلقائي (لم يعد يتم قبول الطلب تلقائياً)
-    // المستخدم يجب أن يضغط على الزر يدوياً لقبول الطلب
+    // ✅ فك التشفير للحصول على البيانات (Offer أو ICE)
+    let requestData;
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const senderPublicKey = await SecureChatSystem.getReceiverPublicKey(fromId);
+        if (!myPrivateKey || !senderPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, senderPublicKey);
+        const decrypted = await SecureChatSystem.decryptData(encryptedData, sharedKey);
+        requestData = JSON.parse(decrypted);
+    } catch(e) {
+        console.error('❌ فشل فك تشفير الطلب:', e);
+        return;
+    }
     
-    this.featureRequestReceived = true;
-    this.startFeatureBlink();
+    // ✅ تخزين الـ Offer و ICE candidates للاستخدام لاحقاً
+    if (!this._pendingOffer) this._pendingOffer = {};
+    this._pendingOffer[fromId] = {
+        sdp: requestData.sdp,
+        iceCandidates: [],
+        timestamp: Date.now()
+    };
+    
+    // ✅ إذا كان Offer، نعرض شاشة الموافقة
+    if (requestData.action === 'offer' && requestData.sdp) {
+        console.log('📡 استلام Offer WebRTC من', fromId);
+        this.featureRequestReceived = true;
+        this.startFeatureBlink();
+        
+        // ✅ عرض إشعار للمستخدم
+        const contactName = await this.getContactName(fromId);
+        const confirmAccept = confirm(`${contactName} يريد تفعيل الميزات (مكالمات وملفات مباشرة). هل توافق؟`);
+        
+        if (confirmAccept) {
+            await this.acceptOffer(fromId, this._pendingOffer[fromId]);
+        } else {
+            // رفض الطلب
+            await this.sendOfferResponse(fromId, 'reject');
+            this.featureRequestReceived = false;
+            this.featureRequestPending = false;
+            if (this.featureBlinkInterval) {
+                clearInterval(this.featureBlinkInterval);
+                this.featureBlinkInterval = null;
+            }
+            const toggleInput = document.getElementById('featureToggleInput');
+            if (toggleInput) toggleInput.checked = false;
+        }
+    }
+    // ✅ إذا كان ICE candidate، نضيفه إلى PeerConnection
+    else if (requestData.action === 'ice' && requestData.candidate) {
+        console.log('📡 استلام ICE candidate');
+        if (CallSystem.pc) {
+            try {
+                await CallSystem.pc.addIceCandidate(new RTCIceCandidate(requestData.candidate.candidate));
+            } catch(e) {
+                console.warn('فشل إضافة ICE candidate:', e);
+            }
+        } else {
+            // تخزين الـ ICE candidates لحين إنشاء PeerConnection
+            if (this._pendingOffer[fromId]) {
+                this._pendingOffer[fromId].iceCandidates.push(requestData.candidate);
+            }
+        }
+    }
+    
     console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
-    console.log('✅ تم تفعيل وضع الاستقبال');
-}, 
+},
+
+// ✅ دالة مساعدة لقبول الـ Offer
+async acceptOffer(fromId, offerData) {
+    console.log('✅ قبول Offer من', fromId);
     
+    // إزالة الـ blinking
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    try {
+        // إنشاء PeerConnection للإجابة
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
+        }
+        
+        CallSystem.pc = new RTCPeerConnection(CallSystem.servers);
+        
+        // إعداد Data Channel المستقبل
+        CallSystem.pc.ondatachannel = e => {
+            console.log('📡 استقبال Data Channel');
+            CallSystem.setupDataChannel(e.channel);
+            CallSystem.dc = e.channel;
+        };
+        
+        // إعداد ICE candidates
+        CallSystem.pc.onicecandidate = e => {
+            if (e.candidate) {
+                this.sendOfferResponse(fromId, 'ice', { candidate: e.candidate });
+            }
+        };
+        
+        // تعيين الـ Remote Description (Offer)
+        await CallSystem.pc.setRemoteDescription(new RTCSessionDescription(offerData.sdp));
+        
+        // إضافة أي ICE candidates مخزنة
+        for (const ice of offerData.iceCandidates) {
+            try {
+                await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice.candidate));
+            } catch(e) {}
+        }
+        
+        // إنشاء Answer
+        const answer = await CallSystem.pc.createAnswer();
+        await CallSystem.pc.setLocalDescription(answer);
+        
+        // إرسال Answer إلى المرسل
+        await this.sendOfferResponse(fromId, 'answer', { sdp: CallSystem.pc.localDescription });
+        
+        // تفعيل الميزات محلياً
+        this.featuresEnabled = true;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        this.friendInConversation = true;
+        
+        const toggleInput = document.getElementById('featureToggleInput');
+        if (toggleInput) toggleInput.checked = true;
+        
+        this.updateAllButtons();
+        console.log('✅ تم فتح القناة وتفعيل الميزات بنجاح');
+        
+    } catch(e) {
+        console.error('❌ فشل قبول الـ Offer:', e);
+        alert('فشل فتح قناة الاتصال');
+        this.featureRequestReceived = false;
+        const toggleInput = document.getElementById('featureToggleInput');
+        if (toggleInput) toggleInput.checked = false;
+    }
+},
+
+// ✅ دالة مساعدة لإرسال الردود (Answer أو ICE)
+async sendOfferResponse(toId, action, data = null) {
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(toId);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        
+        const messageData = {
+            type: 'feature_response',
+            action: action,
+            timestamp: Date.now()
+        };
+        if (data) {
+            if (data.sdp) messageData.sdp = data.sdp;
+            if (data.candidate) messageData.candidate = data.candidate;
+        }
+        
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(messageData), sharedKey);
+        await SecureChatSystem.sendToServer(toId, { 
+            id: Date.now().toString(), 
+            type: 'feature_response', 
+            data: encrypted, 
+            timestamp: Date.now() 
+        });
+        console.log(`📨 تم إرسال ${action} إلى`, toId);
+    } catch(e) {
+        console.error('❌ فشل إرسال الرد:', e);
+    }
+}, 
+
     
     // ==================== القسم 9: acceptFeatureRequest ====================
 async acceptFeatureRequest() {
@@ -355,17 +566,19 @@ async acceptFeatureRequest() {
         return;
     }
     
+    // ✅ تفعيل الميزات محلياً فوراً
     this.featuresEnabled = true;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
     
     if (this.currentChat) {
         this.friendInConversation = true;
-        console.log('✅ تم تفعيل friendInConversation يدوياً بعد قبول الطلب');
+        console.log('✅ تم تفعيل friendInConversation');
     }
     
     console.log('✅ featuresEnabled =', this.featuresEnabled);
     
+    // ✅ إزالة الـ blinking وتغيير لون الزر للأخضر فوراً
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
@@ -377,16 +590,10 @@ async acceptFeatureRequest() {
     if (toggleInput) toggleInput.checked = true;
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    if (this.currentChat) {
-        try {
-            console.log('🔧 محاولة فتح Data Channel...');
-            await CallSystem.ensureDataChannelOnly(this.currentChat);
-            console.log('✅ تم فتح Data Channel بنجاح');
-        } catch(e) {
-            console.error('❌ خطأ في فتح Data Channel:', e);
-        }
-    }
+    // ✅ تحديث الواجهة فوراً
+    this.updateAllButtons();
     
+    // ✅ إرسال قبول التفعيل (مع إشارة أن القناة ستفتح)
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
@@ -408,9 +615,18 @@ async acceptFeatureRequest() {
         console.error('❌ خطأ في إرسال القبول:', e);
     }
     
-    this.updateAllButtons();
-    console.log('✅ تم تفعيل الميزات!');
+    // ✅ فتح القناة في الخلفية (لا ننتظرها - المستخدم يرى الزر أخضر فوراً)
+    if (this.currentChat) {
+        CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
+            console.log('✅ تم فتح Data Channel في الخلفية');
+        }).catch(e => {
+            console.error('❌ خطأ في فتح Data Channel (خلفية):', e);
+        });
+    }
+    
+    console.log('✅ تم تفعيل الميزات! القناة تفتح في الخلفية');
 },
+    
     
     // ==================== القسم 10: handleFeatureResponse ====================
 async handleFeatureResponse(fromId, action) {
