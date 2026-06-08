@@ -2555,6 +2555,50 @@ ChatSystem.init();
 
 
 
+// ==================== عرض الـ Logs على الشاشة (للهاتف) ====================
+(function onScreenLog() {
+    const logDiv = document.createElement('div');
+    logDiv.id = 'onScreenLog';
+    logDiv.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.85);
+        color: #0f0;
+        font-size: 11px;
+        font-family: monospace;
+        padding: 8px;
+        border-radius: 8px;
+        z-index: 99999;
+        max-height: 150px;
+        overflow-y: auto;
+        direction: ltr;
+        text-align: left;
+        pointer-events: none;
+        border: 1px solid #4CAF50;
+    `;
+    document.body.appendChild(logDiv);
+    
+    const originalLog = console.log;
+    console.log = function(...args) {
+        originalLog(...args);
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+        const logLine = document.createElement('div');
+        logLine.textContent = msg.slice(0, 100);
+        logLine.style.borderBottom = '1px solid #333';
+        logLine.style.padding = '2px 0';
+        logDiv.appendChild(logLine);
+        logDiv.scrollTop = logDiv.scrollHeight;
+        setTimeout(() => {
+            if (logDiv.children.length > 20) logDiv.removeChild(logDiv.children[0]);
+        }, 100);
+    };
+    
+    console.log('✅ [شاشة] نظام التسجيل على الشاشة تم تفعيله');
+})();
+
+
 // ==================== نظام التحقق من وصول الإشارات (للتصحيح) ====================
 (function setupDebugLogger() {
     // حفظ الدوال الأصلية
