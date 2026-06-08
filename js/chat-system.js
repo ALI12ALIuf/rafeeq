@@ -466,7 +466,7 @@ async handleFeatureRequest(fromId, encryptedData) {
     console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
 },
 
-// ✅ دالة مساعدة لقبول الـ Offer
+// ✅ دالة مساعدة لقبول الـ Offer (معدلة)
 async acceptOffer(fromId, offerData) {
     console.log('✅ قبول Offer من', fromId);
     
@@ -480,6 +480,19 @@ async acceptOffer(fromId, offerData) {
     if (switchLabel) switchLabel.classList.remove('blinking');
     
     try {
+        // ✅ تأكد من وجود servers
+        if (!CallSystem.servers) {
+            console.log('🔧 إعداد iceServers بشكل افتراضي');
+            CallSystem.servers = {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+                    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+                ]
+            };
+        }
+        
         // إنشاء PeerConnection للإجابة
         if (CallSystem.pc) {
             try { CallSystem.pc.close(); } catch(e) {}
@@ -569,7 +582,7 @@ async sendOfferResponse(toId, action, data = null) {
     } catch(e) {
         console.error('❌ فشل إرسال الرد:', e);
     }
-}, 
+},
 
     
     // ==================== القسم 9: acceptFeatureRequest ====================
