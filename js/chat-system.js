@@ -511,6 +511,38 @@ const ChatSystem = {
             console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
         }
     },
+
+    // ==================== القسم 10.1: disableFeatures ====================
+async disableFeatures() {
+    console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    if (CallSystem.dc) {
+        try { CallSystem.dc.close(); } catch(e) {}
+        CallSystem.dc = null;
+    }
+    if (CallSystem.pc) {
+        try { CallSystem.pc.close(); } catch(e) {}
+        CallSystem.pc = null;
+    }
+    
+    this.updateAllButtons();
+    console.log('✅ تم إلغاء تفعيل الميزات');
+},
     
     // ==================== القسم 13 ====================
     handleFeatureCancel() {
