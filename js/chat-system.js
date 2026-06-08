@@ -2176,6 +2176,28 @@ resetFeatures() {
             if (document.getElementById('locationSwipeModal')) overlay.remove();
         }, 30000);
     }, 
+
+       // ==================== القسم 35: saveMessage ====================
+    saveMessage(friendId, message) { 
+        const key = `chat_${friendId}`; 
+        let h = []; 
+        try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
+        h.push(message); 
+        let serialized = JSON.stringify(h);
+        while (serialized.length > 4000000) {
+            let removed = false;
+            for (let i = 0; i < h.length; i++) {
+                if (h[i].type === 'video' || h[i].type === 'image' || h[i].type === 'file') { h.splice(i, 1); removed = true; break; }
+            }
+            if (!removed) h.splice(0, 1);
+            serialized = JSON.stringify(h);
+        }
+        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
+            h = h.slice(Math.floor(h.length * 0.2));
+            try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
+        }
+        this.messages[friendId] = h; 
+    }, 
     
     // ==================== القسم 36 ====================
     updateLastMessage(friendId, lastMessage) { 
@@ -2187,6 +2209,56 @@ resetFeatures() {
             } 
         }); 
     },
+
+    // ==================== القسم 37: closeChat ====================
+closeChat() {
+    console.log('🔴 closeChat - بدء إغلاق المحادثة');
+    console.log('currentChat:', this.currentChat);
+    console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
+    
+    const chatId = this.currentChat;
+    
+    if (chatId) {
+        console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
+        
+        const key = `chat_${chatId}`;
+        const messages = this.messages[chatId] || [];
+        const filteredMessages = messages.filter(msg => msg.type === 'text');
+        this.messages[chatId] = filteredMessages;
+        localStorage.setItem(key, JSON.stringify(filteredMessages));
+        console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
+    }
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+        this.featureBlinkInterval = null;
+    }
+    
+    const btn = document.getElementById('enableFeaturesBtn');
+    if (btn) {
+        btn.style.background = '#f44336';
+        btn.title = 'تفعيل الميزات';
+    }
+    
+    const toggleContainer = document.getElementById('featureToggleContainer');
+    const kickBtn = document.getElementById('kickBtn');
+    if (toggleContainer) toggleContainer.style.display = 'none';
+    if (kickBtn) kickBtn.style.display = 'none';
+    
+    this.updateAllButtons();
+    
+    document.body.classList.remove('conversation-open');
+    document.getElementById('conversationPage').style.display = 'none';
+    document.querySelector('.chat-page').style.display = 'block';
+    this.currentChat = null;
+    this.friendInConversation = false;
+    
+    console.log('✅ closeChat - انتهى');
+},
     
     // ==================== القسم 38 ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
