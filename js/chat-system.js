@@ -38,6 +38,19 @@ updateFeatureToggleUI() {
     
     console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=false`);
 },
+
+// ==================== القسم 2.6: دالة جلب اسم المستخدم ====================
+async getContactName(userId) {
+    try {
+        const userDoc = await window.db.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+            return userDoc.data().name || 'مستخدم';
+        }
+    } catch(e) {
+        console.warn('خطأ في جلب اسم المستخدم:', e);
+    }
+    return 'مستخدم';
+},
     
     // ==================== القسم 3: init ====================
 init() { 
