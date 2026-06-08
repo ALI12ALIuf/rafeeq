@@ -1,6 +1,5 @@
-// ========== chat-system.js ==========
+// ========== chat-system.js - النسخة المعدلة (تم إزالة جميع دوال التنظيف) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
-
 
 // ==================== القسم 2: تعريف ChatSystem ====================
 const ChatSystem = {
@@ -45,38 +44,12 @@ init() {
     this.loadAllChats(); 
     this.setupPageFocusListener();
     this.setupFeatureButton();
-    this.setupBeforeUnloadListener();
+    // تم إزالة setupBeforeUnloadListener
     
-    // ✅ تنظيف الملفات والوسائط عند تحميل الصفحة
-    this.cleanMediaMessagesOnLoad();
+    // تم إزالة cleanMediaMessagesOnLoad
 },
 
-// ==================== القسم 3.5: cleanMediaMessagesOnLoad ====================
-cleanMediaMessagesOnLoad() {
-    for (const friendId in this.messages) {
-        const messages = this.messages[friendId] || [];
-        const filteredMessages = messages.filter(msg => msg.type === 'text');
-        if (filteredMessages.length !== messages.length) {
-            this.messages[friendId] = filteredMessages;
-            const key = `chat_${friendId}`;
-            localStorage.setItem(key, JSON.stringify(filteredMessages));
-            console.log(`✅ تم تنظيف الوسائط من محادثة ${friendId}`);
-        }
-    }
-    console.log('🧹 تم تنظيف جميع الملفات والوسائط من localStorage');
-},
-    
-    
-    // ==================== القسم 4: setupBeforeUnloadListener ====================
-setupBeforeUnloadListener() {
-    window.addEventListener('beforeunload', () => {
-        if (this.currentChat && this.featuresEnabled) {
-            console.log('🚪 الصفحة تغلق - سيتم إلغاء الميزات محلياً');
-        }
-    });
-},
-
-    // ==================== القسم 5: setupFeatureButton (تبسيط - الأزرار موجودة في HTML) ====================
+    // ==================== القسم 4: setupFeatureButton (تبسيط - الأزرار موجودة في HTML) ====================
 setupFeatureButton() {
     // ✅ الأزرار موجودة بالفعل في HTML، فقط نحدثها ونجعلها مرئية
     const toggleContainer = document.getElementById('featureToggleContainer');
@@ -544,9 +517,7 @@ async handleFeatureResponse(fromId, action) {
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
-    if (this.currentChat && typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
-        await CallSystem.deleteAllWebRTCSignals(this.currentChat);
-    }
+    // تم إزالة CallSystem.deleteAllWebRTCSignals
     
     this.featuresEnabled = false;
     this.featureRequestPending = false;
@@ -685,7 +656,7 @@ updateAllButtons() {
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
 },
     
-   // ==================== القسم 15: setupPageFocusListener & closeConversation ====================
+   // ==================== القسم 15: setupPageFocusListener ====================
 setupPageFocusListener() {
     window.addEventListener('focus', () => {
         if (this.currentChat && this.featuresEnabled) {
@@ -697,7 +668,6 @@ setupPageFocusListener() {
 closeConversation() {
     console.log("🚪 إغلاق صفحة المحادثة والعودة للقائمة الرئيسية");
     
-    // ✅ السطر المضاف لتنظيف الـ body وإيقاف حسابات الكيبورد فوراً
     document.body.classList.remove('conversation-open');
 
     this.currentChat = null;
@@ -797,7 +767,6 @@ closeConversation() {
 openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     
-    // ✅ تم إزالة _pendingConversationStatus (لم نعد نستخدمه)
     this.friendInConversation = false;
     
     this.resetFeatures();
@@ -809,22 +778,14 @@ openChat(friendId, friendName, friendAvatar) {
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
     
-    // ✅ تم إزالة PresenceSystem.watchFriend (لم نعد نستخدم حالة الاتصال من السيرفر)
-    
-    // ✅ تم إزالة sendConversationStatus و requestConversationStatus (لم نعد نرسلهما)
-    
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
     setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     
-    // ✅ تم إزالة setupFeatureButton (الأزرار أصبحت دائمة في HTML)
-    
-    // ✅ تحديث حالة الأزرار (إظهار/إخفاء إذا لزم الأمر)
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'flex';
     if (kickBtn) kickBtn.style.display = 'flex';
     
-    // ✅ تحديث حالة الزر فوراً
     this.updateAllButtons();
     
     setTimeout(() => {
@@ -851,7 +812,6 @@ openChat(friendId, friendName, friendAvatar) {
         c.innerHTML = ''; 
         const messages = this.messages[friendId] || [];
         
-        // عرض النصوص فقط من التخزين
         messages.forEach(msg => {
             if (msg.type === 'text') {
                 this.displayMessage(msg);
@@ -2289,9 +2249,7 @@ closeChat() {
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
         
-        if (typeof CallSystem !== 'undefined' && CallSystem.deleteAllWebRTCSignals) {
-            CallSystem.deleteAllWebRTCSignals(chatId);
-        }
+        // تم إزالة CallSystem.deleteAllWebRTCSignals
         
         const key = `chat_${chatId}`;
         const messages = this.messages[chatId] || [];
@@ -2340,7 +2298,16 @@ closeChat() {
         PresenceSystem.stopAll();
     }
     
-    if (!CallSystem.isInCall) CallSystem.cleanupConnections();
+    if (!CallSystem.isInCall) {
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
+        }
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
+        }
+    }
     this.currentChat = null;
     this.friendInConversation = false;
     
@@ -2364,17 +2331,10 @@ const initVisualViewportFix = () => {
         const conversationPage = document.querySelector('.conversation-page');
         const messagesContainer = document.querySelector('.messages-container');
         
-        // التحقق من أن المحادثة مفتوحة حالياً وأن العنصر موجود في الواجهة
         if (conversationPage && document.body.classList.contains('conversation-open')) {
-            // 1. جلب الارتفاع الحقيقي للمساحة المرئية فوق الكيبورد بدقة ملليمترية
             const currentViewportHeight = window.visualViewport.height;
-            
-            // 2. إجبار حاوية المحادثة الكبرى على أخذ هذا الارتفاع الفعلي فقط
             conversationPage.style.height = `${currentViewportHeight}px`;
-            
-            // 3. تأمين النزول التلقائي لآخر رسالة عند ظهور الكيبورد لتسهيل القراءة
             if (messagesContainer) {
-                // استخدام setTimeout بسيط لضمان انتهاء المتصفح من إعادة رسم العناصر
                 setTimeout(() => {
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }, 30);
@@ -2382,51 +2342,38 @@ const initVisualViewportFix = () => {
         }
     };
 
-    // الاستماع لحدث تغيير الحجم (عند خروج أو دخول الكيبورد)
     window.visualViewport.addEventListener('resize', fixViewportHeight);
-    
-    // الاستماع لحدث التمرير لمنع القفز أو الاهتزاز العشوائي في المتصفحات الذكية
     window.visualViewport.addEventListener('scroll', fixViewportHeight);
 };
 
-// تشغيل دالة التثبيت بمجرد تحميل الصفحة بالكامل
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initVisualViewportFix);
 } else {
     initVisualViewportFix();
 }
 
-
 // 🛡️ تأمين شامل: منع سحب الواجهة بالخطأ للأعلى عند لمس الهيدر أو شريط الكتابة
 document.addEventListener('touchmove', function(e) {
-    // التحقق من أن صفحة المحادثة مفتوحة حالياً
     if (document.body.classList.contains('conversation-open')) {
-        
-        // التحقق مما إذا كان المستخدم يلمس منطقة الرسائل (المسموح لها بالتمرير)
         const isMessagesContainer = e.target.closest('.messages-container');
-        
-        // إذا كان الإصبع يلمس أي مكان آخر (مثل حقل الإدخال أو الهيدر) وسحب للأعلى، امنعه فوراً
         if (!isMessagesContainer) {
             e.preventDefault();
         }
     }
-}, { passive: false }); // { passive: false } إجبارية لمنع السلوك الافتراضي للمتصفح الذكي
-
+}, { passive: false });
 
 // 🛡️ جدار حماية صارم: منع تكبير أو تصغير الموقع نهائياً بالإصبعين أو النقر المزدوج
 document.addEventListener('touchstart', function (e) {
-    // إذا لمس المستخدم الشاشة بأكثر من إصبع (محاولة عمل زووم)
     if (e.touches.length > 1) {
-        e.preventDefault(); // إلغاء التكبير فوراً
+        e.preventDefault();
     }
 }, { passive: false });
 
-// منع التكبير عند النقر المزدوج السريع (Double-tap to zoom)
 let lastTouchEnd = 0;
 document.addEventListener('touchend', function (e) {
     const now = (new Date()).getTime();
     if (now - lastTouchEnd <= 300) {
-        e.preventDefault(); // إلغاء تكبير النقر المزدوج
+        e.preventDefault();
     }
     lastTouchEnd = now;
 }, { passive: false });
