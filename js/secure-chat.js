@@ -247,7 +247,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (تم إزالة conversation_status, conversation_status_request, feature_cancel) ==========
+    // ========== الدالة المعدلة (تم تعديل part of feature_request) ==========
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -296,12 +296,11 @@ const SecureChatSystem = {
                     }
                 }
             }
+            // ✅ التعديل المطلوب هنا - تمرير البيانات المشفرة
             else if (msg.package.type === 'feature_request') {
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                const requestData = JSON.parse(decryptedData);
                 console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
-                    ChatSystem.handleFeatureRequest(msg.from);
+                    ChatSystem.handleFeatureRequest(msg.from, msg.package.data);
                 }
             }
             else if (msg.package.type === 'feature_response') {
@@ -317,7 +316,7 @@ const SecureChatSystem = {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    Console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
                     
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
