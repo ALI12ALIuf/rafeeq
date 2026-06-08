@@ -844,7 +844,7 @@ openChat(friendId, friendName, friendAvatar) {
 },
     
     
-    // ==================== القسم 25: displayMessages ====================
+// ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { 
         const c = document.getElementById('messagesContainer'); 
         if (!c) return; 
@@ -857,13 +857,6 @@ openChat(friendId, friendName, friendAvatar) {
                 this.displayMessage(msg);
             }
         });
-        
-        // إضافة رسالة توضيحية للمستخدم
-        const infoMsg = document.createElement('div');
-        infoMsg.className = 'system-message';
-        infoMsg.style.cssText = 'text-align: center; color: #888; font-size: 0.7rem; padding: 15px; border-top: 1px solid #333; margin-top: 10px; direction: rtl;';
-        infoMsg.innerHTML = '📱 <strong>ملاحظة:</strong> الصور والفيديوهات والملفات والبصمات لا تُحفظ محليًا - تظهر فقط أثناء المحادثة المباشرة';
-        c.appendChild(infoMsg);
         
         c.scrollTop = c.scrollHeight;
     },
