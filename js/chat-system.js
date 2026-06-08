@@ -2554,6 +2554,93 @@ closeChat() {
 ChatSystem.init();
 
 
+
+// ==================== نظام التحقق من وصول الإشارات (للتصحيح) ====================
+(function setupDebugLogger() {
+    // حفظ الدوال الأصلية
+    const originalSendToServer = SecureChatSystem.sendToServer;
+    const originalHandleFeatureRequest = ChatSystem.handleFeatureRequest;
+    
+    // ✅ تتبع إرسال الطلبات
+    SecureChatSystem.sendToServer = async function(toId, message) {
+        if (message.type === 'feature_request') {
+            console.log('📤📤📤 [DEBUG] إرسال طلب تفعيل 📤📤📤');
+            console.log('👤 إلى:', toId);
+            console.log('📦 نوع:', message.type);
+            console.log('⏰ الوقت:', new Date().toISOString());
+            
+            // محاولة فك البيانات للتحقق
+            try {
+                const decrypted = await ChatSystem.decryptMessage?.(message.data);
+                if (decrypted) {
+                    const data = JSON.parse(decrypted);
+                    console.log('📋 محتوى الطلب:', data.action);
+                }
+            } catch(e) {}
+        }
+        return originalSendToServer.call(this, toId, message);
+    };
+    
+    // ✅ تتبع استقبال الطلبات (إذا كانت الدالة موجودة في SecureChatSystem)
+    if (window.SecureChatSystem && !window.SecureChatSystem._patched) {
+        const originalProcessMessage = window.SecureChatSystem.processMessage;
+        if (originalProcessMessage) {
+            window.SecureChatSystem.processMessage = async function(message) {
+                if (message && message.type === 'feature_request') {
+                    console.log('📥📥📥 [DEBUG] استلام طلب تفعيل 📥📥📥');
+                    console.log('👤 من:', message.from);
+                    console.log('📦 نوع:', message.type);
+                    console.log('⏰ الوقت:', new Date().toISOString());
+                    
+                    // تنبيه على الشاشة
+                    showDebugNotification(`📥 استلام طلب من المستخدم`);
+                }
+                return originalProcessMessage.call(this, message);
+            };
+            window.SecureChatSystem._patched = true;
+        }
+    }
+    
+    // ✅ تتبع وصول البيانات إلى handleFeatureRequest
+    ChatSystem.handleFeatureRequest = async function(fromId, encryptedData) {
+        console.log('🔴🔴🔴 [DEBUG] وصول إلى handleFeatureRequest 🔴🔴🔴');
+        console.log('👤 من:', fromId);
+        console.log('📦 البيانات موجودة:', !!encryptedData);
+        console.log('⏰ الوقت:', new Date().toISOString());
+        
+        // تنبيه على الشاشة
+        showDebugNotification(`🔔 استلام طلب تفعيل من المستخدم`);
+        
+        return originalHandleFeatureRequest.call(this, fromId, encryptedData);
+    };
+    
+    // ✅ دالة عرض إشعار على الشاشة
+    function showDebugNotification(message) {
+        const notification = document.createElement('div');
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 99999;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            font-family: monospace;
+            direction: ltr;
+        `;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
+    
+    console.log('✅ [DEBUG] نظام تتبع الإشارات تم تفعيله');
+})();
+
+
+
 // ✅ الحل النهائي والثابت للمتصفحات والهواتف عند ظهور واختفاء الكيبورد
 const initVisualViewportFix = () => {
     if (!window.visualViewport) return;
