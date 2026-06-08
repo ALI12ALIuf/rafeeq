@@ -1,5 +1,4 @@
-// ========== 1. webrtc-call.js - النسخة النهائية المتكاملة ==========
-// جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
+// ========== 1. webrtc-call.js - النسخة النهائية بعد إزالة التنظيف ==========
 
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
@@ -15,116 +14,6 @@ const CallSystem = {
             { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
             { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
         ] 
-    },
-    
-    // ==================== 1.5 حذف إشارات WebRTC من Firestore ====================
-    
-    async deleteAllWebRTCSignals(chatId) {
-        if (!chatId) return;
-        try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', chatId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) {
-                console.log('📡 لا توجد إشارات WebRTC عالقة للمحادثة', chatId);
-                return;
-            }
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة من Firestore للمحادثة ${chatId}`);
-        } catch(e) {
-            console.warn('⚠️ فشل حذف الإشارات العالقة:', e);
-        }
-    },
-    
-    async deleteAllMyWebRTCSignals() {
-        if (!window.auth?.currentUser) return;
-        const myId = window.auth.currentUser.uid;
-        try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', myId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) return;
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة للمستخدم الحالي`);
-        } catch(e) {}
-    },
-    
-    // ==================== 2. التنظيف التلقائي ====================
-    
-    async autoCleanupOnLoad() {
-        console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
-        
-        await this.deleteAllMyWebRTCSignals();
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.currentCallId = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
-        }
-        
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
-        }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        if (typeof PresenceSystem !== 'undefined' && window.auth?.currentUser) {
-            try {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    online: true,
-                    inCall: false,
-                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                console.log('✅ تم تنظيف حالة المستخدم في قاعدة البيانات');
-            } catch(e) {
-                console.warn('⚠️ فشل تنظيف قاعدة البيانات:', e.message);
-            }
-        }
-        
-        console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
     },
     
     // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
@@ -169,7 +58,6 @@ const CallSystem = {
             return false;
         }
         
-        this.cleanupConnections();
         try {
             console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
             
@@ -239,7 +127,6 @@ const CallSystem = {
             
             const audioTracks = this.localStream.getAudioTracks();
             if (audioTracks.length === 0) {
-                this.endCall();
                 return;
             }
             console.log('✅ تم الحصول على الميكروفون');
@@ -271,7 +158,10 @@ const CallSystem = {
             this.pc.onconnectionstatechange = () => {
                 console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
                 if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
-                    this.endCall();
+                    this.isInCall = false;
+                    const ui = document.getElementById('callUI');
+                    if (ui) ui.remove();
+                    document.body.classList.remove('in-call');
                 }
             };
             
@@ -283,7 +173,10 @@ const CallSystem = {
             
         } catch (e) { 
             console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
-            this.endCall(); 
+            this.isInCall = false;
+            const ui = document.getElementById('callUI');
+            if (ui) ui.remove();
+            document.body.classList.remove('in-call');
         }
     },
 
@@ -323,7 +216,6 @@ const CallSystem = {
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
             if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
                 return;
             }
             
@@ -339,7 +231,12 @@ const CallSystem = {
                 if (rv && e.streams[0]) rv.srcObject = e.streams[0];
             };
             this.pc.onconnectionstatechange = () => {
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+                    this.isInCall = false;
+                    const ui = document.getElementById('callUI');
+                    if (ui) ui.remove();
+                    document.body.classList.remove('in-call');
+                }
             };
             
             const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
@@ -347,7 +244,10 @@ const CallSystem = {
             await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
             
         } catch (e) { 
-            this.endCall(); 
+            this.isInCall = false;
+            const ui = document.getElementById('callUI');
+            if (ui) ui.remove();
+            document.body.classList.remove('in-call');
         }
     },
     
@@ -424,7 +324,7 @@ const CallSystem = {
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             
             if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
+                this.isInCall = false;
                 return;
             }
             
@@ -484,7 +384,10 @@ const CallSystem = {
             this.pc.onconnectionstatechange = () => {
                 console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
                 if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
-                    this.endCall();
+                    this.isInCall = false;
+                    const ui = document.getElementById('callUI');
+                    if (ui) ui.remove();
+                    document.body.classList.remove('in-call');
                 }
             };
             
@@ -510,7 +413,10 @@ const CallSystem = {
         } catch (e) { 
             console.error('❌ خطأ في استقبال المكالمة:', e);
             this.sendSignal(callerId, { type: 'reject' });
-            this.endCall(); 
+            this.isInCall = false;
+            const ui = document.getElementById('callUI');
+            if (ui) ui.remove();
+            document.body.classList.remove('in-call');
         }
     },
 
@@ -851,7 +757,6 @@ setupDataChannel(channel) {
                     time: msg.time || new Date().toISOString() 
                 };
                 if (ChatSystem.currentChat) {
-                    ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
                     ChatSystem.displayMessage(displayMsg);
                 }
                 return;
@@ -867,7 +772,8 @@ setupDataChannel(channel) {
                 console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
                     console.log('🚪 تم طردك من المحادثة');
-                    ChatSystem.closeChat();
+                    ChatSystem.currentChat = null;
+                    ChatSystem.friendInConversation = false;
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
                     ChatSystem.featureRequestReceived = false;
@@ -881,6 +787,10 @@ setupDataChannel(channel) {
                         kickBtn.style.opacity = '0.5';
                         kickBtn.style.pointerEvents = 'none';
                     }
+                    
+                    document.body.classList.remove('conversation-open');
+                    document.getElementById('conversationPage').style.display = 'none';
+                    document.querySelector('.chat-page').style.display = 'block';
                 }
                 return;
             }
@@ -888,7 +798,7 @@ setupDataChannel(channel) {
             if (msg.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر');
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
                     ChatSystem.featureRequestReceived = false;
@@ -919,7 +829,6 @@ setupDataChannel(channel) {
             }
             const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
             if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
                 ChatSystem.displayMessage(displayMsg);
             }
         } catch (error) {
@@ -1008,7 +917,10 @@ handleCallStatus(msg) {
     } else if (msg.status === 'disconnected') {
         console.log('📞 الطرف الآخر قطع الاتصال');
         if (this.isInCall) {
-            this.endCall();
+            this.isInCall = false;
+            const ui = document.getElementById('callUI');
+            if (ui) ui.remove();
+            document.body.classList.remove('in-call');
         }
     }
 },
@@ -1071,7 +983,6 @@ async createNewDataChannel(calleeId) {
     }
     
     this.reconnectAttempts = 0;
-    this.cleanupConnections();
     try {
         this.pc = new RTCPeerConnection(this.servers);
         this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
@@ -1099,7 +1010,10 @@ async handleSignaling(data) {
             console.log('📞 الطرف الآخر رفض المكالمة');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
-            this.endCall();
+            this.isInCall = false;
+            const ui = document.getElementById('callUI');
+            if (ui) ui.remove();
+            document.body.classList.remove('in-call');
             return;
         }
         
@@ -1107,7 +1021,10 @@ async handleSignaling(data) {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
-            this.endCall();
+            this.isInCall = false;
+            const ui = document.getElementById('callUI');
+            if (ui) ui.remove();
+            document.body.classList.remove('in-call');
             return;
         }
         
@@ -1284,7 +1201,11 @@ async sendSignal(calleeId, data) {
         ui.innerHTML = uiHTML;
         document.body.appendChild(ui);
         
-        document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
+        document.getElementById('endCallBtn')?.addEventListener('click', () => {
+            this.isInCall = false;
+            ui.remove();
+            document.body.classList.remove('in-call');
+        });
         
         if (type === 'video') {
             const lv = document.getElementById('localVideo');
@@ -1458,248 +1379,148 @@ async sendSignal(calleeId, data) {
         }
     },
     
+
     // ==================== 13. إرسال الملفات ====================
-    
-    async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
-            return false;
-        }
-        
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
-            }
-            
-            const b64 = await this.fileToBase64(blobToSend);
-            const chunkSize = 16000;
-            const totalChunks = Math.ceil(b64.length / chunkSize);
-            const fileId = Date.now().toString();
-            
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
-            
-            for (let i = 0; i < totalChunks; i++) {
-                if (this.dc.readyState !== 'open') {
-                    ChatSystem.hideProgressBar();
-                    return false;
-                }
-                const chunk = {
-                    type: type,
-                    data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
-                    chunk: i,
-                    total: totalChunks,
-                    id: fileId,
-                    fileName: file.name || 'ملف'
-                };
-                this.dc.send(JSON.stringify(chunk));
-                const progress = ((i + 1) / totalChunks) * 100;
-                const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
-                ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-                await new Promise(r => setTimeout(r, 50));
-            }
-            ChatSystem.hideProgressBar();
-            console.log('✅ تم إرسال الملف بنجاح');
-            return true;
-        } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            ChatSystem.hideProgressBar();
-            return false;
-        }
-    },
-    
-    handleChunkMessage(msg) {
-        if (!this.incomingChunks[msg.id]) {
-            this.incomingChunks[msg.id] = [];
-            this.incomingFileInfo[msg.id] = {
-                type: msg.type,
-                fileName: msg.fileName,
-                total: msg.total,
-                received: 0
-            };
-            ChatSystem.showProgressBar('جاري استلام الملف...', 0);
-        }
-        
-        this.incomingChunks[msg.id][msg.chunk] = msg.data;
-        this.incomingFileInfo[msg.id].received++;
-        const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-        const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
-        ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-        
-        if (this.incomingFileInfo[msg.id].received === msg.total) {
-            const fullData = this.incomingChunks[msg.id].join('');
-            
-            let finalData = fullData;
-            
-            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
-                finalData = 'data:image/jpeg;base64,' + fullData;
-            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
-                finalData = 'data:video/mp4;base64,' + fullData;
-            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
-                finalData = 'data:audio/webm;base64,' + fullData;
-            }
-            
-            const displayMsg = {
-                id: msg.id,
-                type: msg.type === 'location' ? 'text' : msg.type,
-                data: finalData,
-                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
-                sender: 'friend',
-                time: new Date().toISOString()
-            };
-            
-            if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-            ChatSystem.hideProgressBar();
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
-        }
-    },
-    
-    compressImage(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const maxSize = 800;
-                    if (width > height && width > maxSize) {
-                        height = (height * maxSize) / width;
-                        width = maxSize;
-                    } else if (height > maxSize) {
-                        width = (width * maxSize) / height;
-                        height = maxSize;
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1] || reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    // ==================== 14. إنهاء المكالمة ====================
-    
-    endCall() {
-        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
-        
-        if (this.currentCallId && ChatSystem.currentChat) {
-            this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
-        }
-        this.currentCallId = null;
-        
-        this.sendCallStatus('disconnected');
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
-        }
-        
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
-        }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        this.reconnectAttempts = 0;
-        
-        if (window.auth?.currentUser) {
-            window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                inCall: false,
-                callType: null,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            }).catch(() => {});
-        }
-        
-        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
-    },
-    
-    cleanupConnections() {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
-        }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
-        }
-        this.incomingChunks = {};
-        this.incomingFileInfo = {};
+
+async sendFileDirect(file, type) {
+    if (!this.dc || this.dc.readyState !== 'open') {
+        console.log('❌ Data Channel غير مفتوح');
+        return false;
     }
-};
-
-// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            if (typeof CallSystem !== 'undefined') {
-                CallSystem.autoCleanupOnLoad();
-            }
-        }, 1500);
-    });
-}
-
-// ==================== 16. التنظيف قبل إغلاق الصفحة ====================
-if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', () => {
-        if (CallSystem.isInCall) {
-            CallSystem.endCall();
+    
+    try {
+        let blobToSend = file;
+        if (type === 'image') {
+            blobToSend = await this.compressImage(file);
         }
+        
+        const arrayBuffer = await blobToSend.arrayBuffer();
+        const chunkSize = 16000;
+        const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize);
+        const fileId = Date.now().toString();
+        
+        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء) - بدون base64`);
+        
+        for (let i = 0; i < totalChunks; i++) {
+            if (this.dc.readyState !== 'open') {
+                ChatSystem.hideProgressBar();
+                return false;
+            }
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, arrayBuffer.byteLength);
+            const chunk = arrayBuffer.slice(start, end);
+            
+            const chunkData = {
+                type: type,
+                data: Array.from(new Uint8Array(chunk)),
+                chunk: i,
+                total: totalChunks,
+                id: fileId,
+                fileName: file.name || 'ملف'
+            };
+            this.dc.send(JSON.stringify(chunkData));
+            const progress = ((i + 1) / totalChunks) * 100;
+            const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
+            ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
+            await new Promise(r => setTimeout(r, 50));
+        }
+        ChatSystem.hideProgressBar();
+        console.log('✅ تم إرسال الملف بنجاح (بدون base64)');
+        return true;
+    } catch (e) {
+        console.error('❌ فشل إرسال الملف:', e);
+        ChatSystem.hideProgressBar();
+        return false;
+    }
+},
+
+handleChunkMessage(msg) {
+    if (!this.incomingChunks[msg.id]) {
+        this.incomingChunks[msg.id] = [];
+        this.incomingFileInfo[msg.id] = {
+            type: msg.type,
+            fileName: msg.fileName,
+            total: msg.total,
+            received: 0
+        };
+        ChatSystem.showProgressBar('جاري استلام الملف...', 0);
+    }
+    
+    const chunkData = new Uint8Array(msg.data);
+    this.incomingChunks[msg.id][msg.chunk] = chunkData;
+    this.incomingFileInfo[msg.id].received++;
+    const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
+    const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
+    ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
+    
+    if (this.incomingFileInfo[msg.id].received === msg.total) {
+        let totalLength = 0;
+        for (let i = 0; i < msg.total; i++) {
+            totalLength += this.incomingChunks[msg.id][i].length;
+        }
+        
+        const fullBuffer = new Uint8Array(totalLength);
+        let offset = 0;
+        for (let i = 0; i < msg.total; i++) {
+            fullBuffer.set(this.incomingChunks[msg.id][i], offset);
+            offset += this.incomingChunks[msg.id][i].length;
+        }
+        
+        let mimeType = 'application/octet-stream';
+        if (msg.type === 'image') mimeType = 'image/jpeg';
+        else if (msg.type === 'video') mimeType = 'video/mp4';
+        else if (msg.type === 'voice') mimeType = 'audio/webm';
+        
+        const blob = new Blob([fullBuffer], { type: mimeType });
+        const objectUrl = URL.createObjectURL(blob);
+        
+        const displayMsg = {
+            id: msg.id,
+            type: msg.type === 'location' ? 'text' : msg.type,
+            data: objectUrl,
+            fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+            sender: 'friend',
+            time: new Date().toISOString(),
+            _blobUrl: objectUrl
+        };
+        
+        if (ChatSystem.currentChat) {
+            ChatSystem.displayMessage(displayMsg);
+        }
+        ChatSystem.hideProgressBar();
+        
+        delete this.incomingChunks[msg.id];
+        delete this.incomingFileInfo[msg.id];
+    }
+},
+
+compressImage(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width, height = img.height;
+                const maxSize = 800;
+                if (width > height && width > maxSize) {
+                    height = (height * maxSize) / width;
+                    width = maxSize;
+                } else if (height > maxSize) {
+                    width = (width * maxSize) / height;
+                    height = maxSize;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
     });
-}
+},
 
 // ==================== 17. الدوال العامة ====================
 window.startAudioCall = async () => {
@@ -1718,9 +1539,4 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-window.cleanupCallState = async () => {
-    await CallSystem.autoCleanupOnLoad();
-    console.log('✅ تم تنظيف حالة المكالمات يدوياً');
-};
-
-console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
+console.log('✅ WebRTC Call System جاهز');
