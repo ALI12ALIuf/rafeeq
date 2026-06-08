@@ -1528,6 +1528,7 @@ compressImage(file) {
     });
 },
 
+
 // ==================== 14. إنهاء المكالمة ====================
     
 endCall() {
@@ -1566,15 +1567,15 @@ endCall() {
         this.localStream = null;
     }
     
-    // ✅ لا نغلق القناة - الميزات تبقى مفعلة بعد المكالمة
-    // if (this.dc) {
-    //     try { this.dc.close(); } catch(e) {}
-    //     this.dc = null;
-    // }
-    // if (this.pc) {
-    //     try { this.pc.close(); } catch(e) {}
-    //     this.pc = null;
-    // }
+    // ✅ إغلاق القناة القديمة (ضروري لتنظيف الحالة)
+    if (this.dc) {
+        try { this.dc.close(); } catch(e) {}
+        this.dc = null;
+    }
+    if (this.pc) {
+        try { this.pc.close(); } catch(e) {}
+        this.pc = null;
+    }
     
     this.incomingChunks = {};
     this.incomingFileInfo = {};
@@ -1600,9 +1601,16 @@ endCall() {
         }).catch(() => {});
     }
     
-    console.log('✅ تم إنهاء المكالمة (مع بقاء Data Channel مفتوح للميزات)');
+    // ✅ إعادة فتح القناة إذا كانت الميزات لا تزال مفعلة
+    if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
+        console.log('🔄 إعادة فتح Data Channel بعد المكالمة...');
+        setTimeout(() => {
+            CallSystem.ensureDataChannelOnly(ChatSystem.currentChat);
+        }, 500);
+    }
+    
+    console.log('✅ تم إنهاء المكالمة');
 }
-
     
 // ==================== 15. الدوال العامة ====================
 window.startAudioCall = async () => {
