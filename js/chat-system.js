@@ -543,6 +543,35 @@ async disableFeatures() {
     this.updateAllButtons();
     console.log('✅ تم إلغاء تفعيل الميزات');
 },
+
+    
+    
+    // ==================== القسم 12: resetFeatures ====================
+resetFeatures() {
+    console.log('🔄 resetFeatures - إعادة تعيين الميزات');
+    
+    const chatId = this.currentChat;
+    
+    this.featuresEnabled = false;
+    this.featureRequestPending = false;
+    this.featureRequestReceived = false;
+    
+    if (this.featureBlinkInterval) {
+        clearInterval(this.featureBlinkInterval);
+    }
+    
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    
+    if (toggleInput) toggleInput.checked = false;
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    if (chatId) {
+        console.log('📤 تم إلغاء الميزات محلياً');
+    }
+    
+    this.updateAllButtons();
+},
     
     // ==================== القسم 13 ====================
     handleFeatureCancel() {
