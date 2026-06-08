@@ -395,7 +395,7 @@ sendOfferSignal(data) {
 },
 
     
-   // ==================== القسم 8: handleFeatureRequest ====================
+  // ==================== القسم 8: handleFeatureRequest ====================
 async handleFeatureRequest(fromId, encryptedData) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
@@ -466,7 +466,7 @@ async handleFeatureRequest(fromId, encryptedData) {
     console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
 },
 
-// ✅ دالة مساعدة لقبول الـ Offer (معدلة)
+// ✅ دالة مساعدة لقبول الـ Offer (معدلة بالكامل مع خوادم ICE مستقلة)
 async acceptOffer(fromId, offerData) {
     console.log('✅ قبول Offer من', fromId);
     
@@ -480,26 +480,41 @@ async acceptOffer(fromId, offerData) {
     if (switchLabel) switchLabel.classList.remove('blinking');
     
     try {
-        // ✅ تأكد من وجود servers
-        if (!CallSystem.servers) {
-            console.log('🔧 إعداد iceServers بشكل افتراضي');
-            CallSystem.servers = {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-                    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-                ]
-            };
-        }
+        // ✅ إعداد ICE servers بشكل كامل ومستقل (حل دائمي)
+        const iceServersConfig = {
+            iceServers: [
+                // STUN servers (للاتصال المباشر)
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
+                // TURN servers (للحالات التي يفشل فيها الاتصال المباشر)
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
+            ]
+        };
         
-        // إنشاء PeerConnection للإجابة
+        // إنشاء PeerConnection للإجابة باستخدام الإعدادات المستقلة
         if (CallSystem.pc) {
             try { CallSystem.pc.close(); } catch(e) {}
             CallSystem.pc = null;
         }
         
-        CallSystem.pc = new RTCPeerConnection(CallSystem.servers);
+        CallSystem.pc = new RTCPeerConnection(iceServersConfig);
         
         // إعداد Data Channel المستقبل
         CallSystem.pc.ondatachannel = e => {
@@ -511,23 +526,30 @@ async acceptOffer(fromId, offerData) {
         // إعداد ICE candidates
         CallSystem.pc.onicecandidate = e => {
             if (e.candidate) {
+                console.log('📡 إرسال ICE candidate');
                 this.sendOfferResponse(fromId, 'ice', { candidate: e.candidate });
             }
         };
         
         // تعيين الـ Remote Description (Offer)
+        console.log('📡 تعيين Remote Description من Offer');
         await CallSystem.pc.setRemoteDescription(new RTCSessionDescription(offerData.sdp));
         
         // إضافة أي ICE candidates مخزنة
         for (const ice of offerData.iceCandidates) {
             try {
                 await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice.candidate));
-            } catch(e) {}
+                console.log('✅ تم إضافة ICE candidate مخزنة');
+            } catch(e) {
+                console.warn('فشل إضافة ICE candidate مخزنة:', e);
+            }
         }
         
         // إنشاء Answer
+        console.log('📡 إنشاء Answer...');
         const answer = await CallSystem.pc.createAnswer();
         await CallSystem.pc.setLocalDescription(answer);
+        console.log('✅ تم إنشاء Answer بنجاح');
         
         // إرسال Answer إلى المرسل
         await this.sendOfferResponse(fromId, 'answer', { sdp: CallSystem.pc.localDescription });
@@ -546,7 +568,7 @@ async acceptOffer(fromId, offerData) {
         
     } catch(e) {
         console.error('❌ فشل قبول الـ Offer:', e);
-        alert('فشل فتح قناة الاتصال');
+        alert('فشل فتح قناة الاتصال: ' + (e.message || 'خطأ غير معروف'));
         this.featureRequestReceived = false;
         const toggleInput = document.getElementById('featureToggleInput');
         if (toggleInput) toggleInput.checked = false;
@@ -582,7 +604,7 @@ async sendOfferResponse(toId, action, data = null) {
     } catch(e) {
         console.error('❌ فشل إرسال الرد:', e);
     }
-},
+}, 
 
     
     // ==================== القسم 9: acceptFeatureRequest ====================
