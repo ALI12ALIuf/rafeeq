@@ -307,6 +307,13 @@ startFeatureBlink() {
     
     // ==================== القسم 7: requestEnableFeatures ====================
 async requestEnableFeatures() {
+    // ✅ التحقق من وجود CallSystem قبل أي شيء
+    if (typeof CallSystem === 'undefined' || CallSystem === null) {
+        console.error('❌ CallSystem غير موجود بعد، انتظر قليلاً');
+        alert('النظام لا يزال قيد التحميل، حاول مرة أخرى بعد ثانية');
+        return;
+    }
+    
     if (!this.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
         return;
@@ -437,6 +444,11 @@ async requestEnableFeatures() {
 // دالة مساعدة لإرسال إشارات ICE
 sendOfferSignal(data) {
     if (!this.currentChat) return;
+    // ✅ التحقق من وجود SecureChatSystem
+    if (typeof SecureChatSystem === 'undefined' || !SecureChatSystem.getMyPrivateKey) {
+        console.error('❌ SecureChatSystem غير موجود');
+        return;
+    }
     SecureChatSystem.getMyPrivateKey().then(async (myPrivateKey) => {
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
         if (!myPrivateKey || !receiverPublicKey) return;
@@ -454,7 +466,7 @@ sendOfferSignal(data) {
             timestamp: Date.now() 
         });
     }).catch(console.error);
-},
+}, 
     
 
     // ==================== القسم 8: handleFeatureRequest ====================
