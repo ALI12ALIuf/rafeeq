@@ -1459,8 +1459,8 @@ compressImage(file) {
 },
 
     
-    // ==================== 14. إنهاء المكالمة ====================
-    endCall() {
+// ==================== 14. إنهاء المكالمة ====================
+endCall() {
     console.log('📞 إنهاء المكالمة...');
     
     if (this.currentCallId && ChatSystem.currentChat) {
@@ -1492,13 +1492,12 @@ compressImage(file) {
         this.localStream = null;
     }
     
-    // ✅ تعديل: إغلاق pc فقط، وليس dc (للميزات)
+    // ✅ إغلاق pc فقط، وليس dc (للميزات)
     if (this.pc) {
         try { this.pc.close(); } catch(e) {}
         this.pc = null;
     }
     // ✅ لا نغلق dc هنا
-    // this.dc = null; ← إزالة هذا السطر
     
     this.incomingChunks = {};
     this.incomingFileInfo = {};
@@ -1524,7 +1523,7 @@ compressImage(file) {
     }
     
     console.log('✅ تم إنهاء المكالمة (الميزات لا تزال مفعلة)');
-}
+},
 
     
 // ==================== 15. الدوال العامة ====================
