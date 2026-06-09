@@ -10,6 +10,7 @@ const SecureChatSystem = {
     VIDEO_WARNING_DURATION: 170,
     VIDEO_MAX_INPUT_SIZE: 250 * 1024 * 1024,
     
+    // ==================== القسم 1: init ====================
     async init() {
         if (!window.auth?.currentUser) { 
             console.error('❌ لا يوجد مستخدم مسجل');
@@ -29,6 +30,7 @@ const SecureChatSystem = {
         }
     },
     
+    // ==================== القسم 2: setupKeys ====================
     async setupKeys() {
         const uid = window.auth.currentUser.uid;
         const existingKey = localStorage.getItem(`enc_private_key_${uid}`);
@@ -68,6 +70,7 @@ const SecureChatSystem = {
         }
     },
     
+    // ==================== القسم 3: دوال المفاتيح ====================
     async generateKeyPair() { return await window.crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']); },
     async exportPublicKey(key) { const raw = await window.crypto.subtle.exportKey('raw', key); return btoa(String.fromCharCode(...new Uint8Array(raw))); },
     
@@ -116,6 +119,7 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
+    // ==================== القسم 4: دوال التشفير ====================
     async encryptData(data, sharedKey) {
         const encoder = new TextEncoder();
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -139,6 +143,7 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
+    // ==================== القسم 5: معالجة الملفات ====================
     async compressImage(file) { 
         return new Promise((resolve, reject) => { 
             const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
@@ -202,6 +207,7 @@ const SecureChatSystem = {
         }); 
     },
     
+    // ==================== القسم 6: إرسال واستقبال الرسائل ====================
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
         
@@ -247,7 +253,7 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ========== الدالة المعدلة (تم تعديل part of feature_request) ==========
+    // ==================== القسم 7: معالجة الرسائل المستلمة ====================
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -255,17 +261,15 @@ const SecureChatSystem = {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
+            // القسم 7.1: رسائل نصية
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
+            // القسم 7.2: إشارات WebRTC
             else if (msg.package.type === 'webrtc') { 
-                // ✅ تجاهل إشارات WebRTC تماماً إذا:
-                // 1. الميزات غير مفعلة
-                // 2. أو الطرف الآخر ليس في المحادثة
-                // 3. أو المستخدم الحالي ليس في محادثة مع المرسل
                 if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
                     console.log('📞 تجاهل إشارة WebRTC - سبب:', {
                         featuresEnabled: ChatSystem.featuresEnabled,
@@ -296,13 +300,14 @@ const SecureChatSystem = {
                     }
                 }
             }
-            // ✅ التعديل المطلوب هنا - تمرير البيانات المشفرة
+            // القسم 7.3: طلب تفعيل الميزات (معدل)
             else if (msg.package.type === 'feature_request') {
                 console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
                     ChatSystem.handleFeatureRequest(msg.from, msg.package.data);
                 }
             }
+            // القسم 7.4: رد على طلب التفعيل
             else if (msg.package.type === 'feature_response') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const responseData = JSON.parse(decryptedData);
@@ -311,12 +316,12 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
-            // ==================== القسم 100: معالجة إشارة إلغاء الميزات (force_disable_features) ====================
+            // القسم 7.5: إشارة إلغاء الميزات (مصحح)
             else if (msg.package.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    Console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');  // ✅ تم التصحيح: Console.log → console.log
                     
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
@@ -335,12 +340,14 @@ const SecureChatSystem = {
                     ChatSystem.updateAllButtons();
                 }
             }
+            // القسم 7.6: مشاركة الموقع
             else if (msg.package.type === 'location') {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'location', data: locationData, sender: 'friend', time: new Date().toISOString() });
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
             }
+            // القسم 7.7: ملفات (صورة، فيديو، ملف)
             else if (msg.package.type === 'file' || msg.package.type === 'image' || msg.package.type === 'video') {
                 const decryptedFile = await this.decryptData(msg.package.data, sharedKey);
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: msg.package.type, data: decryptedFile, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() });
