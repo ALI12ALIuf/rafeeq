@@ -21,7 +21,7 @@ const SecureChatSystem = {
             console.log('🔐 بدء تهيئة نظام التشفير...');
             await this.setupKeys();
             this.startReceiving();
-            PresenceSystem.setOnline();
+            // PresenceSystem.setOnline(); // ❌ تمت إزالتها (غير مستخدمة)
             console.log('✅ تم تهيئة نظام التشفير بنجاح');
             return true;
         } catch (error) {
