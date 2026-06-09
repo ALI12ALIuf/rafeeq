@@ -763,7 +763,6 @@ async createDataChannelOnly(calleeId) {
         });
     },
 
-    
    // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
@@ -905,7 +904,7 @@ setupDataChannel(channel) {
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        if (!this.isEndingCall && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -1017,6 +1016,7 @@ async sendSignal(calleeId, data) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
 }, 
+   
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
@@ -1530,7 +1530,7 @@ compressImage(file) {
         
         console.log('✅ تم إنهاء المكالمة');
     }
-};    
+};
 
     
 // ==================== 15. الدوال العامة ====================
