@@ -859,11 +859,6 @@ setupDataChannel(channel) {
     
     channel.onopen = () => {
         console.log('✅ Data Channel مفتوح');
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        this.reconnectAttempts = 0;
         this.sendCallStatus('connected');
         
         if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
@@ -945,71 +940,7 @@ sendCallStatus(status) {
     }
 },
 
-async ensureDataChannel(calleeId) {
-    if (!calleeId) return;
-    if (this.dc && this.dc.readyState === 'open') return;
-    if (this.dc && this.dc.readyState === 'connecting') {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                clearInterval(checkInterval);
-                reject(new Error('انتهت مهلة انتظار القناة'));
-            }, 10000);
-            const checkInterval = setInterval(() => {
-                if (!this.dc) {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                } else if (this.dc.readyState === 'open') {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    resolve();
-                } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                }
-            }, 500);
-        });
-    }
-    return this.createNewDataChannel(calleeId);
-},
-
-async createNewDataChannel(calleeId) {
-    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-        console.log('🚫 منع إنشاء Data Channel جديد - الميزات غير مفعلة');
-        return;
-    }
-    
-    this.reconnectAttempts = 0;
-    if (this.pc) {
-        try { this.pc.close(); } catch(e) {}
-        this.pc = null;
-    }
-    if (this.dc) {
-        try { this.dc.close(); } catch(e) {}
-        this.dc = null;
-    }
-    
-    try {
-        this.pc = new RTCPeerConnection(this.servers);
-        this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-        this.setupDataChannel(this.dc);
-        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
-        this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
-        this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-        this.pc.onconnectionstatechange = () => {
-            switch(this.pc?.connectionState) {
-                case 'connected': this.reconnectAttempts = 0; break;
-                case 'failed': case 'disconnected': break;
-            }
-        };
-        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-        await this.pc.setLocalDescription(offer);
-        await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-    } catch (error) {
-        throw error;
-    }
-},
+// ✅ تم حذف ensureDataChannel و createNewDataChannel (غير مستخدمين)
 
 async handleSignaling(data) {
     try {
