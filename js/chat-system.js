@@ -305,21 +305,30 @@ startFeatureBlink() {
     }, 500);
 },  
     
-    // ==================== القسم 7: requestEnableFeatures ====================
+        // ==================== القسم 7: requestEnableFeatures ====================
 async requestEnableFeatures() {
-    // ✅ التحقق من وجود CallSystem قبل أي شيء
+    // ✅ انتظر حتى يصبح CallSystem جاهزاً (حل جذري)
+    let waitCount = 0;
+    while (typeof CallSystem === 'undefined' && waitCount < 30) {
+        await new Promise(r => setTimeout(r, 100));
+        waitCount++;
+    }
+    
     if (typeof CallSystem === 'undefined' || CallSystem === null) {
-        console.error('❌ CallSystem غير موجود بعد، انتظر قليلاً');
-        alert('النظام لا يزال قيد التحميل، حاول مرة أخرى بعد ثانية');
+        console.error('❌ CallSystem لم يتم تحميله بعد 3 ثواني');
+        alert('النظام لا يزال قيد التحميل، حاول مرة أخرى بعد ثانيتين');
+        this.featureRequestPending = false;
         return;
     }
     
     if (!this.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
+        this.featureRequestPending = false;
         return;
     }
     if (this.featuresEnabled) {
         alert('الميزات مفعلة بالفعل');
+        this.featureRequestPending = false;
         return;
     }
     if (this.featureRequestPending) {
@@ -327,7 +336,6 @@ async requestEnableFeatures() {
         return;
     }
     
-    this.featureRequestPending = true;
     this.startFeatureBlink();
     
     try {
@@ -466,7 +474,7 @@ sendOfferSignal(data) {
             timestamp: Date.now() 
         });
     }).catch(console.error);
-}, 
+},
     
 
     // ==================== القسم 8: handleFeatureRequest ====================
