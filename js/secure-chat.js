@@ -1,6 +1,45 @@
 // ========== secure-chat.js ==========
 // نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
 
+
+// ==================== تعريف PresenceSystem احتياطياً ====================
+if (typeof PresenceSystem === 'undefined') {
+    console.log('⚠️ PresenceSystem غير موجود، يتم إنشاؤه احتياطياً');
+    window.PresenceSystem = {
+        onlineStatus: false,
+        intervalId: null,
+        setOnline() {
+            if (this.onlineStatus) return;
+            this.onlineStatus = true;
+            if (window.auth?.currentUser) {
+                window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    online: true,
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(() => {});
+            }
+        },
+        setOffline() {
+            if (!this.onlineStatus) return;
+            this.onlineStatus = false;
+            if (window.auth?.currentUser) {
+                window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    online: false,
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(() => {});
+            }
+        },
+        stopAll() {
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
+            this.setOffline();
+        }
+    };
+    console.log('✅ PresenceSystem تم إنشاؤه احتياطياً');
+}
+
+
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
     keyCache: new Map(),
