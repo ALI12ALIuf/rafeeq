@@ -1529,10 +1529,10 @@ compressImage(file) {
 },
 
     
-// ==================== 14. إنهاء المكالمة ====================
+// ==================== 14. إنهاء المكالمة (فقط الصوت/الفيديو، مع الحفاظ على Data Channel) ====================
     
     endCall() {
-        console.log('📞 إنهاء المكالمة...');
+        console.log('📞 إنهاء المكالمة... (الحفاظ على Data Channel للملفات)');
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
@@ -1567,14 +1567,9 @@ compressImage(file) {
             this.localStream = null;
         }
         
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
-        }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
-        }
+        // ✅ ❌❌❌ لا نغلق Data Channel و PeerConnection هنا ❌❌❌
+        // نتركهم للملفات والميزات
+        
         this.incomingChunks = {};
         this.incomingFileInfo = {};
         
@@ -1599,9 +1594,50 @@ compressImage(file) {
             }).catch(() => {});
         }
         
-        console.log('✅ تم إنهاء المكالمة');
-    }
-};
+        console.log('✅ تم إنهاء المكالمة (Data Channel لا يزال مفتوحاً)');
+        console.log(`📡 حالة Data Channel: ${this.dc ? this.dc.readyState : 'لا يوجد'}`);
+    },
+
+    // ==================== 14.1. إنهاء كل شيء (لإغلاق المحادثة بالكامل) ====================
+    
+    endCallCompletely() {
+        console.log('🔴 إنهاء كل شيء - لإغلاق المحادثة بالكامل');
+        
+        // ✅ إنهاء المكالمة أولاً
+        if (this.isInCall) {
+            this.endCall();
+        }
+        
+        // ✅ الآن نغلق Data Channel و PeerConnection
+        if (this.dc) {
+            try { 
+                this.dc.close(); 
+                console.log('✅ تم إغلاق Data Channel');
+            } catch(e) {}
+            this.dc = null;
+        }
+        
+        if (this.pc) {
+            try { 
+                this.pc.close(); 
+                console.log('✅ تم إغلاق PeerConnection');
+            } catch(e) {}
+            this.pc = null;
+        }
+        
+        // ✅ تنظيف KeepAlive مرة أخرى للتأكد
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
+        
+        // ✅ تنظيف المتغيرات
+        this.incomingChunks = {};
+        this.incomingFileInfo = {};
+        this.reconnectAttempts = 0;
+        
+        console.log('✅ تم تنظيف كل شيء (المكالمة + Data Channel)');
+    },
     
     
 // ==================== 15. الدوال العامة ====================
