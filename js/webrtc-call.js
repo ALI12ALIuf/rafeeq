@@ -1133,6 +1133,25 @@ async sendSignal(calleeId, data) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
 },
+
+    // ==================== 9.1 Data Channel المكالمة ====================
+setupCallDataChannel(channel) {
+    if (!channel) return;
+    console.log('📡 إعداد Data Channel للمكالمة');
+    
+    channel.onopen = () => {
+        console.log('✅ Data Channel المكالمة مفتوح');
+    };
+    
+    channel.onclose = () => {
+        console.log('❌ Data Channel المكالمة مغلق');
+    };
+    
+    channel.onerror = (e) => {
+        console.error('❌ خطأ في Data Channel المكالمة:', e);
+    };
+},
+    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
