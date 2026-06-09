@@ -1597,12 +1597,19 @@ compressImage(file) {
 endCall() {
     console.log('📞 إنهاء المكالمة...');
     
-    if (this.currentCallId && ChatSystem.currentChat) {
-        this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
+    // ✅ تحقق من وجود ChatSystem قبل استخدامه
+    if (this.currentCallId && typeof ChatSystem !== 'undefined' && ChatSystem.currentChat) {
+        try {
+            this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
+        } catch(e) {
+            console.warn('⚠️ فشل إرسال إشارة إنهاء المكالمة:', e);
+        }
     }
     this.currentCallId = null;
     
-    this.sendCallStatus('disconnected');
+    try {
+        this.sendCallStatus('disconnected');
+    } catch(e) {}
     
     if (this.keepAliveInterval) {
         clearInterval(this.keepAliveInterval);
@@ -1630,7 +1637,7 @@ endCall() {
         this.localStream = null;
     }
     
-    // ✅ إغلاق قناة المكالمة فقط (المنفصلة)
+    // ✅ إغلاق قناة المكالمة فقط
     if (this.callDc) {
         try { this.callDc.close(); } catch(e) {}
         this.callDc = null;
@@ -1639,16 +1646,6 @@ endCall() {
         try { this.callPc.close(); } catch(e) {}
         this.callPc = null;
     }
-    
-    // ✅ لا نغلق قناة الميزات (تبقى مفتوحة)
-    // if (this.dc) {
-    //     try { this.dc.close(); } catch(e) {}
-    //     this.dc = null;
-    // }
-    // if (this.pc) {
-    //     try { this.pc.close(); } catch(e) {}
-    //     this.pc = null;
-    // }
     
     this.incomingChunks = {};
     this.incomingFileInfo = {};
