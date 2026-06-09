@@ -311,12 +311,12 @@ const SecureChatSystem = {
                     ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                 }
             }
-            // ==================== معالجة إشارة إلغاء الميزات (force_disable_features) ====================
+            // ==================== القسم 100: معالجة إشارة إلغاء الميزات (force_disable_features) ====================
             else if (msg.package.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    Console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
                     
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
