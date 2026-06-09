@@ -2574,9 +2574,10 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-    // ==================== القسم 37: closeChat ====================
+  // ==================== القسم 37: closeChat ====================
+
 closeChat() {
-    console.log('🔴 closeChat - بدء إغلاق المحادثة');
+    console.log('🔴 closeChat - بدء إغلاق المحادثة بالكامل');
     console.log('currentChat:', this.currentChat);
     console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
     
@@ -2585,7 +2586,18 @@ closeChat() {
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
         
-        // تم إزالة CallSystem.deleteAllWebRTCSignals
+        // ✅ إرسال إشارة إيقاف الميزات للطرف الآخر
+        if (this.featuresEnabled && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            try {
+                CallSystem.dc.send(JSON.stringify({ 
+                    type: 'force_disable_features',
+                    timestamp: Date.now()
+                }));
+                console.log('✅ تم إرسال إشارة إيقاف الميزات إلى الطرف الآخر');
+            } catch(e) {
+                console.error('❌ فشل إرسال إشارة الإيقاف:', e);
+            }
+        }
         
         const key = `chat_${chatId}`;
         const messages = this.messages[chatId] || [];
@@ -2606,6 +2618,7 @@ closeChat() {
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
+    this.friendInConversation = false;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -2618,7 +2631,7 @@ closeChat() {
         btn.title = 'تفعيل الميزات';
     }
     
-    // ✅ إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
+    // إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'none';
@@ -2627,27 +2640,37 @@ closeChat() {
     this.updateAllButtons();
     
     document.body.classList.remove('conversation-open');
-    document.getElementById('conversationPage').style.display = 'none';
-    document.querySelector('.chat-page').style.display = 'block';
+    const conversationPage = document.getElementById('conversationPage');
+    if (conversationPage) conversationPage.style.display = 'none';
+    const chatPage = document.querySelector('.chat-page');
+    if (chatPage) chatPage.style.display = 'block';
     
     if (typeof PresenceSystem !== 'undefined' && PresenceSystem.stopAll) {
         PresenceSystem.stopAll();
     }
     
-    if (!CallSystem.isInCall) {
-        if (CallSystem.dc) {
-            try { CallSystem.dc.close(); } catch(e) {}
-            CallSystem.dc = null;
-        }
-        if (CallSystem.pc) {
-            try { CallSystem.pc.close(); } catch(e) {}
-            CallSystem.pc = null;
+    // ✅ ✅ ✅ استخدام الدالة الجديدة لإغلاق كل شيء (المكالمة + Data Channel)
+    if (typeof CallSystem !== 'undefined') {
+        if (CallSystem.endCallCompletely) {
+            CallSystem.endCallCompletely();
+        } else {
+            // للتوافق مع الإصدارات القديمة
+            if (CallSystem.isInCall) CallSystem.endCall();
+            if (CallSystem.dc) { try { CallSystem.dc.close(); } catch(e) {} CallSystem.dc = null; }
+            if (CallSystem.pc) { try { CallSystem.pc.close(); } catch(e) {} CallSystem.pc = null; }
         }
     }
-    this.currentChat = null;
-    this.friendInConversation = false;
     
-    console.log('✅ closeChat - انتهى');
+    // تحديث زر التفعيل
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (toggleInput) toggleInput.checked = false;
+    
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    if (switchLabel) switchLabel.classList.remove('blinking');
+    
+    this.currentChat = null;
+    
+    console.log('✅ closeChat - تم إغلاق المحادثة بالكامل');
 },
     
     
