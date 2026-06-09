@@ -297,7 +297,8 @@ startFeatureBlink() {
         }
     }, 500);
 },  
-    
+
+
     // ==================== القسم 7: requestEnableFeatures ====================
 async requestEnableFeatures() {
     if (!this.currentChat) {
@@ -317,14 +318,14 @@ async requestEnableFeatures() {
     this.startFeatureBlink();
     
     try {
-        // ✅ إنشاء PeerConnection و Offer مباشرة (بدلاً من إرسال طلب نصي)
-        if (CallSystem.pc) {
-            try { CallSystem.pc.close(); } catch(e) {}
-            CallSystem.pc = null;
+        // ✅ إنشاء PeerConnection و Offer لقناة الميزات (pcFeatures, dcFeatures)
+        if (CallSystem.pcFeatures) {
+            try { CallSystem.pcFeatures.close(); } catch(e) {}
+            CallSystem.pcFeatures = null;
         }
-        if (CallSystem.dc) {
-            try { CallSystem.dc.close(); } catch(e) {}
-            CallSystem.dc = null;
+        if (CallSystem.dcFeatures) {
+            try { CallSystem.dcFeatures.close(); } catch(e) {}
+            CallSystem.dcFeatures = null;
         }
         
         // ✅ إعداد ICE servers بشكل كامل ومستقل
@@ -353,27 +354,28 @@ async requestEnableFeatures() {
             ]
         };
         
-        CallSystem.pc = new RTCPeerConnection(iceServersConfig);
-        CallSystem.dc = CallSystem.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-        CallSystem.setupDataChannel(CallSystem.dc);
+        // ✅ استخدام pcFeatures لقناة الميزات
+        CallSystem.pcFeatures = new RTCPeerConnection(iceServersConfig);
+        CallSystem.dcFeatures = CallSystem.pcFeatures.createDataChannel('features', { ordered: true, maxRetransmits: 3 });
+        CallSystem.setupDataChannel(CallSystem.dcFeatures, 'features');
         
-        CallSystem.pc.onicecandidate = e => {
+        CallSystem.pcFeatures.onicecandidate = e => {
             if (e.candidate) {
-                console.log('📡 إرسال ICE candidate من المرسل');
+                console.log('📡 إرسال ICE candidate من المرسل (قناة الميزات)');
                 this.sendOfferSignal({ candidate: e.candidate });
             }
         };
         
-        const offer = await CallSystem.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
-        await CallSystem.pc.setLocalDescription(offer);
+        const offer = await CallSystem.pcFeatures.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+        await CallSystem.pcFeatures.setLocalDescription(offer);
         
         // ✅ انتظر حتى يكتمل الـ localDescription
         await new Promise(resolve => {
-            if (CallSystem.pc.localDescription && CallSystem.pc.localDescription.sdp) {
+            if (CallSystem.pcFeatures.localDescription && CallSystem.pcFeatures.localDescription.sdp) {
                 resolve();
             } else {
                 const checkInterval = setInterval(() => {
-                    if (CallSystem.pc.localDescription && CallSystem.pc.localDescription.sdp) {
+                    if (CallSystem.pcFeatures.localDescription && CallSystem.pcFeatures.localDescription.sdp) {
                         clearInterval(checkInterval);
                         resolve();
                     }
@@ -385,21 +387,21 @@ async requestEnableFeatures() {
             }
         });
         
-        console.log('📡 الـ localDescription جاهز:', {
-            type: CallSystem.pc.localDescription?.type,
-            hasSdp: !!CallSystem.pc.localDescription?.sdp,
-            sdpLength: CallSystem.pc.localDescription?.sdp?.length
+        console.log('📡 الـ localDescription جاهز (قناة الميزات):', {
+            type: CallSystem.pcFeatures.localDescription?.type,
+            hasSdp: !!CallSystem.pcFeatures.localDescription?.sdp,
+            sdpLength: CallSystem.pcFeatures.localDescription?.sdp?.length
         });
         
         // ✅ التحقق من صحة الـ localDescription
-        if (!CallSystem.pc.localDescription || !CallSystem.pc.localDescription.sdp) {
-            throw new Error('فشل إنشاء SDP صالح');
+        if (!CallSystem.pcFeatures.localDescription || !CallSystem.pcFeatures.localDescription.sdp) {
+            throw new Error('فشل إنشاء SDP صالح لقناة الميزات');
         }
         
         // ✅ إرسال Offer مع SDP كامل
         const sdpToSend = {
-            type: CallSystem.pc.localDescription.type,
-            sdp: CallSystem.pc.localDescription.sdp
+            type: CallSystem.pcFeatures.localDescription.type,
+            sdp: CallSystem.pcFeatures.localDescription.sdp
         };
         
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -418,7 +420,7 @@ async requestEnableFeatures() {
             data: encrypted, 
             timestamp: Date.now() 
         });
-        console.log('📨 تم إرسال Offer WebRTC لفتح القناة مباشرة');
+        console.log('📨 تم إرسال Offer WebRTC لفتح قناة الميزات');
     } catch(e) {
         this.featureRequestPending = false;
         this.startFeatureBlink();
@@ -468,7 +470,7 @@ async handleFeatureRequest(fromId, encryptedData) {
         return;
     }
     
-    // ✅ تخزين الـ Offer و ICE candidates للاستخدام لاحقاً
+    // ✅ تخزين الـ Offer و ICE candidates للاستخدام لاحقاً (لقناة الميزات)
     if (!this._pendingOffer) this._pendingOffer = {};
     this._pendingOffer[fromId] = {
         sdp: requestData.sdp,
@@ -493,7 +495,7 @@ async handleFeatureRequest(fromId, encryptedData) {
         
         console.log('📡 SDP صالح - type:', requestData.sdp.type, 'length:', requestData.sdp.sdp.length);
         
-        // ✅ تحويل SDP إلى كائن RTCSessionDescription صحيح
+        // ✅ تحويل SDP إلى كائن RTCSessionDescription صحيح (لقناة الميزات)
         this._pendingOffer[fromId].sdp = new RTCSessionDescription({
             type: requestData.sdp.type,
             sdp: requestData.sdp.sdp
@@ -505,12 +507,12 @@ async handleFeatureRequest(fromId, encryptedData) {
         // ✅ عرض إشعار للمستخدم (بدون confirm تلقائي)
         console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
     }
-    // ✅ إذا كان ICE candidate، نضيفه إلى PeerConnection
+    // ✅ إذا كان ICE candidate، نضيفه إلى PeerConnection (قناة الميزات)
     else if (requestData.action === 'ice' && requestData.candidate) {
-        console.log('📡 استلام ICE candidate');
-        if (CallSystem.pc) {
+        console.log('📡 استلام ICE candidate (قناة الميزات)');
+        if (CallSystem.pcFeatures) {
             try {
-                await CallSystem.pc.addIceCandidate(new RTCIceCandidate(requestData.candidate.candidate));
+                await CallSystem.pcFeatures.addIceCandidate(new RTCIceCandidate(requestData.candidate.candidate));
             } catch(e) {
                 console.warn('فشل إضافة ICE candidate:', e);
             }
@@ -523,7 +525,7 @@ async handleFeatureRequest(fromId, encryptedData) {
     }
 },
 
-// ✅ دالة مساعدة لقبول الـ Offer (معدلة بالكامل مع خوادم ICE مستقلة)
+// ✅ دالة مساعدة لقبول الـ Offer (معدلة بالكامل مع خوادم ICE مستقلة - لقناة الميزات)
 async acceptOffer(fromId, offerData) {
     console.log('✅ قبول Offer من', fromId);
     
@@ -537,16 +539,14 @@ async acceptOffer(fromId, offerData) {
     if (switchLabel) switchLabel.classList.remove('blinking');
     
     try {
-        // ✅ إعداد ICE servers بشكل كامل ومستقل (حل دائمي)
+        // ✅ إعداد ICE servers بشكل كامل ومستقل
         const iceServersConfig = {
             iceServers: [
-                // STUN servers (للاتصال المباشر)
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
                 { urls: 'stun:stun2.l.google.com:19302' },
                 { urls: 'stun:stun3.l.google.com:19302' },
                 { urls: 'stun:stun4.l.google.com:19302' },
-                // TURN servers (للحالات التي يفشل فيها الاتصال المباشر)
                 {
                     urls: 'turn:openrelay.metered.ca:80',
                     username: 'openrelayproject',
@@ -565,25 +565,25 @@ async acceptOffer(fromId, offerData) {
             ]
         };
         
-        // إنشاء PeerConnection للإجابة باستخدام الإعدادات المستقلة
-        if (CallSystem.pc) {
-            try { CallSystem.pc.close(); } catch(e) {}
-            CallSystem.pc = null;
+        // إنشاء PeerConnection للإجابة (لقناة الميزات)
+        if (CallSystem.pcFeatures) {
+            try { CallSystem.pcFeatures.close(); } catch(e) {}
+            CallSystem.pcFeatures = null;
         }
         
-        CallSystem.pc = new RTCPeerConnection(iceServersConfig);
+        CallSystem.pcFeatures = new RTCPeerConnection(iceServersConfig);
         
-        // إعداد Data Channel المستقبل
-        CallSystem.pc.ondatachannel = e => {
-            console.log('📡 استقبال Data Channel');
-            CallSystem.setupDataChannel(e.channel);
-            CallSystem.dc = e.channel;
+        // إعداد Data Channel المستقبل (لقناة الميزات)
+        CallSystem.pcFeatures.ondatachannel = e => {
+            console.log('📡 استقبال Data Channel (قناة الميزات)');
+            CallSystem.setupDataChannel(e.channel, 'features');
+            CallSystem.dcFeatures = e.channel;
         };
         
         // إعداد ICE candidates
-        CallSystem.pc.onicecandidate = e => {
+        CallSystem.pcFeatures.onicecandidate = e => {
             if (e.candidate) {
-                console.log('📡 إرسال ICE candidate');
+                console.log('📡 إرسال ICE candidate (قناة الميزات)');
                 this.sendOfferResponse(fromId, 'ice', { candidate: e.candidate });
             }
         };
@@ -596,12 +596,12 @@ async acceptOffer(fromId, offerData) {
             throw new Error('SDP غير صالح للاستخدام - type: ' + offerSdp.type);
         }
         
-        await CallSystem.pc.setRemoteDescription(offerSdp);
+        await CallSystem.pcFeatures.setRemoteDescription(offerSdp);
         
         // إضافة أي ICE candidates مخزنة
         for (const ice of offerData.iceCandidates) {
             try {
-                await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice.candidate));
+                await CallSystem.pcFeatures.addIceCandidate(new RTCIceCandidate(ice.candidate));
                 console.log('✅ تم إضافة ICE candidate مخزنة');
             } catch(e) {
                 console.warn('فشل إضافة ICE candidate مخزنة:', e);
@@ -609,13 +609,13 @@ async acceptOffer(fromId, offerData) {
         }
         
         // إنشاء Answer
-        console.log('📡 إنشاء Answer...');
-        const answer = await CallSystem.pc.createAnswer();
-        await CallSystem.pc.setLocalDescription(answer);
+        console.log('📡 إنشاء Answer (قناة الميزات)...');
+        const answer = await CallSystem.pcFeatures.createAnswer();
+        await CallSystem.pcFeatures.setLocalDescription(answer);
         console.log('✅ تم إنشاء Answer بنجاح');
         
         // إرسال Answer إلى المرسل
-        await this.sendOfferResponse(fromId, 'answer', { sdp: CallSystem.pc.localDescription });
+        await this.sendOfferResponse(fromId, 'answer', { sdp: CallSystem.pcFeatures.localDescription });
         
         // تفعيل الميزات محلياً
         this.featuresEnabled = true;
@@ -627,7 +627,7 @@ async acceptOffer(fromId, offerData) {
         if (toggleInput) toggleInput.checked = true;
         
         this.updateAllButtons();
-        console.log('✅ تم فتح القناة وتفعيل الميزات بنجاح');
+        console.log('✅ تم فتح قناة الميزات وتفعيل الميزات بنجاح');
         
     } catch(e) {
         console.error('❌ فشل قبول الـ Offer:', e);
@@ -638,7 +638,7 @@ async acceptOffer(fromId, offerData) {
     }
 },
 
-// ✅ دالة مساعدة لإرسال الردود (Answer أو ICE)
+// ✅ دالة مساعدة لإرسال الردود (Answer أو ICE) - لقناة الميزات
 async sendOfferResponse(toId, action, data = null) {
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -728,16 +728,16 @@ async acceptFeatureRequest() {
         console.error('❌ خطأ في إرسال القبول:', e);
     }
     
-    // ✅ فتح القناة في الخلفية (لا ننتظرها - المستخدم يرى الزر أخضر فوراً)
+    // ✅ فتح قناة الميزات في الخلفية (لا ننتظرها - المستخدم يرى الزر أخضر فوراً)
     if (this.currentChat) {
         CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
-            console.log('✅ تم فتح Data Channel في الخلفية');
+            console.log('✅ تم فتح قناة الميزات في الخلفية');
         }).catch(e => {
-            console.error('❌ خطأ في فتح Data Channel (خلفية):', e);
+            console.error('❌ خطأ في فتح قناة الميزات (خلفية):', e);
         });
     }
     
-    console.log('✅ تم تفعيل الميزات! القناة تفتح في الخلفية');
+    console.log('✅ تم تفعيل الميزات! قناة الميزات تفتح في الخلفية');
 },
     
     
