@@ -7,6 +7,7 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    isEndingCall: false,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -15,6 +16,7 @@ const CallSystem = {
             { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
         ] 
     },
+
     
     // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
     
@@ -762,7 +764,7 @@ async createDataChannelOnly(calleeId) {
     },
 
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+   // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -877,7 +879,7 @@ setupDataChannel(channel) {
             this.keepAliveInterval = null;
         }
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        if (!this.isEndingCall && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('🔌 انقطاع القناة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -896,6 +898,8 @@ setupDataChannel(channel) {
             
             ChatSystem.updateAllButtons();
         }
+        
+        this.isEndingCall = false;
     };
     
     channel.onerror = (e) => {
@@ -940,8 +944,6 @@ sendCallStatus(status) {
     }
 },
 
-// ✅ تم حذف ensureDataChannel و createNewDataChannel (غير مستخدمين)
-
 async handleSignaling(data) {
     try {
         if (data.type === 'reject') {
@@ -982,14 +984,12 @@ async handleSignaling(data) {
     }
 },
 
-// ✅ دالة sendSignal المعدلة - تدعم الإرسال عبر Firebase أثناء فتح القناة
 async sendSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
         return;
     }
     
-    // ✅ إذا القناة مفتوحة → أرسل مباشرة
     if (this.dc && this.dc.readyState === 'open') {
         try {
             this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
@@ -1000,8 +1000,6 @@ async sendSignal(calleeId, data) {
         }
     }
     
-    // ✅ إذا القناة لا تزال تفتح → أرسل عبر Firebase (لفتح القناة)
-    // هذا ضروري لتمرير Offer/Answer/ICE أثناء عملية الفتح
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
@@ -1018,7 +1016,7 @@ async sendSignal(calleeId, data) {
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
-},
+}, 
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
@@ -1458,11 +1456,12 @@ compressImage(file) {
     });
 },
 
-    
 // ==================== 14. إنهاء المكالمة ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة...');
+        
+        this.isEndingCall = true;
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
@@ -1531,8 +1530,8 @@ compressImage(file) {
         
         console.log('✅ تم إنهاء المكالمة');
     }
-};
-    
+};    
+
     
 // ==================== 15. الدوال العامة ====================
 window.startAudioCall = async () => {
