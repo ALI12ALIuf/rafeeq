@@ -949,6 +949,7 @@ async handleSignaling(data) {
             console.log('📞 الطرف الآخر رفض المكالمة');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
+            this.isEndingCall = true;
             this.endCall();
             return;
         }
@@ -957,6 +958,7 @@ async handleSignaling(data) {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
+            this.isEndingCall = true;
             this.endCall();
             return;
         }
@@ -1015,7 +1017,7 @@ async sendSignal(calleeId, data) {
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
-}, 
+},
    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
