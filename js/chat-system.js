@@ -5,17 +5,11 @@
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
-    _pendingConversationStatus: {},
     
     featuresEnabled: false,
     featureRequestPending: false,
     featureRequestReceived: false,
     featureBlinkInterval: null,
-    
-    // ✅ متغيرات المؤقت 120 ثانية
-    offlineStartTime: null,
-    offlineTimer: null,
-    offlineCountdownInterval: null,
     
     // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
 updateFeatureToggleUI() {
@@ -53,16 +47,15 @@ async getContactName(userId) {
 },
    
 
-    
     // ==================== القسم 3: init ====================
 init() { 
     this.loadAllChats(); 
-    this.setupPageFocusListener();
     this.setupFeatureButton();
     // تم إزالة setupBeforeUnloadListener
     
     // تم إزالة cleanMediaMessagesOnLoad
 },
+    
 
     // ==================== القسم 4: setupFeatureButton (تبسيط - الأزرار موجودة في HTML) ====================
 setupFeatureButton() {
@@ -910,28 +903,6 @@ resetFeatures() {
     this.updateAllButtons();
 },
     
-    // ==================== القسم 13: handleFeatureCancel ====================
-handleFeatureCancel() {
-    console.log('🔓 handleFeatureCancel - تم استلام إلغاء من الطرف الآخر');
-    
-    this.featuresEnabled = false;
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-        this.featureBlinkInterval = null;
-    }
-    
-    const toggleInput = document.getElementById('featureToggleInput');
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) toggleInput.checked = false;
-    if (switchLabel) switchLabel.classList.remove('blinking');
-    
-    this.updateAllButtons();
-    console.log('⚠️ الطرف الآخر خرج من المحادثة، تم إلغاء تفعيل الميزات');
-},
     
    // ==================== القسم 14: updateAllButtons ====================
 updateAllButtons() {
@@ -991,16 +962,9 @@ updateAllButtons() {
     
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
 },
-    
-   // ==================== القسم 15: setupPageFocusListener ====================
-setupPageFocusListener() {
-    window.addEventListener('focus', () => {
-        if (this.currentChat && this.featuresEnabled) {
-            console.log('👁️ الصفحة في المقدمة');
-        }
-    });
-},
 
+    
+   // ==================== القسم 15: closeConversation ====================
 closeConversation() {
     console.log("🚪 إغلاق صفحة المحادثة والعودة للقائمة الرئيسية");
     
@@ -1032,8 +996,8 @@ closeConversation() {
     
     const appHeader = document.querySelector('.app-header');
     if (appHeader) appHeader.style.setProperty('display', 'flex', 'important');
-}, 
-    
+},
+
     
     // ==================== القسم 17: loadAllChats ====================
     loadAllChats() { 
