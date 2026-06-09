@@ -386,21 +386,6 @@ window.addEventListener('authReady', async () => {
     if (window.auth?.currentUser) await SecureChatSystem.init(); 
 });
 
-window.addEventListener('beforeunload', () => { 
-    PresenceSystem.setOffline(); 
-});
-
-document.addEventListener('visibilitychange', () => { 
-    if (document.hidden) {
-        PresenceSystem.setOffline(); 
-    } else { 
-        PresenceSystem.setOnline(); 
-        if (ChatSystem.currentChat && ChatSystem.friendOnline) {
-            setTimeout(() => CallSystem.ensureDataChannelOnly(ChatSystem.currentChat).catch(() => {}), 1000);
-        }
-    } 
-});
-
 if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
 
 window.addEventListener('error', (event) => { 
