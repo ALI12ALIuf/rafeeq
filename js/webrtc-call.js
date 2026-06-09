@@ -1529,9 +1529,20 @@ compressImage(file) {
             }).catch(() => {});
         }
         
+        // ✅ إعادة فتح Data Channel بعد المكالمة (لتبقى الميزات مفعلة)
+        if (ChatSystem.featuresEnabled && ChatSystem.currentChat) {
+            setTimeout(() => {
+                console.log('🔧 إعادة فتح Data Channel بعد المكالمة...');
+                this.ensureDataChannelOnly(ChatSystem.currentChat).catch(e => {
+                    console.error('❌ فشل إعادة فتح القناة:', e);
+                });
+            }, 500);
+        }
+        
         console.log('✅ تم إنهاء المكالمة');
     }
 };
+        
     
     
 // ==================== 15. الدوال العامة ====================
