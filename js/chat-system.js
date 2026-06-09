@@ -768,11 +768,11 @@ async handleFeatureResponse(fromId, action) {
         
         if (this.currentChat) {
             try {
-                console.log('🔧 محاولة فتح Data Channel بعد قبول الطرف الآخر...');
+                console.log('🔧 محاولة فتح قناة الميزات بعد قبول الطرف الآخر...');
                 await CallSystem.ensureDataChannelOnly(this.currentChat);
-                console.log('✅ تم فتح Data Channel بنجاح');
+                console.log('✅ تم فتح قناة الميزات بنجاح');
             } catch(e) {
-                console.error('❌ خطأ في فتح Data Channel:', e);
+                console.error('❌ خطأ في فتح قناة الميزات:', e);
             }
         }
         
@@ -828,13 +828,22 @@ async handleFeatureResponse(fromId, action) {
             btn.title = 'تفعيل الميزات';
         }
         
-        if (CallSystem.dc) {
-            try { CallSystem.dc.close(); } catch(e) {}
-            CallSystem.dc = null;
+        // ✅ تصحيح: استخدام القنوات الجديدة
+        if (CallSystem.dcFeatures) {
+            try { CallSystem.dcFeatures.close(); } catch(e) {}
+            CallSystem.dcFeatures = null;
         }
-        if (CallSystem.pc) {
-            try { CallSystem.pc.close(); } catch(e) {}
-            CallSystem.pc = null;
+        if (CallSystem.pcFeatures) {
+            try { CallSystem.pcFeatures.close(); } catch(e) {}
+            CallSystem.pcFeatures = null;
+        }
+        if (CallSystem.dcCall) {
+            try { CallSystem.dcCall.close(); } catch(e) {}
+            CallSystem.dcCall = null;
+        }
+        if (CallSystem.pcCall) {
+            try { CallSystem.pcCall.close(); } catch(e) {}
+            CallSystem.pcCall = null;
         }
         
         this.updateAllButtons();
@@ -842,7 +851,7 @@ async handleFeatureResponse(fromId, action) {
     }
 },
 
-     // ==================== القسم 10.1: disableFeatures ====================
+// ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
     
@@ -863,13 +872,22 @@ async disableFeatures() {
     if (toggleInput) toggleInput.checked = false;
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    if (CallSystem.dc) {
-        try { CallSystem.dc.close(); } catch(e) {}
-        CallSystem.dc = null;
+    // ✅ تصحيح: استخدام القنوات الجديدة
+    if (CallSystem.dcFeatures) {
+        try { CallSystem.dcFeatures.close(); } catch(e) {}
+        CallSystem.dcFeatures = null;
     }
-    if (CallSystem.pc) {
-        try { CallSystem.pc.close(); } catch(e) {}
-        CallSystem.pc = null;
+    if (CallSystem.pcFeatures) {
+        try { CallSystem.pcFeatures.close(); } catch(e) {}
+        CallSystem.pcFeatures = null;
+    }
+    if (CallSystem.dcCall) {
+        try { CallSystem.dcCall.close(); } catch(e) {}
+        CallSystem.dcCall = null;
+    }
+    if (CallSystem.pcCall) {
+        try { CallSystem.pcCall.close(); } catch(e) {}
+        CallSystem.pcCall = null;
     }
     
     this.updateAllButtons();
