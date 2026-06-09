@@ -8,6 +8,7 @@ const CallSystem = {
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
     isEndingCall: false,
+    isRemoteEnding: false,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -762,8 +763,9 @@ async createDataChannelOnly(calleeId) {
             }, 30000);
         });
     },
+ 
 
-   // ==================== 9. Data Channel وإدارة الاتصال ====================
+    // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -878,7 +880,7 @@ setupDataChannel(channel) {
             this.keepAliveInterval = null;
         }
         
-        if (!this.isEndingCall && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        if (!this.isEndingCall && !this.isRemoteEnding && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('🔌 انقطاع القناة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -899,12 +901,13 @@ setupDataChannel(channel) {
         }
         
         this.isEndingCall = false;
+        this.isRemoteEnding = false;
     };
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         
-        if (!this.isEndingCall && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+        if (!this.isEndingCall && !this.isRemoteEnding && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
@@ -949,6 +952,7 @@ async handleSignaling(data) {
             console.log('📞 الطرف الآخر رفض المكالمة');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
+            this.isRemoteEnding = true;
             this.isEndingCall = true;
             this.endCall();
             return;
@@ -958,6 +962,7 @@ async handleSignaling(data) {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
+            this.isRemoteEnding = true;
             this.isEndingCall = true;
             this.endCall();
             return;
@@ -1018,7 +1023,7 @@ async sendSignal(calleeId, data) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
 },
-   
+    
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
