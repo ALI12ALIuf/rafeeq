@@ -2574,7 +2574,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-  // ==================== القسم 37: closeChat ====================
+    // ==================== القسم 37: closeChat ====================
 
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة بالكامل');
@@ -2586,8 +2586,8 @@ closeChat() {
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
         
-        // ✅ إرسال إشارة إيقاف الميزات للطرف الآخر
-        if (this.featuresEnabled && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        // ✅ إرسال إشارة إيقاف الميزات للطرف الآخر (مع التحقق من وجود CallSystem)
+        if (this.featuresEnabled && typeof CallSystem !== 'undefined' && CallSystem.dc && CallSystem.dc.readyState === 'open') {
             try {
                 CallSystem.dc.send(JSON.stringify({ 
                     type: 'force_disable_features',
@@ -2650,15 +2650,22 @@ closeChat() {
     }
     
     // ✅ ✅ ✅ استخدام الدالة الجديدة لإغلاق كل شيء (المكالمة + Data Channel)
-    if (typeof CallSystem !== 'undefined') {
-        if (CallSystem.endCallCompletely) {
-            CallSystem.endCallCompletely();
-        } else {
-            // للتوافق مع الإصدارات القديمة
-            if (CallSystem.isInCall) CallSystem.endCall();
-            if (CallSystem.dc) { try { CallSystem.dc.close(); } catch(e) {} CallSystem.dc = null; }
-            if (CallSystem.pc) { try { CallSystem.pc.close(); } catch(e) {} CallSystem.pc = null; }
+    // مع التحقق الإضافي من وجود CallSystem و endCallCompletely
+    if (typeof CallSystem !== 'undefined' && CallSystem !== null) {
+        try {
+            if (typeof CallSystem.endCallCompletely === 'function') {
+                CallSystem.endCallCompletely();
+            } else if (typeof CallSystem.endCall === 'function') {
+                // للتوافق مع الإصدارات القديمة
+                if (CallSystem.isInCall) CallSystem.endCall();
+                if (CallSystem.dc) { try { CallSystem.dc.close(); } catch(e) {} CallSystem.dc = null; }
+                if (CallSystem.pc) { try { CallSystem.pc.close(); } catch(e) {} CallSystem.pc = null; }
+            }
+        } catch(e) {
+            console.warn('⚠️ تحذير: فشل في إغلاق CallSystem:', e);
         }
+    } else {
+        console.log('⚠️ CallSystem غير موجود، تخطي إغلاق الاتصالات');
     }
     
     // تحديث زر التفعيل
