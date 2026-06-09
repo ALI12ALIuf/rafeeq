@@ -1,10 +1,13 @@
-// ========== 1. webrtc-call.js - النسخة النهائية المتكاملة ==========
-// جميع ميزات الصوت من ملف 22 + مكالمات الفيديو + إرسال الملفات + تنظيف تلقائي
+// ========== 1. webrtc-call.js - النسخة المعدلة (فصل القنوات) ==========
+// جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
 
 const CallSystem = {
-    pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
+    // قناة الميزات (ملفات، رسائل، مواقع) - تبقى مفتوحة دائماً
+    pcFeatures: null, dcFeatures: null,
+    // قناة المكالمات (صوت، فيديو) - تفتح وتغلق
+    pcCall: null, dcCall: null,
+    localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
-    reconnectTimer: null, maxReconnectAttempts: 3, reconnectAttempts: 0,
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
@@ -17,188 +20,119 @@ const CallSystem = {
         ] 
     },
     
-    // ==================== 1.5 حذف إشارات WebRTC من Firestore ====================
+    // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) - قناة الميزات ====================
     
-    async deleteAllWebRTCSignals(chatId) {
-        if (!chatId) return;
-        try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', chatId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) {
-                console.log('📡 لا توجد إشارات WebRTC عالقة للمحادثة', chatId);
-                return;
+async ensureDataChannelOnly(calleeId) {
+    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
+        console.log('🚫 منع فتح Data Channel - الميزات غير مفعلة');
+        return false;
+    }
+    
+    if (!calleeId) return false;
+    
+    // ✅ إذا قناة الميزات مفتوحة بالفعل
+    if (this.dcFeatures && this.dcFeatures.readyState === 'open') {
+        console.log('✅ قناة الميزات موجودة ومفتوحة');
+        return true;
+    }
+    
+    // ✅ إذا قناة الميزات في طور الاتصال - انتظر
+    if (this.dcFeatures && this.dcFeatures.readyState === 'connecting') {
+        console.log('⏳ قناة الميزات في طور الاتصال...');
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(false), 10000);
+            const check = setInterval(() => {
+                if (this.dcFeatures && this.dcFeatures.readyState === 'open') {
+                    clearInterval(check);
+                    clearTimeout(timeout);
+                    resolve(true);
+                } else if (this.dcFeatures && (this.dcFeatures.readyState === 'failed' || this.dcFeatures.readyState === 'closed')) {
+                    clearInterval(check);
+                    clearTimeout(timeout);
+                    this.createDataChannelOnly(calleeId).then(resolve);
+                }
+            }, 500);
+        });
+    }
+    
+    // ✅ إذا لا توجد قناة، قم بإنشائها
+    return this.createDataChannelOnly(calleeId);
+},
+
+async createDataChannelOnly(calleeId) {
+    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
+        console.log('🚫 منع إنشاء قناة الميزات - الميزات غير مفعلة');
+        return false;
+    }
+    
+    // ✅ إذا كانت قناة الميزات مفتوحة بالفعل، لا نعيد إنشاءها
+    if (this.dcFeatures && this.dcFeatures.readyState === 'open') {
+        console.log('✅ قناة الميزات موجودة ومفتوحة، لا حاجة لإعادة الإنشاء');
+        return true;
+    }
+    
+    // ✅ تنظيف الاتصالات القديمة فقط إذا كانت فاشلة أو مغلقة
+    if (this.pcFeatures && (this.pcFeatures.connectionState === 'failed' || this.pcFeatures.connectionState === 'closed')) {
+        try { this.pcFeatures.close(); } catch(e) {}
+        this.pcFeatures = null;
+    }
+    if (this.dcFeatures && (this.dcFeatures.readyState === 'failed' || this.dcFeatures.readyState === 'closed')) {
+        try { this.dcFeatures.close(); } catch(e) {}
+        this.dcFeatures = null;
+    }
+    
+    // ✅ إذا كان هناك PeerConnection في حالة connecting، لا ننشئ جديداً
+    if (this.pcFeatures && (this.pcFeatures.connectionState === 'connecting' || this.pcFeatures.connectionState === 'new')) {
+        console.log('⏳ PeerConnection قيد الاتصال بالفعل، انتظر...');
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(false), 10000);
+            const check = setInterval(() => {
+                if (this.dcFeatures && this.dcFeatures.readyState === 'open') {
+                    clearInterval(check);
+                    clearTimeout(timeout);
+                    resolve(true);
+                } else if (this.pcFeatures && (this.pcFeatures.connectionState === 'failed' || this.pcFeatures.connectionState === 'closed')) {
+                    clearInterval(check);
+                    clearTimeout(timeout);
+                    this.createDataChannelOnly(calleeId).then(resolve);
+                }
+            }, 500);
+        });
+    }
+    
+    try {
+        console.log('🔧 إنشاء قناة الميزات (بدون مكالمة)...');
+        
+        this.pcFeatures = new RTCPeerConnection(this.servers);
+        this.dcFeatures = this.pcFeatures.createDataChannel('features', { ordered: true, maxRetransmits: 3 });
+        this.setupDataChannel(this.dcFeatures, 'features');
+        
+        this.pcFeatures.onicecandidate = e => { 
+            if (e.candidate) {
+                console.log('📡 إرسال ICE candidate (قناة الميزات)');
+                this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
             }
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة من Firestore للمحادثة ${chatId}`);
-        } catch(e) {
-            console.warn('⚠️ فشل حذف الإشارات العالقة:', e);
-        }
-    },
+        };
+        
+        this.pcFeatures.ondatachannel = e => { 
+            console.log('📡 استقبال Data Channel من الطرف الآخر (قناة الميزات)');
+            this.setupDataChannel(e.channel, 'features'); 
+            this.dcFeatures = e.channel; 
+        };
+        
+        const offer = await this.pcFeatures.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+        await this.pcFeatures.setLocalDescription(offer);
+        await this.sendSignal(calleeId, { sdp: this.pcFeatures.localDescription, type: 'datachannel' });
+        
+        console.log('✅ تم إرسال Offer لفتح قناة الميزات');
+        return true;
+    } catch (error) {
+        console.error('❌ فشل إنشاء قناة الميزات:', error);
+        return false;
+    }
+},
     
-    async deleteAllMyWebRTCSignals() {
-        if (!window.auth?.currentUser) return;
-        const myId = window.auth.currentUser.uid;
-        try {
-            const messagesRef = window.db.collection('secure_messages');
-            const snapshot = await messagesRef
-                .where('to', '==', myId)
-                .where('package.type', '==', 'webrtc')
-                .get();
-            
-            if (snapshot.empty) return;
-            
-            const batch = window.db.batch();
-            snapshot.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            console.log(`✅ تم حذف ${snapshot.size} إشارة WebRTC عالقة للمستخدم الحالي`);
-        } catch(e) {}
-    },
-    
-    // ==================== 2. التنظيف التلقائي ====================
-    
-    async autoCleanupOnLoad() {
-        console.log('🧹 تشغيل التنظيف التلقائي للمكالمات العالقة...');
-        
-        await this.deleteAllMyWebRTCSignals();
-        
-        this.isInCall = false;
-        this.callType = null;
-        this.currentCallId = null;
-        this.isAudioMuted = false;
-        this.isVideoMuted = false;
-        this.isSpeakerEnabled = false;
-        
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.callTimerInterval) {
-            clearInterval(this.callTimerInterval);
-            this.callTimerInterval = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        if (this.remoteAudioElement) {
-            this.remoteAudioElement.pause();
-            this.remoteAudioElement.srcObject = null;
-            this.remoteAudioElement = null;
-        }
-        
-        if (this.localStream) {
-            try {
-                this.localStream.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            this.localStream = null;
-        }
-        
-        this.cleanupConnections();
-        
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
-        document.body.classList.remove('in-call');
-        
-        if (typeof PresenceSystem !== 'undefined' && window.auth?.currentUser) {
-            try {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    online: true,
-                    inCall: false,
-                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                console.log('✅ تم تنظيف حالة المستخدم في قاعدة البيانات');
-            } catch(e) {
-                console.warn('⚠️ فشل تنظيف قاعدة البيانات:', e.message);
-            }
-        }
-        
-        console.log('✅ اكتمل التنظيف التلقائي - جاهز للمكالمات الجديدة');
-    },
-    
-    // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
-    
-    async ensureDataChannelOnly(calleeId) {
-        if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-            console.log('🚫 منع فتح Data Channel - الميزات غير مفعلة');
-            return false;
-        }
-        
-        if (!calleeId) return false;
-        
-        if (this.dc && this.dc.readyState === 'open') {
-            console.log('✅ Data Channel موجود ومفتوح');
-            return true;
-        }
-        
-        if (this.dc && this.dc.readyState === 'connecting') {
-            console.log('⏳ Data Channel في طور الاتصال...');
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => resolve(false), 10000);
-                const check = setInterval(() => {
-                    if (this.dc && this.dc.readyState === 'open') {
-                        clearInterval(check);
-                        clearTimeout(timeout);
-                        resolve(true);
-                    } else if (this.dc && (this.dc.readyState === 'failed' || this.dc.readyState === 'closed')) {
-                        clearInterval(check);
-                        clearTimeout(timeout);
-                        this.createDataChannelOnly(calleeId).then(resolve);
-                    }
-                }, 500);
-            });
-        }
-        
-        return this.createDataChannelOnly(calleeId);
-    },
-    
-    async createDataChannelOnly(calleeId) {
-        if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-            console.log('🚫 منع إنشاء Data Channel - الميزات غير مفعلة');
-            return false;
-        }
-        
-        this.cleanupConnections();
-        try {
-            console.log('🔧 إنشاء Data Channel فقط (بدون مكالمة)...');
-            
-            this.pc = new RTCPeerConnection(this.servers);
-            this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-            this.setupDataChannel(this.dc);
-            
-            this.pc.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
-            };
-            
-            this.pc.ondatachannel = e => { 
-                this.setupDataChannel(e.channel); 
-                this.dc = e.channel; 
-            };
-            
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'datachannel' });
-            
-            console.log('✅ تم إرسال طلب فتح Data Channel');
-            return true;
-        } catch (error) {
-            console.error('❌ فشل إنشاء Data Channel:', error);
-            return false;
-        }
-    },
-    
-    // ==================== 4. المكالمة الصوتية ====================
+    // ==================== 4. المكالمة الصوتية (قناة المكالمات) ====================
 
     async startAudioCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -244,41 +178,42 @@ const CallSystem = {
             }
             console.log('✅ تم الحصول على الميكروفون');
             
-            this.pc = new RTCPeerConnection(this.servers);
+            // ✅ استخدام قناة المكالمات المنفصلة
+            this.pcCall = new RTCPeerConnection(this.servers);
             
             this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
+                this.pcCall.addTrack(track, this.localStream);
+                console.log(`➕ تم إضافة مسار ${track.kind} (قناة المكالمات)`);
             });
             
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
+            this.dcCall = this.pcCall.createDataChannel('call');
+            this.setupDataChannel(this.dcCall, 'call');
             
-            this.pc.onicecandidate = e => { 
+            this.pcCall.onicecandidate = e => { 
                 if (e.candidate) {
-                    console.log('📡 إرسال ICE candidate');
+                    console.log('📡 إرسال ICE candidate (قناة المكالمات)');
                     this.sendSignal(calleeId, { candidate: e.candidate });
                 }
             };
             
-            this.pc.ontrack = e => {
-                console.log(`📞 استقبال مسار ${e.track.kind}`);
+            this.pcCall.ontrack = e => {
+                console.log(`📞 استقبال مسار ${e.track.kind} (قناة المكالمات)`);
                 if (e.track.kind === 'audio') {
                     this.setupRemoteAudio(e.streams[0]);
                 }
             };
             
-            this.pc.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+            this.pcCall.onconnectionstatechange = () => {
+                console.log(`🔄 حالة الاتصال (قناة المكالمات): ${this.pcCall?.connectionState}`);
+                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
                     this.endCall();
                 }
             };
             
             console.log('📞 إنشاء عرض مكالمة صوتية...');
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
+            const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+            await this.pcCall.setLocalDescription(offer);
+            await this.sendSignal(calleeId, { sdp: this.pcCall.localDescription, type: 'audio' });
             console.log('✅ تم إرسال العرض');
             
         } catch (e) { 
@@ -287,7 +222,7 @@ const CallSystem = {
         }
     },
 
-    // ==================== 5. المكالمة المرئية ====================
+    // ==================== 5. المكالمة المرئية (قناة المكالمات) ====================
 
     async startVideoCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -328,23 +263,25 @@ const CallSystem = {
             }
             
             this.showCallUI('video');
-            this.pc = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
-            this.dc = this.pc.createDataChannel('chat');
-            this.setupDataChannel(this.dc);
             
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pc.ontrack = e => {
+            // ✅ استخدام قناة المكالمات المنفصلة
+            this.pcCall = new RTCPeerConnection(this.servers);
+            this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
+            this.dcCall = this.pcCall.createDataChannel('call');
+            this.setupDataChannel(this.dcCall, 'call');
+            
+            this.pcCall.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+            this.pcCall.ontrack = e => {
                 const rv = document.getElementById('remoteVideo');
                 if (rv && e.streams[0]) rv.srcObject = e.streams[0];
             };
-            this.pc.onconnectionstatechange = () => {
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
+            this.pcCall.onconnectionstatechange = () => {
+                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
             };
             
-            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            await this.pc.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
+            const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+            await this.pcCall.setLocalDescription(offer);
+            await this.sendSignal(calleeId, { sdp: this.pcCall.localDescription, type: 'video' });
             
         } catch (e) { 
             this.endCall(); 
@@ -390,7 +327,7 @@ const CallSystem = {
     },
 
     
-    // ==================== 7. استقبال المكالمات ====================
+    // ==================== 7. استقبال المكالمات (قناة المكالمات) ====================
 
     async receiveCall(callerId, callData) {
         if (this.isInCall) {
@@ -439,18 +376,19 @@ const CallSystem = {
             
             this.showCallUI(this.callType);
             
-            this.pc = new RTCPeerConnection(this.servers);
+            // ✅ استخدام قناة المكالمات المنفصلة
+            this.pcCall = new RTCPeerConnection(this.servers);
             
             this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
+                this.pcCall.addTrack(track, this.localStream);
+                console.log(`➕ تم إضافة مسار ${track.kind} (قناة المكالمات)`);
             });
             
-            this.pc.onicecandidate = e => { 
+            this.pcCall.onicecandidate = e => { 
                 if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
             };
             
-            this.pc.ontrack = e => {
+            this.pcCall.ontrack = e => {
                 console.log('📞 استقبال مسار:', e.track.kind);
                 
                 if (e.track.kind === 'video') {
@@ -475,25 +413,25 @@ const CallSystem = {
                 }
             };
             
-            this.pc.ondatachannel = e => {
-                console.log('📡 استقبال Data Channel');
-                this.setupDataChannel(e.channel);
-                this.dc = e.channel;
+            this.pcCall.ondatachannel = e => {
+                console.log('📡 استقبال Data Channel (قناة المكالمات)');
+                this.setupDataChannel(e.channel, 'call');
+                this.dcCall = e.channel;
             };
             
-            this.pc.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
-                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
+            this.pcCall.onconnectionstatechange = () => {
+                console.log(`🔄 حالة الاتصال (قناة المكالمات): ${this.pcCall?.connectionState}`);
+                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
                     this.endCall();
                 }
             };
             
             if (callData.sdp) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+                await this.pcCall.setRemoteDescription(new RTCSessionDescription(callData.sdp));
                 const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
-                const answer = await this.pc.createAnswer(answerOptions);
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
+                const answer = await this.pcCall.createAnswer(answerOptions);
+                await this.pcCall.setLocalDescription(answer);
+                await this.sendSignal(callerId, { sdp: this.pcCall.localDescription });
                 console.log('✅ تم إرسال الرد');
             }
             
@@ -519,7 +457,7 @@ const CallSystem = {
 
     showIncomingCall(callerId, callData) {
         if (callData.type === 'datachannel') {
-            console.log('📡 استلام طلب فتح Data Channel - لا حاجة لعرض شاشة');
+            console.log('📡 استلام طلب فتح قناة الميزات - لا حاجة لعرض شاشة');
             this.handleSignaling(callData);
             return;
         }
@@ -830,12 +768,13 @@ const CallSystem = {
             }, 30000);
         });
     },
+
     
     // ==================== 9. Data Channel وإدارة الاتصال ====================
 
-setupDataChannel(channel) {
+setupDataChannel(channel, type = 'features') {
     if (!channel) return;
-    console.log('📡 إعداد Data Channel');
+    console.log(`📡 إعداد Data Channel (${type})`);
     
     channel.onmessage = e => {
         try {
@@ -919,7 +858,6 @@ setupDataChannel(channel) {
             }
             const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
             if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
                 ChatSystem.displayMessage(displayMsg);
             }
         } catch (error) {
@@ -928,33 +866,31 @@ setupDataChannel(channel) {
     };
     
     channel.onopen = () => {
-        console.log('✅ Data Channel مفتوح');
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
+        console.log(`✅ Data Channel مفتوح (${type})`);
+        if (type === 'features') {
+            this.sendCallStatus('connected');
         }
-        this.reconnectAttempts = 0;
-        this.sendCallStatus('connected');
         
         if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
         this.keepAliveInterval = setInterval(() => {
-            if (this.dc && this.dc.readyState === 'open') {
-                this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+            if (this.dcFeatures && this.dcFeatures.readyState === 'open') {
+                this.dcFeatures.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
             }
         }, 2000);
     };
     
     channel.onclose = () => {
-        console.log('❌ Data Channel مغلق');
-        this.sendCallStatus('disconnected');
+        console.log(`❌ Data Channel مغلق (${type})`);
+        if (type === 'features') {
+            this.sendCallStatus('disconnected');
+        }
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
         }
-        this.scheduleReconnect();
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('🔌 انقطاع القناة - الطرف الآخر أغلق المتصفح، إلغاء تفعيل الميزات');
+        if (type === 'features' && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('🔌 انقطاع قناة الميزات - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
             ChatSystem.featureRequestReceived = false;
@@ -971,16 +907,14 @@ setupDataChannel(channel) {
             }
             
             ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب انقطاع قناة الاتصال');
         }
     };
     
     channel.onerror = (e) => {
-        console.error('❌ خطأ في Data Channel:', e);
-        this.scheduleReconnect();
+        console.error(`❌ خطأ في Data Channel (${type}):`, e);
         
-        if (ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
+        if (type === 'features' && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('⚠️ خطأ في قناة الميزات - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
             ChatSystem.featureRequestReceived = false;
@@ -997,7 +931,6 @@ setupDataChannel(channel) {
             }
             
             ChatSystem.updateAllButtons();
-            console.log('✅ تم إلغاء تفعيل الميزات بسبب خطأ القناة');
         }
     };
 },
@@ -1014,82 +947,8 @@ handleCallStatus(msg) {
 },
 
 sendCallStatus(status) {
-    if (this.dc && this.dc.readyState === 'open') {
-        this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
-    }
-},
-
-scheduleReconnect() {
-    if (!ChatSystem.currentChat) return;
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 16000);
-    this.reconnectTimer = setTimeout(async () => {
-        try {
-            if (ChatSystem.currentChat) {
-                await this.ensureDataChannelOnly(ChatSystem.currentChat);
-            }
-        } catch (error) {}
-        this.reconnectTimer = null;
-    }, delay);
-},
-
-async ensureDataChannel(calleeId) {
-    if (!calleeId) return;
-    if (this.dc && this.dc.readyState === 'open') return;
-    if (this.dc && this.dc.readyState === 'connecting') {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                clearInterval(checkInterval);
-                reject(new Error('انتهت مهلة انتظار القناة'));
-            }, 10000);
-            const checkInterval = setInterval(() => {
-                if (!this.dc) {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                } else if (this.dc.readyState === 'open') {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    resolve();
-                } else if (this.dc.readyState === 'failed' || this.dc.readyState === 'closed') {
-                    clearInterval(checkInterval);
-                    clearTimeout(timeout);
-                    this.createNewDataChannel(calleeId).then(resolve).catch(reject);
-                }
-            }, 500);
-        });
-    }
-    return this.createNewDataChannel(calleeId);
-},
-
-async createNewDataChannel(calleeId) {
-    if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-        console.log('🚫 منع إنشاء Data Channel جديد - الميزات غير مفعلة');
-        return;
-    }
-    
-    this.reconnectAttempts = 0;
-    this.cleanupConnections();
-    try {
-        this.pc = new RTCPeerConnection(this.servers);
-        this.dc = this.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
-        this.setupDataChannel(this.dc);
-        this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {}); };
-        this.pc.oniceconnectionstatechange = () => { if (this.pc?.iceConnectionState === 'failed') this.pc.restartIce(); };
-        this.pc.ondatachannel = e => { this.setupDataChannel(e.channel); this.dc = e.channel; };
-        this.pc.onconnectionstatechange = () => {
-            switch(this.pc?.connectionState) {
-                case 'connected': this.reconnectAttempts = 0; break;
-                case 'failed': case 'disconnected': this.scheduleReconnect(); break;
-            }
-        };
-        const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-        await this.pc.setLocalDescription(offer);
-        await this.sendSignal(calleeId, { sdp: this.pc.localDescription });
-    } catch (error) {
-        throw error;
+    if (this.dcFeatures && this.dcFeatures.readyState === 'open') {
+        this.dcFeatures.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
     }
 },
 
@@ -1111,21 +970,31 @@ async handleSignaling(data) {
             return;
         }
         
-        if (!this.pc) {
-            this.pc = new RTCPeerConnection(this.servers);
-            this.pc.ondatachannel = e => { this.dc = e.channel; this.setupDataChannel(this.dc); };
-            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); };
+        if (!this.pcCall && !this.pcFeatures) {
+            this.pcCall = new RTCPeerConnection(this.servers);
+            this.pcCall.ondatachannel = e => { 
+                this.dcCall = e.channel; 
+                this.setupDataChannel(this.dcCall, 'call'); 
+            };
+            this.pcCall.onicecandidate = e => { 
+                if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); 
+            };
         }
         if (data.sdp) {
-            await this.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-            if (data.sdp.type === 'offer') {
-                const answer = await this.pc.createAnswer();
-                await this.pc.setLocalDescription(answer);
-                await this.sendSignal(ChatSystem.currentChat, { sdp: this.pc.localDescription });
+            const targetPc = data.type === 'audio' || data.type === 'video' ? this.pcCall : this.pcFeatures;
+            if (targetPc) {
+                await targetPc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                if (data.sdp.type === 'offer') {
+                    const answer = await targetPc.createAnswer();
+                    await targetPc.setLocalDescription(answer);
+                    await this.sendSignal(ChatSystem.currentChat, { sdp: targetPc.localDescription });
+                }
             }
         } else if (data.candidate) {
-            if (this.pc && data.candidate) {
-                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            if (this.pcCall && data.candidate) {
+                await this.pcCall.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } else if (this.pcFeatures && data.candidate) {
+                await this.pcFeatures.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         }
     } catch (e) {
@@ -1133,30 +1002,38 @@ async handleSignaling(data) {
     }
 },
 
+// ✅ دالة sendSignal المعدلة - تدعم الإرسال عبر Firebase أثناء فتح القناة
 async sendSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
         return;
     }
     
-    if (this.dc && this.dc.readyState === 'open') {
+    // ✅ إذا قناة الميزات مفتوحة → أرسل مباشرة
+    if (this.dcFeatures && this.dcFeatures.readyState === 'open') {
         try {
-            this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
-            console.log('📡 تم إرسال الإشارة مباشرة عبر Data Channel');
+            this.dcFeatures.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
+            console.log('📡 تم إرسال الإشارة مباشرة عبر قناة الميزات');
             return;
         } catch(e) {
-            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
+            console.error('❌ فشل الإرسال المباشر:', e);
         }
     }
     
+    // ✅ إذا القناة لا تزال تفتح → أرسل عبر Firebase (لفتح القناة)
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
         if (!myPrivateKey || !receiverPublicKey) return;
         const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
         const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-        await SecureChatSystem.sendToServer(calleeId, { id: Date.now().toString(), type: 'webrtc', data: encrypted, timestamp: Date.now() });
-        console.log('📡 تم إرسال الإشارة عبر Firebase (حل احتياطي)');
+        await SecureChatSystem.sendToServer(calleeId, { 
+            id: Date.now().toString(), 
+            type: 'webrtc', 
+            data: encrypted, 
+            timestamp: Date.now() 
+        });
+        console.log('📡 تم إرسال الإشارة عبر Firebase (لفتح القناة)');
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
@@ -1444,8 +1321,8 @@ async sendSignal(calleeId, data) {
                 video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
-            if (this.pc) {
-                const sender = this.pc.getSenders().find(s => s.track?.kind === 'video');
+            if (this.pcCall) {
+                const sender = this.pcCall.getSenders().find(s => s.track?.kind === 'video');
                 if (sender) await sender.replaceTrack(newVideoTrack);
             }
             const audioTrack = this.localStream.getAudioTracks()[0];
@@ -1458,147 +1335,154 @@ async sendSignal(calleeId, data) {
         }
     },
     
-    // ==================== 13. إرسال الملفات ====================
+    // ==================== 13. إرسال الملفات (عبر قناة الميزات) ====================
+
+async sendFileDirect(file, type) {
+    // ✅ استخدام قناة الميزات
+    if (!this.dcFeatures || this.dcFeatures.readyState !== 'open') {
+        console.log('❌ قناة الميزات غير مفتوحة');
+        return false;
+    }
     
-    async sendFileDirect(file, type) {
-        if (!this.dc || this.dc.readyState !== 'open') {
-            console.log('❌ Data Channel غير مفتوح');
-            return false;
+    try {
+        let blobToSend = file;
+        if (type === 'image') {
+            blobToSend = await this.compressImage(file);
         }
         
-        try {
-            let blobToSend = file;
-            if (type === 'image') {
-                blobToSend = await this.compressImage(file);
+        const arrayBuffer = await blobToSend.arrayBuffer();
+        const chunkSize = 16000;
+        const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize);
+        const fileId = Date.now().toString();
+        
+        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء) - بدون base64 (عبر قناة الميزات)`);
+        
+        for (let i = 0; i < totalChunks; i++) {
+            if (this.dcFeatures.readyState !== 'open') {
+                ChatSystem.hideProgressBar();
+                return false;
             }
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, arrayBuffer.byteLength);
+            const chunk = arrayBuffer.slice(start, end);
             
-            const b64 = await this.fileToBase64(blobToSend);
-            const chunkSize = 16000;
-            const totalChunks = Math.ceil(b64.length / chunkSize);
-            const fileId = Date.now().toString();
-            
-            console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
-            
-            for (let i = 0; i < totalChunks; i++) {
-                if (this.dc.readyState !== 'open') {
-                    ChatSystem.hideProgressBar();
-                    return false;
+            const chunkData = {
+                type: type,
+                data: Array.from(new Uint8Array(chunk)),
+                chunk: i,
+                total: totalChunks,
+                id: fileId,
+                fileName: file.name || 'ملف'
+            };
+            this.dcFeatures.send(JSON.stringify(chunkData));
+            const progress = ((i + 1) / totalChunks) * 100;
+            const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
+            ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
+            await new Promise(r => setTimeout(r, 50));
+        }
+        ChatSystem.hideProgressBar();
+        console.log('✅ تم إرسال الملف بنجاح (عبر قناة الميزات)');
+        return true;
+    } catch (e) {
+        console.error('❌ فشل إرسال الملف:', e);
+        ChatSystem.hideProgressBar();
+        return false;
+    }
+},
+
+handleChunkMessage(msg) {
+    if (!this.incomingChunks[msg.id]) {
+        this.incomingChunks[msg.id] = [];
+        this.incomingFileInfo[msg.id] = {
+            type: msg.type,
+            fileName: msg.fileName,
+            total: msg.total,
+            received: 0
+        };
+        ChatSystem.showProgressBar('جاري استلام الملف...', 0);
+    }
+    
+    const chunkData = new Uint8Array(msg.data);
+    this.incomingChunks[msg.id][msg.chunk] = chunkData;
+    this.incomingFileInfo[msg.id].received++;
+    const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
+    const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
+    ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
+    
+    if (this.incomingFileInfo[msg.id].received === msg.total) {
+        let totalLength = 0;
+        for (let i = 0; i < msg.total; i++) {
+            totalLength += this.incomingChunks[msg.id][i].length;
+        }
+        
+        const fullBuffer = new Uint8Array(totalLength);
+        let offset = 0;
+        for (let i = 0; i < msg.total; i++) {
+            fullBuffer.set(this.incomingChunks[msg.id][i], offset);
+            offset += this.incomingChunks[msg.id][i].length;
+        }
+        
+        let mimeType = 'application/octet-stream';
+        if (msg.type === 'image') mimeType = 'image/jpeg';
+        else if (msg.type === 'video') mimeType = 'video/mp4';
+        else if (msg.type === 'voice') mimeType = 'audio/webm';
+        
+        const blob = new Blob([fullBuffer], { type: mimeType });
+        const objectUrl = URL.createObjectURL(blob);
+        
+        const displayMsg = {
+            id: msg.id,
+            type: msg.type === 'location' ? 'text' : msg.type,
+            data: objectUrl,
+            fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+            sender: 'friend',
+            time: new Date().toISOString(),
+            _blobUrl: objectUrl
+        };
+        
+        if (ChatSystem.currentChat) {
+            ChatSystem.displayMessage(displayMsg);
+        }
+        ChatSystem.hideProgressBar();
+        
+        delete this.incomingChunks[msg.id];
+        delete this.incomingFileInfo[msg.id];
+    }
+},
+
+compressImage(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width, height = img.height;
+                const maxSize = 800;
+                if (width > height && width > maxSize) {
+                    height = (height * maxSize) / width;
+                    width = maxSize;
+                } else if (height > maxSize) {
+                    width = (width * maxSize) / height;
+                    height = maxSize;
                 }
-                const chunk = {
-                    type: type,
-                    data: b64.substring(i * chunkSize, (i + 1) * chunkSize),
-                    chunk: i,
-                    total: totalChunks,
-                    id: fileId,
-                    fileName: file.name || 'ملف'
-                };
-                this.dc.send(JSON.stringify(chunk));
-                const progress = ((i + 1) / totalChunks) * 100;
-                const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
-                ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-                await new Promise(r => setTimeout(r, 50));
-            }
-            ChatSystem.hideProgressBar();
-            console.log('✅ تم إرسال الملف بنجاح');
-            return true;
-        } catch (e) {
-            console.error('❌ فشل إرسال الملف:', e);
-            ChatSystem.hideProgressBar();
-            return false;
-        }
-    },
-    
-    handleChunkMessage(msg) {
-        if (!this.incomingChunks[msg.id]) {
-            this.incomingChunks[msg.id] = [];
-            this.incomingFileInfo[msg.id] = {
-                type: msg.type,
-                fileName: msg.fileName,
-                total: msg.total,
-                received: 0
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
             };
-            ChatSystem.showProgressBar('جاري استلام الملف...', 0);
-        }
-        
-        this.incomingChunks[msg.id][msg.chunk] = msg.data;
-        this.incomingFileInfo[msg.id].received++;
-        const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-        const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
-        ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-        
-        if (this.incomingFileInfo[msg.id].received === msg.total) {
-            const fullData = this.incomingChunks[msg.id].join('');
-            
-            let finalData = fullData;
-            
-            if (msg.type === 'image' && !fullData.startsWith('data:image')) {
-                finalData = 'data:image/jpeg;base64,' + fullData;
-            } else if (msg.type === 'video' && !fullData.startsWith('data:video')) {
-                finalData = 'data:video/mp4;base64,' + fullData;
-            } else if (msg.type === 'voice' && !fullData.startsWith('data:audio')) {
-                finalData = 'data:audio/webm;base64,' + fullData;
-            }
-            
-            const displayMsg = {
-                id: msg.id,
-                type: msg.type === 'location' ? 'text' : msg.type,
-                data: finalData,
-                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
-                sender: 'friend',
-                time: new Date().toISOString()
-            };
-            
-            if (ChatSystem.currentChat) {
-                ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
-                ChatSystem.displayMessage(displayMsg);
-            }
-            ChatSystem.hideProgressBar();
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
-        }
-    },
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+},
+
     
-    compressImage(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const maxSize = 800;
-                    if (width > height && width > maxSize) {
-                        height = (height * maxSize) / width;
-                        width = maxSize;
-                    } else if (height > maxSize) {
-                        width = (width * maxSize) / height;
-                        height = maxSize;
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1] || reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    // ==================== 14. إنهاء المكالمة ====================
+// ==================== 14. إنهاء المكالمة (إغلاق قناة المكالمات فقط) ====================
     
     endCall() {
-        console.log('📞 إنهاء المكالمة وتنظيف الحالة...');
+        console.log('📞 إنهاء المكالمة...');
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
@@ -1633,7 +1517,20 @@ async sendSignal(calleeId, data) {
             this.localStream = null;
         }
         
-        this.cleanupConnections();
+        // ✅ إغلاق قناة المكالمات فقط (pcCall و dcCall)
+        if (this.dcCall) {
+            try { this.dcCall.close(); } catch(e) {}
+            this.dcCall = null;
+        }
+        if (this.pcCall) {
+            try { this.pcCall.close(); } catch(e) {}
+            this.pcCall = null;
+        }
+        
+        // ✅ لا نغلق قناة الميزات (pcFeatures, dcFeatures)
+        
+        this.incomingChunks = {};
+        this.incomingFileInfo = {};
         
         const ui = document.getElementById('callUI');
         if (ui) ui.remove();
@@ -1656,52 +1553,12 @@ async sendSignal(calleeId, data) {
             }).catch(() => {});
         }
         
-        console.log('✅ تم إنهاء المكالمة وتنظيف جميع الحالات بنجاح');
-    },
-    
-    cleanupConnections() {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            this.keepAliveInterval = null;
-        }
-        if (this.dc) {
-            try { this.dc.close(); } catch(e) {}
-            this.dc = null;
-        }
-        if (this.pc) {
-            try { this.pc.close(); } catch(e) {}
-            this.pc = null;
-        }
-        this.incomingChunks = {};
-        this.incomingFileInfo = {};
+        console.log('✅ تم إنهاء المكالمة (قناة الميزات لا تزال مفتوحة)');
     }
 };
-
-// ==================== 15. التنظيف التلقائي عند تحميل الصفحة ====================
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            if (typeof CallSystem !== 'undefined') {
-                CallSystem.autoCleanupOnLoad();
-            }
-        }, 1500);
-    });
-}
-
-// ==================== 16. التنظيف قبل إغلاق الصفحة ====================
-if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', () => {
-        if (CallSystem.isInCall) {
-            CallSystem.endCall();
-        }
-    });
-}
-
-// ==================== 17. الدوال العامة ====================
+    
+    
+// ==================== 15. الدوال العامة ====================
 window.startAudioCall = async () => {
     if (!ChatSystem.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
@@ -1718,9 +1575,4 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-window.cleanupCallState = async () => {
-    await CallSystem.autoCleanupOnLoad();
-    console.log('✅ تم تنظيف حالة المكالمات يدوياً');
-};
-
-console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
+console.log('✅ WebRTC Call System جاهز - مع فصل قنوات الميزات عن المكالمات');
