@@ -305,30 +305,14 @@ startFeatureBlink() {
     }, 500);
 },  
     
-        // ==================== القسم 7: requestEnableFeatures ====================
+    // ==================== القسم 7: requestEnableFeatures ====================
 async requestEnableFeatures() {
-    // ✅ انتظر حتى يصبح CallSystem جاهزاً (حل جذري)
-    let waitCount = 0;
-    while (typeof CallSystem === 'undefined' && waitCount < 30) {
-        await new Promise(r => setTimeout(r, 100));
-        waitCount++;
-    }
-    
-    if (typeof CallSystem === 'undefined' || CallSystem === null) {
-        console.error('❌ CallSystem لم يتم تحميله بعد 3 ثواني');
-        alert('النظام لا يزال قيد التحميل، حاول مرة أخرى بعد ثانيتين');
-        this.featureRequestPending = false;
-        return;
-    }
-    
     if (!this.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
-        this.featureRequestPending = false;
         return;
     }
     if (this.featuresEnabled) {
         alert('الميزات مفعلة بالفعل');
-        this.featureRequestPending = false;
         return;
     }
     if (this.featureRequestPending) {
@@ -336,6 +320,7 @@ async requestEnableFeatures() {
         return;
     }
     
+    this.featureRequestPending = true;
     this.startFeatureBlink();
     
     try {
@@ -452,11 +437,6 @@ async requestEnableFeatures() {
 // دالة مساعدة لإرسال إشارات ICE
 sendOfferSignal(data) {
     if (!this.currentChat) return;
-    // ✅ التحقق من وجود SecureChatSystem
-    if (typeof SecureChatSystem === 'undefined' || !SecureChatSystem.getMyPrivateKey) {
-        console.error('❌ SecureChatSystem غير موجود');
-        return;
-    }
     SecureChatSystem.getMyPrivateKey().then(async (myPrivateKey) => {
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
         if (!myPrivateKey || !receiverPublicKey) return;
@@ -2595,9 +2575,8 @@ updateLastMessage(friendId, lastMessage) {
 
 
     // ==================== القسم 37: closeChat ====================
-
 closeChat() {
-    console.log('🔴 closeChat - بدء إغلاق المحادثة بالكامل');
+    console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
     console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
     
@@ -2606,18 +2585,7 @@ closeChat() {
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
         
-        // ✅ إرسال إشارة إيقاف الميزات للطرف الآخر (مع التحقق من وجود CallSystem)
-        if (this.featuresEnabled && typeof CallSystem !== 'undefined' && CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            try {
-                CallSystem.dc.send(JSON.stringify({ 
-                    type: 'force_disable_features',
-                    timestamp: Date.now()
-                }));
-                console.log('✅ تم إرسال إشارة إيقاف الميزات إلى الطرف الآخر');
-            } catch(e) {
-                console.error('❌ فشل إرسال إشارة الإيقاف:', e);
-            }
-        }
+        // تم إزالة CallSystem.deleteAllWebRTCSignals
         
         const key = `chat_${chatId}`;
         const messages = this.messages[chatId] || [];
@@ -2638,7 +2606,6 @@ closeChat() {
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
-    this.friendInConversation = false;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -2651,7 +2618,7 @@ closeChat() {
         btn.title = 'تفعيل الميزات';
     }
     
-    // إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
+    // ✅ إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'none';
@@ -2660,44 +2627,27 @@ closeChat() {
     this.updateAllButtons();
     
     document.body.classList.remove('conversation-open');
-    const conversationPage = document.getElementById('conversationPage');
-    if (conversationPage) conversationPage.style.display = 'none';
-    const chatPage = document.querySelector('.chat-page');
-    if (chatPage) chatPage.style.display = 'block';
+    document.getElementById('conversationPage').style.display = 'none';
+    document.querySelector('.chat-page').style.display = 'block';
     
     if (typeof PresenceSystem !== 'undefined' && PresenceSystem.stopAll) {
         PresenceSystem.stopAll();
     }
     
-    // ✅ ✅ ✅ استخدام الدالة الجديدة لإغلاق كل شيء (المكالمة + Data Channel)
-    // مع التحقق الإضافي من وجود CallSystem و endCallCompletely
-    if (typeof CallSystem !== 'undefined' && CallSystem !== null) {
-        try {
-            if (typeof CallSystem.endCallCompletely === 'function') {
-                CallSystem.endCallCompletely();
-            } else if (typeof CallSystem.endCall === 'function') {
-                // للتوافق مع الإصدارات القديمة
-                if (CallSystem.isInCall) CallSystem.endCall();
-                if (CallSystem.dc) { try { CallSystem.dc.close(); } catch(e) {} CallSystem.dc = null; }
-                if (CallSystem.pc) { try { CallSystem.pc.close(); } catch(e) {} CallSystem.pc = null; }
-            }
-        } catch(e) {
-            console.warn('⚠️ تحذير: فشل في إغلاق CallSystem:', e);
+    if (!CallSystem.isInCall) {
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
         }
-    } else {
-        console.log('⚠️ CallSystem غير موجود، تخطي إغلاق الاتصالات');
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
+        }
     }
-    
-    // تحديث زر التفعيل
-    const toggleInput = document.getElementById('featureToggleInput');
-    if (toggleInput) toggleInput.checked = false;
-    
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    if (switchLabel) switchLabel.classList.remove('blinking');
-    
     this.currentChat = null;
+    this.friendInConversation = false;
     
-    console.log('✅ closeChat - تم إغلاق المحادثة بالكامل');
+    console.log('✅ closeChat - انتهى');
 },
     
     
@@ -2707,7 +2657,6 @@ closeChat() {
 
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
-
 
 
 
