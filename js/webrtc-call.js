@@ -1,6 +1,8 @@
 // ========== 1. webrtc-call.js - النسخة المعدلة (تم إزالة جميع دوال التنظيف) ==========
 // جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
 
+console.log('✅ webrtc-call.js تم تحميله بنجاح');
+
 const CallSystem = {
     pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
