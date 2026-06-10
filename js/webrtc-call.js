@@ -1479,10 +1479,6 @@ compressImage(file) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
         }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
         
         if (this.remoteAudioElement) {
             this.remoteAudioElement.pause();
@@ -1519,7 +1515,6 @@ compressImage(file) {
         this.isAudioMuted = false;
         this.isVideoMuted = false;
         this.isSpeakerEnabled = false;
-        this.reconnectAttempts = 0;
         
         if (window.auth?.currentUser) {
             window.db.collection('users').doc(window.auth.currentUser.uid).update({
