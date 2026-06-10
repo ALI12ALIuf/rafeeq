@@ -722,7 +722,7 @@ async sendOfferResponse(toId, action, data = null) {
 },
 
 
-    // ==================== القسم 9: acceptFeatureRequest ====================
+    // ==================== القسم 9: acceptFeatureRequest (المعدل) ====================
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
     
@@ -731,65 +731,113 @@ async acceptFeatureRequest() {
         return;
     }
     
-    // ✅ تفعيل الميزات محلياً فوراً
-    this.featuresEnabled = true;
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    if (this.currentChat) {
-        this.friendInConversation = true;
-        console.log('✅ تم تفعيل friendInConversation');
-    }
-    
-    console.log('✅ featuresEnabled =', this.featuresEnabled);
-    
-    // ✅ إزالة الـ blinking وتغيير لون الزر للأخضر فوراً
+    // ✅ إزالة الـ blinking
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
     }
     
-    const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) toggleInput.checked = true;
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ تحديث الواجهة فوراً
-    this.updateAllButtons();
+    // ✅ الحصول على الـ pending offer المخزن من القسم 8
+    const fromId = this.currentChat;
+    const pendingOffer = this._pendingOffer?.[fromId];
     
-    // ✅ إرسال قبول التفعيل (مع إشارة أن القناة ستفتح)
-    try {
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-            type: 'feature_response',
-            action: 'accepted',
-            timestamp: Date.now()
-        }), sharedKey);
-        await SecureChatSystem.sendToServer(this.currentChat, { 
-            id: Date.now().toString(), 
-            type: 'feature_response', 
-            data: encrypted, 
-            timestamp: Date.now() 
+    if (pendingOffer && pendingOffer.sdp) {
+        console.log('📡 تم العثور على Offer معلق، سيتم قبوله مع تجميع ICE لمدة 5 ثواني');
+        
+        // ✅ تفعيل الميزات محلياً فوراً (المستخدم يرى الزر أخضر)
+        this.featuresEnabled = true;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        this.friendInConversation = true;
+        
+        const toggleInput = document.getElementById('featureToggleInput');
+        if (toggleInput) toggleInput.checked = true;
+        
+        this.updateAllButtons();
+        
+        // ✅ إرسال قبول التفعيل (إشارة سريعة)
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (myPrivateKey && receiverPublicKey) {
+                const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+                const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                    type: 'feature_response',
+                    action: 'accepted',
+                    timestamp: Date.now()
+                }), sharedKey);
+                await SecureChatSystem.sendToServer(this.currentChat, { 
+                    id: Date.now().toString(), 
+                    type: 'feature_response', 
+                    data: encrypted, 
+                    timestamp: Date.now() 
+                });
+                console.log('✅ تم إرسال قبول التفعيل');
+            }
+        } catch(e) {
+            console.error('❌ خطأ في إرسال القبول:', e);
+        }
+        
+        // ✅ استدعاء acceptOffer التي تنتظر 5 ثواني وتجمع ICE
+        await this.acceptOffer(fromId, {
+            sdp: pendingOffer.sdp,
+            iceCandidates: pendingOffer.iceCandidates || []
         });
-        console.log('✅ تم إرسال قبول التفعيل');
-    } catch(e) {
-        console.error('❌ خطأ في إرسال القبول:', e);
-    }
-    
-    // ✅ فتح القناة في الخلفية (لا ننتظرها - المستخدم يرى الزر أخضر فوراً)
-    if (this.currentChat) {
+        
+        // تنظيف الـ pending offer
+        delete this._pendingOffer[fromId];
+        
+        console.log('✅ تم فتح القناة مع تجميع ICE');
+        
+    } else {
+        console.warn('⚠️ لا يوجد Offer معلق - استخدام الطريقة القديمة كحل احتياطي');
+        
+        // ✅ الطريقة القديمة (حل احتياطي)
+        this.featuresEnabled = true;
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
+        this.friendInConversation = true;
+        
+        const toggleInput = document.getElementById('featureToggleInput');
+        if (toggleInput) toggleInput.checked = true;
+        
+        this.updateAllButtons();
+        
+        // إرسال قبول التفعيل
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (myPrivateKey && receiverPublicKey) {
+                const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+                const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                    type: 'feature_response',
+                    action: 'accepted',
+                    timestamp: Date.now()
+                }), sharedKey);
+                await SecureChatSystem.sendToServer(this.currentChat, { 
+                    id: Date.now().toString(), 
+                    type: 'feature_response', 
+                    data: encrypted, 
+                    timestamp: Date.now() 
+                });
+                console.log('✅ تم إرسال قبول التفعيل');
+            }
+        } catch(e) {
+            console.error('❌ خطأ في إرسال القبول:', e);
+        }
+        
+        // فتح القناة بالطريقة القديمة
         CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
             console.log('✅ تم فتح Data Channel في الخلفية');
         }).catch(e => {
-            console.error('❌ خطأ في فتح Data Channel (خلفية):', e);
+            console.error('❌ خطأ في فتح Data Channel:', e);
         });
     }
     
-    console.log('✅ تم تفعيل الميزات! القناة تفتح في الخلفية');
+    console.log('✅ تم تفعيل الميزات!');
 },
     
     // ==================== القسم 10: handleFeatureResponse ====================
