@@ -9,6 +9,7 @@ const CallSystem = {
     remoteAudioElement: null,
     isEndingCall: false,
     isRemoteEnding: false,
+    isInActiveCall: false,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -149,6 +150,7 @@ async createDataChannelOnly(calleeId) {
         }
         
         this.isInCall = true;
+        this.isInActiveCall = true;
         this.callType = 'audio';
         this.currentCallId = calleeId;
         
@@ -238,6 +240,7 @@ async createDataChannelOnly(calleeId) {
         }
         
         this.isInCall = true;
+        this.isInActiveCall = true;
         this.callType = 'video';
         this.currentCallId = calleeId;
         
@@ -333,6 +336,7 @@ async createDataChannelOnly(calleeId) {
         }
         
         this.isInCall = true;
+        this.isInActiveCall = true;
         this.callType = callData.type || 'audio';
         this.currentCallId = callerId;
         console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
@@ -880,8 +884,8 @@ setupDataChannel(channel) {
             this.keepAliveInterval = null;
         }
         
-        if (!this.isEndingCall && !this.isRemoteEnding && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('🔌 انقطاع القناة - إلغاء تفعيل الميزات');
+        if (!this.isInActiveCall && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('🔌 انقطاع القناة خارج المكالمة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
             ChatSystem.featureRequestReceived = false;
@@ -902,13 +906,14 @@ setupDataChannel(channel) {
         
         this.isEndingCall = false;
         this.isRemoteEnding = false;
+        this.isInActiveCall = false;
     };
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         
-        if (!this.isEndingCall && !this.isRemoteEnding && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
-            console.log('⚠️ خطأ في القناة - إلغاء تفعيل الميزات');
+        if (!this.isInActiveCall && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('⚠️ خطأ خارج المكالمة - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
             ChatSystem.featureRequestPending = false;
             ChatSystem.featureRequestReceived = false;
@@ -952,8 +957,7 @@ async handleSignaling(data) {
             console.log('📞 الطرف الآخر رفض المكالمة');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
-            this.isRemoteEnding = true;
-            this.isEndingCall = true;
+            this.isInActiveCall = false;
             this.endCall();
             return;
         }
@@ -962,8 +966,7 @@ async handleSignaling(data) {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
             const inc = document.getElementById('incomingCall');
             if (inc) inc.remove();
-            this.isRemoteEnding = true;
-            this.isEndingCall = true;
+            this.isInActiveCall = false;
             this.endCall();
             return;
         }
@@ -1469,6 +1472,7 @@ compressImage(file) {
         console.log('📞 إنهاء المكالمة...');
         
         this.isEndingCall = true;
+        this.isInActiveCall = false;
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
