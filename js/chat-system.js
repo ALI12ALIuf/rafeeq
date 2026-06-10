@@ -374,7 +374,7 @@ async requestEnableFeatures() {
         const offer = await CallSystem.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
         await CallSystem.pc.setLocalDescription(offer);
         
-        // ✅ انتظار اكتمال ICE gathering مع timeout (1.5 ثانية كحد أقصى)
+        // ✅ انتظار اكتمال ICE gathering مع timeout (5 ثواني كحد أقصى)
         console.log('📡 انتظار اكتمال ICE gathering...');
         
         await Promise.race([
@@ -391,9 +391,9 @@ async requestEnableFeatures() {
                 }
             }),
             new Promise(resolve => setTimeout(() => {
-                console.log('⚠️ انتهى وقت الانتظار (1.5 ثانية)، سيتم إرسال ICE candidates المتوفرة فقط');
+                console.log('⚠️ انتهى وقت الانتظار (5 ثواني)، سيتم إرسال ICE candidates المتوفرة فقط');
                 resolve();
-            }, 1500))
+            }, 5000))
         ]);
         
         console.log(`📡 تم تجميع ${collectedIceCandidates.length} ICE candidate(s)`);
@@ -523,7 +523,7 @@ async handleFeatureRequest(fromId, encryptedData) {
     console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
 },
 
-// ✅ دالة مساعدة لقبول الـ Offer (معدلة)
+// ✅ دالة مساعدة لقبول الـ Offer (معدلة بالكامل مع تجميع ICE)
 async acceptOffer(fromId, offerData) {
     console.log('✅ قبول Offer من', fromId);
     
@@ -578,11 +578,17 @@ async acceptOffer(fromId, offerData) {
             CallSystem.dc = e.channel;
         };
         
-        // إعداد ICE candidates
+        // ✅ تجميع ICE candidates للمستقبل
+        const collectedIceCandidates = [];
+        let iceGatheringComplete = false;
+        
         CallSystem.pc.onicecandidate = e => {
             if (e.candidate) {
-                console.log('📡 إرسال ICE candidate');
-                this.sendOfferResponse(fromId, 'ice', { candidate: e.candidate });
+                console.log('📡 تجميع ICE candidate (مستقبل)');
+                collectedIceCandidates.push(e.candidate);
+            } else {
+                console.log(`📡 اكتمل تجميع ICE candidates للمستقبل (${collectedIceCandidates.length} candidate)`);
+                iceGatheringComplete = true;
             }
         };
         
@@ -596,14 +602,14 @@ async acceptOffer(fromId, offerData) {
         
         await CallSystem.pc.setRemoteDescription(offerSdp);
         
-        // ✅ إضافة ICE candidates المجمعة
-        const iceCandidatesList = offerData.iceCandidates || [];
-        console.log(`📡 إضافة ${iceCandidatesList.length} ICE candidates مجمعة`);
+        // ✅ إضافة ICE candidates المجمعة من المرسل
+        const senderIceCandidates = offerData.iceCandidates || [];
+        console.log(`📡 إضافة ${senderIceCandidates.length} ICE candidates من المرسل`);
         
-        for (const ice of iceCandidatesList) {
+        for (const ice of senderIceCandidates) {
             try {
                 await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
-                console.log('✅ تم إضافة ICE candidate');
+                console.log('✅ تم إضافة ICE candidate من المرسل');
             } catch(e) {
                 console.warn('فشل إضافة ICE candidate:', e);
             }
@@ -615,8 +621,38 @@ async acceptOffer(fromId, offerData) {
         await CallSystem.pc.setLocalDescription(answer);
         console.log('✅ تم إنشاء Answer بنجاح');
         
-        // إرسال Answer إلى المرسل
-        await this.sendOfferResponse(fromId, 'answer', { sdp: CallSystem.pc.localDescription });
+        // ✅ انتظار اكتمال ICE gathering للمستقبل مع timeout (5 ثواني)
+        console.log('📡 انتظار اكتمال ICE gathering للمستقبل...');
+        
+        await Promise.race([
+            new Promise(resolve => {
+                if (iceGatheringComplete) {
+                    resolve();
+                } else {
+                    const checkInterval = setInterval(() => {
+                        if (iceGatheringComplete) {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 50);
+                }
+            }),
+            new Promise(resolve => setTimeout(() => {
+                console.log('⚠️ انتهى وقت الانتظار (5 ثواني) لـ ICE candidates المستقبل');
+                resolve();
+            }, 5000))
+        ]);
+        
+        console.log(`📡 تم تجميع ${collectedIceCandidates.length} ICE candidate(s) للمستقبل`);
+        
+        // ✅ إرسال Answer + ICE candidates مجتمعة في رسالة واحدة
+        await this.sendOfferResponse(fromId, 'answer_with_ice', {
+            sdp: {
+                type: CallSystem.pc.localDescription.type,
+                sdp: CallSystem.pc.localDescription.sdp,
+                iceCandidates: collectedIceCandidates
+            }
+        });
         
         // تفعيل الميزات محلياً
         this.featuresEnabled = true;
@@ -639,7 +675,7 @@ async acceptOffer(fromId, offerData) {
     }
 },
 
-// ✅ دالة مساعدة لإرسال الردود (Answer أو ICE)
+// ✅ دالة مساعدة لإرسال الردود (Answer + ICE مجمعة)
 async sendOfferResponse(toId, action, data = null) {
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -647,14 +683,21 @@ async sendOfferResponse(toId, action, data = null) {
         if (!myPrivateKey || !receiverPublicKey) return;
         const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
         
-        const messageData = {
+        let messageData = {
             type: 'feature_response',
             action: action,
             timestamp: Date.now()
         };
+        
         if (data) {
-            if (data.sdp) messageData.sdp = data.sdp;
-            if (data.candidate) messageData.candidate = data.candidate;
+            if (data.sdp) {
+                // ✅ إرسال Answer + ICE مجمعة (النظام الجديد)
+                messageData.sdp = data.sdp;
+            }
+            if (data.candidate && action !== 'answer_with_ice') {
+                // للتوافق (نادر)
+                messageData.candidate = data.candidate;
+            }
         }
         
         const encrypted = await SecureChatSystem.encryptData(JSON.stringify(messageData), sharedKey);
@@ -664,7 +707,7 @@ async sendOfferResponse(toId, action, data = null) {
             data: encrypted, 
             timestamp: Date.now() 
         });
-        console.log(`📨 تم إرسال ${action} إلى`, toId);
+        console.log(`📨 تم إرسال ${action} مع ${data?.sdp?.iceCandidates?.length || 0} ICE candidates إلى`, toId);
     } catch(e) {
         console.error('❌ فشل إرسال الرد:', e);
     }
