@@ -784,22 +784,9 @@ async acceptFeatureRequest() {
     console.log('✅ تم تفعيل الميزات! القناة تفتح في الخلفية');
 },
     
-    
-// ==================== القسم 10: handleFeatureResponse ====================
-async handleFeatureResponse(fromId, action, data = null) {
+    // ==================== القسم 10: handleFeatureResponse ====================
+async handleFeatureResponse(fromId, action) {
     console.log('📨 handleFeatureResponse - from:', fromId, 'action:', action);
-    
-    // ✅ معالجة answer_with_ice (الإجابة مع ICE مجمعة)
-    if (action === 'answer_with_ice' && data && data.sdp) {
-        console.log('📡 استلام Answer مع ICE مجمعة من', fromId);
-        console.log(`📡 عدد ICE candidates المجمعة: ${data.sdp.iceCandidates?.length || 0}`);
-        
-        // تمرير الـ SDP إلى handleSignaling
-        if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
-            CallSystem.handleSignaling({ sdp: data.sdp });
-        }
-        return;
-    }
     
     if (action === 'accepted') {
         this.featuresEnabled = true;
@@ -896,7 +883,8 @@ async handleFeatureResponse(fromId, action, data = null) {
         this.updateAllButtons();
         console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
     }
-},
+},    
+
 
      // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
