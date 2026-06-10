@@ -578,14 +578,16 @@ async acceptOffer(fromId, offerData) {
             CallSystem.dc = e.channel;
         };
         
-        // ✅ تجميع ICE candidates للمستقبل
+        // ✅ تجميع ICE candidates للمستقبل (مع timeout 5 ثواني)
         const collectedIceCandidates = [];
         let iceGatheringComplete = false;
+        let iceGatheringStarted = false;
         
         CallSystem.pc.onicecandidate = e => {
             if (e.candidate) {
                 console.log('📡 تجميع ICE candidate (مستقبل)');
                 collectedIceCandidates.push(e.candidate);
+                iceGatheringStarted = true;
             } else {
                 console.log(`📡 اكتمل تجميع ICE candidates للمستقبل (${collectedIceCandidates.length} candidate)`);
                 iceGatheringComplete = true;
@@ -611,7 +613,7 @@ async acceptOffer(fromId, offerData) {
                 await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
                 console.log('✅ تم إضافة ICE candidate من المرسل');
             } catch(e) {
-                console.warn('فشل إضافة ICE candidate:', e);
+                console.warn('فشل إضافة ICE candidate من المرسل:', e);
             }
         }
         
@@ -622,7 +624,12 @@ async acceptOffer(fromId, offerData) {
         console.log('✅ تم إنشاء Answer بنجاح');
         
         // ✅ انتظار اكتمال ICE gathering للمستقبل مع timeout (5 ثواني)
-        console.log('📡 انتظار اكتمال ICE gathering للمستقبل...');
+        console.log('📡 انتظار اكتمال ICE gathering للمستقبل (5 ثواني)...');
+        
+        // إذا لم يبدأ التجميع بعد، ننتظر قليلاً
+        if (!iceGatheringStarted) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
         
         await Promise.race([
             new Promise(resolve => {
@@ -634,7 +641,7 @@ async acceptOffer(fromId, offerData) {
                             clearInterval(checkInterval);
                             resolve();
                         }
-                    }, 50);
+                    }, 100);
                 }
             }),
             new Promise(resolve => setTimeout(() => {
@@ -693,9 +700,10 @@ async sendOfferResponse(toId, action, data = null) {
             if (data.sdp) {
                 // ✅ إرسال Answer + ICE مجمعة (النظام الجديد)
                 messageData.sdp = data.sdp;
+                console.log(`📦 إرسال Answer مع ${data.sdp.iceCandidates?.length || 0} ICE candidates مجمعة`);
             }
             if (data.candidate && action !== 'answer_with_ice') {
-                // للتوافق (نادر)
+                // للتوافق مع الإصدارات القديمة (نادر)
                 messageData.candidate = data.candidate;
             }
         }
@@ -707,7 +715,7 @@ async sendOfferResponse(toId, action, data = null) {
             data: encrypted, 
             timestamp: Date.now() 
         });
-        console.log(`📨 تم إرسال ${action} مع ${data?.sdp?.iceCandidates?.length || 0} ICE candidates إلى`, toId);
+        console.log(`📨 تم إرسال ${action} إلى`, toId);
     } catch(e) {
         console.error('❌ فشل إرسال الرد:', e);
     }
