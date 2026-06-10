@@ -2720,3 +2720,48 @@ document.addEventListener('touchend', function (e) {
     }
     lastTouchEnd = now;
 }, { passive: false });
+
+
+
+// ==================== فحص إصدار acceptOffer ====================
+(function checkAcceptOfferVersion() {
+    setTimeout(() => {
+        const originalAcceptOffer = ChatSystem.acceptOffer;
+        
+        // عرض نسخة من الدالة على الشاشة
+        const acceptOfferStr = originalAcceptOffer.toString();
+        const hasIceCollection = acceptOfferStr.includes('collectedIceCandidates');
+        const hasAnswerWithIce = acceptOfferStr.includes('answer_with_ice');
+        
+        const div = document.createElement('div');
+        div.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: ${hasIceCollection && hasAnswerWithIce ? '#4CAF50' : '#f44336'};
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 999999;
+            font-family: monospace;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        `;
+        
+        if (hasIceCollection && hasAnswerWithIce) {
+            div.innerHTML = '✅ النسخة صحيحة (تدعم تجميع ICE)';
+        } else {
+            div.innerHTML = '❌ النسخة قديمة (لا تدعم تجميع ICE)<br>يجب تحديث الملف على السيرفر';
+        }
+        
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 5000);
+        
+        console.log('🔍 فحص acceptOffer:', {
+            hasIceCollection,
+            hasAnswerWithIce,
+            isCorrect: hasIceCollection && hasAnswerWithIce
+        });
+    }, 2000);
+})();
