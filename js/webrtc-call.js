@@ -982,14 +982,14 @@ async handleSignaling(data) {
     }
 },
 
-// ✅ دالة sendSignal المعدلة - تدعم الإرسال عبر Firebase أثناء فتح القناة
+// ✅ دالة sendSignal المعدلة - إرسال مباشر فقط (بدون Firebase)
 async sendSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
         return;
     }
     
-    // ✅ إذا القناة مفتوحة → أرسل مباشرة
+    // ✅ فقط أرسل إذا القناة مفتوحة
     if (this.dc && this.dc.readyState === 'open') {
         try {
             this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
@@ -1000,24 +1000,8 @@ async sendSignal(calleeId, data) {
         }
     }
     
-    // ✅ إذا القناة لا تزال تفتح → أرسل عبر Firebase (لفتح القناة)
-    // هذا ضروري لتمرير Offer/Answer/ICE أثناء عملية الفتح
-    try {
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-        await SecureChatSystem.sendToServer(calleeId, { 
-            id: Date.now().toString(), 
-            type: 'webrtc', 
-            data: encrypted, 
-            timestamp: Date.now() 
-        });
-        console.log('📡 تم إرسال الإشارة عبر Firebase (لفتح القناة)');
-    } catch (error) {
-        console.error('خطأ في إرسال الإشارة:', error);
-    }
+    // ✅ لا ترسل عبر Firebase أبداً (نظام مباشر فقط)
+    console.error('❌ فشل إرسال الإشارة - Data Channel غير مفتوح (readyState:', this.dc?.readyState, ')');
 },
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
