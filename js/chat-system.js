@@ -2538,7 +2538,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-    // ==================== القسم 37: closeChat ====================
+   // ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2594,9 +2594,7 @@ closeChat() {
     document.getElementById('conversationPage').style.display = 'none';
     document.querySelector('.chat-page').style.display = 'block';
     
-    if (typeof PresenceSystem !== 'undefined' && PresenceSystem.stopAll) {
-        PresenceSystem.stopAll();
-    }
+    // ✅ تم إزالة PresenceSystem.stopAll() (غير مستخدم)
     
     if (!CallSystem.isInCall) {
         if (CallSystem.dc) {
@@ -2612,7 +2610,7 @@ closeChat() {
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
-},
+}, 
     
     
     // ==================== القسم 38: escapeHtml ====================
