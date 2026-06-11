@@ -252,9 +252,9 @@ const SecureChatSystem = {
             } 
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
-    
 
-        // ==================== القسم 7: معالجة الرسائل المستلمة ====================
+
+   // ==================== القسم 7: معالجة الرسائل المستلمة ====================
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -318,6 +318,26 @@ const SecureChatSystem = {
                 if (responseData.action === 'answer_batch' && responseData.sdp) {
                     console.log(`📦 استلام دفعة الرد (Answer + ${responseData.iceCandidates?.length || 0} ICE candidates) من:`, msg.from);
                     
+                    // ✅ إعادة تعيين حالة الطلب وإيقاف الـ blinking (لحل مشكلة انتهاء المهلة عند المرسل)
+                    if (typeof ChatSystem !== 'undefined') {
+                        ChatSystem.featureRequestPending = false;
+                        ChatSystem.featureRequestReceived = false;
+                        if (ChatSystem.featureBlinkInterval) {
+                            clearInterval(ChatSystem.featureBlinkInterval);
+                            ChatSystem.featureBlinkInterval = null;
+                        }
+                        const switchLabel = document.getElementById('featureSwitchLabel');
+                        if (switchLabel) switchLabel.classList.remove('blinking');
+                        ChatSystem.featuresEnabled = true;
+                        if (ChatSystem.currentChat === msg.from) {
+                            ChatSystem.friendInConversation = true;
+                        }
+                        const toggleInput = document.getElementById('featureToggleInput');
+                        if (toggleInput) toggleInput.checked = true;
+                        ChatSystem.updateAllButtons();
+                        console.log('✅ تم تحديث حالة المرسل بعد استلام answer_batch');
+                    }
+                    
                     // معالجة الـ Answer وإضافة ICE candidates المجمعة
                     if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
                         try {
@@ -347,6 +367,26 @@ const SecureChatSystem = {
                 // ✅ معالجة answer العادي (للتوافق مع الإصدارات القديمة)
                 else if (responseData.action === 'answer' && responseData.sdp) {
                     console.log('📞 استلام Answer منفرد (دعم خلفي)');
+                    
+                    // ✅ إعادة تعيين حالة الطلب أيضاً
+                    if (typeof ChatSystem !== 'undefined') {
+                        ChatSystem.featureRequestPending = false;
+                        ChatSystem.featureRequestReceived = false;
+                        if (ChatSystem.featureBlinkInterval) {
+                            clearInterval(ChatSystem.featureBlinkInterval);
+                            ChatSystem.featureBlinkInterval = null;
+                        }
+                        const switchLabel = document.getElementById('featureSwitchLabel');
+                        if (switchLabel) switchLabel.classList.remove('blinking');
+                        ChatSystem.featuresEnabled = true;
+                        if (ChatSystem.currentChat === msg.from) {
+                            ChatSystem.friendInConversation = true;
+                        }
+                        const toggleInput = document.getElementById('featureToggleInput');
+                        if (toggleInput) toggleInput.checked = true;
+                        ChatSystem.updateAllButtons();
+                    }
+                    
                     if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
                         try {
                             const answerSdp = new RTCSessionDescription({
@@ -445,4 +485,3 @@ const SecureChatSystem = {
     }
 };
 
-    
