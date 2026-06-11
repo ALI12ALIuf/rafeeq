@@ -298,7 +298,45 @@ startFeatureBlink() {
     }, 500);
 },  
     
-    // ==================== القسم 7: requestEnableFeatures (معدل - تجميع 5 ثواني) ====================
+  // ==================== القسم 6: startFeatureBlink (معدل - 60 ثانية) ====================
+startFeatureBlink() {
+    if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
+    
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    if (!switchLabel) return;
+    
+    switchLabel.classList.add('blinking');
+    
+    let blinkCount = 0;
+    this.featureBlinkInterval = setInterval(() => {
+        if (!this.featureRequestPending && !this.featureRequestReceived) {
+            clearInterval(this.featureBlinkInterval);
+            switchLabel.classList.remove('blinking');
+            return;
+        }
+        
+        blinkCount++;
+        // ✅ تغيير من 30 إلى 60 ثانية (60 ثانية = 120 تكرار × 0.5)
+        if (blinkCount > 120) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureRequestPending = false;
+            this.featureRequestReceived = false;
+            switchLabel.classList.remove('blinking');
+            
+            // ✅ إعادة تعيين الزر إلى اللون الأحمر عند انتهاء المهلة
+            const toggleInput = document.getElementById('featureToggleInput');
+            if (toggleInput) toggleInput.checked = false;
+            
+            // ✅ تحديث واجهة المستخدم
+            this.updateAllButtons();
+            
+            console.log('⏰ انتهت مهلة الانتظار (60 ثانية)، تم إلغاء الطلب');
+        }
+    }, 500);
+},  
+    
+
+// ==================== القسم 7: requestEnableFeatures (معدل - تجميع 10 ثواني) ====================
 async requestEnableFeatures() {
     if (!this.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
@@ -402,13 +440,13 @@ async requestEnableFeatures() {
             sdp: CallSystem.pc.localDescription.sdp
         };
         
-        // ✅ انتظار 5 ثواني لتجميع جميع ICE candidates
+        // ✅ انتظار 10 ثواني لتجميع جميع ICE candidates (تغيير من 5000 إلى 10000)
         await new Promise(resolve => {
             if (this._batchTimer) clearTimeout(this._batchTimer);
             this._batchTimer = setTimeout(() => {
-                console.log(`📦 انتهاء التجميع (5 ثواني) - تم تجميع ${this._pendingIceCandidates.length} ICE candidate`);
+                console.log(`📦 انتهاء التجميع (10 ثواني) - تم تجميع ${this._pendingIceCandidates.length} ICE candidate`);
                 resolve();
-            }, 5000);
+            }, 10000);
         });
         
         // ✅ إرسال دفعة واحدة (Offer + جميع ICE candidates المجمعة)
@@ -505,7 +543,7 @@ async handleFeatureRequest(fromId, encryptedData) {
     }
 },
 
-// ✅ دالة مساعدة لقبول الـ Offer (معدلة - تجميع 5 ثواني للمستلم)
+// ==================== القسم 8.1: acceptOffer (معدلة - تجميع 10 ثواني للمستلم) ====================
 async acceptOffer(fromId, offerData) {
     console.log('✅ قبول Offer من', fromId);
     
@@ -592,13 +630,13 @@ async acceptOffer(fromId, offerData) {
         await CallSystem.pc.setLocalDescription(answer);
         console.log('✅ تم إنشاء Answer بنجاح');
         
-        // ✅ انتظار 5 ثواني لتجميع ICE candidates الخاصة بالمستلم
+        // ✅ انتظار 10 ثواني لتجميع ICE candidates الخاصة بالمستلم (5000 → 10000)
         await new Promise(resolve => {
             if (this._responseBatchTimer) clearTimeout(this._responseBatchTimer);
             this._responseBatchTimer = setTimeout(() => {
-                console.log(`📦 انتهاء تجميع المستلم (5 ثواني) - تم تجميع ${this._responseIceCandidates.length} ICE candidate`);
+                console.log(`📦 انتهاء تجميع المستلم (10 ثواني) - تم تجميع ${this._responseIceCandidates.length} ICE candidate`);
                 resolve();
-            }, 5000);
+            }, 10000);
         });
         
         // ✅ إرسال دفعة واحدة (Answer + جميع ICE candidates المجمعة)
