@@ -1,4 +1,4 @@
-// ========== 1. webrtc-call.js - النسخة المعدلة (تم إزالة جميع دوال التنظيف) ==========
+// ========== 1. webrtc-call.js - النسخة النهائية المعدلة ==========
 // جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
 
 const CallSystem = {
@@ -888,15 +888,51 @@ setupDataChannel(channel) {
             this.keepAliveInterval = null;
         }
         
-        // ✅ لا نلغِ الميزات عند إغلاق القناة (الميزات تنفصل فقط عند الطرد)
-        // تم إزالة كود إلغاء الميزات نهائياً
+        // ✅ فقط إذا كانت القناة المغلقة هي dc (قناة الميزات) وليس dcCall (قناة المكالمة)
+        if (channel === this.dc && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('🔌 انقطاع قناة الميزات - إلغاء تفعيل الميزات');
+            ChatSystem.featuresEnabled = false;
+            ChatSystem.featureRequestPending = false;
+            ChatSystem.featureRequestReceived = false;
+            
+            if (ChatSystem.featureBlinkInterval) {
+                clearInterval(ChatSystem.featureBlinkInterval);
+                ChatSystem.featureBlinkInterval = null;
+            }
+            
+            const btn = document.getElementById('enableFeaturesBtn');
+            if (btn) {
+                btn.style.background = '#f44336';
+                btn.title = 'تفعيل الميزات';
+            }
+            
+            ChatSystem.updateAllButtons();
+        }
     };
     
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         
-        // ✅ لا نلغِ الميزات عند حدوث خطأ (الميزات تنفصل فقط عند الطرد)
-        // تم إزالة كود إلغاء الميزات نهائياً
+        // ✅ فقط إذا كانت القناة التي حدث فيها الخطأ هي dc (قناة الميزات) وليس dcCall
+        if (channel === this.dc && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
+            console.log('⚠️ خطأ في قناة الميزات - إلغاء تفعيل الميزات');
+            ChatSystem.featuresEnabled = false;
+            ChatSystem.featureRequestPending = false;
+            ChatSystem.featureRequestReceived = false;
+            
+            if (ChatSystem.featureBlinkInterval) {
+                clearInterval(ChatSystem.featureBlinkInterval);
+                ChatSystem.featureBlinkInterval = null;
+            }
+            
+            const btn = document.getElementById('enableFeaturesBtn');
+            if (btn) {
+                btn.style.background = '#f44336';
+                btn.title = 'تفعيل الميزات';
+            }
+            
+            ChatSystem.updateAllButtons();
+        }
     };
 },
 
