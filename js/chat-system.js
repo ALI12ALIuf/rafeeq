@@ -262,42 +262,6 @@ async kickUserFromConversation() {
 },   
     
     
-  // ==================== القسم 6: startFeatureBlink ====================
-startFeatureBlink() {
-    if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
-    
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    if (!switchLabel) return;
-    
-    switchLabel.classList.add('blinking');
-    
-    let blinkCount = 0;
-    this.featureBlinkInterval = setInterval(() => {
-        if (!this.featureRequestPending && !this.featureRequestReceived) {
-            clearInterval(this.featureBlinkInterval);
-            switchLabel.classList.remove('blinking');
-            return;
-        }
-        
-        blinkCount++;
-        if (blinkCount > 30) {
-            clearInterval(this.featureBlinkInterval);
-            this.featureRequestPending = false;
-            this.featureRequestReceived = false;
-            switchLabel.classList.remove('blinking');
-            
-            // ✅ إعادة تعيين الزر إلى اللون الأحمر عند انتهاء المهلة
-            const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
-            
-            // ✅ تحديث واجهة المستخدم
-            this.updateAllButtons();
-            
-            console.log('⏰ انتهت مهلة الانتظار (30 ثانية)، تم إلغاء الطلب');
-        }
-    }, 500);
-},  
-    
   // ==================== القسم 6: startFeatureBlink (معدل - 60 ثانية) ====================
 startFeatureBlink() {
     if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
