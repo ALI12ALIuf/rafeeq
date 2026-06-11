@@ -269,17 +269,10 @@ const SecureChatSystem = {
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
-            // القسم 7.2: إشارات WebRTC
+            // القسم 7.2: إشارات WebRTC (معدل - إزالة الشروط التي تمنع المكالمات)
             else if (msg.package.type === 'webrtc') { 
-                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
-                        featuresEnabled: ChatSystem.featuresEnabled,
-                        friendInConversation: ChatSystem.friendInConversation,
-                        currentChat: ChatSystem.currentChat,
-                        sender: msg.from
-                    });
-                    return;
-                }
+                // ✅ إزالة الشروط التي تمنع وصول إشارات المكالمات
+                // المكالمات يجب أن تعمل حتى لو الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة
                 
                 const signalData = await this.decryptData(msg.package.data, sharedKey);
                 const parsedData = JSON.parse(signalData);
