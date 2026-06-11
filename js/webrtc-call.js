@@ -773,7 +773,7 @@ async createDataChannelOnly(calleeId) {
     },
 
     
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+       // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -1001,14 +1001,29 @@ async handleSignaling(data) {
     }
 },
 
-// ✅ دالة sendSignal المعدلة - تدعم الإرسال عبر Firebase أثناء فتح القناة
+// ✅ دالة sendSignal المعدلة - تدعم إرسال إشارات المكالمات عبر dcCall
 async sendSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
         return;
     }
     
-    // ✅ إذا القناة مفتوحة → أرسل مباشرة
+    // ✅ تحديد نوع الإشارة: إذا كانت مكالمة (صوت أو فيديو)
+    const isCallSignal = (data.type === 'audio' || data.type === 'video') || 
+                         (data.sdp && (data.type === 'audio' || data.type === 'video'));
+    
+    // ✅ إشارات المكالمات ترسل عبر dcCall (قناة المكالمات المنفصلة)
+    if (isCallSignal && this.dcCall && this.dcCall.readyState === 'open') {
+        try {
+            this.dcCall.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
+            console.log('📡 تم إرسال إشارة المكالمة مباشرة عبر dcCall');
+            return;
+        } catch(e) {
+            console.error('❌ فشل الإرسال عبر dcCall:', e);
+        }
+    }
+    
+    // ✅ إشارات الميزات (دردشة، ملفات، موقع) ترسل عبر dc
     if (this.dc && this.dc.readyState === 'open') {
         try {
             this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
@@ -1037,7 +1052,7 @@ async sendSignal(calleeId, data) {
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
-},
+}, 
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
