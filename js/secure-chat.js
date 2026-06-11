@@ -253,7 +253,8 @@ const SecureChatSystem = {
         }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
     },
     
-    // ==================== القسم 7: معالجة الرسائل المستلمة ====================
+
+        // ==================== القسم 7: معالجة الرسائل المستلمة ====================
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -300,20 +301,103 @@ const SecureChatSystem = {
                     }
                 }
             }
-            // القسم 7.3: طلب تفعيل الميزات (معدل)
+            // القسم 7.3: طلب تفعيل الميزات (معدل - يدعم الدفعات)
             else if (msg.package.type === 'feature_request') {
                 console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
                     ChatSystem.handleFeatureRequest(msg.from, msg.package.data);
                 }
             }
-            // القسم 7.4: رد على طلب التفعيل
+            // القسم 7.4: رد على طلب التفعيل (معدل - يدعم الدفعات answer_batch)
             else if (msg.package.type === 'feature_response') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const responseData = JSON.parse(decryptedData);
                 console.log('🔓 استلام رد على طلب التفعيل من:', msg.from, '| الحالة:', responseData.action);
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                    ChatSystem.handleFeatureResponse(msg.from, responseData.action);
+                
+                // ✅ معالجة الدفعة (answer_batch)
+                if (responseData.action === 'answer_batch' && responseData.sdp) {
+                    console.log(`📦 استلام دفعة الرد (Answer + ${responseData.iceCandidates?.length || 0} ICE candidates) من:`, msg.from);
+                    
+                    // معالجة الـ Answer وإضافة ICE candidates المجمعة
+                    if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
+                        try {
+                            // تعيين الـ Remote Description (Answer)
+                            const answerSdp = new RTCSessionDescription({
+                                type: responseData.sdp.type,
+                                sdp: responseData.sdp.sdp
+                            });
+                            await CallSystem.pc.setRemoteDescription(answerSdp);
+                            console.log('✅ تم تعيين Answer SDP');
+                            
+                            // إضافة جميع ICE candidates المجمعة
+                            for (const ice of (responseData.iceCandidates || [])) {
+                                try {
+                                    await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
+                                    console.log('✅ تم إضافة ICE candidate من الدفعة');
+                                } catch(e) {
+                                    console.warn('فشل إضافة ICE candidate:', e);
+                                }
+                            }
+                            console.log('✅ تم معالجة دفعة الرد بنجاح');
+                        } catch(e) {
+                            console.error('❌ فشل معالجة دفعة الرد:', e);
+                        }
+                    }
+                }
+                // ✅ معالجة answer العادي (للتوافق مع الإصدارات القديمة)
+                else if (responseData.action === 'answer' && responseData.sdp) {
+                    console.log('📞 استلام Answer منفرد (دعم خلفي)');
+                    if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
+                        try {
+                            const answerSdp = new RTCSessionDescription({
+                                type: responseData.sdp.type,
+                                sdp: responseData.sdp.sdp
+                            });
+                            await CallSystem.pc.setRemoteDescription(answerSdp);
+                            console.log('✅ تم تعيين Answer SDP');
+                        } catch(e) {
+                            console.error('❌ فشل تعيين Answer:', e);
+                        }
+                    }
+                }
+                // ✅ معالجة ice منفرد (للتوافق مع الإصدارات القديمة)
+                else if (responseData.action === 'ice' && responseData.candidate) {
+                    console.log('📞 استلام ICE candidate منفرد (دعم خلفي)');
+                    if (typeof CallSystem !== 'undefined' && CallSystem.pc) {
+                        try {
+                            await CallSystem.pc.addIceCandidate(new RTCIceCandidate(responseData.candidate.candidate));
+                            console.log('✅ تم إضافة ICE candidate منفرد');
+                        } catch(e) {
+                            console.warn('فشل إضافة ICE candidate:', e);
+                        }
+                    }
+                }
+                // ✅ معالجة accepted العادي
+                else if (responseData.action === 'accepted') {
+                    console.log('✅ تم قبول طلب التفعيل من:', msg.from);
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
+                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
+                    }
+                }
+                // ✅ معالجة rejected
+                else if (responseData.action === 'rejected') {
+                    console.log('❌ تم رفض طلب التفعيل من:', msg.from);
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
+                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
+                    }
+                }
+                // ✅ معالجة disable
+                else if (responseData.action === 'disable') {
+                    console.log('🔴 استلام إشارة إيقاف من:', msg.from);
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
+                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
+                    }
+                }
+                else {
+                    // للتوافق مع الإصدارات القديمة جداً
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
+                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
+                    }
                 }
             }
             // القسم 7.5: إشارة إلغاء الميزات (مصحح)
@@ -321,7 +405,7 @@ const SecureChatSystem = {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');  // ✅ تم التصحيح: Console.log → console.log
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
                     
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
@@ -360,3 +444,5 @@ const SecureChatSystem = {
         }
     }
 };
+
+    
