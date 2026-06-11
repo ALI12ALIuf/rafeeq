@@ -2,9 +2,7 @@
 // جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
 
 const CallSystem = {
-    pc: null, dc: null,           // ✅ خاصة بالميزات (دردشة، ملفات، موقع)
-    pcCall: null, dcCall: null,   // ✅ خاصة بالمكالمات (صوت، فيديو)
-    localStream: null, isInCall: false, callType: null, currentCallId: null,
+    pc: null, dc: null, localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
     callTimerInterval: null, keepAliveInterval: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
@@ -130,7 +128,7 @@ async createDataChannelOnly(calleeId) {
     }
 },
     
-    // ==================== 4. المكالمة الصوتية (معدلة - تستخدم pcCall/dcCall) ====================
+    // ==================== 4. المكالمة الصوتية ====================
 
     async startAudioCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -176,43 +174,41 @@ async createDataChannelOnly(calleeId) {
             }
             console.log('✅ تم الحصول على الميكروفون');
             
-            // ✅ استخدام pcCall بدلاً من pc (للمكالمات فقط)
-            this.pcCall = new RTCPeerConnection(this.servers);
+            this.pc = new RTCPeerConnection(this.servers);
             
             this.localStream.getTracks().forEach(track => {
-                this.pcCall.addTrack(track, this.localStream);
+                this.pc.addTrack(track, this.localStream);
                 console.log(`➕ تم إضافة مسار ${track.kind}`);
             });
             
-            // ✅ استخدام dcCall بدلاً من dc (للمكالمات فقط)
-            this.dcCall = this.pcCall.createDataChannel('chat');
-            this.setupDataChannel(this.dcCall);
+            this.dc = this.pc.createDataChannel('chat');
+            this.setupDataChannel(this.dc);
             
-            this.pcCall.onicecandidate = e => { 
+            this.pc.onicecandidate = e => { 
                 if (e.candidate) {
                     console.log('📡 إرسال ICE candidate');
                     this.sendSignal(calleeId, { candidate: e.candidate });
                 }
             };
             
-            this.pcCall.ontrack = e => {
+            this.pc.ontrack = e => {
                 console.log(`📞 استقبال مسار ${e.track.kind}`);
                 if (e.track.kind === 'audio') {
                     this.setupRemoteAudio(e.streams[0]);
                 }
             };
             
-            this.pcCall.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pcCall?.connectionState}`);
-                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
+            this.pc.onconnectionstatechange = () => {
+                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
                     this.endCall();
                 }
             };
             
             console.log('📞 إنشاء عرض مكالمة صوتية...');
-            const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pcCall.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pcCall.localDescription, type: 'audio' });
+            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+            await this.pc.setLocalDescription(offer);
+            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'audio' });
             console.log('✅ تم إرسال العرض');
             
         } catch (e) { 
@@ -221,8 +217,7 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-
-// ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall) ====================
+// ==================== 5. المكالمة المرئية ====================
 
     async startVideoCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -263,32 +258,29 @@ async createDataChannelOnly(calleeId) {
             }
             
             this.showCallUI('video');
+            this.pc = new RTCPeerConnection(this.servers);
+            this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
+            this.dc = this.pc.createDataChannel('chat');
+            this.setupDataChannel(this.dc);
             
-            // ✅ استخدام pcCall بدلاً من pc (للمكالمات فقط)
-            this.pcCall = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
-            
-            // ✅ استخدام dcCall بدلاً من dc (للمكالمات فقط)
-            this.dcCall = this.pcCall.createDataChannel('chat');
-            this.setupDataChannel(this.dcCall);
-            
-            this.pcCall.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
-            this.pcCall.ontrack = e => {
+            this.pc.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+            this.pc.ontrack = e => {
                 const rv = document.getElementById('remoteVideo');
                 if (rv && e.streams[0]) rv.srcObject = e.streams[0];
             };
-            this.pcCall.onconnectionstatechange = () => {
-                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
+            this.pc.onconnectionstatechange = () => {
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) this.endCall();
             };
             
-            const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            await this.pcCall.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pcCall.localDescription, type: 'video' });
+            const offer = await this.pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+            await this.pc.setLocalDescription(offer);
+            await this.sendSignal(calleeId, { sdp: this.pc.localDescription, type: 'video' });
             
         } catch (e) { 
             this.endCall(); 
         }
     },
+
     
     // ==================== 6. إعداد الصوت عن بعد ====================
     
@@ -328,8 +320,8 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-    
-    // ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall) ====================
+
+    // ==================== 7. استقبال المكالمات ====================
 
     async receiveCall(callerId, callData) {
         if (this.isInCall) {
@@ -378,19 +370,18 @@ async createDataChannelOnly(calleeId) {
             
             this.showCallUI(this.callType);
             
-            // ✅ استخدام pcCall بدلاً من pc (للمكالمات فقط)
-            this.pcCall = new RTCPeerConnection(this.servers);
+            this.pc = new RTCPeerConnection(this.servers);
             
             this.localStream.getTracks().forEach(track => {
-                this.pcCall.addTrack(track, this.localStream);
+                this.pc.addTrack(track, this.localStream);
                 console.log(`➕ تم إضافة مسار ${track.kind}`);
             });
             
-            this.pcCall.onicecandidate = e => { 
+            this.pc.onicecandidate = e => { 
                 if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
             };
             
-            this.pcCall.ontrack = e => {
+            this.pc.ontrack = e => {
                 console.log('📞 استقبال مسار:', e.track.kind);
                 
                 if (e.track.kind === 'video') {
@@ -415,26 +406,25 @@ async createDataChannelOnly(calleeId) {
                 }
             };
             
-            this.pcCall.ondatachannel = e => {
+            this.pc.ondatachannel = e => {
                 console.log('📡 استقبال Data Channel');
                 this.setupDataChannel(e.channel);
-                // ✅ استخدام dcCall بدلاً من dc
-                this.dcCall = e.channel;
+                this.dc = e.channel;
             };
             
-            this.pcCall.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pcCall?.connectionState}`);
-                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
+            this.pc.onconnectionstatechange = () => {
+                console.log(`🔄 حالة الاتصال: ${this.pc?.connectionState}`);
+                if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'disconnected')) {
                     this.endCall();
                 }
             };
             
             if (callData.sdp) {
-                await this.pcCall.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+                await this.pc.setRemoteDescription(new RTCSessionDescription(callData.sdp));
                 const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
-                const answer = await this.pcCall.createAnswer(answerOptions);
-                await this.pcCall.setLocalDescription(answer);
-                await this.sendSignal(callerId, { sdp: this.pcCall.localDescription });
+                const answer = await this.pc.createAnswer(answerOptions);
+                await this.pc.setLocalDescription(answer);
+                await this.sendSignal(callerId, { sdp: this.pc.localDescription });
                 console.log('✅ تم إرسال الرد');
             }
             
@@ -454,7 +444,7 @@ async createDataChannelOnly(calleeId) {
             this.endCall(); 
         }
     },
-
+    
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
 
@@ -1470,7 +1460,7 @@ compressImage(file) {
 },
 
     
-// ==================== 14. إنهاء المكالمة (معدلة - تغلق pcCall/dcCall فقط) ====================
+// ==================== 14. إنهاء المكالمة ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة...');
@@ -1504,17 +1494,14 @@ compressImage(file) {
             this.localStream = null;
         }
         
-        // ✅ إغلاق pcCall و dcCall فقط (خاصة بالمكالمات)
-        // ولا نلمس pc و dc (خاصة بميزات الدردشة)
-        if (this.dcCall) {
-            try { this.dcCall.close(); } catch(e) {}
-            this.dcCall = null;
+        if (this.dc) {
+            try { this.dc.close(); } catch(e) {}
+            this.dc = null;
         }
-        if (this.pcCall) {
-            try { this.pcCall.close(); } catch(e) {}
-            this.pcCall = null;
+        if (this.pc) {
+            try { this.pc.close(); } catch(e) {}
+            this.pc = null;
         }
-        
         this.incomingChunks = {};
         this.incomingFileInfo = {};
         
@@ -1541,7 +1528,7 @@ compressImage(file) {
         console.log('✅ تم إنهاء المكالمة');
     }
 };
-    
+       
     
 // ==================== 15. الدوال العامة ====================
 window.startAudioCall = async () => {
