@@ -772,8 +772,7 @@ async createDataChannelOnly(calleeId) {
         });
     },
 
-    
-       // ==================== 9. Data Channel وإدارة الاتصال ====================
+    // ==================== 9. Data Channel وإدارة الاتصال ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -801,7 +800,12 @@ setupDataChannel(channel) {
             
             if (msg.type === 'webrtc_signal') {
                 console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
-                this.handleSignaling(msg.data);
+                // ✅ معالجة إشارات المكالمات (عرض شاشة المكالمة الواردة)
+                if (msg.data.sdp && msg.data.sdp.type === 'offer') {
+                    this.showIncomingCall(ChatSystem.currentChat, msg.data);
+                } else {
+                    this.handleSignaling(msg.data);
+                }
                 return;
             }
             
@@ -1001,7 +1005,7 @@ async handleSignaling(data) {
     }
 },
 
-// ✅ دالة sendSignal المعدلة - تدعم إرسال إشارات المكالمات عبر dcCall
+// ✅ دالة sendSignal المعدلة - إشارات المكالمات ترسل عبر dc (قناة الميزات)
 async sendSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
@@ -1010,20 +1014,22 @@ async sendSignal(calleeId, data) {
     
     // ✅ تحديد نوع الإشارة: إذا كانت مكالمة (صوت أو فيديو)
     const isCallSignal = (data.type === 'audio' || data.type === 'video') || 
-                         (data.sdp && (data.type === 'audio' || data.type === 'video'));
+                         (data.sdp && (data.sdp.type === 'offer' || data.sdp.type === 'answer'));
     
-    // ✅ إشارات المكالمات ترسل عبر dcCall (قناة المكالمات المنفصلة)
-    if (isCallSignal && this.dcCall && this.dcCall.readyState === 'open') {
-        try {
-            this.dcCall.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
-            console.log('📡 تم إرسال إشارة المكالمة مباشرة عبر dcCall');
-            return;
-        } catch(e) {
-            console.error('❌ فشل الإرسال عبر dcCall:', e);
+    // ✅ إشارات المكالمات ترسل عبر dc (قناة الميزات الحالية)
+    if (isCallSignal) {
+        if (this.dc && this.dc.readyState === 'open') {
+            try {
+                this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
+                console.log('📡 تم إرسال إشارة المكالمة مباشرة عبر dc (قناة الميزات)');
+                return;
+            } catch(e) {
+                console.error('❌ فشل الإرسال عبر dc:', e);
+            }
         }
     }
     
-    // ✅ إشارات الميزات (دردشة، ملفات، موقع) ترسل عبر dc
+    // ✅ إشارات الميزات (دردشة، ملفات، موقع) ترسل عبر dc أيضاً
     if (this.dc && this.dc.readyState === 'open') {
         try {
             this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
@@ -1034,7 +1040,7 @@ async sendSignal(calleeId, data) {
         }
     }
     
-    // ✅ إذا القناة لا تزال تفتح → أرسل عبر Firebase (لفتح القناة)
+    // ✅ إذا القناة لا تزال تفتح → أرسل عبر Firebase (لفتح القناة فقط)
     // هذا ضروري لتمرير Offer/Answer/ICE أثناء عملية الفتح
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -1052,7 +1058,7 @@ async sendSignal(calleeId, data) {
     } catch (error) {
         console.error('خطأ في إرسال الإشارة:', error);
     }
-}, 
+},
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
