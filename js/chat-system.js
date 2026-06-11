@@ -594,7 +594,7 @@ async acceptOffer(fromId, offerData) {
         await CallSystem.pc.setLocalDescription(answer);
         console.log('✅ تم إنشاء Answer بنجاح');
         
-        // ✅ انتظار 10 ثواني لتجميع ICE candidates الخاصة بالمستلم (5000 → 10000)
+        // ✅ انتظار 10 ثواني لتجميع ICE candidates الخاصة بالمستلم
         await new Promise(resolve => {
             if (this._responseBatchTimer) clearTimeout(this._responseBatchTimer);
             this._responseBatchTimer = setTimeout(() => {
@@ -609,6 +609,7 @@ async acceptOffer(fromId, offerData) {
             iceCandidates: this._responseIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
         });
         
+        // ✅ تفعيل الميزات بعد إرسال الرد بنجاح (وليس قبله)
         this.featuresEnabled = true;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -693,7 +694,7 @@ async sendOfferResponse(toId, action, data = null) {
     }
 },
 
-// ==================== القسم 9: acceptFeatureRequest (معدل) ====================
+// ==================== القسم 9: acceptFeatureRequest (معدل - بدون تفعيل مباشر) ====================
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
     
@@ -702,29 +703,21 @@ async acceptFeatureRequest() {
         return;
     }
     
-    this.featuresEnabled = true;
+    // ✅ لا نفعّل الميزات هنا (سنفعّلها بعد نجاح القناة في acceptOffer)
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
     
     if (this.currentChat) {
-        this.friendInConversation = true;
-        console.log('✅ تم تفعيل friendInConversation');
+        console.log('✅ تم تجهيز المحادثة، في انتظار تفعيل الميزات بعد نجاح القناة');
     }
-    
-    console.log('✅ featuresEnabled =', this.featuresEnabled);
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
     }
     
-    const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
-    
-    if (toggleInput) toggleInput.checked = true;
     if (switchLabel) switchLabel.classList.remove('blinking');
-    
-    this.updateAllButtons();
     
     // ✅ التحقق من وجود Offer معلق قبل قبوله
     if (this._pendingOffer && this._pendingOffer[this.currentChat] && this._pendingOffer[this.currentChat].sdp) {
@@ -732,39 +725,26 @@ async acceptFeatureRequest() {
         await this.acceptOffer(this.currentChat, this._pendingOffer[this.currentChat]);
         delete this._pendingOffer[this.currentChat];
     } else {
-        console.log('⚠️ لا يوجد Offer معلق، إرسال قبول التفعيل فقط');
+        console.log('⚠️ لا يوجد Offer معلق');
         
-        try {
-            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!myPrivateKey || !receiverPublicKey) return;
-            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-                type: 'feature_response',
-                action: 'accepted',
-                timestamp: Date.now()
-            }), sharedKey);
-            await SecureChatSystem.sendToServer(this.currentChat, { 
-                id: Date.now().toString(), 
-                type: 'feature_response', 
-                data: encrypted, 
-                timestamp: Date.now() 
-            });
-            console.log('✅ تم إرسال قبول التفعيل');
-        } catch(e) {
-            console.error('❌ خطأ في إرسال القبول:', e);
-        }
-        
+        // محاولة فتح القناة مباشرة (حالة نادرة)
         if (this.currentChat) {
             CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
                 console.log('✅ تم فتح Data Channel في الخلفية');
+                // تفعيل الميزات بعد نجاح القناة
+                this.featuresEnabled = true;
+                this.friendInConversation = true;
+                const toggleInput = document.getElementById('featureToggleInput');
+                if (toggleInput) toggleInput.checked = true;
+                this.updateAllButtons();
+                console.log('✅ تم تفعيل الميزات بعد فتح القناة');
             }).catch(e => {
-                console.error('❌ خطأ في فتح Data Channel (خلفية):', e);
+                console.error('❌ خطأ في فتح Data Channel:', e);
             });
         }
     }
     
-    console.log('✅ تم تفعيل الميزات!');
+    console.log('✅ تم تجهيز القناة، في انتظار تفعيل الميزات بعد نجاح الاتصال');
 },
     
     
