@@ -298,7 +298,7 @@ startFeatureBlink() {
     }, 500);
 },  
     
-    // ==================== القسم 7: requestEnableFeatures ====================
+    // ==================== القسم 7: requestEnableFeatures (معدل - تجميع 5 ثواني) ====================
 async requestEnableFeatures() {
     if (!this.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
@@ -316,8 +316,11 @@ async requestEnableFeatures() {
     this.featureRequestPending = true;
     this.startFeatureBlink();
     
+    // ✅ مصفوفة لتجميع ICE candidates
+    this._pendingIceCandidates = [];
+    this._batchTimer = null;
+    
     try {
-        // ✅ إنشاء PeerConnection و Offer مباشرة (بدلاً من إرسال طلب نصي)
         if (CallSystem.pc) {
             try { CallSystem.pc.close(); } catch(e) {}
             CallSystem.pc = null;
@@ -327,7 +330,6 @@ async requestEnableFeatures() {
             CallSystem.dc = null;
         }
         
-        // ✅ إعداد ICE servers بشكل كامل ومستقل
         const iceServersConfig = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -357,17 +359,17 @@ async requestEnableFeatures() {
         CallSystem.dc = CallSystem.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
         CallSystem.setupDataChannel(CallSystem.dc);
         
+        // ✅ تجميع ICE candidates بدلاً من إرسالها فوراً
         CallSystem.pc.onicecandidate = e => {
             if (e.candidate) {
-                console.log('📡 إرسال ICE candidate من المرسل');
-                this.sendOfferSignal({ candidate: e.candidate });
+                console.log('📡 تجميع ICE candidate:', e.candidate.candidate.substring(0, 50));
+                this._pendingIceCandidates.push(e.candidate);
             }
         };
         
         const offer = await CallSystem.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
         await CallSystem.pc.setLocalDescription(offer);
         
-        // ✅ انتظر حتى يكتمل الـ localDescription
         await new Promise(resolve => {
             if (CallSystem.pc.localDescription && CallSystem.pc.localDescription.sdp) {
                 resolve();
@@ -391,25 +393,34 @@ async requestEnableFeatures() {
             sdpLength: CallSystem.pc.localDescription?.sdp?.length
         });
         
-        // ✅ التحقق من صحة الـ localDescription
         if (!CallSystem.pc.localDescription || !CallSystem.pc.localDescription.sdp) {
             throw new Error('فشل إنشاء SDP صالح');
         }
         
-        // ✅ إرسال Offer مع SDP كامل
         const sdpToSend = {
             type: CallSystem.pc.localDescription.type,
             sdp: CallSystem.pc.localDescription.sdp
         };
         
+        // ✅ انتظار 5 ثواني لتجميع جميع ICE candidates
+        await new Promise(resolve => {
+            if (this._batchTimer) clearTimeout(this._batchTimer);
+            this._batchTimer = setTimeout(() => {
+                console.log(`📦 انتهاء التجميع (5 ثواني) - تم تجميع ${this._pendingIceCandidates.length} ICE candidate`);
+                resolve();
+            }, 5000);
+        });
+        
+        // ✅ إرسال دفعة واحدة (Offer + جميع ICE candidates المجمعة)
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
         if (!myPrivateKey || !receiverPublicKey) return;
         const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
         const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
             type: 'feature_request',
-            action: 'offer',
+            action: 'offer_batch',
             sdp: sdpToSend,
+            iceCandidates: this._pendingIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex })),
             timestamp: Date.now()
         }), sharedKey);
         await SecureChatSystem.sendToServer(this.currentChat, { 
@@ -418,7 +429,12 @@ async requestEnableFeatures() {
             data: encrypted, 
             timestamp: Date.now() 
         });
-        console.log('📨 تم إرسال Offer WebRTC لفتح القناة مباشرة');
+        console.log(`📨 تم إرسال الدفعة (Offer + ${this._pendingIceCandidates.length} ICE candidates) لفتح القناة`);
+        
+        // تنظيف
+        this._pendingIceCandidates = [];
+        this._batchTimer = null;
+        
     } catch(e) {
         this.featureRequestPending = false;
         this.startFeatureBlink();
@@ -427,34 +443,10 @@ async requestEnableFeatures() {
     }
 },
 
-// دالة مساعدة لإرسال إشارات ICE
-sendOfferSignal(data) {
-    if (!this.currentChat) return;
-    SecureChatSystem.getMyPrivateKey().then(async (myPrivateKey) => {
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-            type: 'feature_request',
-            action: 'ice',
-            candidate: data,
-            timestamp: Date.now()
-        }), sharedKey);
-        await SecureChatSystem.sendToServer(this.currentChat, { 
-            id: Date.now().toString(), 
-            type: 'feature_request', 
-            data: encrypted, 
-            timestamp: Date.now() 
-        });
-    }).catch(console.error);
-},
-    
-
-    // ==================== القسم 8: handleFeatureRequest ====================
+// ==================== القسم 8: handleFeatureRequest (معدل - استقبال الدفعة) ====================
 async handleFeatureRequest(fromId, encryptedData) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
-    // ✅ فك التشفير للحصول على البيانات (Offer أو ICE)
     let requestData;
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -468,66 +460,55 @@ async handleFeatureRequest(fromId, encryptedData) {
         return;
     }
     
-    // ✅ تخزين الـ Offer و ICE candidates للاستخدام لاحقاً
-    if (!this._pendingOffer) this._pendingOffer = {};
-    this._pendingOffer[fromId] = {
-        sdp: requestData.sdp,
-        iceCandidates: [],
-        timestamp: Date.now()
-    };
-    
-    // ✅ إذا كان Offer، نعرض شاشة الموافقة
-    if (requestData.action === 'offer' && requestData.sdp) {
-        console.log('📡 استلام Offer WebRTC من', fromId);
+    // ✅ معالجة الدفعة الواحدة (offer_batch)
+    if (requestData.action === 'offer_batch' && requestData.sdp) {
+        console.log('📡 استلام دفعة (Offer + ICE candidates) من', fromId);
+        console.log(`📦 عدد ICE candidates في الدفعة: ${requestData.iceCandidates?.length || 0}`);
         
-        // ✅ التحقق من صحة SDP
         if (!requestData.sdp.type || requestData.sdp.type !== 'offer') {
             console.error('❌ SDP غير صالح - type:', requestData.sdp.type);
             return;
         }
         
         if (!requestData.sdp.sdp || requestData.sdp.sdp.length < 10) {
-            console.error('❌ SDP فارغ أو غير مكتمل - length:', requestData.sdp.sdp?.length);
+            console.error('❌ SDP فارغ أو غير مكتمل');
             return;
         }
         
-        console.log('📡 SDP صالح - type:', requestData.sdp.type, 'length:', requestData.sdp.sdp.length);
-        
-        // ✅ تحويل SDP إلى كائن RTCSessionDescription صحيح
-        this._pendingOffer[fromId].sdp = new RTCSessionDescription({
-            type: requestData.sdp.type,
-            sdp: requestData.sdp.sdp
-        });
+        // تخزين الدفعة كاملة
+        if (!this._pendingOffer) this._pendingOffer = {};
+        this._pendingOffer[fromId] = {
+            sdp: new RTCSessionDescription({
+                type: requestData.sdp.type,
+                sdp: requestData.sdp.sdp
+            }),
+            iceCandidates: requestData.iceCandidates || [],
+            timestamp: Date.now()
+        };
         
         this.featureRequestReceived = true;
         this.startFeatureBlink();
-        
-        // ✅ عرض إشعار للمستخدم (بدون confirm تلقائي)
         console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
     }
-    // ✅ إذا كان ICE candidate، نضيفه إلى PeerConnection
+    // ✅ معالجة ICE منفردة (للدعم الخلفي فقط)
     else if (requestData.action === 'ice' && requestData.candidate) {
-        console.log('📡 استلام ICE candidate');
+        console.log('📡 استلام ICE candidate منفرد (دعم خلفي)');
         if (CallSystem.pc) {
             try {
                 await CallSystem.pc.addIceCandidate(new RTCIceCandidate(requestData.candidate.candidate));
             } catch(e) {
                 console.warn('فشل إضافة ICE candidate:', e);
             }
-        } else {
-            // تخزين الـ ICE candidates لحين إنشاء PeerConnection
-            if (this._pendingOffer[fromId]) {
-                this._pendingOffer[fromId].iceCandidates.push(requestData.candidate);
-            }
+        } else if (this._pendingOffer && this._pendingOffer[fromId]) {
+            this._pendingOffer[fromId].iceCandidates.push(requestData.candidate);
         }
     }
 },
 
-// ✅ دالة مساعدة لقبول الـ Offer (معدلة بالكامل مع خوادم ICE مستقلة)
+// ✅ دالة مساعدة لقبول الـ Offer (معدلة - تجميع 5 ثواني للمستلم)
 async acceptOffer(fromId, offerData) {
     console.log('✅ قبول Offer من', fromId);
     
-    // إزالة الـ blinking
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
@@ -536,17 +517,18 @@ async acceptOffer(fromId, offerData) {
     const switchLabel = document.getElementById('featureSwitchLabel');
     if (switchLabel) switchLabel.classList.remove('blinking');
     
+    // ✅ مصفوفة لتجميع ICE candidates الخاصة بالمستلم
+    this._responseIceCandidates = [];
+    this._responseBatchTimer = null;
+    
     try {
-        // ✅ إعداد ICE servers بشكل كامل ومستقل (حل دائمي)
         const iceServersConfig = {
             iceServers: [
-                // STUN servers (للاتصال المباشر)
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
                 { urls: 'stun:stun2.l.google.com:19302' },
                 { urls: 'stun:stun3.l.google.com:19302' },
                 { urls: 'stun:stun4.l.google.com:19302' },
-                // TURN servers (للحالات التي يفشل فيها الاتصال المباشر)
                 {
                     urls: 'turn:openrelay.metered.ca:80',
                     username: 'openrelayproject',
@@ -565,7 +547,6 @@ async acceptOffer(fromId, offerData) {
             ]
         };
         
-        // إنشاء PeerConnection للإجابة باستخدام الإعدادات المستقلة
         if (CallSystem.pc) {
             try { CallSystem.pc.close(); } catch(e) {}
             CallSystem.pc = null;
@@ -573,51 +554,59 @@ async acceptOffer(fromId, offerData) {
         
         CallSystem.pc = new RTCPeerConnection(iceServersConfig);
         
-        // إعداد Data Channel المستقبل
         CallSystem.pc.ondatachannel = e => {
             console.log('📡 استقبال Data Channel');
             CallSystem.setupDataChannel(e.channel);
             CallSystem.dc = e.channel;
         };
         
-        // إعداد ICE candidates
+        // ✅ تجميع ICE candidates الخاصة بالمستلم
         CallSystem.pc.onicecandidate = e => {
             if (e.candidate) {
-                console.log('📡 إرسال ICE candidate');
-                this.sendOfferResponse(fromId, 'ice', { candidate: e.candidate });
+                console.log('📡 تجميع ICE candidate للمستلم');
+                this._responseIceCandidates.push(e.candidate);
             }
         };
         
-        // ✅ تعيين الـ Remote Description (Offer) مع التحقق من الصحة
         const offerSdp = offerData.sdp;
-        console.log('📡 تعيين Remote Description - type:', offerSdp.type, 'sdp length:', offerSdp.sdp?.length);
+        console.log('📡 تعيين Remote Description - type:', offerSdp.type);
         
         if (!offerSdp.type || !offerSdp.sdp) {
-            throw new Error('SDP غير صالح للاستخدام - type: ' + offerSdp.type);
+            throw new Error('SDP غير صالح للاستخدام');
         }
         
         await CallSystem.pc.setRemoteDescription(offerSdp);
         
-        // إضافة أي ICE candidates مخزنة
-        for (const ice of offerData.iceCandidates) {
+        // إضافة ICE candidates المستلمة من المرسل
+        for (const ice of (offerData.iceCandidates || [])) {
             try {
-                await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice.candidate));
-                console.log('✅ تم إضافة ICE candidate مخزنة');
+                await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
+                console.log('✅ تم إضافة ICE candidate مستلمة');
             } catch(e) {
-                console.warn('فشل إضافة ICE candidate مخزنة:', e);
+                console.warn('فشل إضافة ICE candidate:', e);
             }
         }
         
-        // إنشاء Answer
         console.log('📡 إنشاء Answer...');
         const answer = await CallSystem.pc.createAnswer();
         await CallSystem.pc.setLocalDescription(answer);
         console.log('✅ تم إنشاء Answer بنجاح');
         
-        // إرسال Answer إلى المرسل
-        await this.sendOfferResponse(fromId, 'answer', { sdp: CallSystem.pc.localDescription });
+        // ✅ انتظار 5 ثواني لتجميع ICE candidates الخاصة بالمستلم
+        await new Promise(resolve => {
+            if (this._responseBatchTimer) clearTimeout(this._responseBatchTimer);
+            this._responseBatchTimer = setTimeout(() => {
+                console.log(`📦 انتهاء تجميع المستلم (5 ثواني) - تم تجميع ${this._responseIceCandidates.length} ICE candidate`);
+                resolve();
+            }, 5000);
+        });
         
-        // تفعيل الميزات محلياً
+        // ✅ إرسال دفعة واحدة (Answer + جميع ICE candidates المجمعة)
+        await this.sendOfferResponseBatch(fromId, {
+            sdp: CallSystem.pc.localDescription,
+            iceCandidates: this._responseIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
+        });
+        
         this.featuresEnabled = true;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -629,6 +618,10 @@ async acceptOffer(fromId, offerData) {
         this.updateAllButtons();
         console.log('✅ تم فتح القناة وتفعيل الميزات بنجاح');
         
+        // تنظيف
+        this._responseIceCandidates = [];
+        this._responseBatchTimer = null;
+        
     } catch(e) {
         console.error('❌ فشل قبول الـ Offer:', e);
         alert('فشل فتح قناة الاتصال: ' + (e.message || 'خطأ غير معروف'));
@@ -638,7 +631,36 @@ async acceptOffer(fromId, offerData) {
     }
 },
 
-// ✅ دالة مساعدة لإرسال الردود (Answer أو ICE)
+// ✅ دالة جديدة: إرسال الردود كدفعة واحدة (Answer + ICE candidates مجمعة)
+async sendOfferResponseBatch(toId, batchData) {
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(toId);
+        if (!myPrivateKey || !receiverPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+        
+        const messageData = {
+            type: 'feature_response',
+            action: 'answer_batch',
+            sdp: batchData.sdp,
+            iceCandidates: batchData.iceCandidates || [],
+            timestamp: Date.now()
+        };
+        
+        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(messageData), sharedKey);
+        await SecureChatSystem.sendToServer(toId, { 
+            id: Date.now().toString(), 
+            type: 'feature_response', 
+            data: encrypted, 
+            timestamp: Date.now() 
+        });
+        console.log(`📨 تم إرسال دفعة الرد (Answer + ${batchData.iceCandidates.length} ICE candidates) إلى`, toId);
+    } catch(e) {
+        console.error('❌ فشل إرسال الرد:', e);
+    }
+},
+
+// ✅ دالة مساعدة لإرسال الردود (للإشارات المنفردة - دعم خلفي)
 async sendOfferResponse(toId, action, data = null) {
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -669,8 +691,7 @@ async sendOfferResponse(toId, action, data = null) {
     }
 },
 
-    
-    // ==================== القسم 9: acceptFeatureRequest ====================
+// ==================== القسم 9: acceptFeatureRequest (معدل) ====================
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
     
@@ -679,7 +700,6 @@ async acceptFeatureRequest() {
         return;
     }
     
-    // ✅ تفعيل الميزات محلياً فوراً
     this.featuresEnabled = true;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
@@ -691,7 +711,6 @@ async acceptFeatureRequest() {
     
     console.log('✅ featuresEnabled =', this.featuresEnabled);
     
-    // ✅ إزالة الـ blinking وتغيير لون الزر للأخضر فوراً
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
@@ -703,41 +722,47 @@ async acceptFeatureRequest() {
     if (toggleInput) toggleInput.checked = true;
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ تحديث الواجهة فوراً
     this.updateAllButtons();
     
-    // ✅ إرسال قبول التفعيل (مع إشارة أن القناة ستفتح)
-    try {
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
-            type: 'feature_response',
-            action: 'accepted',
-            timestamp: Date.now()
-        }), sharedKey);
-        await SecureChatSystem.sendToServer(this.currentChat, { 
-            id: Date.now().toString(), 
-            type: 'feature_response', 
-            data: encrypted, 
-            timestamp: Date.now() 
-        });
-        console.log('✅ تم إرسال قبول التفعيل');
-    } catch(e) {
-        console.error('❌ خطأ في إرسال القبول:', e);
+    // ✅ التحقق من وجود Offer معلق قبل قبوله
+    if (this._pendingOffer && this._pendingOffer[this.currentChat] && this._pendingOffer[this.currentChat].sdp) {
+        console.log('📡 يوجد Offer معلق، جاري قبوله...');
+        await this.acceptOffer(this.currentChat, this._pendingOffer[this.currentChat]);
+        delete this._pendingOffer[this.currentChat];
+    } else {
+        console.log('⚠️ لا يوجد Offer معلق، إرسال قبول التفعيل فقط');
+        
+        try {
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
+            if (!myPrivateKey || !receiverPublicKey) return;
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            const encrypted = await SecureChatSystem.encryptData(JSON.stringify({ 
+                type: 'feature_response',
+                action: 'accepted',
+                timestamp: Date.now()
+            }), sharedKey);
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: Date.now().toString(), 
+                type: 'feature_response', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            console.log('✅ تم إرسال قبول التفعيل');
+        } catch(e) {
+            console.error('❌ خطأ في إرسال القبول:', e);
+        }
+        
+        if (this.currentChat) {
+            CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
+                console.log('✅ تم فتح Data Channel في الخلفية');
+            }).catch(e => {
+                console.error('❌ خطأ في فتح Data Channel (خلفية):', e);
+            });
+        }
     }
     
-    // ✅ فتح القناة في الخلفية (لا ننتظرها - المستخدم يرى الزر أخضر فوراً)
-    if (this.currentChat) {
-        CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
-            console.log('✅ تم فتح Data Channel في الخلفية');
-        }).catch(e => {
-            console.error('❌ خطأ في فتح Data Channel (خلفية):', e);
-        });
-    }
-    
-    console.log('✅ تم تفعيل الميزات! القناة تفتح في الخلفية');
+    console.log('✅ تم تفعيل الميزات!');
 },
     
     
