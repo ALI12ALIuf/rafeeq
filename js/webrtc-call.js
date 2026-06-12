@@ -1249,11 +1249,26 @@ compressImage(file) {
     });
 },
 
-    
 // ==================== 14. إنهاء المكالمة (معدلة - تغلق pcCall/dcCall فقط) ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة...');
+        
+        // ✅ إخفاء أزرار التحكم الثابتة
+        const controls = document.getElementById('callControls');
+        if (controls) controls.style.display = 'none';
+        
+        // ✅ إخفاء واجهة الصوت
+        const audioUI = document.getElementById('audioCallUI');
+        if (audioUI) audioUI.style.display = 'none';
+        
+        // ✅ إخفاء عناصر الفيديو
+        const videoContainer = document.getElementById('videoCallContainer');
+        if (videoContainer) videoContainer.style.display = 'none';
+        
+        // ✅ إعادة إظهار واجهة المحادثة
+        const conversationPage = document.getElementById('conversationPage');
+        if (conversationPage) conversationPage.style.opacity = '1';
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
@@ -1303,6 +1318,7 @@ compressImage(file) {
         this.incomingChunks = {};
         this.incomingFileInfo = {};
         
+        // ✅ إزالة العناصر الديناميكية القديمة (إن وجدت للتوافق)
         const ui = document.getElementById('callUI');
         if (ui) ui.remove();
         const inc = document.getElementById('incomingCall');
@@ -1325,7 +1341,8 @@ compressImage(file) {
         
         console.log('✅ تم إنهاء المكالمة');
     }
-};
+};    
+
        
     
 // ==================== 15. الدوال العامة ====================
