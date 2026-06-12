@@ -149,6 +149,25 @@
                     <div class="emoji-grid"></div>
                 </div>
             </div>
+
+            <!-- ==================== القسم 4.3.7: أزرار التحكم أثناء المكالمة (ثابتة) ==================== -->
+            <div id="callControls" style="display: none;">
+                <button id="muteAudioBtn" class="call-btn" style="background: #4CAF50; color: white;">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="endCallBtn" class="end-call-btn" style="background: #f44336; color: white;">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+                <button id="muteVideoBtn" class="call-btn" style="background: #4CAF50; color: white; display: none;">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button id="switchCameraBtn" class="call-btn" style="background: #4CAF50; color: white; display: none;">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button id="speakerBtn" class="call-btn" style="background: #4CAF50; color: white; display: none;">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+            </div>
         </div>
 
         <!-- ==================== القسم 4.4: صفحة الملف الشخصي (Profile) ==================== -->
@@ -217,6 +236,44 @@
         <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span data-i18n="profile">الملف</span></button>
         <button class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span data-i18n="settings">الإعدادات</span></button>
     </nav>
+</div>
+
+<!-- ==================== القسم 5.1: شاشة المكالمة الواردة (ثابتة) ==================== -->
+<div id="incomingCallFixed" style="display: none;">
+    <div style="text-align: center;">
+        <div id="incomingAvatarFixed" style="font-size: 5rem; margin-bottom: 20px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));">👤</div>
+        <div id="incomingNameFixed" style="font-size: 1.8rem; color: white; font-weight: bold; margin-bottom: 10px;">...</div>
+        <div style="margin-top: 50px; display: flex; justify-content: center; gap: 40px;">
+            <button id="acceptCallFixedBtn" style="width: 80px; height: 80px; border-radius: 50%; background: #4CAF50; border: none; cursor: pointer; font-size: 2rem; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                <i class="fas fa-phone"></i>
+            </button>
+            <button id="rejectCallFixedBtn" style="width: 80px; height: 80px; border-radius: 50%; background: #f44336; border: none; cursor: pointer; font-size: 2rem; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                <i class="fas fa-phone-slash"></i>
+            </button>
+        </div>
+        <div style="margin-top: 30px; color: white; font-size: 0.9rem;">اتصال وارد...</div>
+    </div>
+</div>
+
+<!-- ==================== القسم 5.2: نافذة معاينة الصورة/الفيديو (ثابتة) ==================== -->
+<div id="mediaPreview" style="display: none;">
+    <button id="previewBackBtn">
+        <i class="fas fa-arrow-right"></i>
+    </button>
+    <button id="previewDownloadBtn">
+        <i class="fas fa-download"></i>
+    </button>
+    <div id="previewContent">
+        <img id="previewImage" style="max-width: 90%; max-height: 90%; display: none;">
+        <video id="previewVideo" style="max-width: 90%; max-height: 90%; display: none;" controls>
+            <source id="previewVideoSource">
+        </video>
+    </div>
+    <div id="videoControls" style="display: none;">
+        <button id="videoPlayBtn">
+            <i class="fas fa-play"></i>
+        </button>
+    </div>
 </div>
 
 <!-- ==================== القسم 6: النوافذ المنبثقة (Modals) ==================== -->
