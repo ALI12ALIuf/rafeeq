@@ -6,7 +6,7 @@ const CallSystem = {
     pcCall: null, dcCall: null,   // ✅ خاصة بالمكالمات (صوت، فيديو)
     localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
-    callTimerInterval: null, keepAliveInterval: null,
+    callTimerInterval: null, keepAliveInterval: null, keepAliveIntervalCall: null, // ✅ إضافة keepAliveIntervalCall
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
     servers: { 
@@ -130,7 +130,7 @@ async createDataChannelOnly(calleeId) {
     }
 },
     
-    // ==================== 4. المكالمة الصوتية (معدلة - تستخدم pcCall/dcCall) ====================
+    // ==================== 4. المكالمة الصوتية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
     async startAudioCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -188,10 +188,14 @@ async createDataChannelOnly(calleeId) {
             this.dcCall = this.pcCall.createDataChannel('chat');
             this.setupDataChannel(this.dcCall);
             
+            // ✅ مصفوفة لتجميع ICE candidates للمكالمة
+            this._callIceCandidates = [];
+            this._callBatchTimer = null;
+            
             this.pcCall.onicecandidate = e => { 
                 if (e.candidate) {
-                    console.log('📡 إرسال ICE candidate');
-                    this.sendSignal(calleeId, { candidate: e.candidate });
+                    console.log('📡 تجميع ICE candidate للمكالمة');
+                    this._callIceCandidates.push(e.candidate);
                 }
             };
             
@@ -212,8 +216,28 @@ async createDataChannelOnly(calleeId) {
             console.log('📞 إنشاء عرض مكالمة صوتية...');
             const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
             await this.pcCall.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pcCall.localDescription, type: 'audio' });
-            console.log('✅ تم إرسال العرض');
+            
+            // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
+            await new Promise(resolve => {
+                if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
+                this._callBatchTimer = setTimeout(() => {
+                    console.log(`📦 انتهاء تجميع المكالمة (5 ثواني) - تم تجميع ${this._callIceCandidates.length} ICE candidate`);
+                    resolve();
+                }, 5000);
+            });
+            
+            // ✅ إرسال Offer + جميع ICE candidates المجمعة
+            await this.sendSignal(calleeId, { 
+                sdp: this.pcCall.localDescription, 
+                type: 'audio',
+                iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
+            });
+            
+            // تنظيف
+            this._callIceCandidates = [];
+            this._callBatchTimer = null;
+            
+            console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
             
         } catch (e) { 
             console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
@@ -221,7 +245,7 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-// ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall) ====================
+// ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
     async startVideoCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -271,7 +295,17 @@ async createDataChannelOnly(calleeId) {
             this.dcCall = this.pcCall.createDataChannel('chat');
             this.setupDataChannel(this.dcCall);
             
-            this.pcCall.onicecandidate = e => { if (e.candidate) this.sendSignal(calleeId, { candidate: e.candidate }); };
+            // ✅ مصفوفة لتجميع ICE candidates للمكالمة
+            this._callIceCandidates = [];
+            this._callBatchTimer = null;
+            
+            this.pcCall.onicecandidate = e => { 
+                if (e.candidate) {
+                    console.log('📡 تجميع ICE candidate للمكالمة');
+                    this._callIceCandidates.push(e.candidate);
+                }
+            };
+            
             this.pcCall.ontrack = e => {
                 const rv = document.getElementById('remoteVideo');
                 if (rv && e.streams[0]) rv.srcObject = e.streams[0];
@@ -282,7 +316,28 @@ async createDataChannelOnly(calleeId) {
             
             const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
             await this.pcCall.setLocalDescription(offer);
-            await this.sendSignal(calleeId, { sdp: this.pcCall.localDescription, type: 'video' });
+            
+            // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
+            await new Promise(resolve => {
+                if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
+                this._callBatchTimer = setTimeout(() => {
+                    console.log(`📦 انتهاء تجميع المكالمة (5 ثواني) - تم تجميع ${this._callIceCandidates.length} ICE candidate`);
+                    resolve();
+                }, 5000);
+            });
+            
+            // ✅ إرسال Offer + جميع ICE candidates المجمعة
+            await this.sendSignal(calleeId, { 
+                sdp: this.pcCall.localDescription, 
+                type: 'video',
+                iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
+            });
+            
+            // تنظيف
+            this._callIceCandidates = [];
+            this._callBatchTimer = null;
+            
+            console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
             
         } catch (e) { 
             this.endCall(); 
@@ -329,7 +384,7 @@ async createDataChannelOnly(calleeId) {
     },
 
 
-    // ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall) ====================
+    // ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
     async receiveCall(callerId, callData) {
         if (this.isInCall) {
@@ -386,8 +441,15 @@ async createDataChannelOnly(calleeId) {
                 console.log(`➕ تم إضافة مسار ${track.kind}`);
             });
             
+            // ✅ مصفوفة لتجميع ICE candidates للإجابة
+            this._answerIceCandidates = [];
+            this._answerBatchTimer = null;
+            
             this.pcCall.onicecandidate = e => { 
-                if (e.candidate) this.sendSignal(callerId, { candidate: e.candidate });
+                if (e.candidate) {
+                    console.log('📡 تجميع ICE candidate للإجابة');
+                    this._answerIceCandidates.push(e.candidate);
+                }
             };
             
             this.pcCall.ontrack = e => {
@@ -434,8 +496,27 @@ async createDataChannelOnly(calleeId) {
                 const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
                 const answer = await this.pcCall.createAnswer(answerOptions);
                 await this.pcCall.setLocalDescription(answer);
-                await this.sendSignal(callerId, { sdp: this.pcCall.localDescription });
-                console.log('✅ تم إرسال الرد');
+                
+                // ✅ انتظار 5 ثواني لتجميع ICE candidates للإجابة
+                await new Promise(resolve => {
+                    if (this._answerBatchTimer) clearTimeout(this._answerBatchTimer);
+                    this._answerBatchTimer = setTimeout(() => {
+                        console.log(`📦 انتهاء تجميع الإجابة (5 ثواني) - تم تجميع ${this._answerIceCandidates.length} ICE candidate`);
+                        resolve();
+                    }, 5000);
+                });
+                
+                // ✅ إرسال Answer + جميع ICE candidates المجمعة
+                await this.sendSignal(callerId, { 
+                    sdp: this.pcCall.localDescription,
+                    iceCandidates: this._answerIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
+                });
+                
+                // تنظيف
+                this._answerIceCandidates = [];
+                this._answerBatchTimer = null;
+                
+                console.log('✅ تم إرسال الرد مع ICE candidates المجمعة');
             }
             
             if (this.callType === 'video') {
@@ -882,6 +963,16 @@ setupDataChannel(channel) {
                 this.dc.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
             }
         }, 2000);
+        
+        // ✅ إضافة keepAliveInterval منفصل لـ dcCall (قناة المكالمات)
+        if (channel === this.dcCall) {
+            if (this.keepAliveIntervalCall) clearInterval(this.keepAliveIntervalCall);
+            this.keepAliveIntervalCall = setInterval(() => {
+                if (this.dcCall && this.dcCall.readyState === 'open') {
+                    this.dcCall.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                }
+            }, 2000);
+        }
     };
     
     channel.onclose = () => {
@@ -890,6 +981,12 @@ setupDataChannel(channel) {
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
+        }
+        
+        // ✅ تنظيف keepAliveIntervalCall
+        if (this.keepAliveIntervalCall) {
+            clearInterval(this.keepAliveIntervalCall);
+            this.keepAliveIntervalCall = null;
         }
         
         // ✅ فقط إذا كانت القناة المغلقة هي dc (قناة الميزات) وليس dcCall (قناة المكالمة)
@@ -1254,7 +1351,7 @@ async sendSignal(calleeId, data) {
             
             const muteBtn = document.getElementById('muteBtn');
             muteBtn?.addEventListener('click', () => {
-                this.toggleMute();
+                this.toggleAudio(); // ✅ تم التغيير من toggleMute إلى toggleAudio
                 const icon = muteBtn.querySelector('i');
                 if (icon) {
                     if (this.isAudioMuted) {
@@ -1291,14 +1388,7 @@ async sendSignal(calleeId, data) {
 
     // ==================== 12. التحكم بالمكالمة ====================
 
-    toggleMute() {
-        this.isAudioMuted = !this.isAudioMuted;
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) audioTrack.enabled = !this.isAudioMuted;
-        }
-        console.log(`🎤 كتم الصوت: ${this.isAudioMuted ? 'مفعل' : 'ملغي'}`);
-    },
+    // ❌ تم حذف toggleMute (استخدم toggleAudio بدلاً منها)
 
     toggleAudio() {
         if (this.localStream) {
@@ -1514,6 +1604,11 @@ compressImage(file) {
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
+        }
+        // ✅ تنظيف keepAliveIntervalCall
+        if (this.keepAliveIntervalCall) {
+            clearInterval(this.keepAliveIntervalCall);
+            this.keepAliveIntervalCall = null;
         }
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
