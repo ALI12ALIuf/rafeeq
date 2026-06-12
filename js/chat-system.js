@@ -1449,177 +1449,32 @@ displayMessage(msg) {
 },
      
 
-    // ==================== القسم 26.1: showImagePreview ====================
+    // ==================== القسم 26.1: showImagePreview (نسخة ثابتة) ====================
 showImagePreview(imageSrc) {
-    const existingPreview = document.getElementById('imagePreviewModal');
-    if (existingPreview) existingPreview.remove();
+    const preview = document.getElementById('mediaPreview');
+    const img = document.getElementById('previewImage');
+    const video = document.getElementById('previewVideo');
+    const videoControls = document.getElementById('videoControls');
     
-    const modal = document.createElement('div');
-    modal.id = 'imagePreviewModal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.95);
-        z-index: 10050;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        touch-action: pan-x pan-y;
-    `;
+    if (!preview) return;
     
-    modal.oncontextmenu = (e) => {
-        e.preventDefault();
-        return false;
-    };
-    
-    const frame = document.createElement('div');
-    frame.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        border: 3px solid #4CAF50;
-        border-radius: 20px;
-        pointer-events: none;
-        z-index: 10051;
-        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
-    `;
-    
-    const imageContainer = document.createElement('div');
-    imageContainer.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        touch-action: none;
-        border-radius: 16px;
-    `;
-    
-    const img = document.createElement('img');
+    // إخفاء الفيديو وإظهار الصورة
+    video.pause();
+    video.style.display = 'none';
+    videoControls.style.display = 'none';
+    img.style.display = 'block';
     img.src = imageSrc;
-    img.style.cssText = `
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-        object-fit: contain;
-        transition: transform 0.1s ease;
-        cursor: default;
-        touch-action: none;
-    `;
     
-    img.oncontextmenu = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    img.ondragstart = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    img.oncopy = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    img.oncut = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    img.onselectstart = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
+    // إعادة تعيين التكبير والتحريك
+    img.style.transform = 'translate(0px, 0px) scale(1)';
     
-    const buttonOverlay = document.createElement('div');
-    buttonOverlay.style.cssText = `
-        position: absolute;
-        top: 30px;
-        left: 0;
-        right: 0;
-        display: flex;
-        justify-content: space-between;
-        padding: 0 30px;
-        pointer-events: none;
-        z-index: 10052;
-    `;
-    
-    const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
-    backBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
-    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    backBtn.onclick = () => {
-        modal.remove();
-    };
-    
-    const downloadBtn = document.createElement('button');
-    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-    downloadBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    downloadBtn.onclick = (e) => {
-        e.stopPropagation();
-        const link = document.createElement('a');
-        link.href = imageSrc;
-        link.download = 'image.jpg';
-        link.click();
-    };
-    
-    buttonOverlay.appendChild(backBtn);
-    buttonOverlay.appendChild(downloadBtn);
-    
+    // متغيرات للتكبير باللمس
     let currentScale = 1;
     let initialDistance = 0;
     let initialScale = 1;
     let startX = 0, startY = 0;
     let translateX = 0, translateY = 0;
     let isTouching = false;
-    
     const minScale = 0.8;
     const maxScale = 3;
     
@@ -1627,363 +1482,214 @@ showImagePreview(imageSrc) {
         img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
     };
     
-    img.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const touches = e.touches;
-        
-        if (touches.length === 2) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            initialDistance = Math.hypot(dx, dy);
-            initialScale = currentScale;
-            isTouching = false;
-        } else if (touches.length === 1) {
-            startX = touches[0].clientX - translateX;
-            startY = touches[0].clientY - translateY;
-            isTouching = true;
-        }
-    });
+    // إزالة المستمعات القديمة لتجنب التكرار
+    const oldImg = img.cloneNode(true);
+    img.parentNode.replaceChild(oldImg, img);
+    const newImg = document.getElementById('previewImage');
     
-    img.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        const touches = e.touches;
-        
-        if (touches.length === 2 && initialDistance > 0) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            const newDistance = Math.hypot(dx, dy);
-            let newScale = initialScale * (newDistance / initialDistance);
-            newScale = Math.min(maxScale, Math.max(minScale, newScale));
+    // إضافة مستمعات اللمس للصورة الجديدة
+    const addTouchListeners = (imageElement) => {
+        imageElement.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touches = e.touches;
             
-            if (newScale !== currentScale) {
-                currentScale = newScale;
+            if (touches.length === 2) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                initialDistance = Math.hypot(dx, dy);
+                initialScale = currentScale;
+                isTouching = false;
+            } else if (touches.length === 1) {
+                startX = touches[0].clientX - translateX;
+                startY = touches[0].clientY - translateY;
+                isTouching = true;
+            }
+        });
+        
+        imageElement.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touches = e.touches;
+            
+            if (touches.length === 2 && initialDistance > 0) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                const newDistance = Math.hypot(dx, dy);
+                let newScale = initialScale * (newDistance / initialDistance);
+                newScale = Math.min(maxScale, Math.max(minScale, newScale));
+                
+                if (newScale !== currentScale) {
+                    currentScale = newScale;
+                    updateTransform();
+                }
+            } else if (touches.length === 1 && isTouching && currentScale > 1) {
+                translateX = touches[0].clientX - startX;
+                translateY = touches[0].clientY - startY;
+                
+                const maxTranslateX = (currentScale - 1) * 200;
+                const maxTranslateY = (currentScale - 1) * 200;
+                translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
+                translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
+                
                 updateTransform();
             }
-        } else if (touches.length === 1 && isTouching && currentScale > 1) {
-            translateX = touches[0].clientX - startX;
-            translateY = touches[0].clientY - startY;
-            
-            const maxTranslateX = (currentScale - 1) * 200;
-            const maxTranslateY = (currentScale - 1) * 200;
-            translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
-            translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
-            
-            updateTransform();
-        }
-    });
-    
-    img.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        initialDistance = 0;
-        isTouching = false;
+        });
         
-        if (currentScale < 0.95) {
-            currentScale = 1;
-            translateX = 0;
-            translateY = 0;
-            updateTransform();
-        }
-    });
-    
-    imageContainer.appendChild(img);
-    modal.appendChild(frame);
-    modal.appendChild(imageContainer);
-    modal.appendChild(buttonOverlay);
-    
-    const escHandler = (e) => {
-        if (e.key === 'Escape' && document.getElementById('imagePreviewModal')) {
-            modal.remove();
-            document.removeEventListener('keydown', escHandler);
-        }
+        imageElement.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            initialDistance = 0;
+            isTouching = false;
+            
+            if (currentScale < 0.95) {
+                currentScale = 1;
+                translateX = 0;
+                translateY = 0;
+                updateTransform();
+            }
+        });
     };
-    document.addEventListener('keydown', escHandler);
     
-    document.body.appendChild(modal);
-},
-
-// ==================== القسم 26.2: showVideoPreview ====================
-showVideoPreview(videoSrc) {
-    const existingPreview = document.getElementById('videoPreviewModal');
-    if (existingPreview) existingPreview.remove();
+    addTouchListeners(newImg);
     
-    const modal = document.createElement('div');
-    modal.id = 'videoPreviewModal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.95);
-        z-index: 10060;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-    `;
+    // زر التحميل
+    const downloadBtn = document.getElementById('previewDownloadBtn');
+    downloadBtn.onclick = () => {
+        const link = document.createElement('a');
+        link.href = imageSrc;
+        link.download = 'image.jpg';
+        link.click();
+    };
     
-    modal.oncontextmenu = (e) => {
+    // زر الرجوع
+    document.getElementById('previewBackBtn').onclick = () => {
+        preview.style.display = 'none';
+        newImg.src = '';
+        currentScale = 1;
+        translateX = 0;
+        translateY = 0;
+        updateTransform();
+    };
+    
+    // منع الضغط بزر الفأرة الأيمن
+    newImg.oncontextmenu = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         return false;
     };
     
-    const frame = document.createElement('div');
-    frame.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        border: 3px solid #4CAF50;
-        border-radius: 20px;
-        pointer-events: none;
-        z-index: 10061;
-        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
-    `;
+    preview.style.display = 'flex';
+},
+
+
+// ==================== القسم 26.2: showVideoPreview (نسخة ثابتة) ====================
+showVideoPreview(videoSrc) {
+    const preview = document.getElementById('mediaPreview');
+    const img = document.getElementById('previewImage');
+    const video = document.getElementById('previewVideo');
+    const videoSource = document.getElementById('previewVideoSource');
+    const videoControls = document.getElementById('videoControls');
     
-    const contentContainer = document.createElement('div');
-    contentContainer.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        display: flex;
-        flex-direction: column;
-        background: #000;
-        border-radius: 16px;
-        overflow: hidden;
-    `;
+    if (!preview) return;
     
-    const videoWrapper = document.createElement('div');
-    videoWrapper.style.cssText = `
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        overflow: hidden;
-    `;
+    // إخفاء الصورة وإظهار الفيديو
+    img.style.display = 'none';
+    video.style.display = 'block';
+    videoControls.style.display = 'block';
     
-    const video = document.createElement('video');
-    video.src = videoSrc;
-    video.style.cssText = `
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-        object-fit: contain;
-    `;
-    video.controls = false;
-    video.playsinline = true;
+    // تعيين مصدر الفيديو
+    videoSource.src = videoSrc;
+    video.load();
     
+    // متغيرات التحكم
+    let isPlaying = false;
+    let currentVideo = video;
+    
+    // البحث عن عناصر التحكم
+    const playBtn = document.getElementById('videoPlayBtn');
+    const downloadBtn = document.getElementById('previewDownloadBtn');
+    const backBtn = document.getElementById('previewBackBtn');
+    
+    // إعادة تعيين حالة الفيديو
+    const resetVideoState = () => {
+        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        isPlaying = false;
+    };
+    
+    // زر تشغيل/إيقاف
+    if (playBtn) {
+        // إزالة المستمع القديم
+        const newPlayBtn = playBtn.cloneNode(true);
+        playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
+        
+        document.getElementById('videoPlayBtn').onclick = () => {
+            if (isPlaying) {
+                video.pause();
+                document.getElementById('videoPlayBtn').innerHTML = '<i class="fas fa-play"></i>';
+                isPlaying = false;
+            } else {
+                video.play();
+                document.getElementById('videoPlayBtn').innerHTML = '<i class="fas fa-pause"></i>';
+                isPlaying = true;
+            }
+        };
+    }
+    
+    // زر التحميل
+    if (downloadBtn) {
+        const newDownloadBtn = downloadBtn.cloneNode(true);
+        downloadBtn.parentNode.replaceChild(newDownloadBtn, downloadBtn);
+        
+        document.getElementById('previewDownloadBtn').onclick = () => {
+            const link = document.createElement('a');
+            link.href = videoSrc;
+            link.download = 'video.mp4';
+            link.click();
+        };
+    }
+    
+    // زر الرجوع
+    if (backBtn) {
+        const newBackBtn = backBtn.cloneNode(true);
+        backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+        
+        document.getElementById('previewBackBtn').onclick = () => {
+            video.pause();
+            video.currentTime = 0;
+            resetVideoState();
+            preview.style.display = 'none';
+            video.src = '';
+        };
+    }
+    
+    // إضافة مستمع لانتهاء الفيديو
+    video.onended = () => {
+        if (playBtn) document.getElementById('videoPlayBtn').innerHTML = '<i class="fas fa-play"></i>';
+        isPlaying = false;
+    };
+    
+    // إضافة مستمع للأخطاء
+    video.onerror = () => {
+        console.error('❌ خطأ في تحميل الفيديو');
+        resetVideoState();
+    };
+    
+    // منع الضغط بزر الفأرة الأيمن
     video.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
         return false;
     };
-    video.ondragstart = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
     
-    const topButtons = document.createElement('div');
-    topButtons.style.cssText = `
-        position: absolute;
-        top: 30px;
-        left: 0;
-        right: 0;
-        display: flex;
-        justify-content: space-between;
-        padding: 0 35px;
-        pointer-events: none;
-        z-index: 10062;
-    `;
+    // إظهار المعاينة
+    preview.style.display = 'flex';
     
-    const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
-    backBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
-    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    backBtn.onclick = () => {
-        if (video) video.pause();
-        modal.remove();
-    };
-    
-    const downloadBtn = document.createElement('button');
-    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-    downloadBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    downloadBtn.onclick = (e) => {
-        e.stopPropagation();
-        const link = document.createElement('a');
-        link.href = videoSrc;
-        link.download = 'video.mp4';
-        link.click();
-    };
-    
-    topButtons.appendChild(backBtn);
-    topButtons.appendChild(downloadBtn);
-    
-    const controlsBar = document.createElement('div');
-    controlsBar.style.cssText = `
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 20px;
-        background: rgba(0,0,0,0.8);
-        backdrop-filter: blur(10px);
-        padding: 15px 20px;
-        border-top: 1px solid #4CAF50;
-        z-index: 10062;
-    `;
-    
-    const playPauseBtn = document.createElement('button');
-    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-    playPauseBtn.style.cssText = `
-        background: #4CAF50;
-        border: none;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.1rem;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-    `;
-    
-    const currentTimeSpan = document.createElement('span');
-    currentTimeSpan.textContent = '0:00';
-    currentTimeSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
-    
-    const progressBar = document.createElement('div');
-    progressBar.style.cssText = `
-        flex: 1;
-        max-width: 300px;
-        height: 4px;
-        background: rgba(255,255,255,0.3);
-        border-radius: 2px;
-        cursor: pointer;
-        position: relative;
-    `;
-    
-    const progressFill = document.createElement('div');
-    progressFill.style.cssText = `
-        width: 0%;
-        height: 100%;
-        background: #4CAF50;
-        border-radius: 2px;
-    `;
-    progressBar.appendChild(progressFill);
-    
-    const durationSpan = document.createElement('span');
-    durationSpan.textContent = '0:00';
-    durationSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
-    
-    controlsBar.appendChild(playPauseBtn);
-    controlsBar.appendChild(currentTimeSpan);
-    controlsBar.appendChild(progressBar);
-    controlsBar.appendChild(durationSpan);
-    
-    videoWrapper.appendChild(video);
-    contentContainer.appendChild(videoWrapper);
-    contentContainer.appendChild(controlsBar);
-    
-    modal.appendChild(frame);
-    modal.appendChild(contentContainer);
-    modal.appendChild(topButtons);
-    
-    video.addEventListener('loadedmetadata', () => {
-        const minutes = Math.floor(video.duration / 60);
-        const seconds = Math.floor(video.duration % 60);
-        durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    });
-    
-    video.addEventListener('timeupdate', () => {
-        const minutes = Math.floor(video.currentTime / 60);
-        const seconds = Math.floor(video.currentTime % 60);
-        currentTimeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        const percent = (video.currentTime / video.duration) * 100;
-        progressFill.style.width = percent + '%';
-    });
-    
-    let isPlaying = false;
-    playPauseBtn.onclick = () => {
-        if (isPlaying) {
-            video.pause();
-            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-            isPlaying = false;
-        } else {
-            video.play();
-            playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-            isPlaying = true;
-        }
-    };
-    
-    video.onended = () => {
-        playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-        isPlaying = false;
-    };
-    
-    progressBar.onclick = (e) => {
-        const rect = progressBar.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const percent = clickX / rect.width;
-        video.currentTime = percent * video.duration;
-    };
-    
-    const escHandler = (e) => {
-        if (e.key === 'Escape' && document.getElementById('videoPreviewModal')) {
-            if (video) video.pause();
-            modal.remove();
-            document.removeEventListener('keydown', escHandler);
-        }
-    };
-    document.addEventListener('keydown', escHandler);
-    
-    document.body.appendChild(modal);
-    
+    // تشغيل الفيديو تلقائياً
     video.play().then(() => {
-        playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        if (playBtn) document.getElementById('videoPlayBtn').innerHTML = '<i class="fas fa-pause"></i>';
         isPlaying = true;
-    }).catch(() => {});
+    }).catch((err) => {
+        console.log('⚠️ التشغيل التلقائي غير مسموح:', err);
+        resetVideoState();
+    });
 },
 
     // ==================== القسم 27: sendMessage ====================
