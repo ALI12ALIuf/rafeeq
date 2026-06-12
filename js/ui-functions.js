@@ -63,10 +63,12 @@ async function loadChats() {
 // ==================== القسم 3: إعداد مستمعي الواجهة ====================
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
-        const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); 
-        if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; 
-        const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); 
-        if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; 
+        // إخفاء قائمة المرفقات الثابتة عند الضغط خارجها
+        const bar = document.getElementById('attachmentsFixedBar');
+        const attachBtn = document.getElementById('fixedAttachBtn');
+        if (bar && attachmentsVisible && !bar.contains(e.target) && !attachBtn?.contains(e.target)) {
+            hideAttachmentsBar();
+        }
     }); 
 }
 
@@ -110,19 +112,116 @@ window.handleMessageKeyPress = e => {
     } 
 };
 
-// ==================== القسم 6: قائمة المرفقات والإيموجي ====================
-window.showAttachmentMenu = () => { 
-    const m = document.getElementById('attachmentMenu'); 
-    if (m) m.style.display = m.style.display === 'none' ? 'flex' : 'none'; 
-    const ep = document.getElementById('emojiPicker'); 
-    if (ep) ep.style.display = 'none'; 
+// ==================== القسم 6: إدارة الأزرار الثابتة ====================
+let attachmentsVisible = false;
+
+// تبديل إظهار قائمة المرفقات
+window.toggleAttachmentsBar = function() {
+    const bar = document.getElementById('attachmentsFixedBar');
+    if (!bar) return;
+    
+    attachmentsVisible = !attachmentsVisible;
+    bar.style.display = attachmentsVisible ? 'flex' : 'none';
 };
 
-window.showEmojiPicker = () => { 
-    const p = document.getElementById('emojiPicker'); 
-    if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'; 
-    const m = document.getElementById('attachmentMenu'); 
-    if (m) m.style.display = 'none'; 
+// إخفاء قائمة المرفقات
+window.hideAttachmentsBar = function() {
+    const bar = document.getElementById('attachmentsFixedBar');
+    if (bar) bar.style.display = 'none';
+    attachmentsVisible = false;
+};
+
+// تهيئة الأزرار الثابتة
+function initFixedButtons() {
+    // زر المرفقات +
+    const attachBtn = document.getElementById('fixedAttachBtn');
+    if (attachBtn) attachBtn.onclick = toggleAttachmentsBar;
+    
+    // زر الإرسال
+    const sendBtn = document.getElementById('fixedSendBtn');
+    if (sendBtn) sendBtn.onclick = () => {
+        if (typeof sendMessage === 'function') sendMessage();
+    };
+    
+    // أزرار المرفقات
+    const imgBtn = document.getElementById('attachImageBtn');
+    if (imgBtn) imgBtn.onclick = () => {
+        if (typeof sendImage === 'function') sendImage();
+        hideAttachmentsBar();
+    };
+    
+    const videoBtn = document.getElementById('attachVideoBtn');
+    if (videoBtn) videoBtn.onclick = () => {
+        if (typeof sendVideo === 'function') sendVideo();
+        hideAttachmentsBar();
+    };
+    
+    const fileBtn = document.getElementById('attachFileBtn');
+    if (fileBtn) fileBtn.onclick = () => {
+        if (typeof sendFile === 'function') sendFile();
+        hideAttachmentsBar();
+    };
+    
+    const voiceBtn = document.getElementById('attachVoiceBtn');
+    if (voiceBtn) voiceBtn.onclick = () => {
+        if (typeof sendVoiceNote === 'function') sendVoiceNote();
+        hideAttachmentsBar();
+    };
+    
+    const locationBtn = document.getElementById('attachLocationBtn');
+    if (locationBtn) locationBtn.onclick = () => {
+        if (typeof shareLocation === 'function') shareLocation();
+        hideAttachmentsBar();
+    };
+}
+
+// مراقبة لوحة المفاتيح
+function setupKeyboardObserver() {
+    let originalHeight = window.innerHeight;
+    
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            const currentHeight = window.visualViewport.height;
+            const isKeyboardOpen = currentHeight < originalHeight - 150;
+            
+            if (isKeyboardOpen) {
+                document.body.classList.add('keyboard-open');
+            } else {
+                document.body.classList.remove('keyboard-open');
+                hideAttachmentsBar();
+            }
+        });
+    }
+}
+
+// تحديث حالة جميع الأزرار
+window.updateAllButtonsFixed = function() {
+    const canUse = window.ChatSystem?.friendInConversation && window.ChatSystem?.featuresEnabled;
+    const isInConversation = !!window.ChatSystem?.currentChat;
+    
+    const attachOptionBtns = document.querySelectorAll('.attach-option-btn');
+    attachOptionBtns.forEach(btn => {
+        if (canUse && isInConversation) {
+            btn.classList.remove('locked');
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        } else {
+            btn.classList.add('locked');
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        }
+    });
+    
+    const callBtns = document.querySelectorAll('.call-buttons button');
+    callBtns.forEach(btn => {
+        if (canUse && isInConversation) {
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        } else {
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        }
+    });
 };
 
 // ==================== القسم 7: إرسال الملفات ====================
@@ -135,7 +234,7 @@ window.sendImage = () => {
         if (f && ChatSystem.currentChat) ChatSystem.sendImage(f); 
     }; 
     i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
+    hideAttachmentsBar();
 };
 
 window.sendVideo = () => { 
@@ -147,7 +246,7 @@ window.sendVideo = () => {
         if (f && ChatSystem.currentChat) ChatSystem.sendVideoFile(f); 
     }; 
     i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
+    hideAttachmentsBar();
 };
 
 window.sendFile = () => { 
@@ -159,7 +258,7 @@ window.sendFile = () => {
         if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); 
     }; 
     i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
+    hideAttachmentsBar();
 };
 
 window.sendVoiceNote = () => { 
@@ -194,19 +293,22 @@ window.sendVoiceNote = () => {
             if (mr.state === 'recording') mr.stop(); 
         }, 900000); 
     }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
+    hideAttachmentsBar();
 };
 
 // ==================== القسم 8: مشاركة الموقع ====================
 window.shareLocation = () => { 
     ChatSystem.shareLocationDirect(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
+    hideAttachmentsBar();
 };
 
 // ==================== القسم 9: إغلاق المحادثة ====================
 window.closeConversation = () => { 
     CallSystem.endCall(); 
     ChatSystem.closeChat();
+    
+    // إخفاء قوائم المرفقات
+    hideAttachmentsBar();
     
     setTimeout(() => {
         const lastPage = popPage();
@@ -380,6 +482,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadChats(); 
     setupChatListeners(); 
     updateTripsCount(); 
+    initFixedButtons();
+    setupKeyboardObserver();
 });
 
 window.addEventListener('authReady', async () => { 
@@ -395,5 +499,3 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => { 
     console.error('❌ خطأ غير معالج:', event.reason); 
 });
-
-
