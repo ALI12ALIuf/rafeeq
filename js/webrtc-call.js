@@ -1103,6 +1103,8 @@ async handleSignaling(data) {
                 if (e.candidate) this.sendSignal(ChatSystem.currentChat, { candidate: e.candidate }).catch(() => {}); 
             };
         }
+        
+        // ✅ معالجة SDP أولاً
         if (data.sdp) {
             await this.pcCall.setRemoteDescription(new RTCSessionDescription(data.sdp));
             if (data.sdp.type === 'offer') {
@@ -1110,9 +1112,23 @@ async handleSignaling(data) {
                 await this.pcCall.setLocalDescription(answer);
                 await this.sendSignal(ChatSystem.currentChat, { sdp: this.pcCall.localDescription });
             }
-        } else if (data.candidate) {
+        } 
+        // ✅ معالجة ICE candidates المجمعة (دفعة واحدة)
+        else if (data.iceCandidates && data.iceCandidates.length > 0) {
+            console.log(`📦 استلام ${data.iceCandidates.length} ICE candidate مجمعة`);
+            for (const ice of data.iceCandidates) {
+                try {
+                    await this.pcCall.addIceCandidate(new RTCIceCandidate(ice));
+                } catch(e) {
+                    console.warn('فشل إضافة ICE candidate مجمع:', e);
+                }
+            }
+        }
+        // ✅ معالجة ICE candidate منفرد (للتوافق مع الإصدارات القديمة)
+        else if (data.candidate) {
             if (this.pcCall && data.candidate) {
                 await this.pcCall.addIceCandidate(new RTCIceCandidate(data.candidate));
+                console.log('📡 تم إضافة ICE candidate منفرد');
             }
         }
     } catch (e) {
