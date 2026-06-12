@@ -1095,6 +1095,13 @@ openChat(friendId, friendName, friendAvatar) {
     
     this.updateAllButtons();
     
+    // ✅ إظهار شريط الإدخال الثابت
+    const inputBar = document.querySelector('.fixed-input-bar');
+    if (inputBar) inputBar.style.display = 'flex';
+    
+    // ✅ تحديث حالة الأزرار الثابتة
+    if (typeof updateAllButtonsFixed === 'function') updateAllButtonsFixed();
+    
     setTimeout(() => {
         if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
             console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
@@ -2614,10 +2621,19 @@ closeChat() {
         }
     }
     this.currentChat = null;
+    
+    // ✅ إخفاء شريط الإدخال الثابت
+    const inputBar = document.querySelector('.fixed-input-bar');
+    if (inputBar) inputBar.style.display = 'none';
+    
+    // ✅ إخفاء قوائم المرفقات
+    if (typeof hideAttachmentsBar === 'function') hideAttachmentsBar();
+    
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
-}, 
+},
+
     
     
     // ==================== القسم 38: escapeHtml ====================
