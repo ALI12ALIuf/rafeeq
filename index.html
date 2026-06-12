@@ -75,7 +75,7 @@
             <div class="chats-list" id="chatsList"></div>
         </div>
 
-        <!-- ==================== القسم 4.3: صفحة المحادثة (Conversation) ==================== -->
+        <!-- ==================== القسم 4.3: صفحة المحادثة (Conversation) - نسخة الأزرار الثابتة ==================== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
             
             <!-- ==================== القسم 4.3.1: رأس المحادثة ==================== -->
@@ -120,35 +120,52 @@
             <!-- ==================== القسم 4.3.3: حاوية الرسائل ==================== -->
             <div class="messages-container" id="messagesContainer"></div>
 
-            <!-- ==================== القسم 4.3.4: مدخل الرسائل ==================== -->
-            <div class="message-input-container">
+            <!-- ==================== القسم 4.3.4: شريط الإدخال الثابت ==================== -->
+            <div class="message-input-container fixed-input-bar">
                 <div class="message-input-wrapper">
-                    <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
+                    <button class="attach-btn" id="fixedAttachBtn">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    
                     <div class="input-area">
                         <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off">
-                        <button class="emoji-btn" onclick="showEmojiPicker()"><i class="far fa-smile"></i></button>
                     </div>
-                    <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
-                    <button class="voice-btn" onclick="startVoiceRecording()" style="display: none;"><i class="fas fa-microphone"></i></button>
-                </div>
-                
-                <!-- ==================== القسم 4.3.5: قائمة المرفقات ==================== -->
-                <div class="attachment-menu" id="attachmentMenu" style="display: none;">
-                    <button onclick="sendImage()" data-dc><i class="fas fa-image"></i> صورة</button>
-                    <button onclick="sendVideo()" data-dc><i class="fas fa-video"></i> فيديو</button>
-                    <button onclick="sendFile()" data-dc><i class="fas fa-file"></i> ملف</button>
-                    <button onclick="sendVoiceNote()" data-dc><i class="fas fa-microphone"></i> بصمة صوت</button>
-                    <button onclick="shareLocation()" data-dc><i class="fas fa-map-marker-alt"></i> موقع</button>
-                </div>
-
-                <!-- ==================== القسم 4.3.6: منتقي الإيموجي ==================== -->
-                <div class="emoji-picker" id="emojiPicker" style="display: none;">
-                    <div class="emoji-categories">
-                        <button class="active">😊</button><button>❤️</button><button>👍</button><button>🎉</button><button>😢</button><button>😡</button>
-                    </div>
-                    <div class="emoji-grid"></div>
+                    
+                    <button class="send-btn" id="fixedSendBtn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                    
+                    <button class="voice-btn" id="fixedVoiceRecordBtn" style="display: none;">
+                        <i class="fas fa-microphone"></i>
+                    </button>
                 </div>
             </div>
+
+            <!-- ==================== القسم 4.3.5: قائمة المرفقات الثابتة ==================== -->
+            <div class="attachments-fixed-bar" id="attachmentsFixedBar" style="display: none;">
+                <button id="attachImageBtn" class="attach-option-btn" data-dc>
+                    <i class="fas fa-image"></i>
+                    <span>صورة</span>
+                </button>
+                <button id="attachVideoBtn" class="attach-option-btn" data-dc>
+                    <i class="fas fa-video"></i>
+                    <span>فيديو</span>
+                </button>
+                <button id="attachFileBtn" class="attach-option-btn" data-dc>
+                    <i class="fas fa-file"></i>
+                    <span>ملف</span>
+                </button>
+                <button id="attachVoiceBtn" class="attach-option-btn" data-dc>
+                    <i class="fas fa-microphone"></i>
+                    <span>بصمة</span>
+                </button>
+                <button id="attachLocationBtn" class="attach-option-btn" data-dc>
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>موقع</span>
+                </button>
+            </div>
+
+            <!-- ==================== القسم 4.3.6: (محذوف - تمت إزالة منتقي الإيموجي نهائياً) ==================== -->
         </div>
 
         <!-- ==================== القسم 4.4: صفحة الملف الشخصي (Profile) ==================== -->
