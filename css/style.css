@@ -270,11 +270,7 @@ body.conversation-open .conversation-page {
 .call-buttons button:hover { background: var(--light); }
 .call-buttons button i { font-size: 1.2rem; }
 
-/* ==================== القسم 13.2: أزرار Mute و Lock ==================== */
-.attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
-.attachment-menu button.locked::after { content: " 🔒"; font-size: 0.8rem; }
-
-/* ==================== القسم 13.3: صندوق الرسائل (التمرير المستقل والسلس) ==================== */
+/* ==================== القسم 13.2: صندوق الرسائل (التمرير المستقل والسلس) ==================== */
 .messages-container { 
     flex: 1 !important; 
     overflow-y: auto !important; 
@@ -302,7 +298,7 @@ body.conversation-open .conversation-page {
 .message-image { max-width: 200px; max-height: 200px; border-radius: 12px; cursor: pointer; }
 .message-audio { width: 250px; height: 40px; border-radius: 20px; }
 
-/* ==================== القسم 13.4: فوتر الإدخال (شريط الكتابة الثابت) ==================== */
+/* ==================== القسم 13.3: فوتر الإدخال (شريط الكتابة الثابت) ==================== */
 .message-input-container { 
     background: var(--card-bg); 
     border-top: 1px solid var(--border); 
@@ -322,7 +318,6 @@ body.conversation-open .conversation-page {
 .attach-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: transparent; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
 .input-area { flex: 1; display: flex; align-items: center; gap: 4px; }
 #messageInput { flex: 1; background: transparent; border: none; padding: 12px; color: var(--text); font-size: 1rem; outline: none; }
-.emoji-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 .send-btn, .voice-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 
 /* تثبيت تفاعل القوائم بشكل دائم */
@@ -330,42 +325,26 @@ body.conversation-open .conversation-page {
     pointer-events: auto !important;
 }
 
-/* ==================== القسم 13.5: قائمة المرفقات ==================== */
-.attachment-menu { position: absolute; bottom: 80px; left: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2100; min-width: 150px; border: 1px solid var(--border); }
-.attachment-menu button { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: none; background: transparent; color: var(--text); cursor: pointer; border-radius: 12px; font-size: 0.95rem; width: 100%; text-align: right; }
-.attachment-menu button i { width: 24px; color: var(--primary); font-size: 1.2rem; }
-
-/* ==================== القسم 13.6: منتقي الإيموجي ==================== */
-.emoji-picker { position: absolute; bottom: 80px; right: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 12px; z-index: 2100; width: 300px; border: 1px solid var(--border); }
-.emoji-categories { display: flex; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-.emoji-categories button { width: 40px; height: 40px; border-radius: 20px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.3rem; }
-.emoji-categories button.active { background: var(--light); color: var(--primary); }
-.emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: 200px; overflow-y: auto; }
-.emoji-grid button { width: 40px; height: 40px; border-radius: 8px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; }
-
-/* ==================== القسم 13.7: استعلامات المحادثة للشاشات الصغيرة ==================== */
+/* ==================== القسم 13.4: استعلامات المحادثة للشاشات الصغيرة ==================== */
 @media (max-width: 480px) {
     .conversation-header { padding: 8px 12px; height: 60px; }
     .message { max-width: 85%; }
     .message-image { max-width: 150px; max-height: 150px; }
     .message-audio { width: 200px; }
-    .attach-btn, .emoji-btn { width: 35px; height: 35px; font-size: 1rem; }
+    .attach-btn { width: 35px; height: 35px; font-size: 1rem; }
     .send-btn, .voice-btn { width: 40px; height: 40px; font-size: 1.1rem; }
 }
 
-/* ==================== القسم 13.8: أنماط الثيم الداكن للمحادثة ==================== */
+/* ==================== القسم 13.5: أنماط الثيم الداكن للمحادثة ==================== */
 .theme-dark .message.received .message-content { background: #2d2d2d; color: #fff; }
 .theme-dark .message.sent .message-content { background: #1976D2; }
 .theme-dark .message-info { color: #999; }
 .theme-dark .message.sent .message-info { color: rgba(255,255,255,0.6); }
-.theme-dark .emoji-picker, .theme-dark .attachment-menu { background: #2d2d2d; border-color: #444; }
-.theme-dark .emoji-categories { border-color: #444; }
-.theme-dark .emoji-categories button.active { background: #444; }
 
-/* ==================== القسم 13.9: حركات الرسائل ==================== */
+/* ==================== القسم 13.6: حركات الرسائل ==================== */
 @keyframes messagePop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
-/* ==================== القسم 13.10: شريط التمرير ==================== */
+/* ==================== القسم 13.7: شريط التمرير ==================== */
 .messages-container::-webkit-scrollbar { width: 6px; }
 .messages-container::-webkit-scrollbar-track { background: transparent; }
 .messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -537,4 +516,167 @@ input:checked + .feature-slider:before {
 
 .kick-btn.active:active {
     transform: scale(0.95);
+}
+
+/* ==================== القسم 18: الأزرار الثابتة - إضافات جديدة ==================== */
+
+/* شريط الإدخال الثابت */
+.fixed-input-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+    z-index: 2001;
+    transform: translateZ(0);
+    transition: transform 0.2s ease;
+}
+
+/* عند ظهور لوحة المفاتيح */
+body.keyboard-open .fixed-input-bar {
+    transform: translateY(-100%);
+}
+
+/* قائمة المرفقات الثابتة */
+.attachments-fixed-bar {
+    position: fixed;
+    bottom: 70px;
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-around;
+    gap: 10px;
+    z-index: 2000;
+    transform: translateZ(0);
+    flex-wrap: wrap;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+
+/* أزرار خيارات المرفقات */
+.attach-option-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background: var(--light);
+    border: none;
+    border-radius: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    min-width: 60px;
+}
+
+.attach-option-btn i {
+    font-size: 1.3rem;
+    color: var(--primary);
+}
+
+.attach-option-btn span {
+    font-size: 0.7rem;
+    color: var(--text);
+}
+
+.attach-option-btn:active {
+    transform: scale(0.95);
+}
+
+.attach-option-btn.locked {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* أزرار ثابتة عامة - منع الحركة غير المرغوبة */
+button, 
+.nav-item,
+.action-btn,
+.attach-option-btn,
+.send-btn,
+.attach-btn,
+.back-btn,
+.edit-profile-btn-left,
+.copy-btn-left,
+.stat-link,
+.settings-item,
+.language-option,
+.avatar-option,
+.modal-btn {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: transform 0.1s ease, background 0.2s ease;
+}
+
+button:active, 
+.nav-item:active,
+.action-btn:active,
+.attach-option-btn:active,
+.send-btn:active,
+.attach-btn:active,
+.back-btn:active,
+.edit-profile-btn-left:active,
+.copy-btn-left:active,
+.stat-link:active,
+.settings-item:active,
+.language-option:active,
+.avatar-option:active,
+.modal-btn:active {
+    transform: scale(0.96);
+}
+
+/* منع الحركة من أزرار المكالمات */
+.call-buttons button:active {
+    transform: scale(0.95);
+}
+
+/* شريط التنقل السفلي - أكثر ثباتاً */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    height: 60px;
+    display: flex;
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* دعم هواتف iPhone ذات الـ Notch */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .fixed-input-bar {
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+    .bottom-nav {
+        padding-bottom: env(safe-area-inset-bottom);
+        height: calc(60px + env(safe-area-inset-bottom));
+    }
+    .attachments-fixed-bar {
+        bottom: calc(70px + env(safe-area-inset-bottom));
+    }
+}
+
+/* للشاشات الصغيرة */
+@media (max-width: 480px) {
+    .attach-option-btn {
+        min-width: 50px;
+        padding: 6px 8px;
+    }
+    .attach-option-btn i {
+        font-size: 1.1rem;
+    }
+    .attach-option-btn span {
+        font-size: 0.6rem;
+    }
+    .attachments-fixed-bar {
+        gap: 5px;
+        padding: 10px 12px;
+    }
 }
