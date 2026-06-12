@@ -1,4 +1,4 @@
-// ========== 1. webrtc-call.js - النسخة النهائية المعدلة بالكامل ==========
+// ========== 1. webrtc-call.js - النسخة النهائية المعدلة ==========
 // جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
 
 const CallSystem = {
@@ -6,7 +6,7 @@ const CallSystem = {
     pcCall: null, dcCall: null,   // ✅ خاصة بالمكالمات (صوت، فيديو)
     localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
-    callTimerInterval: null, keepAliveInterval: null, keepAliveIntervalCall: null,
+    callTimerInterval: null, keepAliveInterval: null, keepAliveIntervalCall: null, // ✅ إضافة keepAliveIntervalCall
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
     servers: { 
@@ -15,8 +15,7 @@ const CallSystem = {
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
             { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-        ],
-        sdpSemantics: 'unified-plan'  // ✅ توحيد قراءة حزم البيانات بين Android و iOS
+        ] 
     },
     
     // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
@@ -309,13 +308,7 @@ async createDataChannelOnly(calleeId) {
             
             this.pcCall.ontrack = e => {
                 const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) {
-                    rv.srcObject = e.streams[0];
-                    // ✅ إضافة playsinline و autoplay لإجبار المتصفح على عرض الفيديو
-                    rv.setAttribute('autoplay', '');
-                    rv.setAttribute('playsinline', '');
-                    rv.play().catch(() => {});
-                }
+                if (rv && e.streams[0]) rv.srcObject = e.streams[0];
             };
             this.pcCall.onconnectionstatechange = () => {
                 if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
@@ -390,183 +383,158 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
+
     // ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
-async receiveCall(callerId, callData) {
-    if (this.isInCall) {
-        console.log('❌ مكالمة نشطة بالفعل');
-        this.sendSignal(callerId, { type: 'reject' });
-        return;
-    }
-    
-    this.isInCall = true;
-    this.callType = callData.type || 'audio';
-    this.currentCallId = callerId;
-    console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
-    
-    try {
-        if (window.auth?.currentUser) {
-            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                inCall: true,
-                callType: this.callType
-            }).catch(() => {});
-        }
-        
-        const silentAudio = new Audio();
-        silentAudio.volume = 0;
-        silentAudio.play().catch(() => {});
-        
-        const constraints = { 
-            audio: true, 
-            video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } : false
-        };
-        
-        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        
-        if (this.localStream.getAudioTracks().length === 0) {
-            this.endCall();
+    async receiveCall(callerId, callData) {
+        if (this.isInCall) {
+            console.log('❌ مكالمة نشطة بالفعل');
+            this.sendSignal(callerId, { type: 'reject' });
             return;
         }
         
-        if (this.callType === 'video') {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                // ✅ قفل الكاميرا بعد الرد (مثل واتساب والنظام الأصلي)
-                videoTrack.enabled = false;
-                this.isVideoMuted = true;
-                console.log('🔒 الكاميرا مقفلة بعد الرد - اضغط زر الكاميرا لتشغيلها');
+        this.isInCall = true;
+        this.callType = callData.type || 'audio';
+        this.currentCallId = callerId;
+        console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
+        
+        try {
+            if (window.auth?.currentUser) {
+                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                    inCall: true,
+                    callType: this.callType
+                }).catch(() => {});
             }
-        }
-        
-        this.showCallUI(this.callType);
-        
-        // ✅ استخدام pcCall بدلاً من pc
-        this.pcCall = new RTCPeerConnection(this.servers);
-        
-        this.localStream.getTracks().forEach(track => {
-            this.pcCall.addTrack(track, this.localStream);
-            console.log(`➕ تم إضافة مسار ${track.kind}`);
-        });
-        
-        // ✅ مصفوفة لتجميع ICE candidates للإجابة
-        this._answerIceCandidates = [];
-        this._answerBatchTimer = null;
-        
-        this.pcCall.onicecandidate = e => { 
-            if (e.candidate) {
-                console.log('📡 تجميع ICE candidate للإجابة');
-                this._answerIceCandidates.push(e.candidate);
-            }
-        };
-        
-        this.pcCall.ontrack = e => {
-            console.log('📞 استقبال مسار:', e.track.kind);
             
-            if (e.track.kind === 'video') {
-                console.log('✅ تم استقبال فيديو بعيد');
-                
-                // ✅ إزالة العنصر القديم نهائياً
-                const oldRv = document.getElementById('remoteVideo');
-                if (oldRv) {
-                    oldRv.remove();
-                }
-                
-                // ✅ إنشاء عنصر جديد
-                const rv = document.createElement('video');
-                rv.id = 'remoteVideo';
-                rv.autoplay = true;
-                rv.playsInline = true;
-                rv.muted = true;
-                rv.style.cssText = 'width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;';
-                
-                document.body.appendChild(rv);
-                rv.srcObject = e.streams[0];
-                
-                // ✅ الحل الجذري: انتظار البيانات ثم التشغيل مع إعادة المحاولة
-                const playVideo = () => {
-                    rv.play().then(() => {
-                        console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
-                        rv.muted = false;
-                    }).catch(err => {
-                        console.log('⚠️ فشل التشغيل، إعادة المحاولة بعد 200ms');
-                        setTimeout(playVideo, 200);
-                    });
-                };
-                
-                // انتظر حتى يتم تحميل البيانات الكافية
-                if (rv.readyState >= 2) {
-                    playVideo();
-                } else {
-                    rv.addEventListener('loadeddata', playVideo, { once: true });
-                    // مهلة أمان: إذا لم يتم التحميل خلال 3 ثوان، حاول التشغيل
-                    setTimeout(playVideo, 3000);
-                }
-                
-                console.log('✅ تم إنشاء وربط الفيديو البعيد من جديد');
-                
-            } else if (e.track.kind === 'audio') {
-                this.setupRemoteAudio(e.streams[0]);
-            }
-        };
-        
-        this.pcCall.ondatachannel = e => {
-            console.log('📡 استقبال Data Channel');
-            this.setupDataChannel(e.channel);
-            // ✅ استخدام dcCall بدلاً من dc
-            this.dcCall = e.channel;
-        };
-        
-        this.pcCall.onconnectionstatechange = () => {
-            console.log(`🔄 حالة الاتصال: ${this.pcCall?.connectionState}`);
-            if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
+            const silentAudio = new Audio();
+            silentAudio.volume = 0;
+            silentAudio.play().catch(() => {});
+            
+            const constraints = { 
+                audio: true, 
+                video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } : false
+            };
+            
+            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            if (this.localStream.getAudioTracks().length === 0) {
                 this.endCall();
+                return;
             }
-        };
-        
-        if (callData.sdp) {
-            await this.pcCall.setRemoteDescription(new RTCSessionDescription(callData.sdp));
-            const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
-            const answer = await this.pcCall.createAnswer(answerOptions);
-            await this.pcCall.setLocalDescription(answer);
             
-            // ✅ انتظار 5 ثواني لتجميع ICE candidates للإجابة
-            await new Promise(resolve => {
-                if (this._answerBatchTimer) clearTimeout(this._answerBatchTimer);
-                this._answerBatchTimer = setTimeout(() => {
-                    console.log(`📦 انتهاء تجميع الإجابة (5 ثواني) - تم تجميع ${this._answerIceCandidates.length} ICE candidate`);
-                    resolve();
-                }, 5000);
+            if (this.callType === 'video') {
+                const videoTrack = this.localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    videoTrack.enabled = false;
+                    this.isVideoMuted = true;
+                    console.log('✅ تم إيقاف الكاميرا بشكل افتراضي');
+                }
+            }
+            
+            this.showCallUI(this.callType);
+            
+            // ✅ استخدام pcCall بدلاً من pc
+            this.pcCall = new RTCPeerConnection(this.servers);
+            
+            this.localStream.getTracks().forEach(track => {
+                this.pcCall.addTrack(track, this.localStream);
+                console.log(`➕ تم إضافة مسار ${track.kind}`);
             });
             
-            // ✅ إرسال Answer + جميع ICE candidates المجمعة
-            await this.sendSignal(callerId, { 
-                sdp: this.pcCall.localDescription,
-                iceCandidates: this._answerIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
-            });
-            
-            // تنظيف
+            // ✅ مصفوفة لتجميع ICE candidates للإجابة
             this._answerIceCandidates = [];
             this._answerBatchTimer = null;
             
-            console.log('✅ تم إرسال الرد مع ICE candidates المجمعة');
-        }
-        
-        if (this.callType === 'video') {
-            setTimeout(() => {
-                const lv = document.getElementById('localVideo');
-                if (lv && this.localStream) {
-                    lv.srcObject = this.localStream;
-                    console.log('✅ تم ربط الفيديو المحلي');
+            this.pcCall.onicecandidate = e => { 
+                if (e.candidate) {
+                    console.log('📡 تجميع ICE candidate للإجابة');
+                    this._answerIceCandidates.push(e.candidate);
                 }
-            }, 500);
+            };
+            
+            this.pcCall.ontrack = e => {
+                console.log('📞 استقبال مسار:', e.track.kind);
+                
+                if (e.track.kind === 'video') {
+                    console.log('✅ تم استقبال فيديو بعيد');
+                    const rv = document.getElementById('remoteVideo');
+                    if (rv) {
+                        rv.srcObject = e.streams[0];
+                        rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
+                        console.log('✅ تم ربط الفيديو البعيد');
+                    } else {
+                        console.log('⚠️ عنصر remoteVideo غير موجود');
+                        setTimeout(() => {
+                            const rv2 = document.getElementById('remoteVideo');
+                            if (rv2) {
+                                rv2.srcObject = e.streams[0];
+                                console.log('✅ تم ربط الفيديو البعيد (بعد التأخير)');
+                            }
+                        }, 500);
+                    }
+                } else if (e.track.kind === 'audio') {
+                    this.setupRemoteAudio(e.streams[0]);
+                }
+            };
+            
+            this.pcCall.ondatachannel = e => {
+                console.log('📡 استقبال Data Channel');
+                this.setupDataChannel(e.channel);
+                // ✅ استخدام dcCall بدلاً من dc
+                this.dcCall = e.channel;
+            };
+            
+            this.pcCall.onconnectionstatechange = () => {
+                console.log(`🔄 حالة الاتصال: ${this.pcCall?.connectionState}`);
+                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
+                    this.endCall();
+                }
+            };
+            
+            if (callData.sdp) {
+                await this.pcCall.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+                const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
+                const answer = await this.pcCall.createAnswer(answerOptions);
+                await this.pcCall.setLocalDescription(answer);
+                
+                // ✅ انتظار 5 ثواني لتجميع ICE candidates للإجابة
+                await new Promise(resolve => {
+                    if (this._answerBatchTimer) clearTimeout(this._answerBatchTimer);
+                    this._answerBatchTimer = setTimeout(() => {
+                        console.log(`📦 انتهاء تجميع الإجابة (5 ثواني) - تم تجميع ${this._answerIceCandidates.length} ICE candidate`);
+                        resolve();
+                    }, 5000);
+                });
+                
+                // ✅ إرسال Answer + جميع ICE candidates المجمعة
+                await this.sendSignal(callerId, { 
+                    sdp: this.pcCall.localDescription,
+                    iceCandidates: this._answerIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
+                });
+                
+                // تنظيف
+                this._answerIceCandidates = [];
+                this._answerBatchTimer = null;
+                
+                console.log('✅ تم إرسال الرد مع ICE candidates المجمعة');
+            }
+            
+            if (this.callType === 'video') {
+                setTimeout(() => {
+                    const lv = document.getElementById('localVideo');
+                    if (lv && this.localStream) {
+                        lv.srcObject = this.localStream;
+                        console.log('✅ تم ربط الفيديو المحلي');
+                    }
+                }, 500);
+            }
+            
+        } catch (e) { 
+            console.error('❌ خطأ في استقبال المكالمة:', e);
+            this.sendSignal(callerId, { type: 'reject' });
+            this.endCall(); 
         }
-        
-    } catch (e) { 
-        console.error('❌ خطأ في استقبال المكالمة:', e);
-        this.sendSignal(callerId, { type: 'reject' });
-        this.endCall(); 
-    }
-},
+    },
     
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
@@ -1383,7 +1351,7 @@ async sendSignal(calleeId, data) {
             
             const muteBtn = document.getElementById('muteBtn');
             muteBtn?.addEventListener('click', () => {
-                this.toggleAudio();
+                this.toggleAudio(); // ✅ تم التغيير من toggleMute إلى toggleAudio
                 const icon = muteBtn.querySelector('i');
                 if (icon) {
                     if (this.isAudioMuted) {
@@ -1457,40 +1425,26 @@ async sendSignal(calleeId, data) {
         
         const currentFacing = videoTrack.getSettings().facingMode;
         const newFacing = currentFacing === 'user' ? 'environment' : 'user';
-        
-        // 1️⃣ تحرير الحساس: إيقاف الكاميرا القديمة فوراً
         videoTrack.stop();
         
         try {
-            // 2️⃣ طلب بث الكاميرا الجديدة
             const newStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: newFacing, width: { ideal: 640 }, height: { ideal: 480 } }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
-            
-            // 3️⃣ استبدال المسار في الاتصال المباشر
             if (this.pcCall) {
                 const sender = this.pcCall.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) {
-                    await sender.replaceTrack(newVideoTrack);
-                }
+                if (sender) await sender.replaceTrack(newVideoTrack);
             }
-            
-            // 4️⃣ دمج المسار الجديد محلياً وتحديث الشاشة المصغرة
             const audioTrack = this.localStream.getAudioTracks()[0];
             this.localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
             const lv = document.getElementById('localVideo');
             if (lv) lv.srcObject = this.localStream;
-            
-            // ✅ تم إزالة إعادة التفاوض (Renegotiation) لأن replaceTrack كافية
-            // وهذا يمنع انقطاع المكالمة عند تبديل الكاميرا
-            
             console.log(`🔄 تبديل الكاميرا إلى ${newFacing === 'user' ? 'أمامية' : 'خلفية'}`);
         } catch (e) {
             console.error('❌ فشل تبديل الكاميرا:', e);
         }
     },
-    
     
     // ==================== 13. إرسال الملفات ====================
 
