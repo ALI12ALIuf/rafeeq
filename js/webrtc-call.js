@@ -1662,6 +1662,13 @@ compressImage(file) {
             }).catch(() => {});
         }
         
+        // ✅ إعادة إظهار شريط الإدخال الثابت بعد إنهاء المكالمة
+        const inputBar = document.querySelector('.fixed-input-bar');
+        if (inputBar) inputBar.style.display = 'flex';
+        
+        // ✅ تحديث حالة الأزرار
+        if (typeof updateAllButtonsFixed === 'function') updateAllButtonsFixed();
+        
         console.log('✅ تم إنهاء المكالمة');
     }
 };
