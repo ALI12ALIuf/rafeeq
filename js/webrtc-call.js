@@ -390,8 +390,7 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-
-// ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+    // ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
 async receiveCall(callerId, callData) {
     if (this.isInCall) {
@@ -432,10 +431,10 @@ async receiveCall(callerId, callData) {
         if (this.callType === 'video') {
             const videoTrack = this.localStream.getVideoTracks()[0];
             if (videoTrack) {
-                // ✅ الكاميرا مفتوحة تلقائياً (إلغاء القفل التلقائي)
-                videoTrack.enabled = true;
-                this.isVideoMuted = false;
-                console.log('✅ الكاميرا مفتوحة بشكل افتراضي');
+                // ✅ قفل الكاميرا بعد الرد (مثل واتساب والنظام الأصلي)
+                videoTrack.enabled = false;
+                this.isVideoMuted = true;
+                console.log('🔒 الكاميرا مقفلة بعد الرد - اضغط زر الكاميرا لتشغيلها');
             }
         }
         
@@ -465,56 +464,35 @@ async receiveCall(callerId, callData) {
             
             if (e.track.kind === 'video') {
                 console.log('✅ تم استقبال فيديو بعيد');
-                const rv = document.getElementById('remoteVideo');
-                if (rv) {
-                    // ✅ إزالة srcObject القديم أولاً
-                    if (rv.srcObject) {
-                        rv.srcObject = null;
-                    }
-                    rv.srcObject = e.streams[0];
-                    rv.setAttribute('autoplay', '');
-                    rv.setAttribute('playsinline', '');
-                    rv.muted = true;  // كتم مؤقت لتسهيل التشغيل
-                    
-                    // ✅ إعادة محاولة التشغيل إذا فشل
-                    const attemptPlay = () => {
-                        rv.play().then(() => {
-                            console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
-                            rv.muted = false;  // إلغاء الكتم بعد التشغيل
-                        }).catch(err => {
-                            console.log('⚠️ فشل التشغيل، إعادة المحاولة بعد 300ms');
-                            setTimeout(attemptPlay, 300);
-                        });
-                    };
-                    attemptPlay();
-                    console.log('✅ تم ربط الفيديو البعيد');
-                } else {
-                    console.log('⚠️ عنصر remoteVideo غير موجود');
-                    setTimeout(() => {
-                        const rv2 = document.getElementById('remoteVideo');
-                        if (rv2) {
-                            if (rv2.srcObject) {
-                                rv2.srcObject = null;
-                            }
-                            rv2.srcObject = e.streams[0];
-                            rv2.setAttribute('autoplay', '');
-                            rv2.setAttribute('playsinline', '');
-                            rv2.muted = true;
-                            
-                            const attemptPlay2 = () => {
-                                rv2.play().then(() => {
-                                    console.log('✅ تم تشغيل الفيديو البعيد بنجاح (بعد التأخير)');
-                                    rv2.muted = false;
-                                }).catch(err => {
-                                    console.log('⚠️ فشل التشغيل، إعادة المحاولة بعد 300ms');
-                                    setTimeout(attemptPlay2, 300);
-                                });
-                            };
-                            attemptPlay2();
-                            console.log('✅ تم ربط الفيديو البعيد (بعد التأخير)');
-                        }
-                    }, 500);
+                
+                // ✅ إزالة العنصر القديم نهائياً
+                const oldRv = document.getElementById('remoteVideo');
+                if (oldRv) {
+                    oldRv.remove();
                 }
+                
+                // ✅ إنشاء عنصر جديد
+                const rv = document.createElement('video');
+                rv.id = 'remoteVideo';
+                rv.autoplay = true;
+                rv.playsInline = true;
+                rv.muted = true;
+                rv.style.cssText = 'width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#000;';
+                
+                document.body.appendChild(rv);
+                rv.srcObject = e.streams[0];
+                
+                // ✅ محاولة التشغيل
+                rv.play().then(() => {
+                    console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
+                    rv.muted = false;
+                }).catch(err => {
+                    console.log('⚠️ فشل تشغيل الفيديو (شاشة سوداء بدلاً من زرقاء):', err);
+                    // الشاشة سوداء أفضل من الزرقاء
+                });
+                
+                console.log('✅ تم إنشاء وربط الفيديو البعيد من جديد');
+                
             } else if (e.track.kind === 'audio') {
                 this.setupRemoteAudio(e.streams[0]);
             }
