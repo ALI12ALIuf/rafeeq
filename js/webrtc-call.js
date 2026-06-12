@@ -855,6 +855,7 @@ async createDataChannelOnly(calleeId) {
 
     // ==================== 9. Data Channel وإدارة الاتصال ====================
 
+
 setupDataChannel(channel) {
     if (!channel) return;
     console.log('📡 إعداد Data Channel');
@@ -863,6 +864,7 @@ setupDataChannel(channel) {
         try {
             const msg = JSON.parse(e.data);
             
+            // 9.1.1 رسائل نصية مباشرة
             if (msg.type === 'direct_text') {
                 console.log('📨 استلام رسالة نصية مباشرة:', msg.text);
                 const displayMsg = { 
@@ -879,9 +881,9 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // 9.1.2 إشارات WebRTC (مكالمات)
             if (msg.type === 'webrtc_signal') {
                 console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
-                // ✅ معالجة إشارات المكالمات (عرض شاشة المكالمة الواردة)
                 if (msg.data.sdp && msg.data.sdp.type === 'offer') {
                     this.showIncomingCall(ChatSystem.currentChat, msg.data);
                 } else {
@@ -890,6 +892,7 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // 9.1.3 إشارة طرد من المحادثة
             if (msg.type === 'force_close_conversation') {
                 console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -912,6 +915,7 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // 9.1.4 إشارة إلغاء الميزات
             if (msg.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -935,15 +939,22 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // 9.1.5 نبضات الاتصال (ping)
             if (msg.type === 'ping') return;
+            
+            // 9.1.6 حالة المكالمة
             if (msg.type === 'call_status') {
                 this.handleCallStatus(msg);
                 return;
             }
+            
+            // 9.1.7 أجزاء الملفات (chunks)
             if (msg.chunk !== undefined) {
                 this.handleChunkMessage(msg);
                 return;
             }
+            
+            // 9.1.8 رسائل أخرى
             const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
             if (ChatSystem.currentChat) {
                 ChatSystem.displayMessage(displayMsg);
@@ -953,6 +964,7 @@ setupDataChannel(channel) {
         }
     };
     
+    // 9.1.9 عند فتح القناة
     channel.onopen = () => {
         console.log('✅ Data Channel مفتوح');
         this.sendCallStatus('connected');
@@ -964,7 +976,7 @@ setupDataChannel(channel) {
             }
         }, 2000);
         
-        // ✅ إضافة keepAliveInterval منفصل لـ dcCall (قناة المكالمات)
+        // ✅ keepAliveInterval منفصل لـ dcCall (قناة المكالمات)
         if (channel === this.dcCall) {
             if (this.keepAliveIntervalCall) clearInterval(this.keepAliveIntervalCall);
             this.keepAliveIntervalCall = setInterval(() => {
@@ -975,6 +987,7 @@ setupDataChannel(channel) {
         }
     };
     
+    // 9.1.10 عند إغلاق القناة
     channel.onclose = () => {
         console.log('❌ Data Channel مغلق');
         this.sendCallStatus('disconnected');
@@ -989,7 +1002,7 @@ setupDataChannel(channel) {
             this.keepAliveIntervalCall = null;
         }
         
-        // ✅ فقط إذا كانت القناة المغلقة هي dc (قناة الميزات) وليس dcCall (قناة المكالمة)
+        // ✅ فقط إذا كانت القناة المغلقة هي dc (قناة الميزات) وليس dcCall
         if (channel === this.dc && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('🔌 انقطاع قناة الميزات - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
@@ -1011,6 +1024,7 @@ setupDataChannel(channel) {
         }
     };
     
+    // 9.1.11 عند حدوث خطأ في القناة
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         
@@ -1037,6 +1051,8 @@ setupDataChannel(channel) {
     };
 },
 
+// ==================== 9.2 معالجة حالة المكالمة ====================
+
 handleCallStatus(msg) {
     if (msg.status === 'connected') {
         console.log('📞 الطرف الآخر متصل');
@@ -1048,13 +1064,15 @@ handleCallStatus(msg) {
     }
 },
 
+// ==================== 9.3 إرسال حالة المكالمة ====================
+
 sendCallStatus(status) {
     if (this.dc && this.dc.readyState === 'open') {
         this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
     }
 },
 
-// ✅ تم حذف ensureDataChannel و createNewDataChannel (غير مستخدمين)
+// ==================== 9.4 معالجة إشارات WebRTC (المكالمات) ====================
 
 async handleSignaling(data) {
     try {
@@ -1102,7 +1120,8 @@ async handleSignaling(data) {
     }
 },
 
-// ✅ دالة sendSignal المعدلة - إشارات المكالمات ترسل عبر dc (قناة الميزات)
+// ==================== 9.5 إرسال الإشارات (بدون حل احتياطي عبر Firebase) ====================
+
 async sendSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
@@ -1137,24 +1156,8 @@ async sendSignal(calleeId, data) {
         }
     }
     
-    // ✅ إذا القناة لا تزال تفتح → أرسل عبر Firebase (لفتح القناة فقط)
-    // هذا ضروري لتمرير Offer/Answer/ICE أثناء عملية الفتح
-    try {
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(calleeId);
-        if (!myPrivateKey || !receiverPublicKey) return;
-        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(data), sharedKey);
-        await SecureChatSystem.sendToServer(calleeId, { 
-            id: Date.now().toString(), 
-            type: 'webrtc', 
-            data: encrypted, 
-            timestamp: Date.now() 
-        });
-        console.log('📡 تم إرسال الإشارة عبر Firebase (لفتح القناة)');
-    } catch (error) {
-        console.error('خطأ في إرسال الإشارة:', error);
-    }
+    // ❌ تم إزالة الحل الاحتياطي عبر Firebase (غير مستخدم للمكالمات)
+    console.error('❌ فشل إرسال الإشارة: لا توجد قناة مفتوحة');
 },
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
