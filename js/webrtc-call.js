@@ -482,14 +482,25 @@ async receiveCall(callerId, callData) {
                 document.body.appendChild(rv);
                 rv.srcObject = e.streams[0];
                 
-                // ✅ محاولة التشغيل
-                rv.play().then(() => {
-                    console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
-                    rv.muted = false;
-                }).catch(err => {
-                    console.log('⚠️ فشل تشغيل الفيديو (شاشة سوداء بدلاً من زرقاء):', err);
-                    // الشاشة سوداء أفضل من الزرقاء
-                });
+                // ✅ الحل الجذري: انتظار البيانات ثم التشغيل مع إعادة المحاولة
+                const playVideo = () => {
+                    rv.play().then(() => {
+                        console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
+                        rv.muted = false;
+                    }).catch(err => {
+                        console.log('⚠️ فشل التشغيل، إعادة المحاولة بعد 200ms');
+                        setTimeout(playVideo, 200);
+                    });
+                };
+                
+                // انتظر حتى يتم تحميل البيانات الكافية
+                if (rv.readyState >= 2) {
+                    playVideo();
+                } else {
+                    rv.addEventListener('loadeddata', playVideo, { once: true });
+                    // مهلة أمان: إذا لم يتم التحميل خلال 3 ثوان، حاول التشغيل
+                    setTimeout(playVideo, 3000);
+                }
                 
                 console.log('✅ تم إنشاء وربط الفيديو البعيد من جديد');
                 
