@@ -1,6 +1,7 @@
 // ========== auth.js ==========
 // Firebase Auth الأساسي
 
+// ==================== القسم 1: دوال مساعدة ====================
 function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
@@ -20,6 +21,7 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
+// ==================== القسم 2: showApp ====================
 function showApp() {
     _captchaActive = false;
     _captchaBlocked = false;
@@ -40,6 +42,7 @@ function showApp() {
     if (app) { app.style.display = 'flex'; }
 }
 
+// ==================== القسم 3: showLoginScreen ====================
 function showLoginScreen() {
     if (_captchaActive || _isLoggingIn) return;
     const el = document.querySelector('.login-screen'); if (el) el.remove();
@@ -49,6 +52,7 @@ function showLoginScreen() {
     document.body.appendChild(d);
 }
 
+// ==================== القسم 4: startGoogleLogin ====================
 async function startGoogleLogin() {
     _isLoggingIn = true;
     sessionStorage.removeItem('_captchaVerified');
@@ -89,6 +93,7 @@ async function startGoogleLogin() {
     }
 }
 
+// ==================== القسم 5: saveUserAndEnter ====================
 async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
@@ -116,10 +121,39 @@ async function saveUserAndEnter(user) {
     }
 }
 
+// ==================== القسم 6: دوال إضافية ====================
 async function signInWithGoogle() { await startGoogleLogin(); }
-function updateUserUI() { const splash = document.getElementById('splash'), app = document.getElementById('app'); if (splash) { splash.classList.add('hide'); setTimeout(() => { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500); } }
 
+function updateUserUI() { 
+    const splash = document.getElementById('splash'), app = document.getElementById('app'); 
+    if (splash) { 
+        splash.classList.add('hide'); 
+        setTimeout(() => { 
+            splash.style.display = 'none'; 
+            if (app) app.style.display = 'flex'; 
+        }, 500); 
+    } 
+}
+
+// ==================== القسم 7: logout (معدل - إضافة تنظيف شامل) ====================
 async function logout() { 
+    // ✅ تنظيف العناصر الديناميكية قبل الخروج
+    if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
+        console.log('🧹 تنظيف العناصر الديناميكية قبل تسجيل الخروج');
+        CallSystem.cleanupDynamicElements();
+    }
+    
+    // ✅ تنظيف أي مؤقتات عالقة في ChatSystem
+    if (typeof ChatSystem !== 'undefined') {
+        if (ChatSystem.featureBlinkInterval) {
+            clearInterval(ChatSystem.featureBlinkInterval);
+            ChatSystem.featureBlinkInterval = null;
+        }
+        ChatSystem.featuresEnabled = false;
+        ChatSystem.featureRequestPending = false;
+        ChatSystem.featureRequestReceived = false;
+    }
+    
     try {
         if (window.auth?.currentUser) {
             await window.db.collection('users').doc(window.auth.currentUser.uid).update({
@@ -136,6 +170,7 @@ async function logout() {
     window.location.reload(); 
 }
 
+// ==================== القسم 8: loadUserData ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
@@ -154,7 +189,7 @@ async function loadUserData(uid) {
     } catch (e) {}
 }
 
-// ========== مراقب حالة تسجيل الدخول ==========
+// ==================== القسم 9: مراقب حالة تسجيل الدخول ====================
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
@@ -203,4 +238,8 @@ if (typeof window.auth !== 'undefined') {
     });
 }
 
-function copyId() { const el = document.getElementById('shareableId'); if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ')); }
+// ==================== القسم 10: copyId ====================
+function copyId() { 
+    const el = document.getElementById('shareableId'); 
+    if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ')); 
+}
