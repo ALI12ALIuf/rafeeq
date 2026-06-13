@@ -492,11 +492,11 @@ async sendToServer(receiverId, encryptedPackage) {
         }
     },
     
-    // ==================== القسم 9: بدء التنظيف الدوري للرسائل (كل ساعة) ====================
-    startExpiredMessagesCleanup() {
-        this.cleanExpiredMessages();
-        setInterval(() => this.cleanExpiredMessages(), 60 * 60 * 1000);
-    },
+    // ==================== القسم 9: بدء التنظيف الدوري للرسائل (كل 6 ساعات) ====================
+startExpiredMessagesCleanup() {
+    this.cleanExpiredMessages();
+    setInterval(() => this.cleanExpiredMessages(), 6 * 60 * 60 * 1000);
+},
     
     // ==================== القسم 10: تنظيف الإشارات المنتهية (30/60 ثانية) ====================
     async cleanOldSignals() {
