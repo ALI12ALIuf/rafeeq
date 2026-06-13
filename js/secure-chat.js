@@ -490,30 +490,39 @@ startReceiving() {
         }
     },
     
-    // ==================== القسم 8: تنظيف الرسائل المنتهية الصلاحية (24 ساعة) ====================
-    async cleanExpiredMessages() {
-        if (!window.auth?.currentUser) return;
-        
-        try {
-            const now = new Date();
-            const snapshot = await window.db.collection('secure_messages')
-                .where('to', '==', window.auth.currentUser.uid)
-                .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
-                .get();
-            
-            for (const doc of snapshot.docs) {
-                await doc.ref.delete();
-                console.log('🗑️ تم حذف رسالة منتهية الصلاحية (لم يستلمها المستلم خلال 24 ساعة)');
-            }
-        } catch (e) {
-            console.warn('خطأ في تنظيف الرسائل المنتهية:', e);
-        }
-    },
+    // ==================== القسم 8: تنظيف الرسائل المنتهية الصلاحية (جميع المستخدمين) ====================
+async cleanExpiredMessages() {
+    // ✅ لا نتحقق من المستخدم (تنظيف عام لجميع الرسائل المنتهية)
     
-    // ==================== القسم 9: بدء التنظيف الدوري للرسائل (كل 6 ساعات) ====================
+    try {
+        const now = new Date();
+        const snapshot = await window.db.collection('secure_messages')
+            .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
+            .get();
+        
+        for (const doc of snapshot.docs) {
+            await doc.ref.delete();
+            console.log('🗑️ تم حذف رسالة منتهية الصلاحية (لجميع المستخدمين)');
+        }
+    } catch (e) {
+        console.warn('خطأ في تنظيف الرسائل المنتهية:', e);
+    }
+},
+
+// ==================== القسم 9: بدء التنظيف (مرة واحدة في اليوم) ====================
 startExpiredMessagesCleanup() {
-    this.cleanExpiredMessages();
-    setInterval(() => this.cleanExpiredMessages(), 6 * 60 * 60 * 1000);
+    // ✅ التنظيف مرة واحدة فقط في اليوم (بدلاً من كل 6 ساعات)
+    const lastCleanup = localStorage.getItem('lastCleanup_sms');
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000; // 24 ساعة
+    
+    if (!lastCleanup || (now - parseInt(lastCleanup)) > oneDay) {
+        this.cleanExpiredMessages();
+        localStorage.setItem('lastCleanup_sms', now.toString());
+        console.log('🧹 تم تنظيف الرسائل (مرة واحدة في اليوم)');
+    } else {
+        console.log('⏸️ تخطي تنظيف الرسائل (تم اليوم بالفعل)');
+    }
 },
     
     // ==================== القسم 10: تنظيف الإشارات المنتهية (30/60 ثانية) ====================
