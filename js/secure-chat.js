@@ -525,45 +525,29 @@ startExpiredMessagesCleanup() {
     }
 },
     
-    // ==================== القسم 10: تنظيف الإشارات المنتهية (30/60 ثانية) ====================
-    async cleanOldSignals() {
-        if (!window.auth?.currentUser) return;
-        const uid = window.auth.currentUser.uid;
-        const thirtySecondsAgo = new Date(Date.now() - 30000);
-        const sixtySecondsAgo = new Date(Date.now() - 60000);
+    // ==================== القسم 10: تنظيف إشارات تفعيل الميزات المنتهية فقط (60 ثانية) ====================
+async cleanOldSignals() {
+    if (!window.auth?.currentUser) return;
+    const uid = window.auth.currentUser.uid;
+    const sixtySecondsAgo = new Date(Date.now() - 60000);
+    
+    try {
+        const featureSnapshot = await window.db.collection('secure_messages')
+            .where('to', '==', uid)
+            .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(sixtySecondsAgo))
+            .get();
         
-        try {
-            // حذف إشارات webrtc (30 ثانية)
-            const webrtcSnapshot = await window.db.collection('secure_messages')
-                .where('to', '==', uid)
-                .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(thirtySecondsAgo))
-                .get();
-            
-            for (const doc of webrtcSnapshot.docs) {
-                const data = doc.data();
-                if (data.package?.type === 'webrtc') {
-                    await doc.ref.delete();
-                    console.log('🗑️ تم حذف إشارة WebRTC قديمة (30 ثانية)');
-                }
+        for (const doc of featureSnapshot.docs) {
+            const data = doc.data();
+            if (data.package?.type === 'feature_request' || data.package?.type === 'feature_response') {
+                await doc.ref.delete();
+                console.log('🗑️ تم حذف إشارة تفعيل ميزات قديمة (60 ثانية)');
             }
-            
-            // حذف إشارات feature_request و feature_response (60 ثانية)
-            const featureSnapshot = await window.db.collection('secure_messages')
-                .where('to', '==', uid)
-                .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(sixtySecondsAgo))
-                .get();
-            
-            for (const doc of featureSnapshot.docs) {
-                const data = doc.data();
-                if (data.package?.type === 'feature_request' || data.package?.type === 'feature_response') {
-                    await doc.ref.delete();
-                    console.log('🗑️ تم حذف إشارة تفعيل ميزات قديمة (60 ثانية)');
-                }
-            }
-        } catch (e) {
-            console.warn('خطأ في تنظيف الإشارات القديمة:', e);
         }
-    },
+    } catch (e) {
+        console.warn('خطأ في تنظيف الإشارات القديمة:', e);
+    }
+},
     
     // ==================== القسم 11: بدء التنظيف الدوري للإشارات (كل 30 ثانية) ====================
     startSignalCleanup() {
