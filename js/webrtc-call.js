@@ -989,7 +989,7 @@ setupDataChannel(channel) {
         }
     };
     
-    // 9.1.10 عند إغلاق القناة
+        // 9.1.10 عند إغلاق القناة
     channel.onclose = () => {
         console.log('❌ Data Channel مغلق');
         this.sendCallStatus('disconnected');
@@ -1016,12 +1016,6 @@ setupDataChannel(channel) {
                 ChatSystem.featureBlinkInterval = null;
             }
             
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
             ChatSystem.updateAllButtons();
         }
     };
@@ -1040,12 +1034,6 @@ setupDataChannel(channel) {
             if (ChatSystem.featureBlinkInterval) {
                 clearInterval(ChatSystem.featureBlinkInterval);
                 ChatSystem.featureBlinkInterval = null;
-            }
-            
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
             }
             
             ChatSystem.updateAllButtons();
