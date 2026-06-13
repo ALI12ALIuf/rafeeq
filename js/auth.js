@@ -164,7 +164,6 @@ async function logout() {
     } catch (e) {}
     
     sessionStorage.removeItem('_captchaVerified');
-    PresenceSystem.stopAll();
     
     try { await window.auth.signOut(); } catch (e) {}
     window.location.reload(); 
