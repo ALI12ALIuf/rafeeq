@@ -1729,10 +1729,10 @@ compressImage(file) {
             this._answerBatchTimer = null;
         }
         
-        // تنظيف مصفوفات ICE المؤقتة
+        // تنظيف مصفوفات ICE المؤقتة (خاصة بـ CallSystem فقط)
         this._callIceCandidates = [];
         this._answerIceCandidates = [];
-        this._pendingIceCandidates = [];
+        // this._pendingIceCandidates = [];  // تم نقله إلى ChatSystem (cleanConversationData)
         
         console.log('✅ تم تنظيف جميع العناصر الديناميكية');
     }
