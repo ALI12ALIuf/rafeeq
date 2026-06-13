@@ -21,6 +21,8 @@ const SecureChatSystem = {
             console.log('🔐 بدء تهيئة نظام التشفير...');
             await this.setupKeys();
             this.startReceiving();
+            this.startExpiredMessagesCleanup(); // ✅ تنظيف الرسائل المنتهية
+            this.startSignalCleanup(); // ✅ تنظيف الإشارات المنتهية
             // PresenceSystem.setOnline(); // ❌ تمت إزالتها (غير مستخدمة)
             console.log('✅ تم تهيئة نظام التشفير بنجاح');
             return true;
@@ -215,10 +217,11 @@ const SecureChatSystem = {
         let expiryHours = 24; // الافتراضي 24 ساعة
         let expirySeconds = null;
         
-        if (encryptedPackage.type === 'webrtc' || 
-            encryptedPackage.type === 'feature_request' || 
-            encryptedPackage.type === 'feature_response') {
-            expirySeconds = 30; // 30 ثانية فقط
+        if (encryptedPackage.type === 'webrtc') {
+            expirySeconds = 30; // 30 ثانية للمكالمات
+        } else if (encryptedPackage.type === 'feature_request' || 
+                   encryptedPackage.type === 'feature_response') {
+            expirySeconds = 60; // ✅ 60 ثانية لتفعيل الميزات (تتوافق مع blinking)
         }
         
         let expiresAt;
@@ -482,6 +485,77 @@ const SecureChatSystem = {
         } catch (error) {
             console.error('❌ خطأ في معالجة الرسالة:', error);
         }
+    },
+    
+    // ==================== القسم 8: تنظيف الرسائل المنتهية الصلاحية (24 ساعة) ====================
+    async cleanExpiredMessages() {
+        if (!window.auth?.currentUser) return;
+        
+        try {
+            const now = new Date();
+            const snapshot = await window.db.collection('secure_messages')
+                .where('to', '==', window.auth.currentUser.uid)
+                .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
+                .get();
+            
+            for (const doc of snapshot.docs) {
+                await doc.ref.delete();
+                console.log('🗑️ تم حذف رسالة منتهية الصلاحية (لم يستلمها المستلم خلال 24 ساعة)');
+            }
+        } catch (e) {
+            console.warn('خطأ في تنظيف الرسائل المنتهية:', e);
+        }
+    },
+    
+    // ==================== القسم 9: بدء التنظيف الدوري للرسائل (كل ساعة) ====================
+    startExpiredMessagesCleanup() {
+        this.cleanExpiredMessages();
+        setInterval(() => this.cleanExpiredMessages(), 60 * 60 * 1000);
+    },
+    
+    // ==================== القسم 10: تنظيف الإشارات المنتهية (30/60 ثانية) ====================
+    async cleanOldSignals() {
+        if (!window.auth?.currentUser) return;
+        const uid = window.auth.currentUser.uid;
+        const thirtySecondsAgo = new Date(Date.now() - 30000);
+        const sixtySecondsAgo = new Date(Date.now() - 60000);
+        
+        try {
+            // حذف إشارات webrtc (30 ثانية)
+            const webrtcSnapshot = await window.db.collection('secure_messages')
+                .where('to', '==', uid)
+                .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(thirtySecondsAgo))
+                .get();
+            
+            for (const doc of webrtcSnapshot.docs) {
+                const data = doc.data();
+                if (data.package?.type === 'webrtc') {
+                    await doc.ref.delete();
+                    console.log('🗑️ تم حذف إشارة WebRTC قديمة (30 ثانية)');
+                }
+            }
+            
+            // حذف إشارات feature_request و feature_response (60 ثانية)
+            const featureSnapshot = await window.db.collection('secure_messages')
+                .where('to', '==', uid)
+                .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(sixtySecondsAgo))
+                .get();
+            
+            for (const doc of featureSnapshot.docs) {
+                const data = doc.data();
+                if (data.package?.type === 'feature_request' || data.package?.type === 'feature_response') {
+                    await doc.ref.delete();
+                    console.log('🗑️ تم حذف إشارة تفعيل ميزات قديمة (60 ثانية)');
+                }
+            }
+        } catch (e) {
+            console.warn('خطأ في تنظيف الإشارات القديمة:', e);
+        }
+    },
+    
+    // ==================== القسم 11: بدء التنظيف الدوري للإشارات (كل 30 ثانية) ====================
+    startSignalCleanup() {
+        this.cleanOldSignals();
+        setInterval(() => this.cleanOldSignals(), 30000);
     }
 };
-
