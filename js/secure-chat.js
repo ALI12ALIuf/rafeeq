@@ -241,6 +241,24 @@ async sendToServer(receiverId, encryptedPackage) {
     } catch (error) { throw error; }
 },
 
+// ==================== القسم 6.1: استقبال الرسائل ====================
+startReceiving() { 
+    if (!window.auth?.currentUser) return null;
+    const uid = window.auth.currentUser.uid;
+    return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
+        for (const change of snapshot.docChanges()) { 
+            if (change.type === 'added') { 
+                const msg = { id: change.doc.id, ...change.doc.data() }; 
+                await this.processReceivedMessage(msg); 
+                try { await change.doc.ref.delete(); } catch (deleteError) {}
+            } 
+        } 
+    }, error => { 
+        console.warn('خطأ في الاستماع للرسائل:', error);
+        setTimeout(() => this.startReceiving(), 5000); 
+    }); 
+},
+
 
    // ==================== القسم 7: معالجة الرسائل المستلمة ====================
     async processReceivedMessage(msg) {
