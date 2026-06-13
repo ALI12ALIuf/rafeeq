@@ -2686,13 +2686,24 @@ closeChat() {
             }
         }
         
-        // 4. تنظيف مصفوفات CallSystem المؤقتة
+        // 4. تنظيف مصفوفات CallSystem المؤقتة (خاصة بـ CallSystem فقط)
         if (typeof CallSystem !== 'undefined') {
             CallSystem.incomingChunks = {};
             CallSystem.incomingFileInfo = {};
-            CallSystem._pendingIceCandidates = [];
             CallSystem._callIceCandidates = [];
             CallSystem._answerIceCandidates = [];
+        }
+        
+        // 5. تنظيف مصفوفات ومؤقتات ChatSystem الخاصة (المنقولة من CallSystem)
+        this._pendingIceCandidates = [];
+        this._responseIceCandidates = [];
+        if (this._batchTimer) {
+            clearTimeout(this._batchTimer);
+            this._batchTimer = null;
+        }
+        if (this._responseBatchTimer) {
+            clearTimeout(this._responseBatchTimer);
+            this._responseBatchTimer = null;
         }
         
         console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
