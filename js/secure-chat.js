@@ -200,14 +200,7 @@ const SecureChatSystem = {
         });
     },
     
-    fileToBase64(blob) { 
-        return new Promise((resolve, reject) => { 
-            const reader = new FileReader(); 
-            reader.onloadend = () => resolve(reader.result); 
-            reader.onerror = () => reject(new Error('فشل قراءة الملف'));
-            reader.readAsDataURL(blob); 
-        }); 
-    },
+    // ❌ تم حذف fileToBase64 (غير مستخدمة، الملفات تمر مباشرة عبر Data Channel P2P)
     
     // ==================== القسم 6: إرسال واستقبال الرسائل ====================
 async sendToServer(receiverId, encryptedPackage) { 
@@ -475,12 +468,6 @@ startReceiving() {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'location', data: locationData, sender: 'friend', time: new Date().toISOString() });
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
-            }
-            // القسم 7.7: ملفات (صورة، فيديو، ملف)
-            else if (msg.package.type === 'file' || msg.package.type === 'image' || msg.package.type === 'video') {
-                const decryptedFile = await this.decryptData(msg.package.data, sharedKey);
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: msg.package.type, data: decryptedFile, fileName: msg.package.fileName, sender: 'friend', time: new Date().toISOString() });
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
             }
             
