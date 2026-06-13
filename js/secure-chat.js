@@ -525,23 +525,23 @@ startExpiredMessagesCleanup() {
     }
 },
     
-    // ==================== القسم 10: تنظيف إشارات تفعيل الميزات المنتهية فقط (60 ثانية) ====================
+    // ==================== القسم 10: تنظيف إشارات تفعيل الميزات (لجميع المستخدمين) ====================
 async cleanOldSignals() {
-    if (!window.auth?.currentUser) return;
-    const uid = window.auth.currentUser.uid;
+    // ✅ لا نتحقق من المستخدم (تنظيف عام لجميع المستخدمين)
     const sixtySecondsAgo = new Date(Date.now() - 60000);
     
     try {
+        // ✅ البحث عن جميع الإشارات المنتهية (بدون شرط 'to')
         const featureSnapshot = await window.db.collection('secure_messages')
-            .where('to', '==', uid)
             .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(sixtySecondsAgo))
             .get();
         
         for (const doc of featureSnapshot.docs) {
             const data = doc.data();
+            // ✅ حذف إشارات التفعيل فقط (بغض النظر عن المستخدم)
             if (data.package?.type === 'feature_request' || data.package?.type === 'feature_response') {
                 await doc.ref.delete();
-                console.log('🗑️ تم حذف إشارة تفعيل ميزات قديمة (60 ثانية)');
+                console.log(`🗑️ تم حذف إشارة تفعيل ميزات قديمة (60 ثانية) للمستخدم: ${data.to || 'غير معروف'}`);
             }
         }
     } catch (e) {
