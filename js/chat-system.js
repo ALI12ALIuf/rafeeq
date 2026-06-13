@@ -1070,10 +1070,15 @@ closeConversation() {
     hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
     
     
-    // ==================== القسم 23: openChat ====================
+    // ==================== القسم 23: openChat (معدل - تنظيف قبل الفتح) ====================
 openChat(friendId, friendName, friendAvatar) {
-    this.currentChat = friendId;
+    // ✅ تنظيف المحادثة السابقة إذا كانت موجودة
+    if (this.currentChat && this.currentChat !== friendId) {
+        console.log('🧹 تنظيف المحادثة السابقة قبل فتح محادثة جديدة:', this.currentChat);
+        this.cleanConversationData(this.currentChat, false);
+    }
     
+    this.currentChat = friendId;
     this.friendInConversation = false;
     
     this.resetFeatures();
@@ -2508,7 +2513,7 @@ showLocationSwipeModalWithClicks(locationData) {
 }, 
     
     
-    // ==================== القسم 35: saveMessage ====================
+    // ==================== القسم 35: saveMessage (معدل - حد 100 رسالة) ====================
     saveMessage(friendId, message) { 
         // فقط النصوص تُحفظ محليًا
         if (message.type !== 'text') {
@@ -2517,19 +2522,43 @@ showLocationSwipeModalWithClicks(locationData) {
         }
         
         const key = `chat_${friendId}`; 
-        let h = []; 
-        try { h = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { h = []; }
-        h.push(message); 
-        let serialized = JSON.stringify(h);
-        while (serialized.length > 4000000) {
-            h.shift();
-            serialized = JSON.stringify(h);
+        let messages = []; 
+        try { 
+            messages = JSON.parse(localStorage.getItem(key)) || []; 
+        } catch (e) { 
+            messages = []; 
         }
-        try { localStorage.setItem(key, JSON.stringify(h)); } catch (e) {
-            h = h.slice(Math.floor(h.length * 0.2));
-            try { localStorage.setItem(key, JSON.stringify(h)); } catch (e2) { h = h.slice(-10); try { localStorage.setItem(key, JSON.stringify(h)); } catch (e3) {} }
+        
+        // إضافة الرسالة الجديدة
+        messages.push(message); 
+        
+        // ✅ إذا تجاوز العدد 100 رسالة، احذف أقدم 50 رسالة
+        if (messages.length > 100) {
+            const excessCount = messages.length - 100;
+            const removeCount = excessCount + 50;
+            messages = messages.slice(removeCount);
+            console.log(`🧹 تم حذف ${removeCount} رسالة قديمة (الحد الأقصى 100 رسالة)`);
         }
-        this.messages[friendId] = h; 
+        
+        // حفظ في localStorage
+        try { 
+            localStorage.setItem(key, JSON.stringify(messages)); 
+        } catch (e) {
+            const removeCount = Math.min(50, messages.length);
+            messages = messages.slice(removeCount);
+            try { 
+                localStorage.setItem(key, JSON.stringify(messages)); 
+                console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة قديمة`);
+            } catch (e2) { 
+                messages = messages.slice(-50);
+                try { 
+                    localStorage.setItem(key, JSON.stringify(messages)); 
+                    console.log(`🧹 مساحة غير كافية - تم الاحتفاظ بآخر 50 رسالة فقط`);
+                } catch (e3) {}
+            }
+        }
+        
+        this.messages[friendId] = messages; 
     },
     
 
@@ -2545,7 +2574,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-   // ==================== القسم 37: closeChat ====================
+   // ==================== القسم 37: closeChat (معدل - تنظيف شامل) ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2556,7 +2585,8 @@ closeChat() {
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
         
-        // تم إزالة CallSystem.deleteAllWebRTCSignals
+        // ✅ تنظيف بيانات المحادثة
+        this.cleanConversationData(chatId, false);
         
         const key = `chat_${chatId}`;
         const messages = this.messages[chatId] || [];
@@ -2601,7 +2631,10 @@ closeChat() {
     document.getElementById('conversationPage').style.display = 'none';
     document.querySelector('.chat-page').style.display = 'block';
     
-    // ✅ تم إزالة PresenceSystem.stopAll() (غير مستخدم)
+    // ✅ تنظيف العناصر الديناميكية
+    if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
+        CallSystem.cleanupDynamicElements();
+    }
     
     if (!CallSystem.isInCall) {
         if (CallSystem.dc) {
@@ -2617,7 +2650,53 @@ closeChat() {
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
-}, 
+},
+    
+    // ==================== القسم 40: تنظيف بيانات المحادثة ====================
+    cleanConversationData(chatId, cleanAll = false) {
+        console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
+        
+        // 1. تنظيف localStorage (النصوص فقط تبقى)
+        const key = `chat_${chatId}`;
+        if (cleanAll) {
+            localStorage.removeItem(key);
+            delete this.messages[chatId];
+            console.log('✅ تم مسح localStorage بالكامل');
+        } else {
+            const messages = this.messages[chatId] || [];
+            const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
+            this.messages[chatId] = textMessages;
+            localStorage.setItem(key, JSON.stringify(textMessages));
+            console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+        }
+        
+        // 2. تنظيف Blob URLs
+        document.querySelectorAll('img, video, audio').forEach(el => {
+            if (el.src && el.src.startsWith('blob:')) {
+                URL.revokeObjectURL(el.src);
+                el.src = '';
+            }
+        });
+        
+        // 3. تنظيف حاوية الرسائل
+        if (this.currentChat === chatId) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '';
+            }
+        }
+        
+        // 4. تنظيف مصفوفات CallSystem المؤقتة
+        if (typeof CallSystem !== 'undefined') {
+            CallSystem.incomingChunks = {};
+            CallSystem.incomingFileInfo = {};
+            CallSystem._pendingIceCandidates = [];
+            CallSystem._callIceCandidates = [];
+            CallSystem._answerIceCandidates = [];
+        }
+        
+        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
+    },
     
     
     // ==================== القسم 38: escapeHtml ====================
@@ -2627,7 +2706,65 @@ closeChat() {
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
 
+// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة ====================
+function performGlobalCleanup() {
+    console.log('🧹 بدء التنظيف الشامل للموقع...');
+    
+    if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
+        CallSystem.cleanupDynamicElements();
+    }
+    
+    document.querySelectorAll('img, video, audio').forEach(el => {
+        if (el.src && el.src.startsWith('blob:')) {
+            URL.revokeObjectURL(el.src);
+            el.src = '';
+        }
+    });
+    
+    const modals = ['incomingCall', 'callUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
+    modals.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            if (el._cleanup) el._cleanup();
+            el.remove();
+        }
+    });
+    
+    const attachmentMenu = document.getElementById('attachmentMenu');
+    if (attachmentMenu) attachmentMenu.style.display = 'none';
+    
+    const emojiPicker = document.getElementById('emojiPicker');
+    if (emojiPicker) emojiPicker.style.display = 'none';
+    
+    document.body.classList.remove('in-call');
+    
+    if (typeof CallSystem !== 'undefined') {
+        if (CallSystem._callBatchTimer) {
+            clearTimeout(CallSystem._callBatchTimer);
+            CallSystem._callBatchTimer = null;
+        }
+        if (CallSystem._answerBatchTimer) {
+            clearTimeout(CallSystem._answerBatchTimer);
+            CallSystem._answerBatchTimer = null;
+        }
+        if (CallSystem.keepAliveInterval) {
+            clearInterval(CallSystem.keepAliveInterval);
+            CallSystem.keepAliveInterval = null;
+        }
+        if (CallSystem.keepAliveIntervalCall) {
+            clearInterval(CallSystem.keepAliveIntervalCall);
+            CallSystem.keepAliveIntervalCall = null;
+        }
+    }
+    
+    console.log('✅ اكتمل التنظيف الشامل للموقع');
+}
 
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', performGlobalCleanup);
+} else {
+    performGlobalCleanup();
+}
 
 // ✅ الحل النهائي والثابت للمتصفحات والهواتف عند ظهور واختفاء الكيبورد
 const initVisualViewportFix = () => {
