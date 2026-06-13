@@ -210,51 +210,36 @@ const SecureChatSystem = {
     },
     
     // ==================== القسم 6: إرسال واستقبال الرسائل ====================
-    async sendToServer(receiverId, encryptedPackage) { 
-        if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
-        
-        // ✅ تحديد مدة الصلاحية حسب نوع الإشارة
-        let expiryHours = 24; // الافتراضي 24 ساعة
-        let expirySeconds = null;
-        
-        if (encryptedPackage.type === 'webrtc') {
-            expirySeconds = 30; // 30 ثانية للمكالمات
-        } else if (encryptedPackage.type === 'feature_request' || 
-                   encryptedPackage.type === 'feature_response') {
-            expirySeconds = 60; // ✅ 60 ثانية لتفعيل الميزات (تتوافق مع blinking)
-        }
-        
-        let expiresAt;
-        if (expirySeconds) {
-            expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expirySeconds * 1000));
-        } else {
-            expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
-        }
-        
-        try {
-            await window.db.collection('secure_messages').add({ 
-                to: receiverId, 
-                from: window.auth.currentUser.uid, 
-                package: encryptedPackage, 
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
-                expiresAt: expiresAt
-            });
-        } catch (error) { throw error; }
-    },
+async sendToServer(receiverId, encryptedPackage) { 
+    if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
     
-    startReceiving() { 
-        if (!window.auth?.currentUser) return null;
-        const uid = window.auth.currentUser.uid;
-        return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
-            for (const change of snapshot.docChanges()) { 
-                if (change.type === 'added') { 
-                    const msg = { id: change.doc.id, ...change.doc.data() }; 
-                    await this.processReceivedMessage(msg); 
-                    try { await change.doc.ref.delete(); } catch (deleteError) {}
-                } 
-            } 
-        }, error => { setTimeout(() => this.startReceiving(), 5000); }); 
-    },
+    // ✅ تحديد مدة الصلاحية حسب نوع الإشارة
+    let expiryHours = 24; // الافتراضي 24 ساعة
+    let expirySeconds = null;
+    
+    // ✅ فقط feature_request و feature_response تحتاج مدة قصيرة
+    if (encryptedPackage.type === 'feature_request' || 
+        encryptedPackage.type === 'feature_response') {
+        expirySeconds = 60; // 60 ثانية لتفعيل الميزات (تتوافق مع blinking)
+    }
+    
+    let expiresAt;
+    if (expirySeconds) {
+        expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expirySeconds * 1000));
+    } else {
+        expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
+    }
+    
+    try {
+        await window.db.collection('secure_messages').add({ 
+            to: receiverId, 
+            from: window.auth.currentUser.uid, 
+            package: encryptedPackage, 
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
+            expiresAt: expiresAt
+        });
+    } catch (error) { throw error; }
+},
 
 
    // ==================== القسم 7: معالجة الرسائل المستلمة ====================
