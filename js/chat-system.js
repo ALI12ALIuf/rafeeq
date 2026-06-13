@@ -2063,7 +2063,7 @@ async sendMessage(text) {
         }
     },
     
-    // ==================== القسم 30: sendImage ====================
+    // ==================== القسم 30: sendImage (معدل - بدون تحرير تلقائي) ====================
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -2085,12 +2085,11 @@ async sendMessage(text) {
                 const msgId = Date.now().toString();
                 const tempUrl = URL.createObjectURL(file);
                 this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-                setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
             } else alert('فشل إرسال الصورة');
         }
     },
-    
-    // ==================== القسم 31: sendVideoFile ====================
+
+// ==================== القسم 31: sendVideoFile (معدل - بدون تحرير تلقائي) ====================
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -2123,14 +2122,12 @@ async sendMessage(text) {
                     
                     this.displayMessage({ id: msgId, type: 'video', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
                     
-                    setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
-                    
                 } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
     },
-    
-    // ==================== القسم 32: sendFile ====================
+
+// ==================== القسم 32: sendFile (معدل - بدون تحرير تلقائي) ====================
     async sendFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -2152,12 +2149,11 @@ async sendMessage(text) {
                 const msgId = Date.now().toString();
                 const tempUrl = URL.createObjectURL(file);
                 this.displayMessage({ id: msgId, type: 'file', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-                setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
             } else alert('فشل إرسال الملف');
         }
     },
-    
-    // ==================== القسم 33: sendVoiceNote ====================
+
+// ==================== القسم 33: sendVoiceNote (معدل - بدون تحرير تلقائي) ====================
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -2179,10 +2175,11 @@ async sendMessage(text) {
                 const msgId = Date.now().toString();
                 const tempUrl = URL.createObjectURL(audioBlob);
                 this.displayMessage({ id: msgId, type: 'voice', data: tempUrl, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-                setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
             } else alert('فشل إرسال البصمة الصوتية');
         }
     },
+
+
     
     // ==================== القسم 34: shareLocationDirect ====================
     
