@@ -988,8 +988,8 @@ setupDataChannel(channel) {
             }, 2000);
         }
     };
-    
-    // 9.1.10 عند إغلاق القناة
+
+        // 9.1.10 عند إغلاق القناة
     channel.onclose = () => {
         console.log('❌ Data Channel مغلق');
         this.sendCallStatus('disconnected');
@@ -1016,12 +1016,6 @@ setupDataChannel(channel) {
                 ChatSystem.featureBlinkInterval = null;
             }
             
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
             ChatSystem.updateAllButtons();
         }
     };
@@ -1042,16 +1036,10 @@ setupDataChannel(channel) {
                 ChatSystem.featureBlinkInterval = null;
             }
             
-            const btn = document.getElementById('enableFeaturesBtn');
-            if (btn) {
-                btn.style.background = '#f44336';
-                btn.title = 'تفعيل الميزات';
-            }
-            
             ChatSystem.updateAllButtons();
         }
     };
-},
+};
 
 // ==================== 9.2 معالجة حالة المكالمة ====================
 
