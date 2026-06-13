@@ -6,7 +6,7 @@ const CallSystem = {
     pcCall: null, dcCall: null,   // ✅ خاصة بالمكالمات (صوت، فيديو)
     localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
-    callTimerInterval: null, keepAliveInterval: null, keepAliveIntervalCall: null, // ✅ إضافة keepAliveIntervalCall
+    callTimerInterval: null, keepAliveInterval: null, keepAliveIntervalCall: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
     servers: { 
@@ -546,6 +546,9 @@ async createDataChannelOnly(calleeId) {
             return;
         }
         
+        // ✅ تنظيف أي عنصر قديم قبل إنشاء جديد
+        this.cleanupDynamicElements();
+        
         console.log('🔔 عرض شاشة المكالمة الواردة...');
         this.currentCallId = callerId;
         
@@ -854,7 +857,6 @@ async createDataChannelOnly(calleeId) {
     },
 
     // ==================== 9. Data Channel وإدارة الاتصال ====================
-
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -1179,9 +1181,14 @@ async sendSignal(calleeId, data) {
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
     showCallUI(type) {
-        document.body.classList.add('in-call');
+        // ✅ تنظيف أي واجهة قديمة قبل إنشاء جديدة
         const existingUi = document.getElementById('callUI');
-        if (existingUi) existingUi.remove();
+        if (existingUi) {
+            if (existingUi._cleanup) existingUi._cleanup();
+            existingUi.remove();
+        }
+        
+        document.body.classList.add('in-call');
         
         const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
         const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
@@ -1370,7 +1377,7 @@ async sendSignal(calleeId, data) {
             
             const muteBtn = document.getElementById('muteBtn');
             muteBtn?.addEventListener('click', () => {
-                this.toggleAudio(); // ✅ تم التغيير من toggleMute إلى toggleAudio
+                this.toggleAudio();
                 const icon = muteBtn.querySelector('i');
                 if (icon) {
                     if (this.isAudioMuted) {
@@ -1607,7 +1614,6 @@ compressImage(file) {
     });
 },
 
-    
 // ==================== 14. إنهاء المكالمة (معدلة - تغلق pcCall/dcCall فقط) ====================
     
     endCall() {
@@ -1658,6 +1664,9 @@ compressImage(file) {
             this.pcCall = null;
         }
         
+        // ✅ تنظيف العناصر الديناميكية
+        this.cleanupDynamicElements();
+        
         this.incomingChunks = {};
         this.incomingFileInfo = {};
         
@@ -1682,6 +1691,50 @@ compressImage(file) {
         }
         
         console.log('✅ تم إنهاء المكالمة');
+    },
+    
+    // ==================== 16. تنظيف العناصر الديناميكية ====================
+    
+    cleanupDynamicElements() {
+        console.log('🧹 بدء تنظيف العناصر الديناميكية...');
+        
+        // قائمة بجميع IDs للعناصر الديناميكية
+        const dynamicIds = [
+            'incomingCall',
+            'callUI',
+            'locationSwipeModal',
+            'imagePreviewModal',
+            'videoPreviewModal'
+        ];
+        
+        // إزالة كل عنصر ديناميكي موجود
+        for (const id of dynamicIds) {
+            const element = document.getElementById(id);
+            if (element) {
+                if (element._cleanup && typeof element._cleanup === 'function') {
+                    element._cleanup();
+                }
+                element.remove();
+                console.log(`🗑️ تم تنظيف العنصر: ${id}`);
+            }
+        }
+        
+        // تنظيف المؤقتات
+        if (this._callBatchTimer) {
+            clearTimeout(this._callBatchTimer);
+            this._callBatchTimer = null;
+        }
+        if (this._answerBatchTimer) {
+            clearTimeout(this._answerBatchTimer);
+            this._answerBatchTimer = null;
+        }
+        
+        // تنظيف مصفوفات ICE المؤقتة
+        this._callIceCandidates = [];
+        this._answerIceCandidates = [];
+        this._pendingIceCandidates = [];
+        
+        console.log('✅ تم تنظيف جميع العناصر الديناميكية');
     }
 };
        
