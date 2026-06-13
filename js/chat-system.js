@@ -783,12 +783,6 @@ async handleFeatureResponse(fromId, action) {
             }
         }
         
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) {
-            btn.style.background = '#4CAF50';
-            btn.title = 'الميزات مفعلة ✅';
-        }
-        
         this.updateAllButtons();
         console.log('✅ تم تفعيل الميزات!');
         
@@ -807,8 +801,6 @@ async handleFeatureResponse(fromId, action) {
         if (toggleInput) toggleInput.checked = false;
         if (switchLabel) switchLabel.classList.remove('blinking');
         
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) btn.style.background = '#f44336';
         console.log('❌ تم رفض طلب تفعيل الميزات');
         
     } else if (action === 'disable') {
@@ -828,12 +820,6 @@ async handleFeatureResponse(fromId, action) {
         
         if (toggleInput) toggleInput.checked = false;
         if (switchLabel) switchLabel.classList.remove('blinking');
-        
-        const btn = document.getElementById('enableFeaturesBtn');
-        if (btn) {
-            btn.style.background = '#f44336';
-            btn.title = 'تفعيل الميزات';
-        }
         
         if (CallSystem.dc) {
             try { CallSystem.dc.close(); } catch(e) {}
@@ -2613,12 +2599,6 @@ closeChat() {
         this.featureBlinkInterval = null;
     }
     
-    const btn = document.getElementById('enableFeaturesBtn');
-    if (btn) {
-        btn.style.background = '#f44336';
-        btn.title = 'تفعيل الميزات';
-    }
-    
     // ✅ إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
@@ -2651,6 +2631,7 @@ closeChat() {
     
     console.log('✅ closeChat - انتهى');
 },
+
     
     // ==================== القسم 40: تنظيف بيانات المحادثة ====================
     cleanConversationData(chatId, cleanAll = false) {
