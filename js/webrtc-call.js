@@ -245,7 +245,7 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-// ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+    // ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
     async startVideoCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -306,10 +306,31 @@ async createDataChannelOnly(calleeId) {
                 }
             };
             
+            // ✅ تعديل ontrack لإضافة تأخير وإعادة محاولة لضمان ربط الفيديو
             this.pcCall.ontrack = e => {
-                const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) rv.srcObject = e.streams[0];
+                if (e.track.kind === 'video') {
+                    console.log('📹 استقبال فيديو بعيد');
+                    
+                    let retryCount = 0;
+                    const tryAttachVideo = () => {
+                        const rv = document.getElementById('remoteVideo');
+                        if (rv && e.streams[0]) {
+                            rv.srcObject = e.streams[0];
+                            rv.play().catch(err => console.log('خطأ في تشغيل الفيديو:', err));
+                            console.log('✅ تم ربط الفيديو البعيد');
+                        } else if (retryCount < 5) {
+                            retryCount++;
+                            setTimeout(tryAttachVideo, 300);
+                        } else {
+                            console.log('⚠️ فشل ربط الفيديو البعيد بعد 5 محاولات');
+                        }
+                    };
+                    tryAttachVideo();
+                } else if (e.track.kind === 'audio') {
+                    this.setupRemoteAudio(e.streams[0]);
+                }
             };
+            
             this.pcCall.onconnectionstatechange = () => {
                 if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
             };
@@ -422,14 +443,15 @@ async createDataChannelOnly(calleeId) {
                 return;
             }
             
-            if (this.callType === 'video') {
-                const videoTrack = this.localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    videoTrack.enabled = false;
-                    this.isVideoMuted = true;
-                    console.log('✅ تم إيقاف الكاميرا بشكل افتراضي');
-                }
-            }
+            // ✅ تم إزالة إيقاف الكاميرا بشكل افتراضي (لمنع الشاشة الزرقاء)
+            // if (this.callType === 'video') {
+            //     const videoTrack = this.localStream.getVideoTracks()[0];
+            //     if (videoTrack) {
+            //         videoTrack.enabled = false;
+            //         this.isVideoMuted = true;
+            //         console.log('✅ تم إيقاف الكاميرا بشكل افتراضي');
+            //     }
+            // }
             
             this.showCallUI(this.callType);
             
@@ -452,26 +474,28 @@ async createDataChannelOnly(calleeId) {
                 }
             };
             
+            // ✅ تعديل ontrack لإضافة تأخير وإعادة محاولة لضمان ربط الفيديو
             this.pcCall.ontrack = e => {
                 console.log('📞 استقبال مسار:', e.track.kind);
                 
                 if (e.track.kind === 'video') {
                     console.log('✅ تم استقبال فيديو بعيد');
-                    const rv = document.getElementById('remoteVideo');
-                    if (rv) {
-                        rv.srcObject = e.streams[0];
-                        rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
-                        console.log('✅ تم ربط الفيديو البعيد');
-                    } else {
-                        console.log('⚠️ عنصر remoteVideo غير موجود');
-                        setTimeout(() => {
-                            const rv2 = document.getElementById('remoteVideo');
-                            if (rv2) {
-                                rv2.srcObject = e.streams[0];
-                                console.log('✅ تم ربط الفيديو البعيد (بعد التأخير)');
-                            }
-                        }, 500);
-                    }
+                    
+                    let retryCount = 0;
+                    const tryAttachVideo = () => {
+                        const rv = document.getElementById('remoteVideo');
+                        if (rv && e.streams[0]) {
+                            rv.srcObject = e.streams[0];
+                            rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
+                            console.log('✅ تم ربط الفيديو البعيد');
+                        } else if (retryCount < 5) {
+                            retryCount++;
+                            setTimeout(tryAttachVideo, 300);
+                        } else {
+                            console.log('⚠️ فشل ربط الفيديو البعيد بعد 5 محاولات');
+                        }
+                    };
+                    tryAttachVideo();
                 } else if (e.track.kind === 'audio') {
                     this.setupRemoteAudio(e.streams[0]);
                 }
