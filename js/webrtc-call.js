@@ -228,8 +228,7 @@ async startAudioCall(calleeId) {
     }
 },
 
-
-// ==================== 5. المكالمة المرئية (بدون تجميع - إرسال فوري) ====================
+   // ==================== 5. المكالمة المرئية (مع تنشيط إجباري للمسار) ====================
 
 async startVideoCall(calleeId) {
     if (!ChatSystem.friendInConversation) {
@@ -271,6 +270,16 @@ async startVideoCall(calleeId) {
         
         this.showCallUI('video');
         
+        // ✅ ✅ ✅ الحل السحري: تنشيط مسار الفيديو إجبارياً
+        const videoTrack = this.localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            console.log('🔥 تنشيط مسار الفيديو إجبارياً...');
+            videoTrack.enabled = false;
+            await new Promise(r => setTimeout(r, 100));
+            videoTrack.enabled = true;
+            console.log('✅ تم تنشيط مسار الفيديو');
+        }
+        
         // ✅ استخدام pcCall بدلاً من pc
         this.pcCall = new RTCPeerConnection(this.servers);
         this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
@@ -279,7 +288,7 @@ async startVideoCall(calleeId) {
         this.dcCall = this.pcCall.createDataChannel('chat');
         this.setupDataChannel(this.dcCall);
         
-        // ✅ إرسال ICE candidates فوراً (بدون تجميع)
+        // ✅ إرسال ICE candidates فوراً
         this.pcCall.onicecandidate = e => { 
             if (e.candidate) {
                 console.log('📡 إرسال ICE candidate فوري');
@@ -287,7 +296,7 @@ async startVideoCall(calleeId) {
             }
         };
         
-        // ✅ تشغيل الفيديو البعيد عند استقباله
+        // ✅ استقبال فيديو المستلم
         this.pcCall.ontrack = e => {
             console.log('📞 ontrack - استقبال مسار:', e.track.kind);
             
@@ -310,19 +319,19 @@ async startVideoCall(calleeId) {
         const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
         await this.pcCall.setLocalDescription(offer);
         
-        // ✅ إرسال الـ offer فوراً (بدون تجميع)
+        // ✅ إرسال الـ offer فوراً
         await this.sendSignal(calleeId, { 
             sdp: this.pcCall.localDescription, 
             type: 'video'
         });
         
-        console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
+        console.log('✅ تم إرسال العرض');
         
     } catch (e) { 
         this.endCall(); 
     }
-},
-
+}, 
+    
 
     // ==================== 6. إعداد الصوت عن بعد ====================
     
