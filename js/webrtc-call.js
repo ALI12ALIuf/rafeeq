@@ -287,16 +287,25 @@ async startVideoCall(calleeId) {
         
         this.showCallUI('video');
         
-        // ✅ ربط الفيديو المحلي (الإصلاح)
-        setTimeout(() => {
-            const lv = document.getElementById('localVideo');
-            if (lv && this.localStream) {
-                lv.srcObject = this.localStream;
-                console.log('✅ تم ربط الفيديو المحلي (للبادئ)');
-            } else {
-                console.warn('⚠️ لم يتم العثور على عنصر localVideo');
-            }
-        }, 500);
+        // ✅ ربط الفيديو المحلي (نسخة قوية مع إعادة المحاولة)
+        if (this.callType === 'video') {
+            let retryCount = 0;
+            const maxRetries = 10;
+            const tryAttachLocalVideo = () => {
+                const lv = document.getElementById('localVideo');
+                if (lv && this.localStream) {
+                    lv.srcObject = this.localStream;
+                    console.log('✅ تم ربط الفيديو المحلي (للبادئ)');
+                } else if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`⏳ انتظار عنصر localVideo... المحاولة ${retryCount}/${maxRetries}`);
+                    setTimeout(tryAttachLocalVideo, 300);
+                } else {
+                    console.error('❌ فشل ربط الفيديو المحلي: لم يتم العثور على عنصر localVideo');
+                }
+            };
+            tryAttachLocalVideo();
+        }
         
         // ✅ استخدام pcCall بدلاً من pc
         this.pcCall = new RTCPeerConnection(this.servers);
@@ -317,26 +326,32 @@ async startVideoCall(calleeId) {
             }
         };
         
-        // ✅ تعديل ontrack لإضافة تأخير وإعادة محاولة لضمان ربط الفيديو
+        // ✅ تعديل ontrack (نسخة قوية مع إعادة محاولة لربط الفيديو البعيد)
         this.pcCall.ontrack = e => {
+            console.log('📞 ontrack - استقبال مسار:', e.track.kind);
+            
             if (e.track.kind === 'video') {
-                console.log('📹 استقبال فيديو بعيد');
+                console.log('📹 تم استقبال فيديو بعيد، جاري ربطه...');
                 
                 let retryCount = 0;
-                const tryAttachVideo = () => {
+                const maxRetries = 10;
+                
+                const tryAttachRemoteVideo = () => {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
                         rv.srcObject = e.streams[0];
-                        rv.play().catch(err => console.log('خطأ في تشغيل الفيديو:', err));
-                        console.log('✅ تم ربط الفيديو البعيد');
-                    } else if (retryCount < 5) {
+                        rv.play().catch(err => console.log('⚠️ خطأ في تشغيل الفيديو البعيد:', err));
+                        console.log('✅ تم ربط الفيديو البعيد بنجاح');
+                    } else if (retryCount < maxRetries) {
                         retryCount++;
-                        setTimeout(tryAttachVideo, 300);
+                        console.log(`⏳ انتظار عنصر remoteVideo... المحاولة ${retryCount}/${maxRetries}`);
+                        setTimeout(tryAttachRemoteVideo, 300);
                     } else {
-                        console.log('⚠️ فشل ربط الفيديو البعيد بعد 5 محاولات');
+                        console.error('❌ فشل ربط الفيديو البعيد: لم يتم العثور على عنصر remoteVideo');
                     }
                 };
-                tryAttachVideo();
+                
+                tryAttachRemoteVideo();
             } else if (e.track.kind === 'audio') {
                 this.setupRemoteAudio(e.streams[0]);
             }
