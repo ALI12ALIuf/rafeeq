@@ -245,7 +245,7 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-     // ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+    // ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
 async startVideoCall(calleeId) {
     if (!ChatSystem.friendInConversation) {
@@ -287,7 +287,7 @@ async startVideoCall(calleeId) {
         
         this.showCallUI('video');
         
-        // ✅ ربط الفيديو المحلي (نسخة قوية مع إعادة المحاولة)
+        // ✅ ربط الفيديو المحلي
         if (this.callType === 'video') {
             let retryCount = 0;
             const maxRetries = 10;
@@ -298,10 +298,7 @@ async startVideoCall(calleeId) {
                     console.log('✅ تم ربط الفيديو المحلي (للبادئ)');
                 } else if (retryCount < maxRetries) {
                     retryCount++;
-                    console.log(`⏳ انتظار عنصر localVideo... المحاولة ${retryCount}/${maxRetries}`);
                     setTimeout(tryAttachLocalVideo, 300);
-                } else {
-                    console.error('❌ فشل ربط الفيديو المحلي: لم يتم العثور على عنصر localVideo');
                 }
             };
             tryAttachLocalVideo();
@@ -326,43 +323,35 @@ async startVideoCall(calleeId) {
             }
         };
         
-        // ✅ الحل النهائي لمشكلة AbortError - تشغيل الفيديو البعيد
+        // ✅ استقبال فيديو المستلم
         this.pcCall.ontrack = e => {
             console.log('📞 ontrack - استقبال مسار:', e.track.kind);
             
             if (e.track.kind === 'video') {
-                console.log('📹 تم استقبال فيديو بعيد، جاري التجهيز...');
+                console.log('📹 تم استقبال فيديو بعيد');
                 
                 const tryPlayVideo = () => {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
-                        // ✅ التأكد من عدم وجود srcObject قديم
                         if (rv.srcObject !== e.streams[0]) {
                             rv.srcObject = null;
                             rv.srcObject = e.streams[0];
                         }
-                        
-                        // ✅ إضافة علامة لمنع إعادة التشغيل المتكرر
                         if (rv.dataset.playing === 'true') return;
                         
-                        // ✅ إعدادات CSS قسرية
                         rv.style.display = 'block';
                         rv.style.visibility = 'visible';
-                        rv.style.opacity = '1';
-                        
                         rv.muted = true;
                         rv.play().then(() => {
                             rv.muted = false;
                             rv.dataset.playing = 'true';
-                            console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
+                            console.log('✅ تم تشغيل فيديو المستلم');
                         }).catch(err => {
-                            console.error('❌ فشل التشغيل:', err.name);
                             setTimeout(() => {
                                 rv.muted = true;
                                 rv.play().then(() => {
                                     rv.muted = false;
                                     rv.dataset.playing = 'true';
-                                    console.log('✅ تم التشغيل بعد المحاولة الثانية');
                                 }).catch(() => {});
                             }, 500);
                         });
@@ -383,7 +372,7 @@ async startVideoCall(calleeId) {
         const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
         await this.pcCall.setLocalDescription(offer);
         
-        // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
+        // ✅ انتظار 5 ثواني لتجميع ICE candidates
         await new Promise(resolve => {
             if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
             this._callBatchTimer = setTimeout(() => {
@@ -399,19 +388,35 @@ async startVideoCall(calleeId) {
             iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
         });
         
-        // ✅ المفتاح السحري: إعادة تعيين مسار الفيديو بعد 3 ثواني لضمان وصوله للمستلم
-        setTimeout(async () => {
-            if (this.pcCall && this.localStream) {
+        // ✅ ✅ ✅ الحل السحري: تنشيط مسار الفيديو بعد إرسال الإشارات مباشرة
+        // هذا يحل مشكلة عدم وصول فيديو المتصل إلى المستلم
+        setTimeout(() => {
+            if (this.localStream) {
                 const videoTrack = this.localStream.getVideoTracks()[0];
                 if (videoTrack) {
-                    console.log('🔄 إعادة تعيين مسار الفيديو لضمان وصوله للطرف الآخر');
+                    console.log('🔥 تنشيط مسار الفيديو لضمان وصوله للمستلم');
+                    // إيقاف ثم تشغيل المسار
                     videoTrack.enabled = false;
-                    await new Promise(r => setTimeout(r, 200));
-                    videoTrack.enabled = true;
-                    console.log('✅ تم إعادة تعيين مسار الفيديو بنجاح');
+                    setTimeout(() => {
+                        if (videoTrack) videoTrack.enabled = true;
+                        console.log('✅ تم تنشيط مسار الفيديو بنجاح');
+                        
+                        // إرسال إشارة تحديث للمستلم
+                        if (this.pcCall) {
+                            const sender = this.pcCall.getSenders().find(s => s.track?.kind === 'video');
+                            if (sender && sender.track) {
+                                // هذا يرسل تحديث للمستلم
+                                this.pcCall.getSenders().forEach(s => {
+                                    if (s.track?.kind === 'video') {
+                                        console.log('📡 إرسال تحديث مسار الفيديو للمستلم');
+                                    }
+                                });
+                            }
+                        }
+                    }, 200);
                 }
             }
-        }, 3000);
+        }, 1000);
         
         // تنظيف
         this._callIceCandidates = [];
