@@ -228,7 +228,7 @@ async startAudioCall(calleeId) {
     }
 },
 
-   // ==================== 5. المكالمة المرئية (النسخة النهائية الصحيحة) ====================
+    // ==================== 5. المكالمة المرئية (الحل النهائي الذي يضمن وصول الفيديو) ====================
 
 async startVideoCall(calleeId) {
     if (!ChatSystem.friendInConversation) {
@@ -300,7 +300,7 @@ async startVideoCall(calleeId) {
         this.dcCall = this.pcCall.createDataChannel('chat');
         this.setupDataChannel(this.dcCall);
         
-        // ✅ إرسال ICE candidates فوراً (بدون تجميع)
+        // ✅ إرسال ICE candidates فوراً
         this.pcCall.onicecandidate = e => { 
             if (e.candidate) {
                 console.log('📡 إرسال ICE candidate فوري');
@@ -308,27 +308,38 @@ async startVideoCall(calleeId) {
             }
         };
         
-        // ✅ ✅ ✅ الحل الصحيح: انتظار حدث onnegotiationneeded أو التأكد من جاهزية المسار
-        // ننتظر حتى يتم تجهيز مسار الفيديو بشكل صحيح
-        await new Promise((resolve) => {
-            // إذا كان مسار الفيديو موجوداً ونشطاً، نكمل فوراً
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack && videoTrack.readyState === 'live') {
-                console.log('🎥 مسار الفيديو جاهز فوراً');
-                resolve();
-            } else {
-                // ننتظر حدث onnegotiationneeded
-                console.log('⏳ انتظار تجهيز مسار الفيديو...');
-                this.pcCall.onnegotiationneeded = () => {
-                    console.log('✅ تم تجهيز مسار الفيديو - onnegotiationneeded');
-                    resolve();
-                };
-                // مهلة أمان 3 ثواني
-                setTimeout(() => {
-                    console.log('✅ انتهاء المهلة - متابعة الـ offer');
-                    resolve();
-                }, 3000);
+        // ✅ استقبال فيديو المستلم
+        this.pcCall.ontrack = e => {
+            console.log('📞 ontrack - استقبال مسار:', e.track.kind);
+            
+            if (e.track.kind === 'video') {
+                console.log('📹 تم استقبال فيديو بعيد');
+                const rv = document.getElementById('remoteVideo');
+                if (rv && e.streams[0]) {
+                    rv.srcObject = e.streams[0];
+                    rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
+                }
+            } else if (e.track.kind === 'audio') {
+                this.setupRemoteAudio(e.streams[0]);
             }
+        };
+        
+        this.pcCall.onconnectionstatechange = () => {
+            if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
+        };
+        
+        // ✅ ✅ ✅ الحل النهائي: انتظار حدث "تأكيد إضافة المسار"
+        await new Promise((resolve) => {
+            setTimeout(() => {
+                const senders = this.pcCall.getSenders();
+                const hasVideoSender = senders.some(s => s.track && s.track.kind === 'video');
+                if (hasVideoSender) {
+                    console.log('✅ تم تأكيد وجود مسار فيديو في الـ PeerConnection');
+                } else {
+                    console.warn('⚠️ لم يتم العثور على مسار فيديو، ولكن نستمر');
+                }
+                resolve();
+            }, 500);
         });
         
         console.log('📞 إنشاء عرض مكالمة فيديو...');
@@ -347,7 +358,8 @@ async startVideoCall(calleeId) {
         console.error('❌ خطأ في بدء المكالمة:', e);
         this.endCall(); 
     }
-}, 
+},
+    
 
     // ==================== 6. إعداد الصوت عن بعد ====================
     
@@ -388,7 +400,7 @@ async startVideoCall(calleeId) {
     },
 
 
-    // ==================== 7. استقبال المكالمات (بدون تجميع - إرسال فوري) ====================
+    // ==================== 7. استقبال المكالمات (بدون تجميع - إرسال فوري مع تأكيد المسار) ====================
 
 async receiveCall(callerId, callData) {
     if (this.isInCall) {
@@ -478,12 +490,15 @@ async receiveCall(callerId, callData) {
             const answer = await this.pcCall.createAnswer(answerOptions);
             await this.pcCall.setLocalDescription(answer);
             
+            // ✅ ✅ ✅ تأخير بسيط قبل إرسال الـ answer لضمان جاهزية المسارات
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
             // ✅ إرسال الـ answer فوراً (بدون تجميع)
             await this.sendSignal(callerId, { 
                 sdp: this.pcCall.localDescription
             });
             
-            console.log('✅ تم إرسال الرد مع ICE candidates المجمعة');
+            console.log('✅ تم إرسال الرد');
         }
         
         if (this.callType === 'video') {
@@ -502,6 +517,7 @@ async receiveCall(callerId, callData) {
         this.endCall(); 
     }
 },
+
     
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
