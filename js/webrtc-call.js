@@ -228,7 +228,7 @@ async startAudioCall(calleeId) {
     }
 },
 
-    // ==================== 5. المكالمة المرئية (الحل النهائي الذي يضمن وصول الفيديو) ====================
+    // ==================== 5. المكالمة المرئية (النسخة النهائية) ====================
 
 async startVideoCall(calleeId) {
     if (!ChatSystem.friendInConversation) {
@@ -271,30 +271,17 @@ async startVideoCall(calleeId) {
         this.showCallUI('video');
         
         // ✅ ربط الفيديو المحلي
-        if (this.callType === 'video') {
-            let retryCount = 0;
-            const maxRetries = 10;
-            const tryAttachLocalVideo = () => {
-                const lv = document.getElementById('localVideo');
-                if (lv && this.localStream) {
-                    lv.srcObject = this.localStream;
-                    console.log('✅ تم ربط الفيديو المحلي (للبادئ)');
-                } else if (retryCount < maxRetries) {
-                    retryCount++;
-                    setTimeout(tryAttachLocalVideo, 300);
-                }
-            };
-            tryAttachLocalVideo();
-        }
+        setTimeout(() => {
+            const lv = document.getElementById('localVideo');
+            if (lv && this.localStream) {
+                lv.srcObject = this.localStream;
+                console.log('✅ تم ربط الفيديو المحلي (للبادئ)');
+            }
+        }, 500);
         
         // ✅ استخدام pcCall بدلاً من pc
         this.pcCall = new RTCPeerConnection(this.servers);
-        
-        // ✅ إضافة المسارات إلى الـ PeerConnection
-        this.localStream.getTracks().forEach(track => {
-            this.pcCall.addTrack(track, this.localStream);
-            console.log(`➕ تم إضافة مسار ${track.kind}`);
-        });
+        this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
         
         // ✅ استخدام dcCall بدلاً من dc
         this.dcCall = this.pcCall.createDataChannel('chat');
@@ -328,21 +315,6 @@ async startVideoCall(calleeId) {
             if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
         };
         
-        // ✅ ✅ ✅ الحل النهائي: انتظار حدث "تأكيد إضافة المسار"
-        await new Promise((resolve) => {
-            setTimeout(() => {
-                const senders = this.pcCall.getSenders();
-                const hasVideoSender = senders.some(s => s.track && s.track.kind === 'video');
-                if (hasVideoSender) {
-                    console.log('✅ تم تأكيد وجود مسار فيديو في الـ PeerConnection');
-                } else {
-                    console.warn('⚠️ لم يتم العثور على مسار فيديو، ولكن نستمر');
-                }
-                resolve();
-            }, 500);
-        });
-        
-        console.log('📞 إنشاء عرض مكالمة فيديو...');
         const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
         await this.pcCall.setLocalDescription(offer);
         
@@ -353,6 +325,30 @@ async startVideoCall(calleeId) {
         });
         
         console.log('✅ تم إرسال العرض');
+        
+        // ✅ ✅ ✅ الحل السحري: إعادة تنشيط مسار الفيديو بعد ثانيتين
+        setTimeout(() => {
+            if (this.pcCall && this.localStream) {
+                const videoTrack = this.localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    console.log('🔥 إعادة تنشيط مسار الفيديو لضمان وصوله للمستلم');
+                    videoTrack.enabled = false;
+                    setTimeout(() => {
+                        videoTrack.enabled = true;
+                        console.log('✅ تم إعادة تنشيط مسار الفيديو');
+                        
+                        // إرسال إشارة تحديث للمستلم
+                        if (this.pcCall && this.pcCall.signalingState === 'stable') {
+                            this.pcCall.createOffer().then(offer => {
+                                this.pcCall.setLocalDescription(offer);
+                                this.sendSignal(calleeId, { sdp: offer, type: 'video' });
+                                console.log('📡 تم إرسال offer جديد للمستلم');
+                            }).catch(() => {});
+                        }
+                    }, 200);
+                }
+            }
+        }, 2000);
         
     } catch (e) { 
         console.error('❌ خطأ في بدء المكالمة:', e);
@@ -400,7 +396,7 @@ async startVideoCall(calleeId) {
     },
 
 
-    // ==================== 7. استقبال المكالمات (النسخة النهائية التي تشغل الفيديو تلقائياً) ====================
+    // ==================== 7. استقبال المكالمات (النسخة النهائية) ====================
 
 async receiveCall(callerId, callData) {
     if (this.isInCall) {
@@ -463,7 +459,6 @@ async receiveCall(callerId, callData) {
             if (e.track.kind === 'video') {
                 console.log('✅ تم استقبال فيديو بعيد - جاري التشغيل...');
                 
-                // محاولة تشغيل الفيديو مع إعادة المحاولة
                 const playVideo = () => {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
@@ -542,8 +537,6 @@ async receiveCall(callerId, callData) {
         this.endCall(); 
     }
 },
-
-    
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
 
@@ -1224,7 +1217,7 @@ showCallUI(type) {
                     box-shadow: 0 5px 20px rgba(0,0,0,0.3);
                 }
             </style>
-            <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
+            <video id="remoteVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
             <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
             <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
                 <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
