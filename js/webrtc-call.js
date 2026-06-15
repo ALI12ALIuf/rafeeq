@@ -130,221 +130,200 @@ async createDataChannelOnly(calleeId) {
     }
 },
     
-    // ==================== 4. المكالمة الصوتية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+    // ==================== 4. المكالمة الصوتية (بدون تجميع - إرسال فوري) ====================
 
-    async startAudioCall(calleeId) {
-        if (!ChatSystem.friendInConversation) {
-            console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
-            return;
-        }
-        
-        if (!window.auth?.currentUser) {
-            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-            return;
-        }
-        if (this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            return;
-        }
-        
-        this.isInCall = true;
-        this.callType = 'audio';
-        this.currentCallId = calleeId;
-        
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: 'audio'
-                }).catch(() => {});
-            }
-            
-            this.showCallUI('audio');
-            
-            const silentAudio = new Audio();
-            silentAudio.volume = 0;
-            silentAudio.play().catch(() => {});
-            
-            console.log('🎤 طلب الوصول إلى الميكروفون...');
-            const constraints = { audio: true, video: false };
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            const audioTracks = this.localStream.getAudioTracks();
-            if (audioTracks.length === 0) {
-                this.endCall();
-                return;
-            }
-            console.log('✅ تم الحصول على الميكروفون');
-            
-            // ✅ استخدام pcCall بدلاً من pc
-            this.pcCall = new RTCPeerConnection(this.servers);
-            
-            this.localStream.getTracks().forEach(track => {
-                this.pcCall.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
-            });
-            
-            // ✅ استخدام dcCall بدلاً من dc
-            this.dcCall = this.pcCall.createDataChannel('chat');
-            this.setupDataChannel(this.dcCall);
-            
-            // ✅ مصفوفة لتجميع ICE candidates للمكالمة
-            this._callIceCandidates = [];
-            this._callBatchTimer = null;
-            
-            this.pcCall.onicecandidate = e => { 
-                if (e.candidate) {
-                    console.log('📡 تجميع ICE candidate للمكالمة');
-                    this._callIceCandidates.push(e.candidate);
-                }
-            };
-            
-            this.pcCall.ontrack = e => {
-                console.log(`📞 استقبال مسار ${e.track.kind}`);
-                if (e.track.kind === 'audio') {
-                    this.setupRemoteAudio(e.streams[0]);
-                }
-            };
-            
-            this.pcCall.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pcCall?.connectionState}`);
-                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
-                    this.endCall();
-                }
-            };
-            
-            console.log('📞 إنشاء عرض مكالمة صوتية...');
-            const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-            await this.pcCall.setLocalDescription(offer);
-            
-            // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
-            await new Promise(resolve => {
-                if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
-                this._callBatchTimer = setTimeout(() => {
-                    console.log(`📦 انتهاء تجميع المكالمة (5 ثواني) - تم تجميع ${this._callIceCandidates.length} ICE candidate`);
-                    resolve();
-                }, 5000);
-            });
-            
-            // ✅ إرسال Offer + جميع ICE candidates المجمعة
-            await this.sendSignal(calleeId, { 
-                sdp: this.pcCall.localDescription, 
-                type: 'audio',
-                iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
-            });
-            
-            // تنظيف
-            this._callIceCandidates = [];
-            this._callBatchTimer = null;
-            
-            console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
-            
-        } catch (e) { 
-            console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
-            this.endCall(); 
-        }
-    },
-
-// ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
-
-    async startVideoCall(calleeId) {
-        if (!ChatSystem.friendInConversation) {
-            console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
-            return;
-        }
-        
-        if (!window.auth?.currentUser) {
-            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-            return;
-        }
-        if (this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            return;
-        }
-        
-        this.isInCall = true;
-        this.callType = 'video';
-        this.currentCallId = calleeId;
-        
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: 'video'
-                }).catch(() => {});
-            }
-            
-            const constraints = { 
-                audio: true, 
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
-            };
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
-                return;
-            }
-            
-            this.showCallUI('video');
-            
-            // ✅ استخدام pcCall بدلاً من pc
-            this.pcCall = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
-            
-            // ✅ استخدام dcCall بدلاً من dc
-            this.dcCall = this.pcCall.createDataChannel('chat');
-            this.setupDataChannel(this.dcCall);
-            
-            // ✅ مصفوفة لتجميع ICE candidates للمكالمة
-            this._callIceCandidates = [];
-            this._callBatchTimer = null;
-            
-            this.pcCall.onicecandidate = e => { 
-                if (e.candidate) {
-                    console.log('📡 تجميع ICE candidate للمكالمة');
-                    this._callIceCandidates.push(e.candidate);
-                }
-            };
-            
-            this.pcCall.ontrack = e => {
-                const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) rv.srcObject = e.streams[0];
-            };
-            this.pcCall.onconnectionstatechange = () => {
-                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
-            };
-            
-            const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            await this.pcCall.setLocalDescription(offer);
-            
-            // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
-            await new Promise(resolve => {
-                if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
-                this._callBatchTimer = setTimeout(() => {
-                    console.log(`📦 انتهاء تجميع المكالمة (5 ثواني) - تم تجميع ${this._callIceCandidates.length} ICE candidate`);
-                    resolve();
-                }, 5000);
-            });
-            
-            // ✅ إرسال Offer + جميع ICE candidates المجمعة
-            await this.sendSignal(calleeId, { 
-                sdp: this.pcCall.localDescription, 
-                type: 'video',
-                iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
-            });
-            
-            // تنظيف
-            this._callIceCandidates = [];
-            this._callBatchTimer = null;
-            
-            console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
-            
-        } catch (e) { 
-            this.endCall(); 
-        }
-    },
-
+async startAudioCall(calleeId) {
+    if (!ChatSystem.friendInConversation) {
+        console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
+        return;
+    }
     
+    if (!window.auth?.currentUser) {
+        console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
+        return;
+    }
+    if (this.isInCall) {
+        console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+        return;
+    }
+    
+    this.isInCall = true;
+    this.callType = 'audio';
+    this.currentCallId = calleeId;
+    
+    try {
+        if (window.auth?.currentUser) {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: true,
+                callType: 'audio'
+            }).catch(() => {});
+        }
+        
+        this.showCallUI('audio');
+        
+        const silentAudio = new Audio();
+        silentAudio.volume = 0;
+        silentAudio.play().catch(() => {});
+        
+        console.log('🎤 طلب الوصول إلى الميكروفون...');
+        const constraints = { audio: true, video: false };
+        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        const audioTracks = this.localStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+            this.endCall();
+            return;
+        }
+        console.log('✅ تم الحصول على الميكروفون');
+        
+        // ✅ استخدام pcCall بدلاً من pc
+        this.pcCall = new RTCPeerConnection(this.servers);
+        
+        this.localStream.getTracks().forEach(track => {
+            this.pcCall.addTrack(track, this.localStream);
+            console.log(`➕ تم إضافة مسار ${track.kind}`);
+        });
+        
+        // ✅ استخدام dcCall بدلاً من dc
+        this.dcCall = this.pcCall.createDataChannel('chat');
+        this.setupDataChannel(this.dcCall);
+        
+        // ✅ إرسال ICE candidates فوراً (بدون تجميع)
+        this.pcCall.onicecandidate = e => { 
+            if (e.candidate) {
+                console.log('📡 إرسال ICE candidate فوري');
+                this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
+            }
+        };
+        
+        this.pcCall.ontrack = e => {
+            console.log(`📞 استقبال مسار ${e.track.kind}`);
+            if (e.track.kind === 'audio') {
+                this.setupRemoteAudio(e.streams[0]);
+            }
+        };
+        
+        this.pcCall.onconnectionstatechange = () => {
+            console.log(`🔄 حالة الاتصال: ${this.pcCall?.connectionState}`);
+            if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
+                this.endCall();
+            }
+        };
+        
+        console.log('📞 إنشاء عرض مكالمة صوتية...');
+        const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+        await this.pcCall.setLocalDescription(offer);
+        
+        // ✅ إرسال الـ offer فوراً (بدون تجميع)
+        await this.sendSignal(calleeId, { 
+            sdp: this.pcCall.localDescription, 
+            type: 'audio'
+        });
+        
+        console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
+        
+    } catch (e) { 
+        console.error('❌ خطأ في بدء المكالمة الصوتية:', e);
+        this.endCall(); 
+    }
+},
+
+
+// ==================== 5. المكالمة المرئية (بدون تجميع - إرسال فوري) ====================
+
+async startVideoCall(calleeId) {
+    if (!ChatSystem.friendInConversation) {
+        console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
+        return;
+    }
+    
+    if (!window.auth?.currentUser) {
+        console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
+        return;
+    }
+    if (this.isInCall) {
+        console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+        return;
+    }
+    
+    this.isInCall = true;
+    this.callType = 'video';
+    this.currentCallId = calleeId;
+    
+    try {
+        if (window.auth?.currentUser) {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: true,
+                callType: 'video'
+            }).catch(() => {});
+        }
+        
+        const constraints = { 
+            audio: true, 
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
+        };
+        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (this.localStream.getAudioTracks().length === 0) {
+            this.endCall();
+            return;
+        }
+        
+        this.showCallUI('video');
+        
+        // ✅ استخدام pcCall بدلاً من pc
+        this.pcCall = new RTCPeerConnection(this.servers);
+        this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
+        
+        // ✅ استخدام dcCall بدلاً من dc
+        this.dcCall = this.pcCall.createDataChannel('chat');
+        this.setupDataChannel(this.dcCall);
+        
+        // ✅ إرسال ICE candidates فوراً (بدون تجميع)
+        this.pcCall.onicecandidate = e => { 
+            if (e.candidate) {
+                console.log('📡 إرسال ICE candidate فوري');
+                this.sendSignal(calleeId, { candidate: e.candidate }).catch(() => {});
+            }
+        };
+        
+        // ✅ تشغيل الفيديو البعيد عند استقباله
+        this.pcCall.ontrack = e => {
+            console.log('📞 ontrack - استقبال مسار:', e.track.kind);
+            
+            if (e.track.kind === 'video') {
+                console.log('📹 تم استقبال فيديو بعيد');
+                const rv = document.getElementById('remoteVideo');
+                if (rv && e.streams[0]) {
+                    rv.srcObject = e.streams[0];
+                    rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
+                }
+            } else if (e.track.kind === 'audio') {
+                this.setupRemoteAudio(e.streams[0]);
+            }
+        };
+        
+        this.pcCall.onconnectionstatechange = () => {
+            if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
+        };
+        
+        const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+        await this.pcCall.setLocalDescription(offer);
+        
+        // ✅ إرسال الـ offer فوراً (بدون تجميع)
+        await this.sendSignal(calleeId, { 
+            sdp: this.pcCall.localDescription, 
+            type: 'video'
+        });
+        
+        console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
+        
+    } catch (e) { 
+        this.endCall(); 
+    }
+},
+
+
     // ==================== 6. إعداد الصوت عن بعد ====================
     
     setupRemoteAudio(stream) {
@@ -384,157 +363,120 @@ async createDataChannelOnly(calleeId) {
     },
 
 
-    // ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+    // ==================== 7. استقبال المكالمات (بدون تجميع - إرسال فوري) ====================
 
-    async receiveCall(callerId, callData) {
-        if (this.isInCall) {
-            console.log('❌ مكالمة نشطة بالفعل');
-            this.sendSignal(callerId, { type: 'reject' });
+async receiveCall(callerId, callData) {
+    if (this.isInCall) {
+        console.log('❌ مكالمة نشطة بالفعل');
+        this.sendSignal(callerId, { type: 'reject' });
+        return;
+    }
+    
+    this.isInCall = true;
+    this.callType = callData.type || 'audio';
+    this.currentCallId = callerId;
+    console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
+    
+    try {
+        if (window.auth?.currentUser) {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: true,
+                callType: this.callType
+            }).catch(() => {});
+        }
+        
+        const silentAudio = new Audio();
+        silentAudio.volume = 0;
+        silentAudio.play().catch(() => {});
+        
+        const constraints = { 
+            audio: true, 
+            video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } : false
+        };
+        
+        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (this.localStream.getAudioTracks().length === 0) {
+            this.endCall();
             return;
         }
         
-        this.isInCall = true;
-        this.callType = callData.type || 'audio';
-        this.currentCallId = callerId;
-        console.log(`📞 استقبال مكالمة ${this.callType === 'video' ? 'فيديو' : 'صوتية'} من ${callerId}`);
+        this.showCallUI(this.callType);
         
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: this.callType
-                }).catch(() => {});
+        // ✅ استخدام pcCall بدلاً من pc
+        this.pcCall = new RTCPeerConnection(this.servers);
+        
+        this.localStream.getTracks().forEach(track => {
+            this.pcCall.addTrack(track, this.localStream);
+            console.log(`➕ تم إضافة مسار ${track.kind}`);
+        });
+        
+        // ✅ إرسال ICE candidates فوراً (بدون تجميع)
+        this.pcCall.onicecandidate = e => { 
+            if (e.candidate) {
+                console.log('📡 إرسال ICE candidate فوري');
+                this.sendSignal(callerId, { candidate: e.candidate }).catch(() => {});
             }
+        };
+        
+        this.pcCall.ontrack = e => {
+            console.log('📞 استقبال مسار:', e.track.kind);
             
-            const silentAudio = new Audio();
-            silentAudio.volume = 0;
-            silentAudio.play().catch(() => {});
-            
-            const constraints = { 
-                audio: true, 
-                video: this.callType === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } : false
-            };
-            
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
-                return;
-            }
-            
-            if (this.callType === 'video') {
-                const videoTrack = this.localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    videoTrack.enabled = false;
-                    this.isVideoMuted = true;
-                    console.log('✅ تم إيقاف الكاميرا بشكل افتراضي');
+            if (e.track.kind === 'video') {
+                console.log('✅ تم استقبال فيديو بعيد');
+                const rv = document.getElementById('remoteVideo');
+                if (rv && e.streams[0]) {
+                    rv.srcObject = e.streams[0];
+                    rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
                 }
+            } else if (e.track.kind === 'audio') {
+                this.setupRemoteAudio(e.streams[0]);
             }
+        };
+        
+        this.pcCall.ondatachannel = e => {
+            console.log('📡 استقبال Data Channel');
+            this.setupDataChannel(e.channel);
+            this.dcCall = e.channel;
+        };
+        
+        this.pcCall.onconnectionstatechange = () => {
+            console.log(`🔄 حالة الاتصال: ${this.pcCall?.connectionState}`);
+            if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
+                this.endCall();
+            }
+        };
+        
+        if (callData.sdp) {
+            await this.pcCall.setRemoteDescription(new RTCSessionDescription(callData.sdp));
+            const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
+            const answer = await this.pcCall.createAnswer(answerOptions);
+            await this.pcCall.setLocalDescription(answer);
             
-            this.showCallUI(this.callType);
-            
-            // ✅ استخدام pcCall بدلاً من pc
-            this.pcCall = new RTCPeerConnection(this.servers);
-            
-            this.localStream.getTracks().forEach(track => {
-                this.pcCall.addTrack(track, this.localStream);
-                console.log(`➕ تم إضافة مسار ${track.kind}`);
+            // ✅ إرسال الـ answer فوراً (بدون تجميع)
+            await this.sendSignal(callerId, { 
+                sdp: this.pcCall.localDescription
             });
             
-            // ✅ مصفوفة لتجميع ICE candidates للإجابة
-            this._answerIceCandidates = [];
-            this._answerBatchTimer = null;
-            
-            this.pcCall.onicecandidate = e => { 
-                if (e.candidate) {
-                    console.log('📡 تجميع ICE candidate للإجابة');
-                    this._answerIceCandidates.push(e.candidate);
-                }
-            };
-            
-            this.pcCall.ontrack = e => {
-                console.log('📞 استقبال مسار:', e.track.kind);
-                
-                if (e.track.kind === 'video') {
-                    console.log('✅ تم استقبال فيديو بعيد');
-                    const rv = document.getElementById('remoteVideo');
-                    if (rv) {
-                        rv.srcObject = e.streams[0];
-                        rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
-                        console.log('✅ تم ربط الفيديو البعيد');
-                    } else {
-                        console.log('⚠️ عنصر remoteVideo غير موجود');
-                        setTimeout(() => {
-                            const rv2 = document.getElementById('remoteVideo');
-                            if (rv2) {
-                                rv2.srcObject = e.streams[0];
-                                console.log('✅ تم ربط الفيديو البعيد (بعد التأخير)');
-                            }
-                        }, 500);
-                    }
-                } else if (e.track.kind === 'audio') {
-                    this.setupRemoteAudio(e.streams[0]);
-                }
-            };
-            
-            this.pcCall.ondatachannel = e => {
-                console.log('📡 استقبال Data Channel');
-                this.setupDataChannel(e.channel);
-                // ✅ استخدام dcCall بدلاً من dc
-                this.dcCall = e.channel;
-            };
-            
-            this.pcCall.onconnectionstatechange = () => {
-                console.log(`🔄 حالة الاتصال: ${this.pcCall?.connectionState}`);
-                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) {
-                    this.endCall();
-                }
-            };
-            
-            if (callData.sdp) {
-                await this.pcCall.setRemoteDescription(new RTCSessionDescription(callData.sdp));
-                const answerOptions = { offerToReceiveAudio: true, offerToReceiveVideo: this.callType === 'video' };
-                const answer = await this.pcCall.createAnswer(answerOptions);
-                await this.pcCall.setLocalDescription(answer);
-                
-                // ✅ انتظار 5 ثواني لتجميع ICE candidates للإجابة
-                await new Promise(resolve => {
-                    if (this._answerBatchTimer) clearTimeout(this._answerBatchTimer);
-                    this._answerBatchTimer = setTimeout(() => {
-                        console.log(`📦 انتهاء تجميع الإجابة (5 ثواني) - تم تجميع ${this._answerIceCandidates.length} ICE candidate`);
-                        resolve();
-                    }, 5000);
-                });
-                
-                // ✅ إرسال Answer + جميع ICE candidates المجمعة
-                await this.sendSignal(callerId, { 
-                    sdp: this.pcCall.localDescription,
-                    iceCandidates: this._answerIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
-                });
-                
-                // تنظيف
-                this._answerIceCandidates = [];
-                this._answerBatchTimer = null;
-                
-                console.log('✅ تم إرسال الرد مع ICE candidates المجمعة');
-            }
-            
-            if (this.callType === 'video') {
-                setTimeout(() => {
-                    const lv = document.getElementById('localVideo');
-                    if (lv && this.localStream) {
-                        lv.srcObject = this.localStream;
-                        console.log('✅ تم ربط الفيديو المحلي');
-                    }
-                }, 500);
-            }
-            
-        } catch (e) { 
-            console.error('❌ خطأ في استقبال المكالمة:', e);
-            this.sendSignal(callerId, { type: 'reject' });
-            this.endCall(); 
+            console.log('✅ تم إرسال الرد مع ICE candidates المجمعة');
         }
-    },
+        
+        if (this.callType === 'video') {
+            setTimeout(() => {
+                const lv = document.getElementById('localVideo');
+                if (lv && this.localStream) {
+                    lv.srcObject = this.localStream;
+                    console.log('✅ تم ربط الفيديو المحلي');
+                }
+            }, 500);
+        }
+        
+    } catch (e) { 
+        console.error('❌ خطأ في استقبال المكالمة:', e);
+        this.sendSignal(callerId, { type: 'reject' });
+        this.endCall(); 
+    }
+},
     
     
     // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
@@ -1168,219 +1110,213 @@ async sendSignal(calleeId, data) {
     
     // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
 
-    showCallUI(type) {
-        // ✅ تنظيف أي واجهة قديمة قبل إنشاء جديدة
-        const existingUi = document.getElementById('callUI');
-        if (existingUi) {
-            if (existingUi._cleanup) existingUi._cleanup();
-            existingUi.remove();
-        }
-        
-        document.body.classList.add('in-call');
-        
-        const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
-        const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
-        const appColor = '#2196F3';
-        const bgColor = '#0a0e27';
-        
-        let uiHTML = '';
-        if (type === 'video') {
-            uiHTML = `
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .local-video {
-                        border: 3px solid rgba(255,255,255,0.3);
-                        transition: all 0.3s ease;
-                        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-                    }
-                </style>
-                <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
-                <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
-                <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا">
-                        <i class="fas fa-video"></i>
-                    </button>
-                </div>`;
-        } else {
-            uiHTML = `
-                <style>
-                    @keyframes pulse {
-                        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-                        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-                    }
-                    .call-btn {
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                        backdrop-filter: blur(10px);
-                        background: rgba(30, 30, 40, 0.85) !important;
-                        border: 1px solid rgba(255,255,255,0.15) !important;
-                    }
-                    .call-btn:active {
-                        transform: scale(1.1);
-                        background: rgba(50, 50, 60, 0.95) !important;
-                    }
-                    .end-call-btn {
-                        background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-                        animation: pulse 1.5s infinite;
-                    }
-                    .end-call-btn:active {
-                        transform: scale(1.1);
-                        background: linear-gradient(135deg, #ff6659, #e53935) !important;
-                    }
-                    .avatar-animation {
-                        animation: float 3s ease-in-out infinite;
-                    }
-                    @keyframes float {
-                        0% { transform: translateY(0px); }
-                        50% { transform: translateY(-10px); }
-                        100% { transform: translateY(0px); }
-                    }
-                </style>
-                <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
-                <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
-                    <div class="avatar-animation" style="font-size:6rem;margin-bottom:15px;filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">${contactAvatar}</div>
-                    <div style="font-size:1.8rem;color:white;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
-                    <div style="margin-top:8px;color:#4CAF50;font-size:0.9rem;background:rgba(76,175,80,0.2);padding:5px 15px;border-radius:20px;display:inline-block;">
-                        <i class="fas fa-phone-alt" style="margin-left:5px;"></i> <span id="callTimer">00:00</span>
-                    </div>
+showCallUI(type) {
+    // ✅ تنظيف أي واجهة قديمة قبل إنشاء جديدة
+    const existingUi = document.getElementById('callUI');
+    if (existingUi) {
+        if (existingUi._cleanup) existingUi._cleanup();
+        existingUi.remove();
+    }
+    
+    document.body.classList.add('in-call');
+    
+    const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
+    const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
+    const appColor = '#2196F3';
+    const bgColor = '#0a0e27';
+    
+    let uiHTML = '';
+    if (type === 'video') {
+        uiHTML = `
+            <style>
+                @keyframes pulse {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+                    70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+                }
+                .call-btn {
+                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    backdrop-filter: blur(10px);
+                    background: rgba(30, 30, 40, 0.85) !important;
+                    border: 1px solid rgba(255,255,255,0.15) !important;
+                }
+                .call-btn:active {
+                    transform: scale(1.1);
+                    background: rgba(50, 50, 60, 0.95) !important;
+                }
+                .end-call-btn {
+                    background: linear-gradient(135deg, #f44336, #d32f2f) !important;
+                    animation: pulse 1.5s infinite;
+                }
+                .end-call-btn:active {
+                    transform: scale(1.1);
+                    background: linear-gradient(135deg, #ff6659, #e53935) !important;
+                }
+                .local-video {
+                    border: 3px solid rgba(255,255,255,0.3);
+                    transition: all 0.3s ease;
+                    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                }
+            </style>
+            <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
+            <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
+            <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
+                <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button id="muteAudioBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="endCallBtn" class="end-call-btn" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+                <button id="muteVideoBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="إيقاف الكاميرا">
+                    <i class="fas fa-video"></i>
+                </button>
+            </div>`;
+    } else {
+        uiHTML = `
+            <style>
+                @keyframes pulse {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+                    70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+                }
+                .call-btn {
+                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    backdrop-filter: blur(10px);
+                    background: rgba(30, 30, 40, 0.85) !important;
+                    border: 1px solid rgba(255,255,255,0.15) !important;
+                }
+                .call-btn:active {
+                    transform: scale(1.1);
+                    background: rgba(50, 50, 60, 0.95) !important;
+                }
+                .end-call-btn {
+                    background: linear-gradient(135deg, #f44336, #d32f2f) !important;
+                    animation: pulse 1.5s infinite;
+                }
+                .end-call-btn:active {
+                    transform: scale(1.1);
+                    background: linear-gradient(135deg, #ff6659, #e53935) !important;
+                }
+                .avatar-animation {
+                    animation: float 3s ease-in-out infinite;
+                }
+                @keyframes float {
+                    0% { transform: translateY(0px); }
+                    50% { transform: translateY(-10px); }
+                    100% { transform: translateY(0px); }
+                }
+            </style>
+            <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(145deg, #1a1a2e, #16213e);z-index:9997;"></div>
+            <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;">
+                <div class="avatar-animation" style="font-size:6rem;margin-bottom:15px;filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">${contactAvatar}</div>
+                <div style="font-size:1.8rem;color:white;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">${contactName}</div>
+                <div style="margin-top:8px;color:#4CAF50;font-size:0.9rem;background:rgba(76,175,80,0.2);padding:5px 15px;border-radius:20px;display:inline-block;">
+                    <i class="fas fa-phone-alt" style="margin-left:5px;"></i> <span id="callTimer">00:00</span>
                 </div>
-                <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
-                    <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                </div>`;
-        }
+            </div>
+            <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
+                <button id="speakerBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل السماعة">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+                <button id="endCallBtn" class="end-call-btn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;" title="إنهاء المكالمة">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+                <button id="muteBtn" class="call-btn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="كتم الميكروفون">
+                    <i class="fas fa-microphone"></i>
+                </button>
+            </div>`;
+    }
+    
+    const ui = document.createElement('div');
+    ui.id = 'callUI';
+    ui.innerHTML = uiHTML;
+    document.body.appendChild(ui);
+    
+    document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
+    
+    if (type === 'video') {
+        const lv = document.getElementById('localVideo');
+        if (lv && this.localStream) lv.srcObject = this.localStream;
+        document.getElementById('switchCameraBtn')?.addEventListener('click', () => this.switchCamera());
         
-        const ui = document.createElement('div');
-        ui.id = 'callUI';
-        ui.innerHTML = uiHTML;
-        document.body.appendChild(ui);
-        
-        document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
-        
-        if (type === 'video') {
-            const lv = document.getElementById('localVideo');
-            if (lv && this.localStream) lv.srcObject = this.localStream;
-            document.getElementById('switchCameraBtn')?.addEventListener('click', () => this.switchCamera());
-            
-            const muteAudioBtn = document.getElementById('muteAudioBtn');
-            muteAudioBtn?.addEventListener('click', () => {
-                this.toggleAudio();
-                const icon = muteAudioBtn.querySelector('i');
-                if (icon) {
-                    if (this.isAudioMuted) {
-                        icon.className = 'fas fa-microphone-slash';
-                        muteAudioBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-microphone';
-                        muteAudioBtn.style.color = appColor;
-                    }
-                }
-            });
-            
-            const muteVideoBtn = document.getElementById('muteVideoBtn');
-            muteVideoBtn?.addEventListener('click', () => {
-                this.toggleVideo();
-                const icon = muteVideoBtn.querySelector('i');
-                if (icon) {
-                    if (this.isVideoMuted) {
-                        icon.className = 'fas fa-video-slash';
-                        muteVideoBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-video';
-                        muteVideoBtn.style.color = appColor;
-                    }
-                }
-            });
-            
-            setTimeout(() => {
-                const rv = document.getElementById('remoteVideo');
-                if (rv) {
-                    rv.srcObject = null;
-                    console.log('✅ تم إعادة تعيين remoteVideo');
-                }
-            }, 100);
-            
-            if (this.isVideoMuted) {
-                const muteVideoBtn = document.getElementById('muteVideoBtn');
-                if (muteVideoBtn) {
-                    const icon = muteVideoBtn.querySelector('i');
-                    if (icon) {
-                        icon.className = 'fas fa-video-slash';
-                        muteVideoBtn.style.color = '#f44336';
-                    }
+        const muteAudioBtn = document.getElementById('muteAudioBtn');
+        muteAudioBtn?.addEventListener('click', () => {
+            this.toggleAudio();
+            const icon = muteAudioBtn.querySelector('i');
+            if (icon) {
+                if (this.isAudioMuted) {
+                    icon.className = 'fas fa-microphone-slash';
+                    muteAudioBtn.style.color = '#f44336';
+                } else {
+                    icon.className = 'fas fa-microphone';
+                    muteAudioBtn.style.color = appColor;
                 }
             }
-            
-        } else {
-            const speakerBtn = document.getElementById('speakerBtn');
-            speakerBtn?.addEventListener('click', () => {
-                this.toggleSpeaker();
-                const icon = speakerBtn.querySelector('i');
-                if (icon) {
-                    if (this.isSpeakerEnabled) {
-                        icon.className = 'fas fa-volume-up';
-                    } else {
-                        icon.className = 'fas fa-volume-mute';
-                    }
+        });
+        
+        const muteVideoBtn = document.getElementById('muteVideoBtn');
+        muteVideoBtn?.addEventListener('click', () => {
+            this.toggleVideo();
+            const icon = muteVideoBtn.querySelector('i');
+            if (icon) {
+                if (this.isVideoMuted) {
+                    icon.className = 'fas fa-video-slash';
+                    muteVideoBtn.style.color = '#f44336';
+                } else {
+                    icon.className = 'fas fa-video';
+                    muteVideoBtn.style.color = appColor;
                 }
-            });
-            
-            const muteBtn = document.getElementById('muteBtn');
-            muteBtn?.addEventListener('click', () => {
-                this.toggleAudio();
-                const icon = muteBtn.querySelector('i');
+            }
+        });
+        
+        // ✅ تم إزالة setTimeout الذي كان يعيد تعيين remoteVideo نهائياً
+        
+        if (this.isVideoMuted) {
+            const muteVideoBtn = document.getElementById('muteVideoBtn');
+            if (muteVideoBtn) {
+                const icon = muteVideoBtn.querySelector('i');
                 if (icon) {
-                    if (this.isAudioMuted) {
-                        icon.className = 'fas fa-microphone-slash';
-                        muteBtn.style.color = '#f44336';
-                    } else {
-                        icon.className = 'fas fa-microphone';
-                        muteBtn.style.color = appColor;
-                    }
+                    icon.className = 'fas fa-video-slash';
+                    muteVideoBtn.style.color = '#f44336';
                 }
-            });
-            
-            this.startCallTimer();
+            }
         }
-    },
+        
+    } else {
+        const speakerBtn = document.getElementById('speakerBtn');
+        speakerBtn?.addEventListener('click', () => {
+            this.toggleSpeaker();
+            const icon = speakerBtn.querySelector('i');
+            if (icon) {
+                if (this.isSpeakerEnabled) {
+                    icon.className = 'fas fa-volume-up';
+                } else {
+                    icon.className = 'fas fa-volume-mute';
+                }
+            }
+        });
+        
+        const muteBtn = document.getElementById('muteBtn');
+        muteBtn?.addEventListener('click', () => {
+            this.toggleAudio();
+            const icon = muteBtn.querySelector('i');
+            if (icon) {
+                if (this.isAudioMuted) {
+                    icon.className = 'fas fa-microphone-slash';
+                    muteBtn.style.color = '#f44336';
+                } else {
+                    icon.className = 'fas fa-microphone';
+                    muteBtn.style.color = appColor;
+                }
+            }
+        });
+        
+        this.startCallTimer();
+    }
+},
 
     // ==================== 11. مؤقت المكالمة ====================
 
