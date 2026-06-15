@@ -245,7 +245,7 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-    // ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+    // ==================== 5. المكالمة المرئية (الحل الجذري) ====================
 
 async startVideoCall(calleeId) {
     if (!ChatSystem.friendInConversation) {
@@ -302,6 +302,28 @@ async startVideoCall(calleeId) {
                 }
             };
             tryAttachLocalVideo();
+        }
+        
+        // ✅ ✅ ✅ الحل الجذري: تنشيط مسار الفيديو قبل إنشاء الـ offer
+        const videoTrack = this.localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            console.log('🔥 تنشيط مسار الفيديو قبل إنشاء الـ offer...');
+            videoTrack.enabled = true;
+            
+            // حيلة سحرية: تشغيل الفيديو في عنصر مؤقت
+            const tempVideo = document.createElement('video');
+            tempVideo.srcObject = new MediaStream([videoTrack]);
+            tempVideo.muted = true;
+            tempVideo.play().then(() => {
+                console.log('✅ تم تنشيط مسار الفيديو مؤقتاً');
+                setTimeout(() => {
+                    tempVideo.pause();
+                    tempVideo.srcObject = null;
+                }, 500);
+            }).catch(() => {});
+            
+            // انتظار قليل لضمان التنشيط
+            await new Promise(r => setTimeout(r, 500));
         }
         
         // ✅ استخدام pcCall بدلاً من pc
@@ -369,6 +391,7 @@ async startVideoCall(calleeId) {
             if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
         };
         
+        // ✅ إنشاء الـ offer بعد تنشيط مسار الفيديو
         const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
         await this.pcCall.setLocalDescription(offer);
         
@@ -387,36 +410,6 @@ async startVideoCall(calleeId) {
             type: 'video',
             iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
         });
-        
-        // ✅ ✅ ✅ الحل السحري: تنشيط مسار الفيديو بعد إرسال الإشارات مباشرة
-        // هذا يحل مشكلة عدم وصول فيديو المتصل إلى المستلم
-        setTimeout(() => {
-            if (this.localStream) {
-                const videoTrack = this.localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    console.log('🔥 تنشيط مسار الفيديو لضمان وصوله للمستلم');
-                    // إيقاف ثم تشغيل المسار
-                    videoTrack.enabled = false;
-                    setTimeout(() => {
-                        if (videoTrack) videoTrack.enabled = true;
-                        console.log('✅ تم تنشيط مسار الفيديو بنجاح');
-                        
-                        // إرسال إشارة تحديث للمستلم
-                        if (this.pcCall) {
-                            const sender = this.pcCall.getSenders().find(s => s.track?.kind === 'video');
-                            if (sender && sender.track) {
-                                // هذا يرسل تحديث للمستلم
-                                this.pcCall.getSenders().forEach(s => {
-                                    if (s.track?.kind === 'video') {
-                                        console.log('📡 إرسال تحديث مسار الفيديو للمستلم');
-                                    }
-                                });
-                            }
-                        }
-                    }, 200);
-                }
-            }
-        }, 1000);
         
         // تنظيف
         this._callIceCandidates = [];
