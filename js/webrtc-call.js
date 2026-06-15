@@ -228,7 +228,7 @@ async startAudioCall(calleeId) {
     }
 },
 
-  // ==================== 5. المكالمة المرئية (مع تأخير الـ Offer لضمان وصول الفيديو) ====================
+   // ==================== 5. المكالمة المرئية (النسخة النهائية الصحيحة) ====================
 
 async startVideoCall(calleeId) {
     if (!ChatSystem.friendInConversation) {
@@ -308,60 +308,46 @@ async startVideoCall(calleeId) {
             }
         };
         
-        // ✅ استقبال فيديو المستلم
-        this.pcCall.ontrack = e => {
-            console.log('📞 ontrack - استقبال مسار:', e.track.kind);
-            
-            if (e.track.kind === 'video') {
-                console.log('📹 تم استقبال فيديو بعيد');
-                const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) {
-                    rv.srcObject = e.streams[0];
-                    rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
-                }
-            } else if (e.track.kind === 'audio') {
-                this.setupRemoteAudio(e.streams[0]);
+        // ✅ ✅ ✅ الحل الصحيح: انتظار حدث onnegotiationneeded أو التأكد من جاهزية المسار
+        // ننتظر حتى يتم تجهيز مسار الفيديو بشكل صحيح
+        await new Promise((resolve) => {
+            // إذا كان مسار الفيديو موجوداً ونشطاً، نكمل فوراً
+            const videoTrack = this.localStream.getVideoTracks()[0];
+            if (videoTrack && videoTrack.readyState === 'live') {
+                console.log('🎥 مسار الفيديو جاهز فوراً');
+                resolve();
+            } else {
+                // ننتظر حدث onnegotiationneeded
+                console.log('⏳ انتظار تجهيز مسار الفيديو...');
+                this.pcCall.onnegotiationneeded = () => {
+                    console.log('✅ تم تجهيز مسار الفيديو - onnegotiationneeded');
+                    resolve();
+                };
+                // مهلة أمان 3 ثواني
+                setTimeout(() => {
+                    console.log('✅ انتهاء المهلة - متابعة الـ offer');
+                    resolve();
+                }, 3000);
             }
-        };
-        
-        this.pcCall.onconnectionstatechange = () => {
-            if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
-        };
-        
-        // ✅ ✅ ✅ الحل السحري: تأخير إنشاء الـ Offer حتى يتم تجهيز الفيديو بالكامل
-        // ننتظر 1.5 ثانية للتأكد من أن مسار الفيديو أصبح جاهزاً للإرسال
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // التحقق من أن مسار الفيديو نشط قبل إنشاء الـ Offer
-        const videoTrack = this.localStream.getVideoTracks()[0];
-        if (videoTrack) {
-            console.log('🎥 مسار الفيديو موجود وحالته:', videoTrack.enabled ? 'نشط' : 'غير نشط');
-            if (!videoTrack.enabled) {
-                videoTrack.enabled = true;
-                console.log('✅ تم تنشيط مسار الفيديو');
-            }
-        } else {
-            console.warn('⚠️ لا يوجد مسار فيديو متاح');
-        }
+        });
         
         console.log('📞 إنشاء عرض مكالمة فيديو...');
         const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
         await this.pcCall.setLocalDescription(offer);
         
-        // ✅ إرسال الـ offer فوراً (بدون تجميع)
+        // ✅ إرسال الـ offer فوراً
         await this.sendSignal(calleeId, { 
             sdp: this.pcCall.localDescription, 
             type: 'video'
         });
         
-        console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
+        console.log('✅ تم إرسال العرض');
         
     } catch (e) { 
         console.error('❌ خطأ في بدء المكالمة:', e);
         this.endCall(); 
     }
 }, 
-    
 
     // ==================== 6. إعداد الصوت عن بعد ====================
     
