@@ -326,7 +326,7 @@ async startVideoCall(calleeId) {
             }
         };
         
-        // ✅ الحل الجذري لمشكلة Autoplay Policy - تشغيل الفيديو البعيد
+        // ✅ الحل النهائي لمشكلة AbortError - تشغيل الفيديو البعيد
         this.pcCall.ontrack = e => {
             console.log('📞 ontrack - استقبال مسار:', e.track.kind);
             
@@ -336,17 +336,31 @@ async startVideoCall(calleeId) {
                 const tryPlayVideo = () => {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
-                        // ✅ الحل: نبدأ الفيديو مكتوماً ثم نرفع الكتم
-                        rv.srcObject = e.streams[0];
+                        // ✅ التأكد من عدم وجود srcObject قديم
+                        if (rv.srcObject !== e.streams[0]) {
+                            rv.srcObject = null;
+                            rv.srcObject = e.streams[0];
+                        }
+                        
+                        // ✅ إضافة علامة لمنع إعادة التشغيل المتكرر
+                        if (rv.dataset.playing === 'true') return;
+                        
                         rv.muted = true;
                         rv.play().then(() => {
                             rv.muted = false;
+                            rv.dataset.playing = 'true';
                             console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
                         }).catch(err => {
                             console.error('❌ فشل التشغيل:', err.name);
-                            // محاولة بديلة: تشغيل بدون صوت
-                            rv.volume = 0;
-                            rv.play().catch(() => {});
+                            // ✅ محاولة بديلة بعد تأخير
+                            setTimeout(() => {
+                                rv.muted = true;
+                                rv.play().then(() => {
+                                    rv.muted = false;
+                                    rv.dataset.playing = 'true';
+                                    console.log('✅ تم التشغيل بعد المحاولة الثانية');
+                                }).catch(() => {});
+                            }, 500);
                         });
                     } else {
                         setTimeout(tryPlayVideo, 200);
@@ -431,7 +445,6 @@ async startVideoCall(calleeId) {
         }
     },
 
-
     // ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
 async receiveCall(callerId, callData) {
@@ -493,7 +506,7 @@ async receiveCall(callerId, callData) {
             }
         };
         
-        // ✅ الحل الجذري لمشكلة Autoplay Policy - تشغيل فيديو المتصل
+        // ✅ الحل النهائي لمشكلة AbortError - تشغيل فيديو المتصل
         this.pcCall.ontrack = e => {
             console.log('📞 ontrack - استقبال مسار:', e.track.kind);
             
@@ -503,17 +516,31 @@ async receiveCall(callerId, callData) {
                 const tryPlayVideo = () => {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
-                        // ✅ الحل: نبدأ الفيديو مكتوماً ثم نرفع الكتم
-                        rv.srcObject = e.streams[0];
+                        // ✅ التأكد من عدم وجود srcObject قديم
+                        if (rv.srcObject !== e.streams[0]) {
+                            rv.srcObject = null;
+                            rv.srcObject = e.streams[0];
+                        }
+                        
+                        // ✅ إضافة علامة لمنع إعادة التشغيل المتكرر
+                        if (rv.dataset.playing === 'true') return;
+                        
                         rv.muted = true;
                         rv.play().then(() => {
                             rv.muted = false;
+                            rv.dataset.playing = 'true';
                             console.log('✅ تم تشغيل فيديو المتصل بنجاح');
                         }).catch(err => {
                             console.error('❌ فشل التشغيل:', err.name);
-                            // محاولة بديلة: تشغيل بدون صوت
-                            rv.volume = 0;
-                            rv.play().catch(() => {});
+                            // ✅ محاولة بديلة بعد تأخير
+                            setTimeout(() => {
+                                rv.muted = true;
+                                rv.play().then(() => {
+                                    rv.muted = false;
+                                    rv.dataset.playing = 'true';
+                                    console.log('✅ تم التشغيل بعد المحاولة الثانية');
+                                }).catch(() => {});
+                            }, 500);
                         });
                     } else {
                         setTimeout(tryPlayVideo, 200);
