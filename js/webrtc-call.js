@@ -245,125 +245,136 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-    // ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+     // ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
 
-    async startVideoCall(calleeId) {
-        if (!ChatSystem.friendInConversation) {
-            console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
+async startVideoCall(calleeId) {
+    if (!ChatSystem.friendInConversation) {
+        console.log('❌ لا يمكن بدء المكالمة: الطرف الآخر ليس في المحادثة');
+        return;
+    }
+    
+    if (!window.auth?.currentUser) {
+        console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
+        return;
+    }
+    if (this.isInCall) {
+        console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
+        return;
+    }
+    
+    this.isInCall = true;
+    this.callType = 'video';
+    this.currentCallId = calleeId;
+    
+    try {
+        if (window.auth?.currentUser) {
+            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
+                inCall: true,
+                callType: 'video'
+            }).catch(() => {});
+        }
+        
+        const constraints = { 
+            audio: true, 
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
+        };
+        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (this.localStream.getAudioTracks().length === 0) {
+            this.endCall();
             return;
         }
         
-        if (!window.auth?.currentUser) {
-            console.log('❌ لا يمكن بدء المكالمة: لا يوجد مستخدم');
-            return;
-        }
-        if (this.isInCall) {
-            console.log('❌ لا يمكن بدء المكالمة: مكالمة نشطة بالفعل');
-            return;
-        }
+        this.showCallUI('video');
         
-        this.isInCall = true;
-        this.callType = 'video';
-        this.currentCallId = calleeId;
-        
-        try {
-            if (window.auth?.currentUser) {
-                await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                    inCall: true,
-                    callType: 'video'
-                }).catch(() => {});
+        // ✅ ربط الفيديو المحلي (الإصلاح)
+        setTimeout(() => {
+            const lv = document.getElementById('localVideo');
+            if (lv && this.localStream) {
+                lv.srcObject = this.localStream;
+                console.log('✅ تم ربط الفيديو المحلي (للبادئ)');
+            } else {
+                console.warn('⚠️ لم يتم العثور على عنصر localVideo');
             }
-            
-            const constraints = { 
-                audio: true, 
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
-            };
-            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            if (this.localStream.getAudioTracks().length === 0) {
-                this.endCall();
-                return;
+        }, 500);
+        
+        // ✅ استخدام pcCall بدلاً من pc
+        this.pcCall = new RTCPeerConnection(this.servers);
+        this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
+        
+        // ✅ استخدام dcCall بدلاً من dc
+        this.dcCall = this.pcCall.createDataChannel('chat');
+        this.setupDataChannel(this.dcCall);
+        
+        // ✅ مصفوفة لتجميع ICE candidates للمكالمة
+        this._callIceCandidates = [];
+        this._callBatchTimer = null;
+        
+        this.pcCall.onicecandidate = e => { 
+            if (e.candidate) {
+                console.log('📡 تجميع ICE candidate للمكالمة');
+                this._callIceCandidates.push(e.candidate);
             }
-            
-            this.showCallUI('video');
-            
-            // ✅ استخدام pcCall بدلاً من pc
-            this.pcCall = new RTCPeerConnection(this.servers);
-            this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
-            
-            // ✅ استخدام dcCall بدلاً من dc
-            this.dcCall = this.pcCall.createDataChannel('chat');
-            this.setupDataChannel(this.dcCall);
-            
-            // ✅ مصفوفة لتجميع ICE candidates للمكالمة
-            this._callIceCandidates = [];
-            this._callBatchTimer = null;
-            
-            this.pcCall.onicecandidate = e => { 
-                if (e.candidate) {
-                    console.log('📡 تجميع ICE candidate للمكالمة');
-                    this._callIceCandidates.push(e.candidate);
-                }
-            };
-            
-            // ✅ تعديل ontrack لإضافة تأخير وإعادة محاولة لضمان ربط الفيديو
-            this.pcCall.ontrack = e => {
-                if (e.track.kind === 'video') {
-                    console.log('📹 استقبال فيديو بعيد');
-                    
-                    let retryCount = 0;
-                    const tryAttachVideo = () => {
-                        const rv = document.getElementById('remoteVideo');
-                        if (rv && e.streams[0]) {
-                            rv.srcObject = e.streams[0];
-                            rv.play().catch(err => console.log('خطأ في تشغيل الفيديو:', err));
-                            console.log('✅ تم ربط الفيديو البعيد');
-                        } else if (retryCount < 5) {
-                            retryCount++;
-                            setTimeout(tryAttachVideo, 300);
-                        } else {
-                            console.log('⚠️ فشل ربط الفيديو البعيد بعد 5 محاولات');
-                        }
-                    };
-                    tryAttachVideo();
-                } else if (e.track.kind === 'audio') {
-                    this.setupRemoteAudio(e.streams[0]);
-                }
-            };
-            
-            this.pcCall.onconnectionstatechange = () => {
-                if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
-            };
-            
-            const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            await this.pcCall.setLocalDescription(offer);
-            
-            // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
-            await new Promise(resolve => {
-                if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
-                this._callBatchTimer = setTimeout(() => {
-                    console.log(`📦 انتهاء تجميع المكالمة (5 ثواني) - تم تجميع ${this._callIceCandidates.length} ICE candidate`);
-                    resolve();
-                }, 5000);
-            });
-            
-            // ✅ إرسال Offer + جميع ICE candidates المجمعة
-            await this.sendSignal(calleeId, { 
-                sdp: this.pcCall.localDescription, 
-                type: 'video',
-                iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
-            });
-            
-            // تنظيف
-            this._callIceCandidates = [];
-            this._callBatchTimer = null;
-            
-            console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
-            
-        } catch (e) { 
-            this.endCall(); 
-        }
-    },
+        };
+        
+        // ✅ تعديل ontrack لإضافة تأخير وإعادة محاولة لضمان ربط الفيديو
+        this.pcCall.ontrack = e => {
+            if (e.track.kind === 'video') {
+                console.log('📹 استقبال فيديو بعيد');
+                
+                let retryCount = 0;
+                const tryAttachVideo = () => {
+                    const rv = document.getElementById('remoteVideo');
+                    if (rv && e.streams[0]) {
+                        rv.srcObject = e.streams[0];
+                        rv.play().catch(err => console.log('خطأ في تشغيل الفيديو:', err));
+                        console.log('✅ تم ربط الفيديو البعيد');
+                    } else if (retryCount < 5) {
+                        retryCount++;
+                        setTimeout(tryAttachVideo, 300);
+                    } else {
+                        console.log('⚠️ فشل ربط الفيديو البعيد بعد 5 محاولات');
+                    }
+                };
+                tryAttachVideo();
+            } else if (e.track.kind === 'audio') {
+                this.setupRemoteAudio(e.streams[0]);
+            }
+        };
+        
+        this.pcCall.onconnectionstatechange = () => {
+            if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
+        };
+        
+        const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+        await this.pcCall.setLocalDescription(offer);
+        
+        // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
+        await new Promise(resolve => {
+            if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
+            this._callBatchTimer = setTimeout(() => {
+                console.log(`📦 انتهاء تجميع المكالمة (5 ثواني) - تم تجميع ${this._callIceCandidates.length} ICE candidate`);
+                resolve();
+            }, 5000);
+        });
+        
+        // ✅ إرسال Offer + جميع ICE candidates المجمعة
+        await this.sendSignal(calleeId, { 
+            sdp: this.pcCall.localDescription, 
+            type: 'video',
+            iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
+        });
+        
+        // تنظيف
+        this._callIceCandidates = [];
+        this._callBatchTimer = null;
+        
+        console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
+        
+    } catch (e) { 
+        this.endCall(); 
+    }
+},
 
     
     // ==================== 6. إعداد الصوت عن بعد ====================
