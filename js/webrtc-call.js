@@ -345,6 +345,11 @@ async startVideoCall(calleeId) {
                         // ✅ إضافة علامة لمنع إعادة التشغيل المتكرر
                         if (rv.dataset.playing === 'true') return;
                         
+                        // ✅ إعدادات CSS قسرية
+                        rv.style.display = 'block';
+                        rv.style.visibility = 'visible';
+                        rv.style.opacity = '1';
+                        
                         rv.muted = true;
                         rv.play().then(() => {
                             rv.muted = false;
@@ -352,7 +357,6 @@ async startVideoCall(calleeId) {
                             console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
                         }).catch(err => {
                             console.error('❌ فشل التشغيل:', err.name);
-                            // ✅ محاولة بديلة بعد تأخير
                             setTimeout(() => {
                                 rv.muted = true;
                                 rv.play().then(() => {
@@ -395,6 +399,20 @@ async startVideoCall(calleeId) {
             iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
         });
         
+        // ✅ المفتاح السحري: إعادة تعيين مسار الفيديو بعد 3 ثواني لضمان وصوله للمستلم
+        setTimeout(async () => {
+            if (this.pcCall && this.localStream) {
+                const videoTrack = this.localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    console.log('🔄 إعادة تعيين مسار الفيديو لضمان وصوله للطرف الآخر');
+                    videoTrack.enabled = false;
+                    await new Promise(r => setTimeout(r, 200));
+                    videoTrack.enabled = true;
+                    console.log('✅ تم إعادة تعيين مسار الفيديو بنجاح');
+                }
+            }
+        }, 3000);
+        
         // تنظيف
         this._callIceCandidates = [];
         this._callBatchTimer = null;
@@ -405,7 +423,6 @@ async startVideoCall(calleeId) {
         this.endCall(); 
     }
 },
-
     
     // ==================== 6. إعداد الصوت عن بعد ====================
     
