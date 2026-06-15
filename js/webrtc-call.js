@@ -326,32 +326,33 @@ async startVideoCall(calleeId) {
             }
         };
         
-        // ✅ تعديل ontrack (نسخة قوية مع إعادة محاولة لربط الفيديو البعيد)
+        // ✅ الحل الجذري لمشكلة Autoplay Policy - تشغيل الفيديو البعيد
         this.pcCall.ontrack = e => {
             console.log('📞 ontrack - استقبال مسار:', e.track.kind);
             
             if (e.track.kind === 'video') {
-                console.log('📹 تم استقبال فيديو بعيد، جاري ربطه...');
+                console.log('📹 تم استقبال فيديو بعيد، جاري التجهيز...');
                 
-                let retryCount = 0;
-                const maxRetries = 10;
-                
-                const tryAttachRemoteVideo = () => {
+                const tryPlayVideo = () => {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
+                        // ✅ الحل: نبدأ الفيديو مكتوماً ثم نرفع الكتم
                         rv.srcObject = e.streams[0];
-                        rv.play().catch(err => console.log('⚠️ خطأ في تشغيل الفيديو البعيد:', err));
-                        console.log('✅ تم ربط الفيديو البعيد بنجاح');
-                    } else if (retryCount < maxRetries) {
-                        retryCount++;
-                        console.log(`⏳ انتظار عنصر remoteVideo... المحاولة ${retryCount}/${maxRetries}`);
-                        setTimeout(tryAttachRemoteVideo, 300);
+                        rv.muted = true;
+                        rv.play().then(() => {
+                            rv.muted = false;
+                            console.log('✅ تم تشغيل الفيديو البعيد بنجاح');
+                        }).catch(err => {
+                            console.error('❌ فشل التشغيل:', err.name);
+                            // محاولة بديلة: تشغيل بدون صوت
+                            rv.volume = 0;
+                            rv.play().catch(() => {});
+                        });
                     } else {
-                        console.error('❌ فشل ربط الفيديو البعيد: لم يتم العثور على عنصر remoteVideo');
+                        setTimeout(tryPlayVideo, 200);
                     }
                 };
-                
-                tryAttachRemoteVideo();
+                tryPlayVideo();
             } else if (e.track.kind === 'audio') {
                 this.setupRemoteAudio(e.streams[0]);
             }
@@ -470,14 +471,6 @@ async receiveCall(callerId, callData) {
         }
         
         // ✅ تم إزالة إيقاف الكاميرا بشكل افتراضي (لمنع الشاشة الزرقاء)
-        // if (this.callType === 'video') {
-        //     const videoTrack = this.localStream.getVideoTracks()[0];
-        //     if (videoTrack) {
-        //         videoTrack.enabled = false;
-        //         this.isVideoMuted = true;
-        //         console.log('✅ تم إيقاف الكاميرا بشكل افتراضي');
-        //     }
-        // }
         
         this.showCallUI(this.callType);
         
@@ -500,32 +493,33 @@ async receiveCall(callerId, callData) {
             }
         };
         
-        // ✅ تعديل ontrack (نسخة قوية مع إعادة محاولة لربط فيديو المتصل)
+        // ✅ الحل الجذري لمشكلة Autoplay Policy - تشغيل فيديو المتصل
         this.pcCall.ontrack = e => {
             console.log('📞 ontrack - استقبال مسار:', e.track.kind);
             
             if (e.track.kind === 'video') {
-                console.log('📹 تم استقبال فيديو المتصل، جاري ربطه...');
+                console.log('📹 تم استقبال فيديو المتصل، جاري التجهيز...');
                 
-                let retryCount = 0;
-                const maxRetries = 10;
-                
-                const tryAttachRemoteVideo = () => {
+                const tryPlayVideo = () => {
                     const rv = document.getElementById('remoteVideo');
                     if (rv && e.streams[0]) {
+                        // ✅ الحل: نبدأ الفيديو مكتوماً ثم نرفع الكتم
                         rv.srcObject = e.streams[0];
-                        rv.play().catch(err => console.log('⚠️ خطأ في تشغيل فيديو المتصل:', err));
-                        console.log('✅ تم ربط فيديو المتصل بنجاح');
-                    } else if (retryCount < maxRetries) {
-                        retryCount++;
-                        console.log(`⏳ انتظار عنصر remoteVideo... المحاولة ${retryCount}/${maxRetries}`);
-                        setTimeout(tryAttachRemoteVideo, 300);
+                        rv.muted = true;
+                        rv.play().then(() => {
+                            rv.muted = false;
+                            console.log('✅ تم تشغيل فيديو المتصل بنجاح');
+                        }).catch(err => {
+                            console.error('❌ فشل التشغيل:', err.name);
+                            // محاولة بديلة: تشغيل بدون صوت
+                            rv.volume = 0;
+                            rv.play().catch(() => {});
+                        });
                     } else {
-                        console.error('❌ فشل ربط فيديو المتصل: لم يتم العثور على عنصر remoteVideo');
+                        setTimeout(tryPlayVideo, 200);
                     }
                 };
-                
-                tryAttachRemoteVideo();
+                tryPlayVideo();
             } else if (e.track.kind === 'audio') {
                 this.setupRemoteAudio(e.streams[0]);
             }
