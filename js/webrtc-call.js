@@ -228,7 +228,7 @@ async startAudioCall(calleeId) {
     }
 },
 
-    // ==================== 5. المكالمة المرئية (النسخة النهائية) ====================
+    // ==================== 5. المكالمة المرئية (الحل النهائي لجميع المتصفحات) ====================
 
 async startVideoCall(calleeId) {
     if (!ChatSystem.friendInConversation) {
@@ -268,6 +268,20 @@ async startVideoCall(calleeId) {
             return;
         }
         
+        // ✅ ✅ ✅ الحل السحري: تنشيط الكاميرا في عنصر فيديو مخفي (لحل مشكلة Chrome)
+        const hiddenVideo = document.createElement('video');
+        hiddenVideo.style.display = 'none';
+        hiddenVideo.srcObject = this.localStream;
+        hiddenVideo.muted = true;
+        hiddenVideo.play().then(() => {
+            console.log('✅ تم تنشيط الكاميرا في عنصر مخفي');
+            setTimeout(() => {
+                hiddenVideo.pause();
+                hiddenVideo.srcObject = null;
+                hiddenVideo.remove();
+            }, 2000);
+        }).catch(e => console.warn('⚠️ فشل تنشيط الكاميرا المخفية:', e));
+        
         this.showCallUI('video');
         
         // ✅ ربط الفيديو المحلي
@@ -304,7 +318,10 @@ async startVideoCall(calleeId) {
                 const rv = document.getElementById('remoteVideo');
                 if (rv && e.streams[0]) {
                     rv.srcObject = e.streams[0];
-                    rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
+                    rv.muted = true;
+                    rv.play().then(() => {
+                        rv.muted = false;
+                    }).catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
                 }
             } else if (e.track.kind === 'audio') {
                 this.setupRemoteAudio(e.streams[0]);
@@ -325,30 +342,6 @@ async startVideoCall(calleeId) {
         });
         
         console.log('✅ تم إرسال العرض');
-        
-        // ✅ ✅ ✅ الحل السحري: إعادة تنشيط مسار الفيديو بعد ثانيتين
-        setTimeout(() => {
-            if (this.pcCall && this.localStream) {
-                const videoTrack = this.localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    console.log('🔥 إعادة تنشيط مسار الفيديو لضمان وصوله للمستلم');
-                    videoTrack.enabled = false;
-                    setTimeout(() => {
-                        videoTrack.enabled = true;
-                        console.log('✅ تم إعادة تنشيط مسار الفيديو');
-                        
-                        // إرسال إشارة تحديث للمستلم
-                        if (this.pcCall && this.pcCall.signalingState === 'stable') {
-                            this.pcCall.createOffer().then(offer => {
-                                this.pcCall.setLocalDescription(offer);
-                                this.sendSignal(calleeId, { sdp: offer, type: 'video' });
-                                console.log('📡 تم إرسال offer جديد للمستلم');
-                            }).catch(() => {});
-                        }
-                    }, 200);
-                }
-            }
-        }, 2000);
         
     } catch (e) { 
         console.error('❌ خطأ في بدء المكالمة:', e);
