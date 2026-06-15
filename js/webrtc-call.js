@@ -228,7 +228,7 @@ async startAudioCall(calleeId) {
     }
 },
 
-   // ==================== 5. المكالمة المرئية (مع تنشيط إجباري للمسار) ====================
+  // ==================== 5. المكالمة المرئية (مع تأخير الـ Offer لضمان وصول الفيديو) ====================
 
 async startVideoCall(calleeId) {
     if (!ChatSystem.friendInConversation) {
@@ -270,25 +270,37 @@ async startVideoCall(calleeId) {
         
         this.showCallUI('video');
         
-        // ✅ ✅ ✅ الحل السحري: تنشيط مسار الفيديو إجبارياً
-        const videoTrack = this.localStream.getVideoTracks()[0];
-        if (videoTrack) {
-            console.log('🔥 تنشيط مسار الفيديو إجبارياً...');
-            videoTrack.enabled = false;
-            await new Promise(r => setTimeout(r, 100));
-            videoTrack.enabled = true;
-            console.log('✅ تم تنشيط مسار الفيديو');
+        // ✅ ربط الفيديو المحلي
+        if (this.callType === 'video') {
+            let retryCount = 0;
+            const maxRetries = 10;
+            const tryAttachLocalVideo = () => {
+                const lv = document.getElementById('localVideo');
+                if (lv && this.localStream) {
+                    lv.srcObject = this.localStream;
+                    console.log('✅ تم ربط الفيديو المحلي (للبادئ)');
+                } else if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(tryAttachLocalVideo, 300);
+                }
+            };
+            tryAttachLocalVideo();
         }
         
         // ✅ استخدام pcCall بدلاً من pc
         this.pcCall = new RTCPeerConnection(this.servers);
-        this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
+        
+        // ✅ إضافة المسارات إلى الـ PeerConnection
+        this.localStream.getTracks().forEach(track => {
+            this.pcCall.addTrack(track, this.localStream);
+            console.log(`➕ تم إضافة مسار ${track.kind}`);
+        });
         
         // ✅ استخدام dcCall بدلاً من dc
         this.dcCall = this.pcCall.createDataChannel('chat');
         this.setupDataChannel(this.dcCall);
         
-        // ✅ إرسال ICE candidates فوراً
+        // ✅ إرسال ICE candidates فوراً (بدون تجميع)
         this.pcCall.onicecandidate = e => { 
             if (e.candidate) {
                 console.log('📡 إرسال ICE candidate فوري');
@@ -316,18 +328,36 @@ async startVideoCall(calleeId) {
             if (this.pcCall && (this.pcCall.connectionState === 'failed' || this.pcCall.connectionState === 'disconnected')) this.endCall();
         };
         
+        // ✅ ✅ ✅ الحل السحري: تأخير إنشاء الـ Offer حتى يتم تجهيز الفيديو بالكامل
+        // ننتظر 1.5 ثانية للتأكد من أن مسار الفيديو أصبح جاهزاً للإرسال
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // التحقق من أن مسار الفيديو نشط قبل إنشاء الـ Offer
+        const videoTrack = this.localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            console.log('🎥 مسار الفيديو موجود وحالته:', videoTrack.enabled ? 'نشط' : 'غير نشط');
+            if (!videoTrack.enabled) {
+                videoTrack.enabled = true;
+                console.log('✅ تم تنشيط مسار الفيديو');
+            }
+        } else {
+            console.warn('⚠️ لا يوجد مسار فيديو متاح');
+        }
+        
+        console.log('📞 إنشاء عرض مكالمة فيديو...');
         const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
         await this.pcCall.setLocalDescription(offer);
         
-        // ✅ إرسال الـ offer فوراً
+        // ✅ إرسال الـ offer فوراً (بدون تجميع)
         await this.sendSignal(calleeId, { 
             sdp: this.pcCall.localDescription, 
             type: 'video'
         });
         
-        console.log('✅ تم إرسال العرض');
+        console.log('✅ تم إرسال العرض مع ICE candidates المجمعة');
         
     } catch (e) { 
+        console.error('❌ خطأ في بدء المكالمة:', e);
         this.endCall(); 
     }
 }, 
