@@ -1181,6 +1181,7 @@ showCallUI(type) {
     const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
     const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
     const appColor = '#2196F3';
+    const bgColor = '#0a0e27';
     
     let uiHTML = '';
     if (type === 'video') {
@@ -1215,7 +1216,7 @@ showCallUI(type) {
                     box-shadow: 0 5px 20px rgba(0,0,0,0.3);
                 }
             </style>
-            <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;"></video>
+            <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:${bgColor};"></video>
             <video id="localVideo" autoplay playsinline muted class="local-video" style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;cursor:pointer;"></video>
             <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
                 <button id="switchCameraBtn" class="call-btn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:${appColor};" title="تبديل الكاميرا">
@@ -1328,8 +1329,6 @@ showCallUI(type) {
                 }
             }
         });
-        
-        // ✅ تم حذف setTimeout الذي كان يعيد تعيين remoteVideo نهائياً
         
         if (this.isVideoMuted) {
             const muteVideoBtn = document.getElementById('muteVideoBtn');
