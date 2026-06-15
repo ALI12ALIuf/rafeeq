@@ -400,7 +400,7 @@ async startVideoCall(calleeId) {
     },
 
 
-    // ==================== 7. استقبال المكالمات (بدون تجميع - إرسال فوري مع تأكيد المسار) ====================
+    // ==================== 7. استقبال المكالمات (النسخة النهائية التي تشغل الفيديو تلقائياً) ====================
 
 async receiveCall(callerId, callData) {
     if (this.isInCall) {
@@ -448,7 +448,7 @@ async receiveCall(callerId, callData) {
             console.log(`➕ تم إضافة مسار ${track.kind}`);
         });
         
-        // ✅ إرسال ICE candidates فوراً (بدون تجميع)
+        // ✅ إرسال ICE candidates فوراً
         this.pcCall.onicecandidate = e => { 
             if (e.candidate) {
                 console.log('📡 إرسال ICE candidate فوري');
@@ -456,16 +456,44 @@ async receiveCall(callerId, callData) {
             }
         };
         
+        // ✅ ✅ ✅ الحل النهائي: تشغيل الفيديو البعيد فور وصوله
         this.pcCall.ontrack = e => {
             console.log('📞 استقبال مسار:', e.track.kind);
             
             if (e.track.kind === 'video') {
-                console.log('✅ تم استقبال فيديو بعيد');
-                const rv = document.getElementById('remoteVideo');
-                if (rv && e.streams[0]) {
-                    rv.srcObject = e.streams[0];
-                    rv.play().catch(err => console.log('خطأ في تشغيل الفيديو البعيد:', err));
-                }
+                console.log('✅ تم استقبال فيديو بعيد - جاري التشغيل...');
+                
+                // محاولة تشغيل الفيديو مع إعادة المحاولة
+                const playVideo = () => {
+                    const rv = document.getElementById('remoteVideo');
+                    if (rv && e.streams[0]) {
+                        // تعيين المصدر
+                        rv.srcObject = e.streams[0];
+                        
+                        // إعدادات إضافية لضمان الظهور
+                        rv.style.display = 'block';
+                        rv.style.visibility = 'visible';
+                        rv.muted = true;
+                        
+                        // تشغيل الفيديو
+                        rv.play().then(() => {
+                            rv.muted = false;
+                            console.log('✅ تم تشغيل فيديو المتصل بنجاح');
+                        }).catch(err => {
+                            console.log('⚠️ فشل التشغيل التلقائي، محاولة مرة أخرى:', err.name);
+                            setTimeout(() => {
+                                rv.muted = true;
+                                rv.play().then(() => {
+                                    rv.muted = false;
+                                    console.log('✅ تم التشغيل بعد المحاولة الثانية');
+                                }).catch(() => {});
+                            }, 500);
+                        });
+                    } else {
+                        setTimeout(playVideo, 200);
+                    }
+                };
+                playVideo();
             } else if (e.track.kind === 'audio') {
                 this.setupRemoteAudio(e.streams[0]);
             }
@@ -490,10 +518,7 @@ async receiveCall(callerId, callData) {
             const answer = await this.pcCall.createAnswer(answerOptions);
             await this.pcCall.setLocalDescription(answer);
             
-            // ✅ ✅ ✅ تأخير بسيط قبل إرسال الـ answer لضمان جاهزية المسارات
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // ✅ إرسال الـ answer فوراً (بدون تجميع)
+            // ✅ إرسال الـ answer فوراً
             await this.sendSignal(callerId, { 
                 sdp: this.pcCall.localDescription
             });
