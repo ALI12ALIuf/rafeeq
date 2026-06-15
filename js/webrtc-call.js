@@ -506,7 +506,7 @@ async receiveCall(callerId, callData) {
             }
         };
         
-        // ✅ الحل النهائي لمشكلة AbortError - تشغيل فيديو المتصل
+        // ✅ الحل النهائي لظهور فيديو المتصل مباشرة
         this.pcCall.ontrack = e => {
             console.log('📞 ontrack - استقبال مسار:', e.track.kind);
             
@@ -524,6 +524,12 @@ async receiveCall(callerId, callData) {
                         
                         // ✅ إضافة علامة لمنع إعادة التشغيل المتكرر
                         if (rv.dataset.playing === 'true') return;
+                        
+                        // ✅ إعدادات إضافية لضمان ظهور الفيديو
+                        rv.style.display = 'block';
+                        rv.style.visibility = 'visible';
+                        rv.style.opacity = '1';
+                        rv.load();
                         
                         rv.muted = true;
                         rv.play().then(() => {
