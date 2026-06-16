@@ -992,105 +992,138 @@ async sendSignal(calleeId, data) {
 
 showCallUI(type) {
     // إخفاء جميع واجهات المكالمات أولاً
-    document.getElementById('audioCallUI').style.display = 'none';
-    document.getElementById('videoCallUI').style.display = 'none';
+    const audioUI = document.getElementById('audioCallUI');
+    const videoUI = document.getElementById('videoCallUI');
+    if (audioUI) audioUI.style.display = 'none';
+    if (videoUI) videoUI.style.display = 'none';
+    
+    document.body.classList.add('in-call');
     
     const contactName = document.querySelector('#conversationName')?.textContent || 'مستخدم';
     const contactAvatar = document.querySelector('#conversationAvatar')?.textContent || '👤';
     
-    document.body.classList.add('in-call');
-    
     if (type === 'audio') {
-        const audioUI = document.getElementById('audioCallUI');
+        if (!audioUI) {
+            console.error('❌ audioCallUI غير موجود في HTML');
+            return;
+        }
         audioUI.style.display = 'block';
         
         // تحديث الاسم والصورة
-        document.getElementById('callName').textContent = contactName;
-        document.getElementById('callAvatar').textContent = contactAvatar;
+        const nameEl = document.getElementById('callName');
+        const avatarEl = document.getElementById('callAvatar');
+        if (nameEl) nameEl.textContent = contactName;
+        if (avatarEl) avatarEl.textContent = contactAvatar;
         
-        // إعداد المستمعات
-        document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
+        // إعداد المستمعات - إزالة القديمة وإضافة الجديدة
+        const endBtn = document.getElementById('endCallBtn');
+        if (endBtn) {
+            const newEndBtn = endBtn.cloneNode(true);
+            endBtn.parentNode.replaceChild(newEndBtn, endBtn);
+            newEndBtn.addEventListener('click', () => this.endCall());
+        }
         
         const speakerBtn = document.getElementById('speakerBtn');
-        speakerBtn?.addEventListener('click', () => {
-            this.toggleSpeaker();
-            const icon = speakerBtn.querySelector('i');
-            if (icon) {
-                if (this.isSpeakerEnabled) {
-                    icon.className = 'fas fa-volume-up';
-                } else {
-                    icon.className = 'fas fa-volume-mute';
+        if (speakerBtn) {
+            const newSpeakerBtn = speakerBtn.cloneNode(true);
+            speakerBtn.parentNode.replaceChild(newSpeakerBtn, speakerBtn);
+            newSpeakerBtn.addEventListener('click', () => {
+                this.toggleSpeaker();
+                const icon = newSpeakerBtn.querySelector('i');
+                if (icon) {
+                    icon.className = this.isSpeakerEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute';
                 }
-            }
-        });
+            });
+        }
         
         const muteBtn = document.getElementById('muteBtn');
-        muteBtn?.addEventListener('click', () => {
-            this.toggleAudio();
-            const icon = muteBtn.querySelector('i');
-            if (icon) {
-                if (this.isAudioMuted) {
-                    icon.className = 'fas fa-microphone-slash';
-                    muteBtn.style.color = '#f44336';
-                } else {
-                    icon.className = 'fas fa-microphone';
-                    muteBtn.style.color = '#2196F3';
+        if (muteBtn) {
+            const newMuteBtn = muteBtn.cloneNode(true);
+            muteBtn.parentNode.replaceChild(newMuteBtn, muteBtn);
+            newMuteBtn.addEventListener('click', () => {
+                this.toggleAudio();
+                const icon = newMuteBtn.querySelector('i');
+                if (icon) {
+                    icon.className = this.isAudioMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
+                    newMuteBtn.style.color = this.isAudioMuted ? '#f44336' : '#2196F3';
                 }
+            });
+            // تحديث الحالة الأولية
+            const icon = newMuteBtn.querySelector('i');
+            if (icon) {
+                icon.className = this.isAudioMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
+                newMuteBtn.style.color = this.isAudioMuted ? '#f44336' : '#2196F3';
             }
-        });
+        }
         
         this.startCallTimer();
         
     } else if (type === 'video') {
-        const videoUI = document.getElementById('videoCallUI');
+        if (!videoUI) {
+            console.error('❌ videoCallUI غير موجود في HTML');
+            return;
+        }
         videoUI.style.display = 'block';
         
         // ربط الفيديو المحلي
         const lv = document.getElementById('localVideo');
-        if (lv && this.localStream) lv.srcObject = this.localStream;
+        if (lv && this.localStream) {
+            lv.srcObject = this.localStream;
+        }
         
-        // إعداد المستمعات
-        document.getElementById('endCallBtnVideo')?.addEventListener('click', () => this.endCall());
+        // إعداد المستمعات - إزالة القديمة وإضافة الجديدة
+        const endBtn = document.getElementById('endCallBtnVideo');
+        if (endBtn) {
+            const newEndBtn = endBtn.cloneNode(true);
+            endBtn.parentNode.replaceChild(newEndBtn, endBtn);
+            newEndBtn.addEventListener('click', () => this.endCall());
+        }
         
-        document.getElementById('switchCameraBtn')?.addEventListener('click', () => this.switchCamera());
+        const switchCam = document.getElementById('switchCameraBtn');
+        if (switchCam) {
+            const newSwitchCam = switchCam.cloneNode(true);
+            switchCam.parentNode.replaceChild(newSwitchCam, switchCam);
+            newSwitchCam.addEventListener('click', () => this.switchCamera());
+        }
         
         const muteAudioBtn = document.getElementById('muteAudioBtn');
-        muteAudioBtn?.addEventListener('click', () => {
-            this.toggleAudio();
-            const icon = muteAudioBtn.querySelector('i');
-            if (icon) {
-                if (this.isAudioMuted) {
-                    icon.className = 'fas fa-microphone-slash';
-                    muteAudioBtn.style.color = '#f44336';
-                } else {
-                    icon.className = 'fas fa-microphone';
-                    muteAudioBtn.style.color = '#2196F3';
+        if (muteAudioBtn) {
+            const newMuteAudioBtn = muteAudioBtn.cloneNode(true);
+            muteAudioBtn.parentNode.replaceChild(newMuteAudioBtn, muteAudioBtn);
+            newMuteAudioBtn.addEventListener('click', () => {
+                this.toggleAudio();
+                const icon = newMuteAudioBtn.querySelector('i');
+                if (icon) {
+                    icon.className = this.isAudioMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
+                    newMuteAudioBtn.style.color = this.isAudioMuted ? '#f44336' : '#2196F3';
                 }
+            });
+            // تحديث الحالة الأولية
+            const icon = newMuteAudioBtn.querySelector('i');
+            if (icon) {
+                icon.className = this.isAudioMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
+                newMuteAudioBtn.style.color = this.isAudioMuted ? '#f44336' : '#2196F3';
             }
-        });
+        }
         
         const muteVideoBtn = document.getElementById('muteVideoBtn');
-        muteVideoBtn?.addEventListener('click', () => {
-            this.toggleVideo();
-            const icon = muteVideoBtn.querySelector('i');
-            if (icon) {
-                if (this.isVideoMuted) {
-                    icon.className = 'fas fa-video-slash';
-                    muteVideoBtn.style.color = '#f44336';
-                } else {
-                    icon.className = 'fas fa-video';
-                    muteVideoBtn.style.color = '#2196F3';
+        if (muteVideoBtn) {
+            const newMuteVideoBtn = muteVideoBtn.cloneNode(true);
+            muteVideoBtn.parentNode.replaceChild(newMuteVideoBtn, muteVideoBtn);
+            newMuteVideoBtn.addEventListener('click', () => {
+                this.toggleVideo();
+                const icon = newMuteVideoBtn.querySelector('i');
+                if (icon) {
+                    icon.className = this.isVideoMuted ? 'fas fa-video-slash' : 'fas fa-video';
+                    newMuteVideoBtn.style.color = this.isVideoMuted ? '#f44336' : '#2196F3';
                 }
-            }
-        });
-        
-        if (this.isVideoMuted) {
-            const muteVideoBtn = document.getElementById('muteVideoBtn');
-            if (muteVideoBtn) {
-                const icon = muteVideoBtn.querySelector('i');
+            });
+            // تحديث الحالة الأولية
+            if (this.isVideoMuted) {
+                const icon = newMuteVideoBtn.querySelector('i');
                 if (icon) {
                     icon.className = 'fas fa-video-slash';
-                    muteVideoBtn.style.color = '#f44336';
+                    newMuteVideoBtn.style.color = '#f44336';
                 }
             }
         }
