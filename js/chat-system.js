@@ -1042,8 +1042,7 @@ openChat(friendId, friendName, friendAvatar) {
         c.scrollTop = c.scrollHeight;
     },
 
-
-// ==================== القسم 26: displayMessage (معدل - استخدام قوالب ثابتة) ====================
+  // ==================== القسم 26: displayMessage (معدل - إصلاح القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1064,6 +1063,9 @@ displayMessage(msg) {
     };
     
     const dateTime = formatDateTime(new Date(msg.time));
+    
+    // تعريف borderColor حسب المرسل
+    const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
     if (msg.type === 'text') {
         const contentDiv = document.createElement('div');
@@ -1108,28 +1110,19 @@ displayMessage(msg) {
         const maxClicks = locationData.maxClicks;
         let clicksRemaining = locationData.clicksRemaining;
         
-        if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-            // استخدام القالب الثابت للموقع المقفل
-            const template = document.getElementById('locationMessageTemplate');
-            if (template) {
-                const clone = template.content.cloneNode(true);
-                const locationDiv = clone.querySelector('.location-card');
-                if (locationDiv) {
+        // استخدام القالب الثابت للموقع
+        const template = document.getElementById('locationMessageTemplate');
+        if (template) {
+            const clone = template.content.cloneNode(true);
+            const locationDiv = clone.querySelector('.location-card');
+            if (locationDiv) {
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) {
                     locationDiv.style.background = '#888';
                     locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
-                    div.appendChild(clone);
-                }
-            }
-        } else {
-            // استخدام القالب الثابت للموقع المفتوح
-            const template = document.getElementById('locationMessageTemplate');
-            if (template) {
-                const clone = template.content.cloneNode(true);
-                const locationDiv = clone.querySelector('.location-card');
-                if (locationDiv) {
-                    const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+                    locationDiv.style.border = 'none';
+                } else {
                     locationDiv.style.border = `1.5px solid ${borderColor}`;
-                    
+                    locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
                     locationDiv.onclick = (e) => {
                         e.stopPropagation();
                         if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
@@ -1154,8 +1147,33 @@ displayMessage(msg) {
                         }
                     };
                 }
-                div.appendChild(clone);
             }
+            div.appendChild(clone);
+        } else {
+            // Fallback إذا لم يوجد القالب
+            const locationDiv = document.createElement('div');
+            locationDiv.style.cssText = `cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid ${borderColor}; color: white; font-size: 1.2rem;`;
+            if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                locationDiv.style.background = '#888';
+                locationDiv.innerHTML = `<i class="fas fa-lock"></i>`;
+                locationDiv.style.cursor = 'default';
+            } else {
+                locationDiv.innerHTML = `<i class="fas fa-map-marker-alt"></i>`;
+                locationDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
+                    window.open(locationUrl, '_blank');
+                    if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                        clicksRemaining--;
+                        if (clicksRemaining <= 0) {
+                            locationDiv.style.background = '#888';
+                            locationDiv.innerHTML = `<i class="fas fa-lock"></i>`;
+                            locationDiv.onclick = () => {};
+                        }
+                    }
+                };
+            }
+            div.appendChild(locationDiv);
         }
     }
     else if (msg.type === 'image') {
@@ -1163,17 +1181,27 @@ displayMessage(msg) {
         const template = document.getElementById('imageMessageTemplate');
         if (template) {
             const clone = template.content.cloneNode(true);
-            const img = clone.querySelector('.message-image-content');
-            if (img) {
-                img.src = msg.data;
-                img.onclick = () => this.showImagePreview(msg.data);
-            }
             const wrapper = clone.querySelector('.message-image-wrapper');
             if (wrapper) {
-                const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
                 wrapper.style.border = `2px solid ${borderColor}`;
+                const img = wrapper.querySelector('.message-image-content');
+                if (img) {
+                    img.src = msg.data;
+                    img.onclick = () => this.showImagePreview(msg.data);
+                    img.oncontextmenu = (e) => e.preventDefault();
+                    img.ondragstart = (e) => e.preventDefault();
+                }
             }
             div.appendChild(clone);
+        } else {
+            // Fallback إذا لم يوجد القالب
+            const img = document.createElement('img');
+            img.src = msg.data;
+            img.style.cssText = `max-width:200px; max-height:200px; border-radius:12px; border:2px solid ${borderColor}; cursor:pointer;`;
+            img.onclick = () => this.showImagePreview(msg.data);
+            img.oncontextmenu = (e) => e.preventDefault();
+            img.ondragstart = (e) => e.preventDefault();
+            div.appendChild(img);
         }
     } 
     else if (msg.type === 'voice') {
@@ -1181,102 +1209,100 @@ displayMessage(msg) {
         const template = document.getElementById('voiceMessageTemplate');
         if (template) {
             const clone = template.content.cloneNode(true);
-            const audioEl = clone.querySelector('.voice-audio-element');
-            const playBtn = clone.querySelector('.voice-play-btn');
-            const replayBtn = clone.querySelector('.voice-replay-btn');
-            const muteBtn = clone.querySelector('.voice-mute-btn');
-            const timeSpan = clone.querySelector('.voice-current-time');
-            const durationSpan = clone.querySelector('.voice-duration');
-            
-            if (audioEl) {
-                audioEl.src = msg.data;
-                
-                // إعداد مدة الصوت
-                const tempAudio = new Audio(msg.data);
-                tempAudio.addEventListener('loadedmetadata', () => {
-                    const duration = tempAudio.duration;
-                    if (durationSpan && !isNaN(duration)) {
-                        const minutes = Math.floor(duration / 60);
-                        const seconds = Math.floor(duration % 60);
-                        durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                    }
-                });
-                
-                let isPlaying = false;
-                
-                if (playBtn) {
-                    playBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        if (isPlaying) {
-                            audioEl.pause();
-                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                            isPlaying = false;
-                        } else {
-                            audioEl.play();
-                            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                            isPlaying = true;
-                        }
-                    };
-                }
-                
-                if (replayBtn) {
-                    replayBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        audioEl.pause();
-                        audioEl.currentTime = 0;
-                        if (playBtn) {
-                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                        }
-                        isPlaying = false;
-                        if (timeSpan) timeSpan.textContent = '0:00';
-                        audioEl.play();
-                        if (playBtn) {
-                            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                        }
-                        isPlaying = true;
-                    };
-                }
-                
-                let isMuted = false;
-                if (muteBtn) {
-                    muteBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        if (isMuted) {
-                            audioEl.muted = false;
-                            muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                            isMuted = false;
-                        } else {
-                            audioEl.muted = true;
-                            muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-                            isMuted = true;
-                        }
-                    };
-                }
-                
-                audioEl.ontimeupdate = () => {
-                    const minutes = Math.floor(audioEl.currentTime / 60);
-                    const seconds = Math.floor(audioEl.currentTime % 60);
-                    if (timeSpan) {
-                        timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                    }
-                };
-                
-                audioEl.onended = () => {
-                    if (playBtn) {
-                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    }
-                    isPlaying = false;
-                    if (timeSpan) timeSpan.textContent = '0:00';
-                };
-            }
-            
-            const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
             const voiceMsg = clone.querySelector('.voice-message');
             if (voiceMsg) {
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
+                const audioEl = voiceMsg.querySelector('.voice-audio-element');
+                const playBtn = voiceMsg.querySelector('.voice-play-btn');
+                const replayBtn = voiceMsg.querySelector('.voice-replay-btn');
+                const muteBtn = voiceMsg.querySelector('.voice-mute-btn');
+                const timeSpan = voiceMsg.querySelector('.voice-current-time');
+                const durationSpan = voiceMsg.querySelector('.voice-duration');
+                
+                if (audioEl && msg.data) {
+                    audioEl.src = msg.data;
+                    
+                    // إعداد مدة الصوت
+                    const tempAudio = new Audio(msg.data);
+                    tempAudio.addEventListener('loadedmetadata', () => {
+                        const duration = tempAudio.duration;
+                        if (durationSpan && !isNaN(duration)) {
+                            const minutes = Math.floor(duration / 60);
+                            const seconds = Math.floor(duration % 60);
+                            durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        }
+                    });
+                    
+                    let isPlaying = false;
+                    
+                    if (playBtn) {
+                        playBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            if (isPlaying) {
+                                audioEl.pause();
+                                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                                isPlaying = false;
+                            } else {
+                                audioEl.play();
+                                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                                isPlaying = true;
+                            }
+                        };
+                    }
+                    
+                    if (replayBtn) {
+                        replayBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            audioEl.pause();
+                            audioEl.currentTime = 0;
+                            if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                            isPlaying = false;
+                            if (timeSpan) timeSpan.textContent = '0:00';
+                            audioEl.play();
+                            if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                            isPlaying = true;
+                        };
+                    }
+                    
+                    let isMuted = false;
+                    if (muteBtn) {
+                        muteBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            if (isMuted) {
+                                audioEl.muted = false;
+                                muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                                isMuted = false;
+                            } else {
+                                audioEl.muted = true;
+                                muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                                isMuted = true;
+                            }
+                        };
+                    }
+                    
+                    audioEl.ontimeupdate = () => {
+                        const minutes = Math.floor(audioEl.currentTime / 60);
+                        const seconds = Math.floor(audioEl.currentTime % 60);
+                        if (timeSpan) {
+                            timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        }
+                    };
+                    
+                    audioEl.onended = () => {
+                        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        isPlaying = false;
+                        if (timeSpan) timeSpan.textContent = '0:00';
+                    };
+                }
             }
-            
             div.appendChild(clone);
+        } else {
+            // Fallback إذا لم يوجد القالب
+            const audio = document.createElement('audio');
+            audio.src = msg.data;
+            audio.controls = true;
+            audio.style.cssText = `max-width:250px; border-radius:20px; border:1.5px solid ${borderColor};`;
+            div.appendChild(audio);
         }
     } 
     else if (msg.type === 'video') {
@@ -1284,22 +1310,29 @@ displayMessage(msg) {
         const template = document.getElementById('videoMessageTemplate');
         if (template) {
             const clone = template.content.cloneNode(true);
-            const video = clone.querySelector('.video-thumbnail-content');
-            const source = video?.querySelector('source');
-            if (source) {
-                source.src = msg.data;
-                video.load();
-            }
             const thumbnail = clone.querySelector('.video-thumbnail');
             if (thumbnail) {
-                const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
                 thumbnail.style.border = `2px solid ${borderColor}`;
+                const video = thumbnail.querySelector('.video-thumbnail-content');
+                const source = video?.querySelector('source');
+                if (source && msg.data) {
+                    source.src = msg.data;
+                    video.load();
+                }
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
                     this.showVideoPreview(msg.data);
                 };
             }
             div.appendChild(clone);
+        } else {
+            // Fallback إذا لم يوجد القالب
+            const video = document.createElement('video');
+            video.src = msg.data;
+            video.style.cssText = `max-width:250px; max-height:200px; border-radius:12px; border:2px solid ${borderColor}; cursor:pointer;`;
+            video.preload = 'metadata';
+            video.onclick = () => this.showVideoPreview(msg.data);
+            div.appendChild(video);
         }
     } 
     else if (msg.type === 'file') {
@@ -1307,35 +1340,46 @@ displayMessage(msg) {
         const template = document.getElementById('fileMessageTemplate');
         if (template) {
             const clone = template.content.cloneNode(true);
-            const fileNameEl = clone.querySelector('.file-name');
-            if (fileNameEl) {
-                fileNameEl.textContent = msg.fileName || 'ملف';
-            }
-            const downloadBtn = clone.querySelector('.download-file-btn');
-            if (downloadBtn) {
-                downloadBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    const link = document.createElement('a');
-                    link.href = msg.data;
-                    link.download = msg.fileName || 'ملف';
-                    link.click();
-                };
-            }
-            const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
             const fileCard = clone.querySelector('.file-card');
             if (fileCard) {
                 fileCard.style.border = `1.5px solid ${borderColor}`;
+                const fileNameEl = fileCard.querySelector('.file-name');
+                if (fileNameEl) {
+                    fileNameEl.textContent = msg.fileName || 'ملف';
+                }
+                const downloadBtn = fileCard.querySelector('.download-file-btn');
+                if (downloadBtn && msg.data) {
+                    downloadBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const link = document.createElement('a');
+                        link.href = msg.data;
+                        link.download = msg.fileName || 'ملف';
+                        link.click();
+                    };
+                }
             }
             div.appendChild(clone);
+        } else {
+            // Fallback إذا لم يوجد القالب
+            const fileDiv = document.createElement('div');
+            fileDiv.style.cssText = `background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1.5px solid ${borderColor};`;
+            fileDiv.innerHTML = `
+                <span style="font-size:1.5rem;">📄</span>
+                <span style="color:white;font-weight:bold;flex:1;word-break:break-all;">${this.escapeHtml(msg.fileName || 'ملف')}</span>
+                <button onclick="this.parentElement.querySelector('a').click()" style="background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:36px;height:36px;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+                    <i class="fas fa-download"></i>
+                </button>
+                <a href="${msg.data}" download="${msg.fileName || 'ملف'}" style="display:none;"></a>
+            `;
+            div.appendChild(fileDiv);
         }
     }
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
-     
 
-    // ==================== القسم 26.1: showImagePreview ====================
+// ==================== القسم 26.1: showImagePreview ====================
 showImagePreview(imageSrc) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1347,6 +1391,7 @@ showImagePreview(imageSrc) {
     this.setupImageZoom(modal, img);
 },
 
+// ==================== القسم 26.1.1: setupImageZoom ====================
 setupImageZoom(modal, img) {
     if (img._zoomCleanup) {
         img._zoomCleanup();
@@ -1478,7 +1523,8 @@ downloadPreviewVideo() {
     link.href = video.src;
     link.download = 'video.mp4';
     link.click();
-},
+},  
+    
 
     // ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
