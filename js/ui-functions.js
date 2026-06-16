@@ -1,4 +1,4 @@
-// ========== ui-functions.js ==========
+// ========== ui-functions.js - النسخة المعدلة (مع دوال إغلاق المعاينات) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -314,7 +314,40 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال مساعدة ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (المضافة) ====================
+window.closeImagePreview = function() {
+    const modal = document.getElementById('imagePreviewModal');
+    const img = document.getElementById('previewImage');
+    if (modal) modal.style.display = 'none';
+    if (img) { img.src = ''; img.style.transform = 'none'; }
+};
+
+window.closeVideoPreview = function() {
+    const modal = document.getElementById('videoPreviewModal');
+    const video = document.getElementById('previewVideo');
+    if (modal) modal.style.display = 'none';
+    if (video) { video.pause(); video.src = ''; }
+};
+
+window.downloadPreviewImage = function() {
+    const img = document.getElementById('previewImage');
+    if (!img || !img.src) return;
+    const link = document.createElement('a');
+    link.href = img.src;
+    link.download = 'image.jpg';
+    link.click();
+};
+
+window.downloadPreviewVideo = function() {
+    const video = document.getElementById('previewVideo');
+    if (!video || !video.src) return;
+    const link = document.createElement('a');
+    link.href = video.src;
+    link.download = 'video.mp4';
+    link.click();
+};
+
+// ==================== القسم 15: دوال مساعدة ====================
 function formatNumber(num) { 
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; 
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; 
@@ -372,7 +405,7 @@ function setupModals() {
     }); 
 }
 
-// ==================== القسم 15: أحداث الصفحة ====================
+// ==================== القسم 16: أحداث الصفحة ====================
 document.addEventListener('DOMContentLoaded', () => { 
     ensureSinglePage(); 
     setupNavigation(); 
@@ -395,5 +428,3 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => { 
     console.error('❌ خطأ غير معالج:', event.reason); 
 });
-
-
