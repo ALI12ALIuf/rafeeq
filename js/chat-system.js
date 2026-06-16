@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة المعدلة (قوالب ثابتة) ==========
+// ========== chat-system.js - النسخة المعدلة (قوالب ثابتة + setupVoiceControls) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 const ChatSystem = {
@@ -1042,6 +1042,89 @@ openChat(friendId, friendName, friendAvatar) {
         c.scrollTop = c.scrollHeight;
     },
 
+// ==================== القسم 26.0: setupVoiceControls (دالة مساعدة للبصمة الصوتية) ====================
+setupVoiceControls(clone, audioEl) {
+    const playBtn = clone.querySelector('.voice-play-btn');
+    const replayBtn = clone.querySelector('.voice-replay-btn');
+    const muteBtn = clone.querySelector('.voice-mute-btn');
+    const timeSpan = clone.querySelector('.voice-current-time');
+    const durationSpan = clone.querySelector('.voice-duration');
+    
+    if (!audioEl || !audioEl.src) return;
+    
+    // إعداد مدة الصوت
+    const tempAudio = new Audio(audioEl.src);
+    tempAudio.addEventListener('loadedmetadata', () => {
+        const duration = tempAudio.duration;
+        if (durationSpan && !isNaN(duration)) {
+            const minutes = Math.floor(duration / 60);
+            const seconds = Math.floor(duration % 60);
+            durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+    });
+    
+    let isPlaying = false;
+    
+    if (playBtn) {
+        playBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (isPlaying) {
+                audioEl.pause();
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                isPlaying = false;
+            } else {
+                audioEl.play();
+                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                isPlaying = true;
+            }
+        };
+    }
+    
+    if (replayBtn) {
+        replayBtn.onclick = (e) => {
+            e.stopPropagation();
+            audioEl.pause();
+            audioEl.currentTime = 0;
+            if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            isPlaying = false;
+            if (timeSpan) timeSpan.textContent = '0:00';
+            audioEl.play();
+            if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            isPlaying = true;
+        };
+    }
+    
+    let isMuted = false;
+    if (muteBtn) {
+        muteBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (isMuted) {
+                audioEl.muted = false;
+                muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                isMuted = false;
+            } else {
+                audioEl.muted = true;
+                muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                isMuted = true;
+            }
+        };
+    }
+    
+    audioEl.ontimeupdate = () => {
+        const minutes = Math.floor(audioEl.currentTime / 60);
+        const seconds = Math.floor(audioEl.currentTime % 60);
+        if (timeSpan) {
+            timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+    };
+    
+    audioEl.onended = () => {
+        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        isPlaying = false;
+        if (timeSpan) timeSpan.textContent = '0:00';
+    };
+},
+
   // ==================== القسم 26: displayMessage (معدل - إصلاح القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
@@ -1213,86 +1296,10 @@ displayMessage(msg) {
             if (voiceMsg) {
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
-                const playBtn = voiceMsg.querySelector('.voice-play-btn');
-                const replayBtn = voiceMsg.querySelector('.voice-replay-btn');
-                const muteBtn = voiceMsg.querySelector('.voice-mute-btn');
-                const timeSpan = voiceMsg.querySelector('.voice-current-time');
-                const durationSpan = voiceMsg.querySelector('.voice-duration');
-                
                 if (audioEl && msg.data) {
                     audioEl.src = msg.data;
-                    
-                    // إعداد مدة الصوت
-                    const tempAudio = new Audio(msg.data);
-                    tempAudio.addEventListener('loadedmetadata', () => {
-                        const duration = tempAudio.duration;
-                        if (durationSpan && !isNaN(duration)) {
-                            const minutes = Math.floor(duration / 60);
-                            const seconds = Math.floor(duration % 60);
-                            durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                        }
-                    });
-                    
-                    let isPlaying = false;
-                    
-                    if (playBtn) {
-                        playBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            if (isPlaying) {
-                                audioEl.pause();
-                                playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                                isPlaying = false;
-                            } else {
-                                audioEl.play();
-                                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                                isPlaying = true;
-                            }
-                        };
-                    }
-                    
-                    if (replayBtn) {
-                        replayBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            audioEl.pause();
-                            audioEl.currentTime = 0;
-                            if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                            isPlaying = false;
-                            if (timeSpan) timeSpan.textContent = '0:00';
-                            audioEl.play();
-                            if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                            isPlaying = true;
-                        };
-                    }
-                    
-                    let isMuted = false;
-                    if (muteBtn) {
-                        muteBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            if (isMuted) {
-                                audioEl.muted = false;
-                                muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                                isMuted = false;
-                            } else {
-                                audioEl.muted = true;
-                                muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-                                isMuted = true;
-                            }
-                        };
-                    }
-                    
-                    audioEl.ontimeupdate = () => {
-                        const minutes = Math.floor(audioEl.currentTime / 60);
-                        const seconds = Math.floor(audioEl.currentTime % 60);
-                        if (timeSpan) {
-                            timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                        }
-                    };
-                    
-                    audioEl.onended = () => {
-                        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                        isPlaying = false;
-                        if (timeSpan) timeSpan.textContent = '0:00';
-                    };
+                    // استخدام الدالة المساعدة لإعداد أزرار التحكم
+                    this.setupVoiceControls(clone, audioEl);
                 }
             }
             div.appendChild(clone);
