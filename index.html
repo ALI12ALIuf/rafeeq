@@ -237,10 +237,49 @@
     </div>
 </div>
 
-<!-- 2. واجهة المكالمة النشطة -->
-<div id="callUI" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:#0a0e27;"></div>
+<!-- 2. واجهة المكالمة الصوتية (ثابتة) -->
+<div id="audioCallUI" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:#0a0e27;">
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;color:white;">
+        <div id="callAvatar" style="font-size:6rem;margin-bottom:15px;animation:float 3s ease-in-out infinite;">👤</div>
+        <div id="callName" style="font-size:1.8rem;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">مستخدم</div>
+        <div style="margin-top:8px;color:#4CAF50;font-size:0.9rem;background:rgba(76,175,80,0.2);padding:5px 15px;border-radius:20px;display:inline-block;">
+            <i class="fas fa-phone-alt" style="margin-left:5px;"></i> <span id="callTimer">00:00</span>
+        </div>
+    </div>
+    <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
+        <button id="speakerBtn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-volume-up"></i>
+        </button>
+        <button id="endCallBtn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;background:linear-gradient(135deg,#f44336,#d32f2f);animation:pulse 1.5s infinite;transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-phone-slash"></i>
+        </button>
+        <button id="muteBtn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-microphone"></i>
+        </button>
+    </div>
+</div>
 
-<!-- 3. معاينة الصورة -->
+<!-- 3. واجهة المكالمة المرئية (ثابتة) -->
+<div id="videoCallUI" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:#0a0e27;">
+    <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#0a0e27;"></video>
+    <video id="localVideo" autoplay playsinline muted style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;border:3px solid rgba(255,255,255,0.3);cursor:pointer;box-shadow:0 5px 20px rgba(0,0,0,0.3);transition:all 0.3s ease;"></video>
+    <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
+        <button id="switchCameraBtn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+        <button id="muteAudioBtn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-microphone"></i>
+        </button>
+        <button id="endCallBtnVideo" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;background:linear-gradient(135deg,#f44336,#d32f2f);animation:pulse 1.5s infinite;transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-phone-slash"></i>
+        </button>
+        <button id="muteVideoBtn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-video"></i>
+        </button>
+    </div>
+</div>
+
+<!-- 4. معاينة الصورة -->
 <div id="imagePreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10050;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-x pan-y;">
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10051;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;border-radius:16px;">
@@ -256,7 +295,7 @@
     </div>
 </div>
 
-<!-- 4. معاينة الفيديو -->
+<!-- 5. معاينة الفيديو -->
 <div id="videoPreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10060;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10061;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;flex-direction:column;background:#000;border-radius:16px;overflow:hidden;">
@@ -274,7 +313,7 @@
     </div>
 </div>
 
-<!-- 5. مشاركة الموقع -->
+<!-- 6. مشاركة الموقع -->
 <div id="locationSwipeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10003;align-items:center;justify-content:center;backdrop-filter:blur(5px);font-family:system-ui,sans-serif;">
     <div style="background:#0a0e27;border-radius:40px;width:340px;max-width:90%;padding:30px 20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4);">
         <div style="font-size:3rem;margin-bottom:10px;">🗺️</div>
@@ -320,13 +359,13 @@
     </div>
 </div>
 
-<!-- 6. شريط التقدم -->
+<!-- 7. شريط التقدم -->
 <div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
     <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
     <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
 </div>
 
-<!-- 7. شاشة تسجيل الدخول -->
+<!-- 8. شاشة تسجيل الدخول -->
 <div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
     <div style="text-align:center;padding:20px;max-width:350px;">
         <div style="font-size:5rem;">🛡️</div>
@@ -337,6 +376,69 @@
         </button>
     </div>
 </div>
+
+<!-- ==================== قوالب الرسائل الثابتة ==================== -->
+
+<!-- قالب الصورة -->
+<template id="imageMessageTemplate">
+    <div class="message-image-wrapper">
+        <img class="message-image-content" src="" alt="صورة" loading="lazy">
+    </div>
+</template>
+
+<!-- قالب الفيديو -->
+<template id="videoMessageTemplate">
+    <div class="message-content video-thumbnail">
+        <video class="video-thumbnail-content" preload="metadata" playsinline>
+            <source src="" type="video/mp4">
+        </video>
+        <div class="video-play-overlay">
+            <i class="fas fa-expand"></i>
+        </div>
+    </div>
+</template>
+
+<!-- قالب البصمة الصوتية -->
+<template id="voiceMessageTemplate">
+    <div class="message-content voice-message">
+        <div class="voice-controls">
+            <button class="voice-play-btn">
+                <i class="fas fa-play"></i>
+            </button>
+            <button class="voice-replay-btn">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <div class="voice-timer">
+                <span class="voice-current-time">0:00</span>
+                <span class="voice-duration">0:00</span>
+            </div>
+            <button class="voice-mute-btn">
+                <i class="fas fa-volume-up"></i>
+            </button>
+        </div>
+        <audio class="voice-audio-element" style="display:none;"></audio>
+    </div>
+</template>
+
+<!-- قالب الملف -->
+<template id="fileMessageTemplate">
+    <div class="message-content file-card">
+        <div class="file-icon">📄</div>
+        <div class="file-info">
+            <div class="file-name"></div>
+        </div>
+        <button class="download-file-btn">
+            <i class="fas fa-download"></i>
+        </button>
+    </div>
+</template>
+
+<!-- قالب الموقع -->
+<template id="locationMessageTemplate">
+    <div class="message-content location-card">
+        <i class="fas fa-map-marker-alt"></i>
+    </div>
+</template>
 
 <!-- ==================== النوافذ المنبثقة (Modals) ==================== -->
 
