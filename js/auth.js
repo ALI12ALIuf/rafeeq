@@ -1,4 +1,4 @@
-// ========== auth.js ==========
+// ========== auth.js - النسخة المعدلة (بدون كابتشا) ==========
 // Firebase Auth الأساسي
 
 // ==================== القسم 1: دوال مساعدة ====================
@@ -23,69 +23,37 @@ const FieldValue = firebase.firestore.FieldValue;
 
 // ==================== القسم 2: showApp ====================
 function showApp() {
-    _captchaActive = false;
-    _captchaBlocked = false;
-    _captchaAttempts = 0;
-    _isLoggingIn = false;
-    _pendingGoogleUser = null;
-    if (_captchaBlockTimer) { clearTimeout(_captchaBlockTimer); _captchaBlockTimer = null; }
-    if (_captchaCountdownTimer) { clearInterval(_captchaCountdownTimer); _captchaCountdownTimer = null; }
-    sessionStorage.removeItem('_captchaTotalAttempts');
-    sessionStorage.setItem('_captchaVerified', 'true');
-    
     const splash = document.getElementById('splash'), app = document.getElementById('app');
-    const loginScreen = document.querySelector('.login-screen');
-    const captchaScreen = document.querySelector('.captcha-screen');
-    if (loginScreen) loginScreen.remove();
-    if (captchaScreen) captchaScreen.remove();
+    const loginScreen = document.getElementById('loginScreen');
+    if (loginScreen) loginScreen.style.display = 'none';
     if (splash) { splash.style.display = 'none'; }
     if (app) { app.style.display = 'flex'; }
 }
 
 // ==================== القسم 3: showLoginScreen ====================
 function showLoginScreen() {
-    if (_captchaActive || _isLoggingIn) return;
-    const el = document.querySelector('.login-screen'); if (el) el.remove();
-    const cap = document.querySelector('.captcha-screen'); if (cap) cap.remove();
-    const d = document.createElement('div'); d.className = 'login-screen'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;';
-    d.innerHTML = `<div style="text-align:center;padding:20px;max-width:350px;"><div style="font-size:5rem;">🛡️</div><h1 style="font-size:2rem;color:var(--primary);">رفيق</h1><p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p><button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;"><i class="fab fa-google"></i> المتابعة بحساب جوجل</button></div>`;
-    document.body.appendChild(d);
+    const loginScreen = document.getElementById('loginScreen');
+    if (loginScreen) loginScreen.style.display = 'flex';
 }
 
-// ==================== القسم 4: startGoogleLogin ====================
+// ==================== القسم 4: startGoogleLogin (معدل - بدون كابتشا) ====================
 async function startGoogleLogin() {
-    _isLoggingIn = true;
-    sessionStorage.removeItem('_captchaVerified');
     try {
-        if (!window.auth || !window.googleProvider) { _isLoggingIn = false; alert('مكتبة Firebase لم يتم تحميلها بعد.'); return; }
+        if (!window.auth || !window.googleProvider) {
+            alert('مكتبة Firebase لم يتم تحميلها بعد.');
+            return;
+        }
         
         const splash = document.getElementById('splash');
         if (splash) { splash.style.display = 'none'; }
         
-        const loginScreen = document.querySelector('.login-screen');
-        if (loginScreen) { loginScreen.style.opacity = '0'; setTimeout(() => { if (loginScreen) loginScreen.remove(); }, 200); }
-        
-        _captchaActive = true;
-        _captchaBlocked = false;
-        _captchaAttempts = 0;
-        _pendingGoogleUser = null;
+        const loginScreen = document.getElementById('loginScreen');
+        if (loginScreen) { loginScreen.style.display = 'none'; }
         
         const result = await window.auth.signInWithPopup(window.googleProvider);
-        _pendingGoogleUser = result.user;
-        
-        if (_pendingGoogleUser) {
-            showCaptchaScreen(async () => {
-                if (_pendingGoogleUser) {
-                    await saveUserAndEnter(_pendingGoogleUser);
-                    _pendingGoogleUser = null;
-                }
-            });
-        }
+        await saveUserAndEnter(result.user);
         
     } catch (error) {
-        _pendingGoogleUser = null;
-        _captchaActive = false;
-        _isLoggingIn = false;
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
         else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
@@ -117,7 +85,6 @@ async function saveUserAndEnter(user) {
     } catch (error) {
         console.error('خطأ في حفظ المستخدم:', error);
         alert('حدث خطأ في إعداد الحساب');
-        _isLoggingIn = false;
     }
 }
 
@@ -137,13 +104,11 @@ function updateUserUI() {
 
 // ==================== القسم 7: logout (معدل - إضافة تنظيف شامل) ====================
 async function logout() { 
-    // ✅ تنظيف العناصر الديناميكية قبل الخروج
     if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
         console.log('🧹 تنظيف العناصر الديناميكية قبل تسجيل الخروج');
         CallSystem.cleanupDynamicElements();
     }
     
-    // ✅ تنظيف أي مؤقتات عالقة في ChatSystem
     if (typeof ChatSystem !== 'undefined') {
         if (ChatSystem.featureBlinkInterval) {
             clearInterval(ChatSystem.featureBlinkInterval);
@@ -162,8 +127,6 @@ async function logout() {
             });
         }
     } catch (e) {}
-    
-    sessionStorage.removeItem('_captchaVerified');
     
     try { await window.auth.signOut(); } catch (e) {}
     window.location.reload(); 
@@ -188,50 +151,23 @@ async function loadUserData(uid) {
     } catch (e) {}
 }
 
-// ==================== القسم 9: مراقب حالة تسجيل الدخول ====================
+// ==================== القسم 9: مراقب حالة تسجيل الدخول (معدل - بدون كابتشا) ====================
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            if (_captchaActive) return;
-            
-            const isVerified = sessionStorage.getItem('_captchaVerified') === 'true';
-            
-            if (!isVerified) {
-                _pendingGoogleUser = user;
-                _captchaActive = true;
-                _isLoggingIn = true;
-                
-                if (app) app.style.display = 'none';
-                if (splash) { splash.style.display = 'none'; }
-                const loginEl = document.querySelector('.login-screen');
-                if (loginEl) loginEl.remove();
-                const capEl = document.querySelector('.captcha-screen');
-                if (capEl) capEl.remove();
-                
-                showCaptchaScreen(async () => {
-                    await saveUserAndEnter(user);
-                    _pendingGoogleUser = null;
-                });
-                return;
-            }
-            
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
             showApp();
         } else {
-            if (_isLoggingIn || _captchaActive) return;
-            
             if (app) app.style.display = 'none';
             if (splash) { splash.style.display = 'flex'; }
             
             setTimeout(() => {
-                if (!_isLoggingIn && !_captchaActive) {
-                    if (splash) { splash.style.display = 'none'; }
-                    showLoginScreen();
-                }
+                if (splash) { splash.style.display = 'none'; }
+                showLoginScreen();
             }, 2500);
         }
     });
