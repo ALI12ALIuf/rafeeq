@@ -635,3 +635,252 @@ input:checked + .toggle-slider:before {
     75% { transform: rotate(-6deg); }
     100% { transform: rotate(0deg); }
 }
+
+/* حركات أزرار المكالمات */
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+    70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+}
+
+/* ==================== القسم 19: ستايلات قوالب الرسائل الثابتة ==================== */
+
+/* قالب الصورة */
+.message-image-wrapper {
+    cursor: pointer;
+    display: inline-block;
+    border-radius: 12px;
+    overflow: hidden;
+    width: 200px;
+    height: 200px;
+}
+
+.message-image-content {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* قالب الفيديو */
+.video-thumbnail {
+    position: relative;
+    width: 250px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+    cursor: pointer;
+}
+
+.video-thumbnail-content {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+    display: block;
+    pointer-events: none;
+}
+
+.video-play-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.6);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+    color: white;
+    font-size: 1.5rem;
+}
+
+/* قالب البصمة الصوتية */
+.voice-message {
+    background: #4CAF50;
+    border-radius: 20px;
+    padding: 8px 12px;
+    display: inline-block;
+    direction: ltr;
+}
+
+.voice-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.voice-controls button {
+    background: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.voice-controls button:hover {
+    transform: scale(1.05);
+}
+
+.voice-controls button:active {
+    transform: scale(0.95);
+}
+
+.voice-controls button i {
+    font-size: 0.9rem;
+    color: #4CAF50;
+}
+
+.voice-controls button .fa-volume-mute {
+    color: #f44336;
+}
+
+.voice-controls button .fa-sync-alt {
+    color: #f44336;
+}
+
+.voice-timer {
+    text-align: center;
+    color: white;
+}
+
+.voice-current-time {
+    font-size: 0.85rem;
+    font-weight: bold;
+    min-width: 45px;
+    display: block;
+}
+
+.voice-duration {
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
+/* قالب الملف */
+.file-card {
+    background: #4CAF50;
+    border-radius: 16px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 250px;
+    max-width: 280px;
+}
+
+.file-icon {
+    background: white;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+
+.file-info {
+    flex: 1;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.file-name {
+    font-weight: bold;
+    font-size: 0.85rem;
+    word-break: break-all;
+    color: white;
+    line-height: 1.3;
+}
+
+.download-file-btn {
+    color: white;
+    cursor: pointer;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    border: none;
+}
+
+.download-file-btn:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.05);
+}
+
+.download-file-btn:active {
+    transform: scale(0.95);
+}
+
+/* قالب الموقع */
+.location-card {
+    cursor: pointer;
+    background: #4CAF50;
+    border-radius: 12px;
+    padding: 8px 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+}
+
+.location-card:hover {
+    transform: scale(1.02);
+}
+
+.location-card:active {
+    transform: scale(0.95);
+}
+
+/* ==================== القسم 20: ستايلات واجهات المكالمات الثابتة ==================== */
+
+/* أزرار المكالمات */
+.call-btn {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    backdrop-filter: blur(10px);
+    background: rgba(30, 30, 40, 0.85) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+}
+
+.call-btn:active {
+    transform: scale(1.1);
+    background: rgba(50, 50, 60, 0.95) !important;
+}
+
+.end-call-btn {
+    background: linear-gradient(135deg, #f44336, #d32f2f) !important;
+    animation: pulse 1.5s infinite;
+}
+
+.end-call-btn:active {
+    transform: scale(1.1);
+    background: linear-gradient(135deg, #ff6659, #e53935) !important;
+}
+
+/* الفيديو المحلي في المكالمة */
+.local-video {
+    border: 3px solid rgba(255,255,255,0.3);
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+}
+
+/* حركة الأفاتار في المكالمة الصوتية */
+.avatar-animation {
+    animation: float 3s ease-in-out infinite;
+}
