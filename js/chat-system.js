@@ -1,7 +1,6 @@
-// ========== chat-system.js - النسخة المعدلة (تم إزالة جميع دوال التنظيف) ==========
+// ========== chat-system.js - النسخة المعدلة (عناصر ثابتة + حذف الكابتشا) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
-// ==================== القسم 2: تعريف ChatSystem ====================
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
@@ -11,19 +10,14 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
-    // ==================== القسم 2.5: دالة تحديث زر التفعيل (مركزية) ====================
+    // ==================== القسم 2.5: دالة تحديث زر التفعيل ====================
 updateFeatureToggleUI() {
     const toggleInput = document.getElementById('featureToggleInput');
     if (!toggleInput) return;
     
-    // ✅ تحديث حالة الزر (checked) بناءً على featuresEnabled
     toggleInput.checked = this.featuresEnabled;
-    
-    // ✅ الزر يكون مفعلاً دائماً (يمكن الضغط عليه لإرسال طلب التفعيل)
-    // بغض النظر عن friendInConversation
     toggleInput.disabled = false;
     
-    // ✅ تحديث الشفافية (الزر دائماً مرئي بالكامل)
     const featureSwitchLabel = document.getElementById('featureSwitchLabel');
     if (featureSwitchLabel) {
         featureSwitchLabel.style.opacity = '1';
@@ -51,15 +45,11 @@ async getContactName(userId) {
 init() { 
     this.loadAllChats(); 
     this.setupFeatureButton();
-    // تم إزالة setupBeforeUnloadListener
-    
-    // تم إزالة cleanMediaMessagesOnLoad
 },
     
 
-    // ==================== القسم 4: setupFeatureButton (تبسيط - الأزرار موجودة في HTML) ====================
+    // ==================== القسم 4: setupFeatureButton ====================
 setupFeatureButton() {
-    // ✅ الأزرار موجودة بالفعل في HTML، فقط نحدثها ونجعلها مرئية
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     const toggleInput = document.getElementById('featureToggleInput');
@@ -69,7 +59,6 @@ setupFeatureButton() {
         return;
     }
     
-    // ✅ إضافة الأنماط إذا لم تكن موجودة (مرة واحدة)
     if (!document.getElementById('featureToggleStyles')) {
         const style = document.createElement('style');
         style.id = 'featureToggleStyles';
@@ -164,14 +153,11 @@ setupFeatureButton() {
         document.head.appendChild(style);
     }
     
-    // ✅ إظهار الأزرار
     toggleContainer.style.display = 'inline-flex';
     kickBtn.style.display = 'inline-flex';
     
-    // ✅ حفظ المراجع
     window.featureToggleInput = toggleInput;
     
-    // ✅ إزالة المستمع القديم لتجنب التكرار
     toggleInput.onclick = (e) => {
         console.log('🔘 تم الضغط على زر التفعيل');
         
@@ -190,7 +176,6 @@ setupFeatureButton() {
         }
     };
     
-    // ✅ معالج الضغط لزر الطرد
     if (kickBtn) {
         kickBtn.onclick = (e) => {
             e.preventDefault();
@@ -199,19 +184,16 @@ setupFeatureButton() {
         };
     }
     
-    // ✅ تحديث حالة الزر إذا كانت الميزات مفعلة مسبقاً
     if (this.featuresEnabled && toggleInput) {
         toggleInput.checked = true;
     }
     
-    // ✅ تحديث حالة زر الطرد
     this.updateKickButtonState();
     this.updateFeatureToggleUI();
     
     console.log('✅ تم تهيئة أزرار التفعيل والطرد');
 },
 
-// ✅ دالة تحديث حالة زر الطرد
 updateKickButtonState() {
     const kickBtn = document.getElementById('kickBtn');
     if (!kickBtn) return;
@@ -242,7 +224,6 @@ async kickUserFromConversation() {
     
     console.log('👢 إنهاء المحادثة مع المستخدم:', this.currentChat);
     
-    // ✅ إرسال إشارة إلى الطرف الآخر لإغلاق المحادثة
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
         try {
             CallSystem.dc.send(JSON.stringify({ 
@@ -257,12 +238,11 @@ async kickUserFromConversation() {
         console.log('❌ Data Channel غير مفتوح، لا يمكن إرسال إشارة');
     }
     
-    // ✅ إغلاق المحادثة محلياً (عند المرسل أيضاً)
     this.closeChat();
 },   
     
     
-  // ==================== القسم 6: startFeatureBlink (معدل - 60 ثانية) ====================
+  // ==================== القسم 6: startFeatureBlink ====================
 startFeatureBlink() {
     if (this.featureBlinkInterval) clearInterval(this.featureBlinkInterval);
     
@@ -280,18 +260,15 @@ startFeatureBlink() {
         }
         
         blinkCount++;
-        // ✅ تغيير من 30 إلى 60 ثانية (60 ثانية = 120 تكرار × 0.5)
         if (blinkCount > 120) {
             clearInterval(this.featureBlinkInterval);
             this.featureRequestPending = false;
             this.featureRequestReceived = false;
             switchLabel.classList.remove('blinking');
             
-            // ✅ إعادة تعيين الزر إلى اللون الأحمر عند انتهاء المهلة
             const toggleInput = document.getElementById('featureToggleInput');
             if (toggleInput) toggleInput.checked = false;
             
-            // ✅ تحديث واجهة المستخدم
             this.updateAllButtons();
             
             console.log('⏰ انتهت مهلة الانتظار (60 ثانية)، تم إلغاء الطلب');
@@ -300,7 +277,7 @@ startFeatureBlink() {
 },  
     
 
-// ==================== القسم 7: requestEnableFeatures (معدل - تجميع 10 ثواني) ====================
+// ==================== القسم 7: requestEnableFeatures ====================
 async requestEnableFeatures() {
     if (!this.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
@@ -318,7 +295,6 @@ async requestEnableFeatures() {
     this.featureRequestPending = true;
     this.startFeatureBlink();
     
-    // ✅ مصفوفة لتجميع ICE candidates
     this._pendingIceCandidates = [];
     this._batchTimer = null;
     
@@ -361,7 +337,6 @@ async requestEnableFeatures() {
         CallSystem.dc = CallSystem.pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
         CallSystem.setupDataChannel(CallSystem.dc);
         
-        // ✅ تجميع ICE candidates بدلاً من إرسالها فوراً
         CallSystem.pc.onicecandidate = e => {
             if (e.candidate) {
                 console.log('📡 تجميع ICE candidate:', e.candidate.candidate.substring(0, 50));
@@ -404,7 +379,6 @@ async requestEnableFeatures() {
             sdp: CallSystem.pc.localDescription.sdp
         };
         
-        // ✅ انتظار 10 ثواني لتجميع جميع ICE candidates (تغيير من 5000 إلى 10000)
         await new Promise(resolve => {
             if (this._batchTimer) clearTimeout(this._batchTimer);
             this._batchTimer = setTimeout(() => {
@@ -413,7 +387,6 @@ async requestEnableFeatures() {
             }, 10000);
         });
         
-        // ✅ إرسال دفعة واحدة (Offer + جميع ICE candidates المجمعة)
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
         if (!myPrivateKey || !receiverPublicKey) return;
@@ -433,7 +406,6 @@ async requestEnableFeatures() {
         });
         console.log(`📨 تم إرسال الدفعة (Offer + ${this._pendingIceCandidates.length} ICE candidates) لفتح القناة`);
         
-        // تنظيف
         this._pendingIceCandidates = [];
         this._batchTimer = null;
         
@@ -445,7 +417,7 @@ async requestEnableFeatures() {
     }
 },
 
-// ==================== القسم 8: handleFeatureRequest (معدل - استقبال الدفعة) ====================
+// ==================== القسم 8: handleFeatureRequest ====================
 async handleFeatureRequest(fromId, encryptedData) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
@@ -462,7 +434,6 @@ async handleFeatureRequest(fromId, encryptedData) {
         return;
     }
     
-    // ✅ معالجة الدفعة الواحدة (offer_batch)
     if (requestData.action === 'offer_batch' && requestData.sdp) {
         console.log('📡 استلام دفعة (Offer + ICE candidates) من', fromId);
         console.log(`📦 عدد ICE candidates في الدفعة: ${requestData.iceCandidates?.length || 0}`);
@@ -477,7 +448,6 @@ async handleFeatureRequest(fromId, encryptedData) {
             return;
         }
         
-        // تخزين الدفعة كاملة
         if (!this._pendingOffer) this._pendingOffer = {};
         this._pendingOffer[fromId] = {
             sdp: new RTCSessionDescription({
@@ -492,7 +462,6 @@ async handleFeatureRequest(fromId, encryptedData) {
         this.startFeatureBlink();
         console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
     }
-    // ✅ معالجة ICE منفردة (للدعم الخلفي فقط)
     else if (requestData.action === 'ice' && requestData.candidate) {
         console.log('📡 استلام ICE candidate منفرد (دعم خلفي)');
         if (CallSystem.pc) {
@@ -507,7 +476,7 @@ async handleFeatureRequest(fromId, encryptedData) {
     }
 },
 
-// ==================== القسم 8.1: acceptOffer (معدلة - تجميع 10 ثواني للمستلم) ====================
+// ==================== القسم 8.1: acceptOffer ====================
 async acceptOffer(fromId, offerData) {
     console.log('✅ قبول Offer من', fromId);
     
@@ -519,7 +488,6 @@ async acceptOffer(fromId, offerData) {
     const switchLabel = document.getElementById('featureSwitchLabel');
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ مصفوفة لتجميع ICE candidates الخاصة بالمستلم
     this._responseIceCandidates = [];
     this._responseBatchTimer = null;
     
@@ -562,7 +530,6 @@ async acceptOffer(fromId, offerData) {
             CallSystem.dc = e.channel;
         };
         
-        // ✅ تجميع ICE candidates الخاصة بالمستلم
         CallSystem.pc.onicecandidate = e => {
             if (e.candidate) {
                 console.log('📡 تجميع ICE candidate للمستلم');
@@ -579,7 +546,6 @@ async acceptOffer(fromId, offerData) {
         
         await CallSystem.pc.setRemoteDescription(offerSdp);
         
-        // إضافة ICE candidates المستلمة من المرسل
         for (const ice of (offerData.iceCandidates || [])) {
             try {
                 await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
@@ -594,7 +560,6 @@ async acceptOffer(fromId, offerData) {
         await CallSystem.pc.setLocalDescription(answer);
         console.log('✅ تم إنشاء Answer بنجاح');
         
-        // ✅ انتظار 10 ثواني لتجميع ICE candidates الخاصة بالمستلم
         await new Promise(resolve => {
             if (this._responseBatchTimer) clearTimeout(this._responseBatchTimer);
             this._responseBatchTimer = setTimeout(() => {
@@ -603,13 +568,11 @@ async acceptOffer(fromId, offerData) {
             }, 10000);
         });
         
-        // ✅ إرسال دفعة واحدة (Answer + جميع ICE candidates المجمعة)
         await this.sendOfferResponseBatch(fromId, {
             sdp: CallSystem.pc.localDescription,
             iceCandidates: this._responseIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
         });
         
-        // ✅ تفعيل الميزات بعد إرسال الرد بنجاح (وليس قبله)
         this.featuresEnabled = true;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
@@ -621,7 +584,6 @@ async acceptOffer(fromId, offerData) {
         this.updateAllButtons();
         console.log('✅ تم فتح القناة وتفعيل الميزات بنجاح');
         
-        // تنظيف
         this._responseIceCandidates = [];
         this._responseBatchTimer = null;
         
@@ -634,7 +596,6 @@ async acceptOffer(fromId, offerData) {
     }
 },
 
-// ✅ دالة جديدة: إرسال الردود كدفعة واحدة (Answer + ICE candidates مجمعة)
 async sendOfferResponseBatch(toId, batchData) {
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -663,7 +624,6 @@ async sendOfferResponseBatch(toId, batchData) {
     }
 },
 
-// ✅ دالة مساعدة لإرسال الردود (للإشارات المنفردة - دعم خلفي)
 async sendOfferResponse(toId, action, data = null) {
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -694,7 +654,7 @@ async sendOfferResponse(toId, action, data = null) {
     }
 },
 
-// ==================== القسم 9: acceptFeatureRequest (معدل - بدون تفعيل مباشر) ====================
+// ==================== القسم 9: acceptFeatureRequest ====================
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
     
@@ -703,7 +663,6 @@ async acceptFeatureRequest() {
         return;
     }
     
-    // ✅ لا نفعّل الميزات هنا (سنفعّلها بعد نجاح القناة في acceptOffer)
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
     
@@ -719,7 +678,6 @@ async acceptFeatureRequest() {
     const switchLabel = document.getElementById('featureSwitchLabel');
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ التحقق من وجود Offer معلق قبل قبوله
     if (this._pendingOffer && this._pendingOffer[this.currentChat] && this._pendingOffer[this.currentChat].sdp) {
         console.log('📡 يوجد Offer معلق، جاري قبوله...');
         await this.acceptOffer(this.currentChat, this._pendingOffer[this.currentChat]);
@@ -727,11 +685,9 @@ async acceptFeatureRequest() {
     } else {
         console.log('⚠️ لا يوجد Offer معلق');
         
-        // محاولة فتح القناة مباشرة (حالة نادرة)
         if (this.currentChat) {
             CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
                 console.log('✅ تم فتح Data Channel في الخلفية');
-                // تفعيل الميزات بعد نجاح القناة
                 this.featuresEnabled = true;
                 this.friendInConversation = true;
                 const toggleInput = document.getElementById('featureToggleInput');
@@ -838,8 +794,6 @@ async handleFeatureResponse(fromId, action) {
      // ==================== القسم 10.1: disableFeatures ====================
 async disableFeatures() {
     console.log('🔴 disableFeatures - إلغاء تفعيل الميزات');
-    
-    // تم إزالة CallSystem.deleteAllWebRTCSignals
     
     this.featuresEnabled = false;
     this.featureRequestPending = false;
@@ -972,7 +926,6 @@ closeConversation() {
     const chatPage = document.querySelector('.page.active') || document.querySelector('.chat-page');
     if (chatPage) chatPage.style.display = 'block';
     
-    // إيقاف الوميض إذا كان شغالاً
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
         this.featureBlinkInterval = null;
@@ -980,10 +933,8 @@ closeConversation() {
     const featureSwitch = document.querySelector('.feature-switch');
     if (featureSwitch) featureSwitch.classList.remove('blinking');
     
-    // إعادة تعيين واجهة زر الميزات
     this.updateFeatureToggleUI();
     
-    // إعادة إظهار القائمة السفلية والهيدر العام للموقع
     const bottomNav = document.querySelector('.bottom-nav');
     if (bottomNav) bottomNav.style.setProperty('display', 'flex', 'important');
     
@@ -1003,45 +954,15 @@ closeConversation() {
         } 
     },
     
-    // ==================== القسم 18: showProgressBar ====================
+    // ==================== القسم 18: showProgressBar (معدل - تستخدم عناصر ثابتة) ====================
     showProgressBar(message, percent) {
-        let bar = document.getElementById('progressBar');
-        if (!bar) {
-            bar = document.createElement('div'); bar.id = 'progressBar';
-            bar.style.cssText = `
-                position: fixed;
-                top: 70px;
-                left: 0;
-                right: 0;
-                height: 22px;
-                background: rgba(0,0,0,0.3);
-                z-index: 10000;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            `;
-            bar.innerHTML = `
-                <div id="progressFill" style="
-                    background: linear-gradient(90deg, #4CAF50, #8BC34A);
-                    height: 100%;
-                    width: 0%;
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    transition: width 0.3s;
-                    border-radius: 0 2px 2px 0;
-                "></div>
-                <span id="progressPercent" style="
-                    position: relative;
-                    z-index: 2;
-                    font-size: 12px;
-                    font-weight: bold;
-                    color: white;
-                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-                ">0%</span>
-            `;
-            document.body.appendChild(bar);
-        }
+        const bar = document.getElementById('progressBar');
+        if (!bar) return;
+        bar.style.display = 'flex';
+        const fill = document.getElementById('progressFill');
+        const perc = document.getElementById('progressPercent');
+        if (fill) fill.style.width = '0%';
+        if (perc) perc.textContent = '0%';
     },
     
     // ==================== القسم 19: updateProgressBar ====================
@@ -1053,12 +974,14 @@ closeConversation() {
     },
     
     // ==================== القسم 20: hideProgressBar ====================
-    hideProgressBar() { const bar = document.getElementById('progressBar'); if (bar) bar.remove(); },
+    hideProgressBar() { 
+        const bar = document.getElementById('progressBar'); 
+        if (bar) bar.style.display = 'none'; 
+    },
     
     
-    // ==================== القسم 23: openChat (معدل - تنظيف قبل الفتح) ====================
+    // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
-    // ✅ تنظيف المحادثة السابقة إذا كانت موجودة
     if (this.currentChat && this.currentChat !== friendId) {
         console.log('🧹 تنظيف المحادثة السابقة قبل فتح محادثة جديدة:', this.currentChat);
         this.cleanConversationData(this.currentChat, false);
@@ -1440,169 +1363,25 @@ displayMessage(msg) {
 },
      
 
-    // ==================== القسم 26.1: showImagePreview ====================
+    // ==================== القسم 26.1: showImagePreview (معدل - تستخدم عناصر ثابتة) ====================
 showImagePreview(imageSrc) {
-    const existingPreview = document.getElementById('imagePreviewModal');
-    if (existingPreview) existingPreview.remove();
+    const modal = document.getElementById('imagePreviewModal');
+    const img = document.getElementById('previewImage');
+    if (!modal || !img) return;
     
-    const modal = document.createElement('div');
-    modal.id = 'imagePreviewModal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.95);
-        z-index: 10050;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        touch-action: pan-x pan-y;
-    `;
-    
-    modal.oncontextmenu = (e) => {
-        e.preventDefault();
-        return false;
-    };
-    
-    const frame = document.createElement('div');
-    frame.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        border: 3px solid #4CAF50;
-        border-radius: 20px;
-        pointer-events: none;
-        z-index: 10051;
-        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
-    `;
-    
-    const imageContainer = document.createElement('div');
-    imageContainer.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        touch-action: none;
-        border-radius: 16px;
-    `;
-    
-    const img = document.createElement('img');
     img.src = imageSrc;
-    img.style.cssText = `
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-        object-fit: contain;
-        transition: transform 0.1s ease;
-        cursor: default;
-        touch-action: none;
-    `;
+    modal.style.display = 'flex';
     
-    img.oncontextmenu = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    img.ondragstart = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    img.oncopy = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    img.oncut = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    img.onselectstart = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    
-    const buttonOverlay = document.createElement('div');
-    buttonOverlay.style.cssText = `
-        position: absolute;
-        top: 30px;
-        left: 0;
-        right: 0;
-        display: flex;
-        justify-content: space-between;
-        padding: 0 30px;
-        pointer-events: none;
-        z-index: 10052;
-    `;
-    
-    const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
-    backBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
-    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    backBtn.onclick = () => {
-        modal.remove();
-    };
-    
-    const downloadBtn = document.createElement('button');
-    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-    downloadBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    downloadBtn.onclick = (e) => {
-        e.stopPropagation();
-        const link = document.createElement('a');
-        link.href = imageSrc;
-        link.download = 'image.jpg';
-        link.click();
-    };
-    
-    buttonOverlay.appendChild(backBtn);
-    buttonOverlay.appendChild(downloadBtn);
+    // إعداد أحداث التكبير/التصغير
+    this.setupImageZoom(modal, img);
+},
+
+setupImageZoom(modal, img) {
+    // إزالة المستمعات القديمة
+    if (img._zoomCleanup) {
+        img._zoomCleanup();
+        img._zoomCleanup = null;
+    }
     
     let currentScale = 1;
     let initialDistance = 0;
@@ -1618,7 +1397,7 @@ showImagePreview(imageSrc) {
         img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
     };
     
-    img.addEventListener('touchstart', (e) => {
+    const touchStartHandler = (e) => {
         e.preventDefault();
         const touches = e.touches;
         
@@ -1633,9 +1412,9 @@ showImagePreview(imageSrc) {
             startY = touches[0].clientY - translateY;
             isTouching = true;
         }
-    });
+    };
     
-    img.addEventListener('touchmove', (e) => {
+    const touchMoveHandler = (e) => {
         e.preventDefault();
         const touches = e.touches;
         
@@ -1661,9 +1440,9 @@ showImagePreview(imageSrc) {
             
             updateTransform();
         }
-    });
+    };
     
-    img.addEventListener('touchend', (e) => {
+    const touchEndHandler = (e) => {
         e.preventDefault();
         initialDistance = 0;
         isTouching = false;
@@ -1674,307 +1453,63 @@ showImagePreview(imageSrc) {
             translateY = 0;
             updateTransform();
         }
-    });
-    
-    imageContainer.appendChild(img);
-    modal.appendChild(frame);
-    modal.appendChild(imageContainer);
-    modal.appendChild(buttonOverlay);
-    
-    const escHandler = (e) => {
-        if (e.key === 'Escape' && document.getElementById('imagePreviewModal')) {
-            modal.remove();
-            document.removeEventListener('keydown', escHandler);
-        }
     };
-    document.addEventListener('keydown', escHandler);
     
-    document.body.appendChild(modal);
+    img.addEventListener('touchstart', touchStartHandler);
+    img.addEventListener('touchmove', touchMoveHandler, { passive: false });
+    img.addEventListener('touchend', touchEndHandler);
+    
+    img._zoomCleanup = () => {
+        img.removeEventListener('touchstart', touchStartHandler);
+        img.removeEventListener('touchmove', touchMoveHandler);
+        img.removeEventListener('touchend', touchEndHandler);
+    };
 },
 
-// ==================== القسم 26.2: showVideoPreview ====================
+// ==================== القسم 26.2: showVideoPreview (معدل - تستخدم عناصر ثابتة) ====================
 showVideoPreview(videoSrc) {
-    const existingPreview = document.getElementById('videoPreviewModal');
-    if (existingPreview) existingPreview.remove();
+    const modal = document.getElementById('videoPreviewModal');
+    const video = document.getElementById('previewVideo');
+    if (!modal || !video) return;
     
-    const modal = document.createElement('div');
-    modal.id = 'videoPreviewModal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.95);
-        z-index: 10060;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-    `;
-    
-    modal.oncontextmenu = (e) => {
-        e.preventDefault();
-        return false;
-    };
-    
-    const frame = document.createElement('div');
-    frame.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        border: 3px solid #4CAF50;
-        border-radius: 20px;
-        pointer-events: none;
-        z-index: 10061;
-        box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
-    `;
-    
-    const contentContainer = document.createElement('div');
-    contentContainer.style.cssText = `
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        bottom: 15px;
-        display: flex;
-        flex-direction: column;
-        background: #000;
-        border-radius: 16px;
-        overflow: hidden;
-    `;
-    
-    const videoWrapper = document.createElement('div');
-    videoWrapper.style.cssText = `
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        overflow: hidden;
-    `;
-    
-    const video = document.createElement('video');
     video.src = videoSrc;
-    video.style.cssText = `
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-        object-fit: contain;
-    `;
-    video.controls = false;
-    video.playsinline = true;
+    modal.style.display = 'flex';
     
-    video.oncontextmenu = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    video.ondragstart = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    };
-    
-    const topButtons = document.createElement('div');
-    topButtons.style.cssText = `
-        position: absolute;
-        top: 30px;
-        left: 0;
-        right: 0;
-        display: flex;
-        justify-content: space-between;
-        padding: 0 35px;
-        pointer-events: none;
-        z-index: 10062;
-    `;
-    
-    const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
-    backBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    backBtn.onmouseover = () => { backBtn.style.background = '#4CAF50'; };
-    backBtn.onmouseout = () => { backBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    backBtn.onclick = () => {
-        if (video) video.pause();
-        modal.remove();
-    };
-    
-    const downloadBtn = document.createElement('button');
-    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-    downloadBtn.style.cssText = `
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #4CAF50;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        backdrop-filter: blur(5px);
-        transition: all 0.2s;
-        color: white;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    downloadBtn.onmouseover = () => { downloadBtn.style.background = '#4CAF50'; };
-    downloadBtn.onmouseout = () => { downloadBtn.style.background = 'rgba(0,0,0,0.7)'; };
-    downloadBtn.onclick = (e) => {
-        e.stopPropagation();
-        const link = document.createElement('a');
-        link.href = videoSrc;
-        link.download = 'video.mp4';
-        link.click();
-    };
-    
-    topButtons.appendChild(backBtn);
-    topButtons.appendChild(downloadBtn);
-    
-    const controlsBar = document.createElement('div');
-    controlsBar.style.cssText = `
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 20px;
-        background: rgba(0,0,0,0.8);
-        backdrop-filter: blur(10px);
-        padding: 15px 20px;
-        border-top: 1px solid #4CAF50;
-        z-index: 10062;
-    `;
-    
-    const playPauseBtn = document.createElement('button');
-    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-    playPauseBtn.style.cssText = `
-        background: #4CAF50;
-        border: none;
-        border-radius: 50%;
-        width: 45px;
-        height: 45px;
-        cursor: pointer;
-        font-size: 1.1rem;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-    `;
-    
-    const currentTimeSpan = document.createElement('span');
-    currentTimeSpan.textContent = '0:00';
-    currentTimeSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
-    
-    const progressBar = document.createElement('div');
-    progressBar.style.cssText = `
-        flex: 1;
-        max-width: 300px;
-        height: 4px;
-        background: rgba(255,255,255,0.3);
-        border-radius: 2px;
-        cursor: pointer;
-        position: relative;
-    `;
-    
-    const progressFill = document.createElement('div');
-    progressFill.style.cssText = `
-        width: 0%;
-        height: 100%;
-        background: #4CAF50;
-        border-radius: 2px;
-    `;
-    progressBar.appendChild(progressFill);
-    
-    const durationSpan = document.createElement('span');
-    durationSpan.textContent = '0:00';
-    durationSpan.style.cssText = `color: white; font-size: 0.9rem; min-width: 45px; text-align: center; font-family: monospace;`;
-    
-    controlsBar.appendChild(playPauseBtn);
-    controlsBar.appendChild(currentTimeSpan);
-    controlsBar.appendChild(progressBar);
-    controlsBar.appendChild(durationSpan);
-    
-    videoWrapper.appendChild(video);
-    contentContainer.appendChild(videoWrapper);
-    contentContainer.appendChild(controlsBar);
-    
-    modal.appendChild(frame);
-    modal.appendChild(contentContainer);
-    modal.appendChild(topButtons);
-    
-    video.addEventListener('loadedmetadata', () => {
-        const minutes = Math.floor(video.duration / 60);
-        const seconds = Math.floor(video.duration % 60);
-        durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    });
-    
-    video.addEventListener('timeupdate', () => {
-        const minutes = Math.floor(video.currentTime / 60);
-        const seconds = Math.floor(video.currentTime % 60);
-        currentTimeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        const percent = (video.currentTime / video.duration) * 100;
-        progressFill.style.width = percent + '%';
-    });
-    
-    let isPlaying = false;
-    playPauseBtn.onclick = () => {
-        if (isPlaying) {
-            video.pause();
-            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-            isPlaying = false;
-        } else {
-            video.play();
-            playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-            isPlaying = true;
-        }
-    };
-    
-    video.onended = () => {
-        playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-        isPlaying = false;
-    };
-    
-    progressBar.onclick = (e) => {
-        const rect = progressBar.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const percent = clickX / rect.width;
-        video.currentTime = percent * video.duration;
-    };
-    
-    const escHandler = (e) => {
-        if (e.key === 'Escape' && document.getElementById('videoPreviewModal')) {
-            if (video) video.pause();
-            modal.remove();
-            document.removeEventListener('keydown', escHandler);
-        }
-    };
-    document.addEventListener('keydown', escHandler);
-    
-    document.body.appendChild(modal);
-    
-    video.play().then(() => {
-        playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-        isPlaying = true;
-    }).catch(() => {});
+    // تشغيل تلقائي
+    video.play().catch(() => {});
+},
+
+// ==================== القسم 26.3: دوال إغلاق المعاينات ====================
+closeImagePreview() {
+    const modal = document.getElementById('imagePreviewModal');
+    const img = document.getElementById('previewImage');
+    if (modal) modal.style.display = 'none';
+    if (img) { img.src = ''; img.style.transform = 'none'; }
+},
+
+closeVideoPreview() {
+    const modal = document.getElementById('videoPreviewModal');
+    const video = document.getElementById('previewVideo');
+    if (modal) modal.style.display = 'none';
+    if (video) { video.pause(); video.src = ''; }
+},
+
+downloadPreviewImage() {
+    const img = document.getElementById('previewImage');
+    if (!img || !img.src) return;
+    const link = document.createElement('a');
+    link.href = img.src;
+    link.download = 'image.jpg';
+    link.click();
+},
+
+downloadPreviewVideo() {
+    const video = document.getElementById('previewVideo');
+    if (!video || !video.src) return;
+    const link = document.createElement('a');
+    link.href = video.src;
+    link.download = 'video.mp4';
+    link.click();
 },
 
     // ==================== القسم 27: sendMessage ====================
@@ -2063,7 +1598,7 @@ async sendMessage(text) {
         }
     },
     
-    // ==================== القسم 30: sendImage (معدل - بدون تحرير تلقائي) ====================
+    // ==================== القسم 30: sendImage ====================
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -2089,7 +1624,7 @@ async sendMessage(text) {
         }
     },
 
-// ==================== القسم 31: sendVideoFile (معدل - بدون تحرير تلقائي) ====================
+// ==================== القسم 31: sendVideoFile ====================
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -2127,7 +1662,7 @@ async sendMessage(text) {
         }
     },
 
-// ==================== القسم 32: sendFile (معدل - بدون تحرير تلقائي) ====================
+// ==================== القسم 32: sendFile ====================
     async sendFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -2153,7 +1688,7 @@ async sendMessage(text) {
         }
     },
 
-// ==================== القسم 33: sendVoiceNote (معدل - بدون تحرير تلقائي) ====================
+// ==================== القسم 33: sendVoiceNote ====================
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -2211,151 +1746,36 @@ async sendMessage(text) {
     }
 },
 
+// ==================== القسم 34.1: showLocationSwipeModalWithClicks (معدل - تستخدم عناصر ثابتة) ====================
 showLocationSwipeModalWithClicks(locationData) {
-    const existing = document.getElementById('locationSwipeModal');
-    if (existing) existing.remove();
+    const modal = document.getElementById('locationSwipeModal');
+    const coordsText = document.getElementById('locationCoordsText');
+    if (!modal || !coordsText) return;
     
-    const appColor = '#2196F3';
+    coordsText.textContent = `${locationData.lat} , ${locationData.lng}`;
+    modal.style.display = 'flex';
     
-    const overlay = document.createElement('div');
-    overlay.id = 'locationSwipeModal';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.85);
-        z-index: 10003;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: system-ui, sans-serif;
-        backdrop-filter: blur(5px);
-    `;
-    
-    overlay.innerHTML = `
-        <style>
-            .toggle-switch {
-                position: relative;
-                display: inline-block;
-                width: 60px;
-                height: 30px;
-            }
-            .toggle-switch input {
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }
-            .toggle-slider {
-                position: absolute;
-                cursor: pointer;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: #555;
-                transition: 0.3s;
-                border-radius: 30px;
-            }
-            .toggle-slider:before {
-                position: absolute;
-                content: "";
-                height: 24px;
-                width: 24px;
-                left: 3px;
-                bottom: 3px;
-                background-color: white;
-                transition: 0.3s;
-                border-radius: 50%;
-            }
-            input:checked + .toggle-slider {
-                background-color: #4CAF50;
-            }
-            input:checked + .toggle-slider:before {
-                transform: translateX(30px);
-            }
-            .click-preset {
-                background: #1a1a2e;
-                color: white;
-                border: 1px solid #4CAF50;
-                padding: 6px 12px;
-                border-radius: 20px;
-                cursor: pointer;
-                transition: all 0.2s;
-                font-size: 0.9rem;
-                min-width: 40px;
-            }
-            .click-preset:hover {
-                background: #4CAF50;
-                border-color: #4CAF50;
-            }
-            .click-preset.selected {
-                background: #4CAF50;
-                border-color: #4CAF50;
-            }
-        </style>
-        
-        <div style="background: #0a0e27; border-radius: 40px; width: 340px; max-width: 90%; padding: 30px 20px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
-            <div style="font-size: 3rem; margin-bottom: 10px;">🗺️</div>
-            <h3 style="color: white; margin: 0 0 5px;">مشاركة الموقع</h3>
-            <p style="color: #aaa; font-size: 0.8rem; margin-bottom: 20px;">هل تريد مشاركة موقعك الحالي</p>
-            
-            <div style="background: rgba(76,175,80,0.15); border-radius: 20px; padding: 12px; margin-bottom: 20px;">
-                <div style="color: #4CAF50; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px;">الإحداثيات</div>
-                <div style="color: white; font-weight: bold; font-size: 0.9rem;">${locationData.lat} , ${locationData.lng}</div>
-            </div>
-            
-            <div style="margin-bottom: 15px;">
-                <div style="color: white; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; text-align: center;">عدد مرات فتح الموقع</div>
-                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0;">
-                    <button type="button" class="click-preset" data-clicks="1">1</button>
-                    <button type="button" class="click-preset" data-clicks="2">2</button>
-                    <button type="button" class="click-preset" data-clicks="3">3</button>
-                    <button type="button" class="click-preset" data-clicks="4">4</button>
-                    <button type="button" class="click-preset" data-clicks="5">5</button>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 15px;">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-                    <span style="color: white; font-size: 0.8rem;">بلا حدود</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="unlimitedToggle">
-                        <span class="toggle-slider"></span>
-                    </label>
-                    <span style="color: #aaa; font-size: 0.8rem;">محدود</span>
-                </div>
-            </div>
-            
-            <p style="color: #888; font-size: 0.65rem; margin: 10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
-            
-            <div class="swipe-container" style="width: 100%; margin: 20px 0; position: relative;">
-                <div id="swipeButton" style="width: 100%; height: 70px; border-radius: 50px; position: relative; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%); border: 2px solid ${appColor};">
-                    <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 2px; background: ${appColor}; transform: translateX(-50%);"></div>
-                    <div style="position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: ${appColor}; border-radius: 50%; transform: translate(-50%, -50%);"></div>
-                    
-                    <div id="leftThumb" style="position: absolute; top: 8px; left: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #4CAF50, #1b5e2a); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: left 0.05s linear; color: white;">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div id="rightThumb" style="position: absolute; top: 8px; right: 8px; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(145deg, #f44336, #8b0000); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: right 0.05s linear; color: white;">
-                        <i class="fas fa-times"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    
-    const button = document.getElementById('swipeButton');
-    const leftThumb = document.getElementById('leftThumb');
-    const rightThumb = document.getElementById('rightThumb');
+    // إعداد السحب للموقع
+    this.setupLocationSwipe(locationData);
+},
+
+setupLocationSwipe(locationData) {
+    const modal = document.getElementById('locationSwipeModal');
+    const button = document.getElementById('locationSwipeButton');
+    const leftThumb = document.getElementById('locationLeftThumb');
+    const rightThumb = document.getElementById('locationRightThumb');
     const unlimitedToggle = document.getElementById('unlimitedToggle');
+    
+    if (!button || !leftThumb || !rightThumb) return;
+    
+    // إزالة المستمعات القديمة
+    if (leftThumb._cleanup) leftThumb._cleanup();
+    if (rightThumb._cleanup) rightThumb._cleanup();
     
     let selectedClicks = 1;
     let selectedButton = null;
     
+    // إعداد أزرار عدد النقرات
     document.querySelectorAll('.click-preset').forEach(btn => {
         btn.onclick = () => {
             if (selectedButton) {
@@ -2439,10 +1859,12 @@ showLocationSwipeModalWithClicks(locationData) {
             locationData.clicksRemaining = maxClicks;
             
             setTimeout(() => {
-                CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
+                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                    CallSystem.dc.send(JSON.stringify({ type: 'location', data: locationData, id: Date.now().toString() }));
+                }
                 const msgId = Date.now().toString();
                 this.displayMessage({ id: msgId, type: 'location', data: locationData, sender: 'me', time: new Date().toISOString(), status: 'sent' });
-                overlay.remove();
+                modal.style.display = 'none';
             }, 200);
         } else {
             leftThumb.style.left = '8px';
@@ -2473,7 +1895,7 @@ showLocationSwipeModalWithClicks(locationData) {
         if (rightCurrentPos >= maxRightMove - 10) {
             rightThumb.style.right = maxRightMove + 'px';
             setTimeout(() => {
-                overlay.remove();
+                modal.style.display = 'none';
             }, 200);
         } else {
             rightThumb.style.right = '8px';
@@ -2485,20 +1907,32 @@ showLocationSwipeModalWithClicks(locationData) {
     rightThumb.addEventListener('mousedown', onRightStart);
     rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
     
-    document.addEventListener('mousemove', (e) => { onLeftMove(e); onRightMove(e); });
-    document.addEventListener('mouseup', () => { onLeftEnd(); onRightEnd(); });
-    document.addEventListener('touchmove', (e) => { onLeftMove(e); onRightMove(e); }, { passive: false });
-    document.addEventListener('touchend', () => { onLeftEnd(); onRightEnd(); });
+    const moveHandler = (e) => { onLeftMove(e); onRightMove(e); };
+    const endHandler = () => { onLeftEnd(); onRightEnd(); };
+    
+    document.addEventListener('mousemove', moveHandler);
+    document.addEventListener('mouseup', endHandler);
+    document.addEventListener('touchmove', moveHandler, { passive: false });
+    document.addEventListener('touchend', endHandler);
+    
+    leftThumb._cleanup = () => {
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('mouseup', endHandler);
+        document.removeEventListener('touchmove', moveHandler);
+        document.removeEventListener('touchend', endHandler);
+    };
+    rightThumb._cleanup = leftThumb._cleanup;
     
     setTimeout(() => {
-        if (document.getElementById('locationSwipeModal')) overlay.remove();
+        if (modal && modal.style.display === 'flex') {
+            modal.style.display = 'none';
+        }
     }, 30000);
 }, 
     
     
-    // ==================== القسم 35: saveMessage (معدل - حد 100 رسالة) ====================
+    // ==================== القسم 35: saveMessage ====================
     saveMessage(friendId, message) { 
-        // فقط النصوص تُحفظ محليًا
         if (message.type !== 'text') {
             console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
             return;
@@ -2512,10 +1946,8 @@ showLocationSwipeModalWithClicks(locationData) {
             messages = []; 
         }
         
-        // إضافة الرسالة الجديدة
         messages.push(message); 
         
-        // ✅ إذا تجاوز العدد 100 رسالة، احذف أقدم 50 رسالة
         if (messages.length > 100) {
             const excessCount = messages.length - 100;
             const removeCount = excessCount + 50;
@@ -2523,7 +1955,6 @@ showLocationSwipeModalWithClicks(locationData) {
             console.log(`🧹 تم حذف ${removeCount} رسالة قديمة (الحد الأقصى 100 رسالة)`);
         }
         
-        // حفظ في localStorage
         try { 
             localStorage.setItem(key, JSON.stringify(messages)); 
         } catch (e) {
@@ -2557,7 +1988,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-   // ==================== القسم 37: closeChat (معدل - تنظيف شامل) ====================
+   // ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2568,7 +1999,6 @@ closeChat() {
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
         
-        // ✅ تنظيف بيانات المحادثة
         this.cleanConversationData(chatId, false);
         
         const key = `chat_${chatId}`;
@@ -2578,7 +2008,6 @@ closeChat() {
         localStorage.setItem(key, JSON.stringify(filteredMessages));
         console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
         
-        // تنظيف جميع blob URLs
         document.querySelectorAll('img, video, audio').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
                 URL.revokeObjectURL(el.src);
@@ -2596,7 +2025,6 @@ closeChat() {
         this.featureBlinkInterval = null;
     }
     
-    // ✅ إخفاء أزرار التفعيل والطرد عند إغلاق المحادثة
     const toggleContainer = document.getElementById('featureToggleContainer');
     const kickBtn = document.getElementById('kickBtn');
     if (toggleContainer) toggleContainer.style.display = 'none';
@@ -2608,7 +2036,6 @@ closeChat() {
     document.getElementById('conversationPage').style.display = 'none';
     document.querySelector('.chat-page').style.display = 'block';
     
-    // ✅ تنظيف العناصر الديناميكية
     if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
         CallSystem.cleanupDynamicElements();
     }
@@ -2634,7 +2061,6 @@ closeChat() {
     cleanConversationData(chatId, cleanAll = false) {
         console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
         
-        // 1. تنظيف localStorage (النصوص فقط تبقى)
         const key = `chat_${chatId}`;
         if (cleanAll) {
             localStorage.removeItem(key);
@@ -2648,7 +2074,6 @@ closeChat() {
             console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
         }
         
-        // 2. تنظيف Blob URLs
         document.querySelectorAll('img, video, audio').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
                 URL.revokeObjectURL(el.src);
@@ -2656,7 +2081,6 @@ closeChat() {
             }
         });
         
-        // 3. تنظيف حاوية الرسائل
         if (this.currentChat === chatId) {
             const messagesContainer = document.getElementById('messagesContainer');
             if (messagesContainer) {
@@ -2664,7 +2088,6 @@ closeChat() {
             }
         }
         
-        // 4. تنظيف مصفوفات CallSystem المؤقتة (خاصة بـ CallSystem فقط)
         if (typeof CallSystem !== 'undefined') {
             CallSystem.incomingChunks = {};
             CallSystem.incomingFileInfo = {};
@@ -2672,7 +2095,6 @@ closeChat() {
             CallSystem._answerIceCandidates = [];
         }
         
-        // 5. تنظيف مصفوفات ومؤقتات ChatSystem الخاصة (المنقولة من CallSystem)
         this._pendingIceCandidates = [];
         this._responseIceCandidates = [];
         if (this._batchTimer) {
@@ -2714,8 +2136,16 @@ function performGlobalCleanup() {
     modals.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            if (el._cleanup) el._cleanup();
-            el.remove();
+            el.style.display = 'none';
+            if (id === 'imagePreviewModal') {
+                const img = document.getElementById('previewImage');
+                if (img) img.src = '';
+            }
+            if (id === 'videoPreviewModal') {
+                const video = document.getElementById('previewVideo');
+                if (video) { video.pause(); video.src = ''; }
+            }
+            if (id === 'callUI') el.innerHTML = '';
         }
     });
     
@@ -2743,6 +2173,10 @@ function performGlobalCleanup() {
         if (CallSystem.keepAliveIntervalCall) {
             clearInterval(CallSystem.keepAliveIntervalCall);
             CallSystem.keepAliveIntervalCall = null;
+        }
+        if (CallSystem._incomingCallTimeout) {
+            clearTimeout(CallSystem._incomingCallTimeout);
+            CallSystem._incomingCallTimeout = null;
         }
     }
     
