@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة المعدلة (عناصر ثابتة + حذف الكابتشا) ==========
+// ========== chat-system.js - النسخة المعدلة (قوالب ثابتة) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 const ChatSystem = {
@@ -954,7 +954,7 @@ closeConversation() {
         } 
     },
     
-    // ==================== القسم 18: showProgressBar (معدل - تستخدم عناصر ثابتة) ====================
+    // ==================== القسم 18: showProgressBar ====================
     showProgressBar(message, percent) {
         const bar = document.getElementById('progressBar');
         if (!bar) return;
@@ -1043,7 +1043,7 @@ openChat(friendId, friendName, friendAvatar) {
     },
 
 
-// ==================== القسم 26: displayMessage ====================
+// ==================== القسم 26: displayMessage (معدل - استخدام قوالب ثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1109,165 +1109,149 @@ displayMessage(msg) {
         let clicksRemaining = locationData.clicksRemaining;
         
         if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.style.cssText = 'background: #888; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: none;';
-            contentDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
-            div.appendChild(contentDiv);
-        } else {
-            const locationDiv = document.createElement('div');
-            locationDiv.className = 'message-content location-card';
-            const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
-            locationDiv.style.cssText = `cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid ${borderColor};`;
-            locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
-            
-            locationDiv.onclick = (e) => {
-                e.stopPropagation();
-                if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
-                window.open(locationUrl, '_blank');
-                if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
-                    clicksRemaining--;
-                    msg.data.clicksRemaining = clicksRemaining;
-                    if (clicksRemaining <= 0) {
-                        locationDiv.style.background = '#888';
-                        locationDiv.style.cursor = 'default';
-                        locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
-                        locationDiv.onclick = () => {};
-                    }
-                    if (ChatSystem.currentChat) {
-                        const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
-                        const msgIndex = messages.findIndex(m => m.id === msg.id);
-                        if (msgIndex !== -1) {
-                            messages[msgIndex].data.clicksRemaining = clicksRemaining;
-                            ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
-                        }
-                    }
+            // استخدام القالب الثابت للموقع المقفل
+            const template = document.getElementById('locationMessageTemplate');
+            if (template) {
+                const clone = template.content.cloneNode(true);
+                const locationDiv = clone.querySelector('.location-card');
+                if (locationDiv) {
+                    locationDiv.style.background = '#888';
+                    locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                    div.appendChild(clone);
                 }
-            };
-            div.appendChild(locationDiv);
+            }
+        } else {
+            // استخدام القالب الثابت للموقع المفتوح
+            const template = document.getElementById('locationMessageTemplate');
+            if (template) {
+                const clone = template.content.cloneNode(true);
+                const locationDiv = clone.querySelector('.location-card');
+                if (locationDiv) {
+                    const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+                    locationDiv.style.border = `1.5px solid ${borderColor}`;
+                    
+                    locationDiv.onclick = (e) => {
+                        e.stopPropagation();
+                        if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
+                        window.open(locationUrl, '_blank');
+                        if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                            clicksRemaining--;
+                            msg.data.clicksRemaining = clicksRemaining;
+                            if (clicksRemaining <= 0) {
+                                locationDiv.style.background = '#888';
+                                locationDiv.style.cursor = 'default';
+                                locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                                locationDiv.onclick = () => {};
+                            }
+                            if (ChatSystem.currentChat) {
+                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                                const msgIndex = messages.findIndex(m => m.id === msg.id);
+                                if (msgIndex !== -1) {
+                                    messages[msgIndex].data.clicksRemaining = clicksRemaining;
+                                    ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                                }
+                            }
+                        }
+                    };
+                }
+                div.appendChild(clone);
+            }
         }
     }
     else if (msg.type === 'image') {
-        let imageSrc = msg.data;
-        
-        const imageDiv = document.createElement('div');
-        imageDiv.className = 'message-image-wrapper';
-        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
-        imageDiv.style.cssText = `cursor: pointer; display: inline-block; border: 2px solid ${borderColor}; border-radius: 12px; overflow: hidden; width: 200px; height: 200px;`;
-        
-        const img = document.createElement('img');
-        img.src = imageSrc;
-        img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block;';
-        img.loading = 'lazy';
-        
-        img.oncontextmenu = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        };
-        img.ondragstart = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        };
-        
-        img.onclick = () => {
-            this.showImagePreview(imageSrc);
-        };
-        
-        imageDiv.appendChild(img);
-        div.appendChild(imageDiv);
+        // استخدام القالب الثابت للصورة
+        const template = document.getElementById('imageMessageTemplate');
+        if (template) {
+            const clone = template.content.cloneNode(true);
+            const img = clone.querySelector('.message-image-content');
+            if (img) {
+                img.src = msg.data;
+                img.onclick = () => this.showImagePreview(msg.data);
+            }
+            const wrapper = clone.querySelector('.message-image-wrapper');
+            if (wrapper) {
+                const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+                wrapper.style.border = `2px solid ${borderColor}`;
+            }
+            div.appendChild(clone);
+        }
     } 
     else if (msg.type === 'voice') {
-        let audioSrc = msg.data;
-        
-        const audioId = `audio_${msg.id}`;
-        let audioDuration = 0;
-        
-        const tempAudio = new Audio(audioSrc);
-        tempAudio.addEventListener('loadedmetadata', () => {
-            audioDuration = tempAudio.duration;
-            const durationSpan = document.getElementById(`duration_${audioId}`);
-            if (durationSpan && !isNaN(audioDuration)) {
-                const minutes = Math.floor(audioDuration / 60);
-                const seconds = Math.floor(audioDuration % 60);
-                durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            }
-        });
-        
-        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
-        
-        div.innerHTML = `
-            <div class="message-content voice-message" style="background: #4CAF50; border-radius: 20px; padding: 8px 12px; display: inline-block; direction: ltr; border: 1.5px solid ${borderColor};">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <button class="voice-play-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>
-                    </button>
-                    <button class="voice-replay-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-sync-alt" style="color: #f44336; font-size: 0.9rem;"></i>
-                    </button>
-                    <div style="text-align: center;">
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <span class="voice-time" id="time_${audioId}" style="color: white; font-size: 0.85rem; font-weight: bold; min-width: 45px;">0:00</span>
-                            <span id="duration_${audioId}" style="color: white; font-size: 0.7rem; opacity: 0.8;">0:00</span>
-                        </div>
-                    </div>
-                    <button class="voice-mute-btn" data-audio="${audioId}" style="background: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>
-                    </button>
-                </div>
-                <audio id="${audioId}" src="${audioSrc}" style="display: none;"></audio>
-            </div>
-        `;
-        
-        setTimeout(() => {
-            const playBtn = div.querySelector('.voice-play-btn');
-            const replayBtn = div.querySelector('.voice-replay-btn');
-            const muteBtn = div.querySelector('.voice-mute-btn');
-            const audioEl = document.getElementById(audioId);
-            const timeSpan = document.getElementById(`time_${audioId}`);
+        // استخدام القالب الثابت للبصمة الصوتية
+        const template = document.getElementById('voiceMessageTemplate');
+        if (template) {
+            const clone = template.content.cloneNode(true);
+            const audioEl = clone.querySelector('.voice-audio-element');
+            const playBtn = clone.querySelector('.voice-play-btn');
+            const replayBtn = clone.querySelector('.voice-replay-btn');
+            const muteBtn = clone.querySelector('.voice-mute-btn');
+            const timeSpan = clone.querySelector('.voice-current-time');
+            const durationSpan = clone.querySelector('.voice-duration');
             
-            if (playBtn && audioEl) {
+            if (audioEl) {
+                audioEl.src = msg.data;
+                
+                // إعداد مدة الصوت
+                const tempAudio = new Audio(msg.data);
+                tempAudio.addEventListener('loadedmetadata', () => {
+                    const duration = tempAudio.duration;
+                    if (durationSpan && !isNaN(duration)) {
+                        const minutes = Math.floor(duration / 60);
+                        const seconds = Math.floor(duration % 60);
+                        durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                });
+                
                 let isPlaying = false;
                 
-                playBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (isPlaying) {
-                        audioEl.pause();
-                        playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                        isPlaying = false;
-                    } else {
-                        audioEl.play();
-                        playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                        isPlaying = true;
-                    }
-                };
+                if (playBtn) {
+                    playBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (isPlaying) {
+                            audioEl.pause();
+                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                            isPlaying = false;
+                        } else {
+                            audioEl.play();
+                            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                            isPlaying = true;
+                        }
+                    };
+                }
                 
-                replayBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    audioEl.pause();
-                    audioEl.currentTime = 0;
-                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                    isPlaying = false;
-                    if (timeSpan) timeSpan.textContent = '0:00';
-                    audioEl.play();
-                    playBtn.innerHTML = '<i class="fas fa-pause" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                    isPlaying = true;
-                };
+                if (replayBtn) {
+                    replayBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        audioEl.pause();
+                        audioEl.currentTime = 0;
+                        if (playBtn) {
+                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        }
+                        isPlaying = false;
+                        if (timeSpan) timeSpan.textContent = '0:00';
+                        audioEl.play();
+                        if (playBtn) {
+                            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                        }
+                        isPlaying = true;
+                    };
+                }
                 
                 let isMuted = false;
-                muteBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (isMuted) {
-                        audioEl.muted = false;
-                        muteBtn.innerHTML = '<i class="fas fa-volume-up" style="color: #4CAF50; font-size: 0.9rem;"></i>';
-                        isMuted = false;
-                    } else {
-                        audioEl.muted = true;
-                        muteBtn.innerHTML = '<i class="fas fa-volume-mute" style="color: #f44336; font-size: 0.9rem;"></i>';
-                        isMuted = true;
-                    }
-                };
+                if (muteBtn) {
+                    muteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (isMuted) {
+                            audioEl.muted = false;
+                            muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                            isMuted = false;
+                        } else {
+                            audioEl.muted = true;
+                            muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                            isMuted = true;
+                        }
+                    };
+                }
                 
                 audioEl.ontimeupdate = () => {
                     const minutes = Math.floor(audioEl.currentTime / 60);
@@ -1278,83 +1262,71 @@ displayMessage(msg) {
                 };
                 
                 audioEl.onended = () => {
-                    playBtn.innerHTML = '<i class="fas fa-play" style="color: #4CAF50; font-size: 0.9rem;"></i>';
+                    if (playBtn) {
+                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    }
                     isPlaying = false;
                     if (timeSpan) timeSpan.textContent = '0:00';
                 };
             }
-        }, 10);
+            
+            const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+            const voiceMsg = clone.querySelector('.voice-message');
+            if (voiceMsg) {
+                voiceMsg.style.border = `1.5px solid ${borderColor}`;
+            }
+            
+            div.appendChild(clone);
+        }
     } 
     else if (msg.type === 'video') {
-        let videoSrc = msg.data;
-        
-        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
-        
-        div.innerHTML = `
-            <div class="message-content video-thumbnail" style="position: relative; width: 250px; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid ${borderColor}; cursor: pointer;">
-                <video style="width: 100%; height: auto; max-height: 200px; display: block; pointer-events: none;" preload="metadata">
-                    <source src="${videoSrc}" type="video/mp4">
-                </video>
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
-                    <i class="fas fa-expand" style="color: white; font-size: 1.5rem;"></i>
-                </div>
-            </div>
-        `;
-        
-        const videoContainer = div.querySelector('.video-thumbnail');
-        videoContainer.oncontextmenu = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        };
-        
-        videoContainer.onclick = (e) => {
-            e.stopPropagation();
-            this.showVideoPreview(videoSrc);
-        };
+        // استخدام القالب الثابت للفيديو
+        const template = document.getElementById('videoMessageTemplate');
+        if (template) {
+            const clone = template.content.cloneNode(true);
+            const video = clone.querySelector('.video-thumbnail-content');
+            const source = video?.querySelector('source');
+            if (source) {
+                source.src = msg.data;
+                video.load();
+            }
+            const thumbnail = clone.querySelector('.video-thumbnail');
+            if (thumbnail) {
+                const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+                thumbnail.style.border = `2px solid ${borderColor}`;
+                thumbnail.onclick = (e) => {
+                    e.stopPropagation();
+                    this.showVideoPreview(msg.data);
+                };
+            }
+            div.appendChild(clone);
+        }
     } 
     else if (msg.type === 'file') {
-        let fileName = msg.fileName || 'ملف';
-        let fileUrl = msg.data;
-        
-        let fileSize = '';
-        
-        let displayName = fileName;
-        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
-        
-        div.innerHTML = `
-            <div class="message-content file-card" style="background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1.5px solid ${borderColor};">
-                <div style="background: white; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex-shrink: 0;">
-                    <span style="font-size: 1.5rem;">📄</span>
-                </div>
-                
-                <div style="flex: 1; overflow: hidden; min-width: 0;">
-                    <div style="font-weight: bold; font-size: 0.85rem; word-break: break-all; color: white; line-height: 1.3;">${this.escapeHtml(displayName)}</div>
-                    ${fileSize ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); margin-top: 4px;">${fileSize}</div>` : ''}
-                </div>
-                
-                <div style="color: white; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;" 
-                     class="download-file-btn"
-                     data-url="${fileUrl}"
-                     data-name="${msg.fileName || 'ملف'}"
-                     onmouseover="this.style.background='rgba(255,255,255,0.3)'"
-                     onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                    <i class="fas fa-download" style="font-size: 1rem; pointer-events: none;"></i>
-                </div>
-            </div>
-        `;
-        
-        const downloadBtnDiv = div.querySelector('.download-file-btn');
-        if (downloadBtnDiv) {
-            downloadBtnDiv.onclick = (e) => {
-                e.stopPropagation();
-                const url = downloadBtnDiv.getAttribute('data-url');
-                const name = downloadBtnDiv.getAttribute('data-name');
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = name;
-                link.click();
-            };
+        // استخدام القالب الثابت للملف
+        const template = document.getElementById('fileMessageTemplate');
+        if (template) {
+            const clone = template.content.cloneNode(true);
+            const fileNameEl = clone.querySelector('.file-name');
+            if (fileNameEl) {
+                fileNameEl.textContent = msg.fileName || 'ملف';
+            }
+            const downloadBtn = clone.querySelector('.download-file-btn');
+            if (downloadBtn) {
+                downloadBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const link = document.createElement('a');
+                    link.href = msg.data;
+                    link.download = msg.fileName || 'ملف';
+                    link.click();
+                };
+            }
+            const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+            const fileCard = clone.querySelector('.file-card');
+            if (fileCard) {
+                fileCard.style.border = `1.5px solid ${borderColor}`;
+            }
+            div.appendChild(clone);
         }
     }
     
@@ -1363,7 +1335,7 @@ displayMessage(msg) {
 },
      
 
-    // ==================== القسم 26.1: showImagePreview (معدل - تستخدم عناصر ثابتة) ====================
+    // ==================== القسم 26.1: showImagePreview ====================
 showImagePreview(imageSrc) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1372,12 +1344,10 @@ showImagePreview(imageSrc) {
     img.src = imageSrc;
     modal.style.display = 'flex';
     
-    // إعداد أحداث التكبير/التصغير
     this.setupImageZoom(modal, img);
 },
 
 setupImageZoom(modal, img) {
-    // إزالة المستمعات القديمة
     if (img._zoomCleanup) {
         img._zoomCleanup();
         img._zoomCleanup = null;
@@ -1466,7 +1436,7 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview (معدل - تستخدم عناصر ثابتة) ====================
+// ==================== القسم 26.2: showVideoPreview ====================
 showVideoPreview(videoSrc) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
@@ -1474,8 +1444,6 @@ showVideoPreview(videoSrc) {
     
     video.src = videoSrc;
     modal.style.display = 'flex';
-    
-    // تشغيل تلقائي
     video.play().catch(() => {});
 },
 
@@ -1746,7 +1714,7 @@ async sendMessage(text) {
     }
 },
 
-// ==================== القسم 34.1: showLocationSwipeModalWithClicks (معدل - تستخدم عناصر ثابتة) ====================
+// ==================== القسم 34.1: showLocationSwipeModalWithClicks ====================
 showLocationSwipeModalWithClicks(locationData) {
     const modal = document.getElementById('locationSwipeModal');
     const coordsText = document.getElementById('locationCoordsText');
@@ -1755,7 +1723,6 @@ showLocationSwipeModalWithClicks(locationData) {
     coordsText.textContent = `${locationData.lat} , ${locationData.lng}`;
     modal.style.display = 'flex';
     
-    // إعداد السحب للموقع
     this.setupLocationSwipe(locationData);
 },
 
@@ -1768,14 +1735,12 @@ setupLocationSwipe(locationData) {
     
     if (!button || !leftThumb || !rightThumb) return;
     
-    // إزالة المستمعات القديمة
     if (leftThumb._cleanup) leftThumb._cleanup();
     if (rightThumb._cleanup) rightThumb._cleanup();
     
     let selectedClicks = 1;
     let selectedButton = null;
     
-    // إعداد أزرار عدد النقرات
     document.querySelectorAll('.click-preset').forEach(btn => {
         btn.onclick = () => {
             if (selectedButton) {
@@ -2132,7 +2097,7 @@ function performGlobalCleanup() {
         }
     });
     
-    const modals = ['incomingCall', 'callUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
+    const modals = ['incomingCall', 'audioCallUI', 'videoCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
     modals.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -2145,7 +2110,12 @@ function performGlobalCleanup() {
                 const video = document.getElementById('previewVideo');
                 if (video) { video.pause(); video.src = ''; }
             }
-            if (id === 'callUI') el.innerHTML = '';
+            if (id === 'audioCallUI' || id === 'videoCallUI') {
+                const rv = document.getElementById('remoteVideo');
+                if (rv) rv.srcObject = null;
+                const lv = document.getElementById('localVideo');
+                if (lv) lv.srcObject = null;
+            }
         }
     });
     
