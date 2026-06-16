@@ -1,4 +1,4 @@
-// ========== 1. webrtc-call.js - النسخة النهائية المعدلة ==========
+// ========== webrtc-call.js - النسخة المعدلة (عناصر ثابتة) ==========
 // جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
 
 const CallSystem = {
@@ -9,6 +9,7 @@ const CallSystem = {
     callTimerInterval: null, keepAliveInterval: null, keepAliveIntervalCall: null,
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
+    _incomingCallTimeout: null,
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -18,7 +19,7 @@ const CallSystem = {
         ] 
     },
     
-    // ==================== 3. Data Channel فقط (لإرسال الملفات بدون مكالمة) ====================
+    // ==================== 3. Data Channel فقط ====================
     
 async ensureDataChannelOnly(calleeId) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
@@ -28,13 +29,11 @@ async ensureDataChannelOnly(calleeId) {
     
     if (!calleeId) return false;
     
-    // ✅ إذا القناة مفتوحة بالفعل
     if (this.dc && this.dc.readyState === 'open') {
         console.log('✅ Data Channel موجود ومفتوح');
         return true;
     }
     
-    // ✅ إذا القناة في طور الاتصال - انتظر
     if (this.dc && this.dc.readyState === 'connecting') {
         console.log('⏳ Data Channel في طور الاتصال...');
         return new Promise((resolve) => {
@@ -53,7 +52,6 @@ async ensureDataChannelOnly(calleeId) {
         });
     }
     
-    // ✅ إذا لا توجد قناة، قم بإنشائها
     return this.createDataChannelOnly(calleeId);
 },
 
@@ -63,13 +61,11 @@ async createDataChannelOnly(calleeId) {
         return false;
     }
     
-    // ✅ إذا كانت القناة مفتوحة بالفعل، لا نعيد إنشاءها
     if (this.dc && this.dc.readyState === 'open') {
         console.log('✅ Data Channel موجود ومفتوح، لا حاجة لإعادة الإنشاء');
         return true;
     }
     
-    // ✅ تنظيف الاتصالات القديمة فقط إذا كانت فاشلة أو مغلقة
     if (this.pc && (this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed')) {
         try { this.pc.close(); } catch(e) {}
         this.pc = null;
@@ -79,7 +75,6 @@ async createDataChannelOnly(calleeId) {
         this.dc = null;
     }
     
-    // ✅ إذا كان هناك PeerConnection في حالة connecting، لا ننشئ جديداً
     if (this.pc && (this.pc.connectionState === 'connecting' || this.pc.connectionState === 'new')) {
         console.log('⏳ PeerConnection قيد الاتصال بالفعل، انتظر...');
         return new Promise((resolve) => {
@@ -130,7 +125,7 @@ async createDataChannelOnly(calleeId) {
     }
 },
     
-    // ==================== 4. المكالمة الصوتية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+    // ==================== 4. المكالمة الصوتية ====================
 
     async startAudioCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -176,7 +171,6 @@ async createDataChannelOnly(calleeId) {
             }
             console.log('✅ تم الحصول على الميكروفون');
             
-            // ✅ استخدام pcCall بدلاً من pc
             this.pcCall = new RTCPeerConnection(this.servers);
             
             this.localStream.getTracks().forEach(track => {
@@ -184,11 +178,9 @@ async createDataChannelOnly(calleeId) {
                 console.log(`➕ تم إضافة مسار ${track.kind}`);
             });
             
-            // ✅ استخدام dcCall بدلاً من dc
             this.dcCall = this.pcCall.createDataChannel('chat');
             this.setupDataChannel(this.dcCall);
             
-            // ✅ مصفوفة لتجميع ICE candidates للمكالمة
             this._callIceCandidates = [];
             this._callBatchTimer = null;
             
@@ -217,7 +209,6 @@ async createDataChannelOnly(calleeId) {
             const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
             await this.pcCall.setLocalDescription(offer);
             
-            // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
             await new Promise(resolve => {
                 if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
                 this._callBatchTimer = setTimeout(() => {
@@ -226,14 +217,12 @@ async createDataChannelOnly(calleeId) {
                 }, 5000);
             });
             
-            // ✅ إرسال Offer + جميع ICE candidates المجمعة
             await this.sendSignal(calleeId, { 
                 sdp: this.pcCall.localDescription, 
                 type: 'audio',
                 iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
             });
             
-            // تنظيف
             this._callIceCandidates = [];
             this._callBatchTimer = null;
             
@@ -245,7 +234,7 @@ async createDataChannelOnly(calleeId) {
         }
     },
 
-// ==================== 5. المكالمة المرئية (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+// ==================== 5. المكالمة المرئية ====================
 
     async startVideoCall(calleeId) {
         if (!ChatSystem.friendInConversation) {
@@ -287,15 +276,12 @@ async createDataChannelOnly(calleeId) {
             
             this.showCallUI('video');
             
-            // ✅ استخدام pcCall بدلاً من pc
             this.pcCall = new RTCPeerConnection(this.servers);
             this.localStream.getTracks().forEach(track => this.pcCall.addTrack(track, this.localStream));
             
-            // ✅ استخدام dcCall بدلاً من dc
             this.dcCall = this.pcCall.createDataChannel('chat');
             this.setupDataChannel(this.dcCall);
             
-            // ✅ مصفوفة لتجميع ICE candidates للمكالمة
             this._callIceCandidates = [];
             this._callBatchTimer = null;
             
@@ -317,7 +303,6 @@ async createDataChannelOnly(calleeId) {
             const offer = await this.pcCall.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
             await this.pcCall.setLocalDescription(offer);
             
-            // ✅ انتظار 5 ثواني لتجميع ICE candidates (لضمان نجاح 100%)
             await new Promise(resolve => {
                 if (this._callBatchTimer) clearTimeout(this._callBatchTimer);
                 this._callBatchTimer = setTimeout(() => {
@@ -326,14 +311,12 @@ async createDataChannelOnly(calleeId) {
                 }, 5000);
             });
             
-            // ✅ إرسال Offer + جميع ICE candidates المجمعة
             await this.sendSignal(calleeId, { 
                 sdp: this.pcCall.localDescription, 
                 type: 'video',
                 iceCandidates: this._callIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
             });
             
-            // تنظيف
             this._callIceCandidates = [];
             this._callBatchTimer = null;
             
@@ -384,7 +367,7 @@ async createDataChannelOnly(calleeId) {
     },
 
 
-    // ==================== 7. استقبال المكالمات (معدلة - تستخدم pcCall/dcCall + تجميع 5 ثواني) ====================
+    // ==================== 7. استقبال المكالمات ====================
 
     async receiveCall(callerId, callData) {
         if (this.isInCall) {
@@ -433,7 +416,6 @@ async createDataChannelOnly(calleeId) {
             
             this.showCallUI(this.callType);
             
-            // ✅ استخدام pcCall بدلاً من pc
             this.pcCall = new RTCPeerConnection(this.servers);
             
             this.localStream.getTracks().forEach(track => {
@@ -441,7 +423,6 @@ async createDataChannelOnly(calleeId) {
                 console.log(`➕ تم إضافة مسار ${track.kind}`);
             });
             
-            // ✅ مصفوفة لتجميع ICE candidates للإجابة
             this._answerIceCandidates = [];
             this._answerBatchTimer = null;
             
@@ -480,7 +461,6 @@ async createDataChannelOnly(calleeId) {
             this.pcCall.ondatachannel = e => {
                 console.log('📡 استقبال Data Channel');
                 this.setupDataChannel(e.channel);
-                // ✅ استخدام dcCall بدلاً من dc
                 this.dcCall = e.channel;
             };
             
@@ -497,7 +477,6 @@ async createDataChannelOnly(calleeId) {
                 const answer = await this.pcCall.createAnswer(answerOptions);
                 await this.pcCall.setLocalDescription(answer);
                 
-                // ✅ انتظار 5 ثواني لتجميع ICE candidates للإجابة
                 await new Promise(resolve => {
                     if (this._answerBatchTimer) clearTimeout(this._answerBatchTimer);
                     this._answerBatchTimer = setTimeout(() => {
@@ -506,13 +485,11 @@ async createDataChannelOnly(calleeId) {
                     }, 5000);
                 });
                 
-                // ✅ إرسال Answer + جميع ICE candidates المجمعة
                 await this.sendSignal(callerId, { 
                     sdp: this.pcCall.localDescription,
                     iceCandidates: this._answerIceCandidates.map(c => ({ candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex }))
                 });
                 
-                // تنظيف
                 this._answerIceCandidates = [];
                 this._answerBatchTimer = null;
                 
@@ -537,7 +514,7 @@ async createDataChannelOnly(calleeId) {
     },
     
     
-    // ========== 8. شاشة المكالمة الواردة بأزرار السحب ==========
+    // ========== 8. شاشة المكالمة الواردة (معدلة - تستخدم عناصر ثابتة) ==========
 
     showIncomingCall(callerId, callData) {
         if (callData.type === 'datachannel') {
@@ -546,22 +523,27 @@ async createDataChannelOnly(calleeId) {
             return;
         }
         
-        // ✅ تنظيف أي عنصر قديم قبل إنشاء جديد
-        this.cleanupDynamicElements();
-        
         console.log('🔔 عرض شاشة المكالمة الواردة...');
         this.currentCallId = callerId;
         
-        const callType = callData.type === 'video' ? 'video' : 'audio';
-        const appColor = '#2196F3';
-        const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
+        const overlay = document.getElementById('incomingCall');
+        const avatar = document.getElementById('incomingCallAvatar');
+        const name = document.getElementById('incomingCallName');
+        const leftThumb = document.getElementById('leftThumb');
+        const rightThumb = document.getElementById('rightThumb');
+        const swipeButton = document.getElementById('swipeButton');
         
+        // تحديث أيقونة القبول حسب نوع المكالمة
+        const callType = callData.type === 'video' ? 'video' : 'audio';
+        const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
+        leftThumb.innerHTML = `<i class="fas ${acceptIcon}"></i>`;
+        
+        // جلب اسم المستخدم
         const fetchUserName = async () => {
             try {
                 const userDoc = await window.db.collection('users').doc(callerId).get();
                 if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    return userData.name || 'مستخدم';
+                    return userDoc.data().name || 'مستخدم';
                 }
             } catch (e) {}
             return 'مستخدم';
@@ -580,280 +562,145 @@ async createDataChannelOnly(calleeId) {
         };
         
         Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
-            const existingOverlay = document.getElementById('incomingCall');
-            if (existingOverlay) existingOverlay.remove();
+            name.textContent = contactName;
+            avatar.textContent = contactAvatar;
             
-            const overlay = document.createElement('div');
-            overlay.id = 'incomingCall';
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: #0a0e27;
-                z-index: 9999;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-            `;
+            // إظهار الشاشة
+            overlay.style.display = 'flex';
             
-            overlay.innerHTML = `
-                <style>
-                    @keyframes float {
-                        0%, 100% { transform: translateY(0px); }
-                        50% { transform: translateY(-15px); }
-                    }
-                    @keyframes ring {
-                        0% { transform: rotate(0deg); }
-                        25% { transform: rotate(6deg); }
-                        50% { transform: rotate(0deg); }
-                        75% { transform: rotate(-6deg); }
-                        100% { transform: rotate(0deg); }
-                    }
-                    .avatar-float {
-                        animation: float 2.5s ease-in-out infinite;
-                    }
-                    .ring-animation {
-                        animation: ring 1.2s ease-in-out infinite;
-                        transform-origin: center;
-                    }
-                    .swipe-container {
-                        width: 360px;
-                        margin: 30px auto;
-                        position: relative;
-                    }
-                    .swipe-button {
-                        width: 100%;
-                        height: 80px;
-                        border-radius: 50px;
-                        position: relative;
-                        overflow: hidden;
-                        cursor: grab;
-                        user-select: none;
-                        touch-action: none;
-                        background: linear-gradient(90deg, #1a5a2a 0%, #1a5a2a 50%, #8b1a1a 50%, #8b1a1a 100%);
-                        border: 2px solid ${appColor};
-                        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-                    }
-                    .swipe-button:active {
-                        cursor: grabbing;
-                    }
-                    .divider-line {
-                        position: absolute;
-                        top: 10px;
-                        bottom: 10px;
-                        left: 50%;
-                        width: 2px;
-                        background: ${appColor};
-                        transform: translateX(-50%);
-                        pointer-events: none;
-                        z-index: 5;
-                        border-radius: 2px;
-                        box-shadow: 0 0 8px ${appColor};
-                    }
-                    .swipe-thumb {
-                        position: absolute;
-                        top: 8px;
-                        width: 64px;
-                        height: 64px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 1.8rem;
-                        box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-                        transition: left 0.1s linear, right 0.1s linear;
-                        cursor: grab;
-                        z-index: 30;
-                        backdrop-filter: blur(5px);
-                        border: 2px solid ${appColor};
-                    }
-                    .swipe-thumb:active {
-                        cursor: grabbing;
-                        transform: scale(0.96);
-                    }
-                    .thumb-left {
-                        left: 8px;
-                        background: linear-gradient(145deg, #4CAF50, #1b5e2a);
-                        color: white;
-                    }
-                    .thumb-right {
-                        right: 8px;
-                        left: auto;
-                        background: linear-gradient(145deg, #f44336, #8b0000);
-                        color: white;
-                    }
-                    .center-dot {
-                        position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        width: 14px;
-                        height: 14px;
-                        background: ${appColor};
-                        border-radius: 50%;
-                        pointer-events: none;
-                        z-index: 20;
-                        box-shadow: 0 0 12px ${appColor};
-                    }
-                </style>
-                
-                <div style="text-align: center; margin-bottom: 50px;">
-                    <div class="avatar-float ring-animation" style="font-size: 5.5rem; margin-bottom: 15px; filter: drop-shadow(0 10px 25px rgba(0,0,0,0.4));">${contactAvatar}</div>
-                    <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 8px; letter-spacing: -0.5px;">${contactName}</div>
-                </div>
-                
-                <div class="swipe-container">
-                    <div id="swipeButton" class="swipe-button">
-                        <div class="divider-line"></div>
-                        <div class="center-dot"></div>
-                        
-                        <div id="leftThumb" class="swipe-thumb thumb-left">
-                            <i class="fas ${acceptIcon}"></i>
-                        </div>
-                        <div id="rightThumb" class="swipe-thumb thumb-right">
-                            <i class="fas fa-phone-slash"></i>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(overlay);
-            
-            const button = document.getElementById('swipeButton');
-            const leftThumb = document.getElementById('leftThumb');
-            const rightThumb = document.getElementById('rightThumb');
-            
-            let isDraggingLeft = false;
-            let isDraggingRight = false;
-            let leftStartX = 0;
-            let rightStartX = 0;
-            let leftCurrentPos = 8;
-            let rightCurrentPos = 8;
-            const buttonWidth = button.clientWidth;
-            const centerPos = buttonWidth / 2;
-            const maxLeftMove = centerPos - 40;
-            const maxRightMove = centerPos - 40;
-            
-            const onLeftStart = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                isDraggingLeft = true;
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const rect = leftThumb.getBoundingClientRect();
-                leftStartX = clientX - (rect.left - button.getBoundingClientRect().left);
-                leftThumb.style.transition = 'none';
-            };
-            
-            const onLeftMove = (e) => {
-                if (!isDraggingLeft) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
-                newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
-                leftCurrentPos = newLeft;
-                leftThumb.style.left = newLeft + 'px';
-            };
-            
-            const onLeftEnd = () => {
-                if (!isDraggingLeft) return;
-                isDraggingLeft = false;
-                leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                
-                if (leftCurrentPos >= maxLeftMove - 10) {
-                    leftThumb.style.left = maxLeftMove + 'px';
-                    setTimeout(() => {
-                        overlay.remove();
-                        this.receiveCall(callerId, callData);
-                    }, 200);
-                } else {
-                    leftThumb.style.left = '8px';
-                }
-            };
-            
-            const onRightStart = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                isDraggingRight = true;
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const rect = rightThumb.getBoundingClientRect();
-                rightStartX = (rect.right - clientX);
-                rightThumb.style.transition = 'none';
-            };
-            
-            const onRightMove = (e) => {
-                if (!isDraggingRight) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const containerRect = button.getBoundingClientRect();
-                let newRight = (containerRect.right - clientX) - rightStartX;
-                newRight = Math.max(8, Math.min(newRight, maxRightMove));
-                rightCurrentPos = newRight;
-                rightThumb.style.right = newRight + 'px';
-            };
-            
-            const onRightEnd = () => {
-                if (!isDraggingRight) return;
-                isDraggingRight = false;
-                rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                
-                if (rightCurrentPos >= maxRightMove - 10) {
-                    rightThumb.style.right = maxRightMove + 'px';
-                    setTimeout(() => {
-                        overlay.remove();
-                        this.sendSignal(callerId, { type: 'reject' });
-                    }, 200);
-                } else {
-                    rightThumb.style.right = '8px';
-                }
-            };
-            
-            leftThumb.addEventListener('mousedown', onLeftStart);
-            leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
-            
-            rightThumb.addEventListener('mousedown', onRightStart);
-            rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
-            
-            document.addEventListener('mousemove', (e) => {
-                onLeftMove(e);
-                onRightMove(e);
-            });
-            document.addEventListener('mouseup', () => {
-                onLeftEnd();
-                onRightEnd();
-            });
-            document.addEventListener('touchmove', (e) => {
-                onLeftMove(e);
-                onRightMove(e);
-            }, { passive: false });
-            document.addEventListener('touchend', () => {
-                onLeftEnd();
-                onRightEnd();
-            });
-            
-            overlay._cleanup = () => {
-                document.removeEventListener('mousemove', onLeftMove);
-                document.removeEventListener('mouseup', onLeftEnd);
-                document.removeEventListener('mousemove', onRightMove);
-                document.removeEventListener('mouseup', onRightEnd);
-            };
-            
-            setTimeout(() => {
-                const stillThere = document.getElementById('incomingCall');
-                if (stillThere) {
-                    if (stillThere._cleanup) stillThere._cleanup();
-                    stillThere.remove();
-                    console.log('⏰ إخفاء شاشة المكالمة الواردة تلقائياً');
-                    this.sendSignal(callerId, { type: 'reject' });
-                }
-            }, 30000);
+            // إعداد السحب
+            this.setupIncomingCallSwipe(callerId, callData);
         });
+        
+        // مؤقت 30 ثانية
+        if (this._incomingCallTimeout) clearTimeout(this._incomingCallTimeout);
+        this._incomingCallTimeout = setTimeout(() => {
+            overlay.style.display = 'none';
+            this.sendSignal(callerId, { type: 'reject' });
+        }, 30000);
+    },
+    
+    setupIncomingCallSwipe(callerId, callData) {
+        const overlay = document.getElementById('incomingCall');
+        const leftThumb = document.getElementById('leftThumb');
+        const rightThumb = document.getElementById('rightThumb');
+        const button = document.getElementById('swipeButton');
+        
+        if (!button || !leftThumb || !rightThumb) return;
+        
+        let isDraggingLeft = false;
+        let isDraggingRight = false;
+        let leftStartX = 0;
+        let rightStartX = 0;
+        let leftCurrentPos = 8;
+        let rightCurrentPos = 8;
+        const buttonWidth = button.clientWidth;
+        const centerPos = buttonWidth / 2;
+        const maxLeftMove = centerPos - 40;
+        const maxRightMove = centerPos - 40;
+        
+        const onLeftStart = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isDraggingLeft = true;
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const rect = leftThumb.getBoundingClientRect();
+            leftStartX = clientX - (rect.left - button.getBoundingClientRect().left);
+            leftThumb.style.transition = 'none';
+        };
+        
+        const onLeftMove = (e) => {
+            if (!isDraggingLeft) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
+            newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
+            leftCurrentPos = newLeft;
+            leftThumb.style.left = newLeft + 'px';
+        };
+        
+        const onLeftEnd = () => {
+            if (!isDraggingLeft) return;
+            isDraggingLeft = false;
+            leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+            
+            if (leftCurrentPos >= maxLeftMove - 10) {
+                leftThumb.style.left = maxLeftMove + 'px';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    this.receiveCall(callerId, callData);
+                }, 200);
+            } else {
+                leftThumb.style.left = '8px';
+            }
+        };
+        
+        const onRightStart = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isDraggingRight = true;
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const rect = rightThumb.getBoundingClientRect();
+            rightStartX = (rect.right - clientX);
+            rightThumb.style.transition = 'none';
+        };
+        
+        const onRightMove = (e) => {
+            if (!isDraggingRight) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const containerRect = button.getBoundingClientRect();
+            let newRight = (containerRect.right - clientX) - rightStartX;
+            newRight = Math.max(8, Math.min(newRight, maxRightMove));
+            rightCurrentPos = newRight;
+            rightThumb.style.right = newRight + 'px';
+        };
+        
+        const onRightEnd = () => {
+            if (!isDraggingRight) return;
+            isDraggingRight = false;
+            rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+            
+            if (rightCurrentPos >= maxRightMove - 10) {
+                rightThumb.style.right = maxRightMove + 'px';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    this.sendSignal(callerId, { type: 'reject' });
+                }, 200);
+            } else {
+                rightThumb.style.right = '8px';
+            }
+        };
+        
+        // إزالة المستمعات القديمة
+        leftThumb._cleanup && leftThumb._cleanup();
+        rightThumb._cleanup && rightThumb._cleanup();
+        
+        leftThumb.addEventListener('mousedown', onLeftStart);
+        leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+        
+        rightThumb.addEventListener('mousedown', onRightStart);
+        rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+        
+        const moveHandler = (e) => {
+            onLeftMove(e);
+            onRightMove(e);
+        };
+        const endHandler = () => {
+            onLeftEnd();
+            onRightEnd();
+        };
+        
+        document.addEventListener('mousemove', moveHandler);
+        document.addEventListener('mouseup', endHandler);
+        document.addEventListener('touchmove', moveHandler, { passive: false });
+        document.addEventListener('touchend', endHandler);
+        
+        // حفظ دالة التنظيف
+        leftThumb._cleanup = () => { document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', endHandler); document.removeEventListener('touchmove', moveHandler); document.removeEventListener('touchend', endHandler); };
+        rightThumb._cleanup = leftThumb._cleanup;
     },
 
     // ==================== 9. Data Channel وإدارة الاتصال ====================
@@ -866,7 +713,6 @@ setupDataChannel(channel) {
         try {
             const msg = JSON.parse(e.data);
             
-            // 9.1.1 رسائل نصية مباشرة
             if (msg.type === 'direct_text') {
                 console.log('📨 استلام رسالة نصية مباشرة:', msg.text);
                 const displayMsg = { 
@@ -883,7 +729,6 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // 9.1.2 إشارات WebRTC (مكالمات)
             if (msg.type === 'webrtc_signal') {
                 console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
                 if (msg.data.sdp && msg.data.sdp.type === 'offer') {
@@ -894,7 +739,6 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // 9.1.3 إشارة طرد من المحادثة
             if (msg.type === 'force_close_conversation') {
                 console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -917,11 +761,10 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // 9.1.4 إشارة إلغاء الميزات
             if (msg.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر');
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
                     ChatSystem.featureRequestReceived = false;
@@ -941,22 +784,18 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // 9.1.5 نبضات الاتصال (ping)
             if (msg.type === 'ping') return;
             
-            // 9.1.6 حالة المكالمة
             if (msg.type === 'call_status') {
                 this.handleCallStatus(msg);
                 return;
             }
             
-            // 9.1.7 أجزاء الملفات (chunks)
             if (msg.chunk !== undefined) {
                 this.handleChunkMessage(msg);
                 return;
             }
             
-            // 9.1.8 رسائل أخرى
             const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
             if (ChatSystem.currentChat) {
                 ChatSystem.displayMessage(displayMsg);
@@ -966,7 +805,6 @@ setupDataChannel(channel) {
         }
     };
     
-    // 9.1.9 عند فتح القناة
     channel.onopen = () => {
         console.log('✅ Data Channel مفتوح');
         this.sendCallStatus('connected');
@@ -978,7 +816,6 @@ setupDataChannel(channel) {
             }
         }, 2000);
         
-        // ✅ keepAliveInterval منفصل لـ dcCall (قناة المكالمات)
         if (channel === this.dcCall) {
             if (this.keepAliveIntervalCall) clearInterval(this.keepAliveIntervalCall);
             this.keepAliveIntervalCall = setInterval(() => {
@@ -989,7 +826,6 @@ setupDataChannel(channel) {
         }
     };
     
-        // 9.1.10 عند إغلاق القناة
     channel.onclose = () => {
         console.log('❌ Data Channel مغلق');
         this.sendCallStatus('disconnected');
@@ -998,13 +834,11 @@ setupDataChannel(channel) {
             this.keepAliveInterval = null;
         }
         
-        // ✅ تنظيف keepAliveIntervalCall
         if (this.keepAliveIntervalCall) {
             clearInterval(this.keepAliveIntervalCall);
             this.keepAliveIntervalCall = null;
         }
         
-        // ✅ فقط إذا كانت القناة المغلقة هي dc (قناة الميزات) وليس dcCall
         if (channel === this.dc && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('🔌 انقطاع قناة الميزات - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
@@ -1020,11 +854,9 @@ setupDataChannel(channel) {
         }
     };
     
-    // 9.1.11 عند حدوث خطأ في القناة
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         
-        // ✅ فقط إذا كانت القناة التي حدث فيها الخطأ هي dc (قناة الميزات) وليس dcCall
         if (channel === this.dc && ChatSystem.currentChat && ChatSystem.featuresEnabled) {
             console.log('⚠️ خطأ في قناة الميزات - إلغاء تفعيل الميزات');
             ChatSystem.featuresEnabled = false;
@@ -1062,27 +894,24 @@ sendCallStatus(status) {
     }
 },
 
-// ==================== 9.4 معالجة إشارات WebRTC (المكالمات) ====================
+// ==================== 9.4 معالجة إشارات WebRTC ====================
 
 async handleSignaling(data) {
     try {
         if (data.type === 'reject') {
             console.log('📞 الطرف الآخر رفض المكالمة');
-            const inc = document.getElementById('incomingCall');
-            if (inc) inc.remove();
+            document.getElementById('incomingCall').style.display = 'none';
             this.endCall();
             return;
         }
         
         if (data.type === 'call_ended') {
             console.log('📞 المتصل أنهى المكالمة قبل الرد');
-            const inc = document.getElementById('incomingCall');
-            if (inc) inc.remove();
+            document.getElementById('incomingCall').style.display = 'none';
             this.endCall();
             return;
         }
         
-        // ✅ استخدام pcCall للمكالمات بدلاً من pc
         if (!this.pcCall) {
             this.pcCall = new RTCPeerConnection(this.servers);
             this.pcCall.ondatachannel = e => { 
@@ -1094,7 +923,6 @@ async handleSignaling(data) {
             };
         }
         
-        // ✅ معالجة SDP أولاً
         if (data.sdp) {
             await this.pcCall.setRemoteDescription(new RTCSessionDescription(data.sdp));
             if (data.sdp.type === 'offer') {
@@ -1103,7 +931,6 @@ async handleSignaling(data) {
                 await this.sendSignal(ChatSystem.currentChat, { sdp: this.pcCall.localDescription });
             }
         } 
-        // ✅ معالجة ICE candidates المجمعة (دفعة واحدة)
         else if (data.iceCandidates && data.iceCandidates.length > 0) {
             console.log(`📦 استلام ${data.iceCandidates.length} ICE candidate مجمعة`);
             for (const ice of data.iceCandidates) {
@@ -1114,7 +941,6 @@ async handleSignaling(data) {
                 }
             }
         }
-        // ✅ معالجة ICE candidate منفرد (للتوافق مع الإصدارات القديمة)
         else if (data.candidate) {
             if (this.pcCall && data.candidate) {
                 await this.pcCall.addIceCandidate(new RTCIceCandidate(data.candidate));
@@ -1126,24 +952,22 @@ async handleSignaling(data) {
     }
 },
 
-// ==================== 9.5 إرسال الإشارات (بدون حل احتياطي عبر Firebase) ====================
+// ==================== 9.5 إرسال الإشارات ====================
 
 async sendSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
-        console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة أو الطرف الآخر ليس في المحادثة');
+        console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة');
         return;
     }
     
-    // ✅ تحديد نوع الإشارة: إذا كانت مكالمة (صوت أو فيديو)
     const isCallSignal = (data.type === 'audio' || data.type === 'video') || 
                          (data.sdp && (data.sdp.type === 'offer' || data.sdp.type === 'answer'));
     
-    // ✅ إشارات المكالمات ترسل عبر dc (قناة الميزات الحالية)
     if (isCallSignal) {
         if (this.dc && this.dc.readyState === 'open') {
             try {
                 this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
-                console.log('📡 تم إرسال إشارة المكالمة مباشرة عبر dc (قناة الميزات)');
+                console.log('📡 تم إرسال إشارة المكالمة مباشرة عبر dc');
                 return;
             } catch(e) {
                 console.error('❌ فشل الإرسال عبر dc:', e);
@@ -1151,7 +975,6 @@ async sendSignal(calleeId, data) {
         }
     }
     
-    // ✅ إشارات الميزات (دردشة، ملفات، موقع) ترسل عبر dc أيضاً
     if (this.dc && this.dc.readyState === 'open') {
         try {
             this.dc.send(JSON.stringify({ type: 'webrtc_signal', data: data }));
@@ -1162,19 +985,18 @@ async sendSignal(calleeId, data) {
         }
     }
     
-    // ❌ تم إزالة الحل الاحتياطي عبر Firebase (غير مستخدم للمكالمات)
     console.error('❌ فشل إرسال الإشارة: لا توجد قناة مفتوحة');
 },
     
-    // ==================== 10. واجهة المستخدم (أثناء المكالمة) ====================
+    // ==================== 10. واجهة المستخدم (معدلة - تستخدم عناصر ثابتة) ====================
 
 showCallUI(type) {
-    // ✅ تنظيف أي واجهة قديمة قبل إنشاء جديدة
-    const existingUi = document.getElementById('callUI');
-    if (existingUi) {
-        if (existingUi._cleanup) existingUi._cleanup();
-        existingUi.remove();
-    }
+    const container = document.getElementById('callUI');
+    if (!container) return;
+    
+    // تنظيف المحتوى السابق
+    container.innerHTML = '';
+    container.style.display = 'block';
     
     document.body.classList.add('in-call');
     
@@ -1288,10 +1110,7 @@ showCallUI(type) {
             </div>`;
     }
     
-    const ui = document.createElement('div');
-    ui.id = 'callUI';
-    ui.innerHTML = uiHTML;
-    document.body.appendChild(ui);
+    container.innerHTML = uiHTML;
     
     document.getElementById('endCallBtn')?.addEventListener('click', () => this.endCall());
     
@@ -1329,8 +1148,6 @@ showCallUI(type) {
                 }
             }
         });
-        
-        // ❌ تم إزالة الكود الذي كان يعيد تعيين remoteVideo (كان يسبب AbortError)
         
         if (this.isVideoMuted) {
             const muteVideoBtn = document.getElementById('muteVideoBtn');
@@ -1395,8 +1212,6 @@ showCallUI(type) {
     },
 
     // ==================== 12. التحكم بالمكالمة ====================
-
-    // ❌ تم حذف toggleMute (استخدم toggleAudio بدلاً منها)
 
     toggleAudio() {
         if (this.localStream) {
@@ -1473,7 +1288,7 @@ async sendFileDirect(file, type) {
         const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize);
         const fileId = Date.now().toString();
         
-        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء) - بدون base64`);
+        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
         
         for (let i = 0; i < totalChunks; i++) {
             if (this.dc.readyState !== 'open') {
@@ -1499,7 +1314,7 @@ async sendFileDirect(file, type) {
             await new Promise(r => setTimeout(r, 50));
         }
         ChatSystem.hideProgressBar();
-        console.log('✅ تم إرسال الملف بنجاح (بدون base64)');
+        console.log('✅ تم إرسال الملف بنجاح');
         return true;
     } catch (e) {
         console.error('❌ فشل إرسال الملف:', e);
@@ -1596,7 +1411,7 @@ compressImage(file) {
     });
 },
 
-// ==================== 14. إنهاء المكالمة (معدلة - تغلق pcCall/dcCall فقط) ====================
+// ==================== 14. إنهاء المكالمة (معدل - تستخدم عناصر ثابتة) ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة...');
@@ -1612,7 +1427,6 @@ compressImage(file) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
         }
-        // ✅ تنظيف keepAliveIntervalCall
         if (this.keepAliveIntervalCall) {
             clearInterval(this.keepAliveIntervalCall);
             this.keepAliveIntervalCall = null;
@@ -1620,6 +1434,10 @@ compressImage(file) {
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
+        }
+        if (this._incomingCallTimeout) {
+            clearTimeout(this._incomingCallTimeout);
+            this._incomingCallTimeout = null;
         }
         
         if (this.remoteAudioElement) {
@@ -1635,8 +1453,6 @@ compressImage(file) {
             this.localStream = null;
         }
         
-        // ✅ إغلاق pcCall و dcCall فقط (خاصة بالمكالمات)
-        // ولا نلمس pc و dc (خاصة بميزات الدردشة)
         if (this.dcCall) {
             try { this.dcCall.close(); } catch(e) {}
             this.dcCall = null;
@@ -1646,16 +1462,12 @@ compressImage(file) {
             this.pcCall = null;
         }
         
-        // ✅ تنظيف العناصر الديناميكية
+        // إخفاء العناصر الثابتة بدلاً من إزالتها
         this.cleanupDynamicElements();
         
         this.incomingChunks = {};
         this.incomingFileInfo = {};
         
-        const ui = document.getElementById('callUI');
-        if (ui) ui.remove();
-        const inc = document.getElementById('incomingCall');
-        if (inc) inc.remove();
         document.body.classList.remove('in-call');
         
         this.isInCall = false;
@@ -1675,31 +1487,35 @@ compressImage(file) {
         console.log('✅ تم إنهاء المكالمة');
     },
     
-    // ==================== 16. تنظيف العناصر الديناميكية ====================
+    // ==================== 16. تنظيف العناصر الديناميكية (معدل - تستخدم عناصر ثابتة) ====================
     
     cleanupDynamicElements() {
         console.log('🧹 بدء تنظيف العناصر الديناميكية...');
         
-        // قائمة بجميع IDs للعناصر الديناميكية
-        const dynamicIds = [
-            'incomingCall',
-            'callUI',
-            'locationSwipeModal',
-            'imagePreviewModal',
-            'videoPreviewModal'
-        ];
-        
-        // إزالة كل عنصر ديناميكي موجود
-        for (const id of dynamicIds) {
-            const element = document.getElementById(id);
-            if (element) {
-                if (element._cleanup && typeof element._cleanup === 'function') {
-                    element._cleanup();
+        // إخفاء العناصر الثابتة بدلاً من إزالتها
+        const elements = ['incomingCall', 'callUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = 'none';
+                if (id === 'callUI') el.innerHTML = '';
+                if (id === 'imagePreviewModal') {
+                    const img = document.getElementById('previewImage');
+                    if (img) img.src = '';
                 }
-                element.remove();
-                console.log(`🗑️ تم تنظيف العنصر: ${id}`);
+                if (id === 'videoPreviewModal') {
+                    const video = document.getElementById('previewVideo');
+                    if (video) { video.pause(); video.src = ''; }
+                }
+                if (id === 'incomingCall') {
+                    // إعادة تعيين مواضع الإبهام
+                    const leftThumb = document.getElementById('leftThumb');
+                    const rightThumb = document.getElementById('rightThumb');
+                    if (leftThumb) { leftThumb.style.left = '8px'; leftThumb.style.transition = 'none'; }
+                    if (rightThumb) { rightThumb.style.right = '8px'; rightThumb.style.transition = 'none'; }
+                }
             }
-        }
+        });
         
         // تنظيف المؤقتات
         if (this._callBatchTimer) {
@@ -1710,13 +1526,15 @@ compressImage(file) {
             clearTimeout(this._answerBatchTimer);
             this._answerBatchTimer = null;
         }
+        if (this._incomingCallTimeout) {
+            clearTimeout(this._incomingCallTimeout);
+            this._incomingCallTimeout = null;
+        }
         
-        // تنظيف مصفوفات ICE المؤقتة (خاصة بـ CallSystem فقط)
         this._callIceCandidates = [];
         this._answerIceCandidates = [];
-        // this._pendingIceCandidates = [];  // تم نقله إلى ChatSystem (cleanConversationData)
         
-        console.log('✅ تم تنظيف جميع العناصر الديناميكية');
+        console.log('✅ تم تنظيف جميع العناصر الثابتة');
     }
 };
        
@@ -1738,4 +1556,4 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-console.log('✅ WebRTC Call System جاهز - مع دعم Data Channel فقط للملفات');
+console.log('✅ WebRTC Call System جاهز - مع دعم العناصر الثابتة');
