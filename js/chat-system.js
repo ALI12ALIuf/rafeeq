@@ -1125,7 +1125,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
-// ==================== القسم 26: displayMessage (معدل - توحيد الخلفيات) ====================
+ // ==================== القسم 26: displayMessage (معدل - استخدام var(--bg)) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1150,18 +1150,15 @@ displayMessage(msg) {
     // تعريف borderColor حسب المرسل
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    // ✅ خلفية داكنة ثابتة لجميع الرسائل
-    const darkBg = '#1a1a2e';
-    
     if (msg.type === 'text') {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         
-        // ✅ المرسل والمستلم: خلفية داكنة + إطار مختلف
+        // ✅ استخدام var(--bg) و var(--text) لتتوافق مع الثيم
         contentDiv.style.cssText = `
             border: 1.5px solid ${borderColor};
-            background: ${darkBg};
-            color: #ffffff;
+            background: var(--bg);
+            color: var(--text);
             border-radius: 18px;
             padding: 10px 14px;
             max-width: 100%;
@@ -1400,7 +1397,7 @@ displayMessage(msg) {
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},
+},                   
 
 // ==================== القسم 26.1: showImagePreview ====================
 showImagePreview(imageSrc) {
