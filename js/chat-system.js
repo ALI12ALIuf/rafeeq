@@ -1125,7 +1125,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
-// ==================== القسم 26: displayMessage (معدل - إصلاح القوالب الثابتة + تثبيت الخلفيات) ====================
+// ==================== القسم 26: displayMessage (معدل - توحيد الخلفيات) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1150,17 +1150,24 @@ displayMessage(msg) {
     // تعريف borderColor حسب المرسل
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
+    // ✅ خلفية داكنة ثابتة لجميع الرسائل
+    const darkBg = '#1a1a2e';
+    
     if (msg.type === 'text') {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         
-        if (msg.sender === 'me') {
-            // رسائل المرسل (تبقى زرقاء)
-            contentDiv.style.cssText = 'border: 1.5px solid #2196F3; background: #2196F3; color: #ffffff; border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
-        } else {
-            // ✅ رسائل المستلم (خلفية داكنة ثابتة)
-            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: #1a1a2e; color: #ffffff; border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
-        }
+        // ✅ المرسل والمستلم: خلفية داكنة + إطار مختلف
+        contentDiv.style.cssText = `
+            border: 1.5px solid ${borderColor};
+            background: ${darkBg};
+            color: #ffffff;
+            border-radius: 18px;
+            padding: 10px 14px;
+            max-width: 100%;
+            word-wrap: break-word;
+            position: relative;
+        `;
         
         const textSpan = document.createElement('span');
         textSpan.style.cssText = 'font-size: 1rem; line-height: 1.4; display: block;';
@@ -1201,7 +1208,7 @@ displayMessage(msg) {
             const clone = template.content.cloneNode(true);
             const locationDiv = clone.querySelector('.location-card');
             if (locationDiv) {
-                // ✅ تثبيت الخلفية الخضراء للمستلم أيضاً
+                // ✅ تثبيت الخلفية الخضراء
                 locationDiv.style.background = '#4CAF50';
                 
                 if (clicksRemaining !== undefined && clicksRemaining <= 0) {
@@ -1240,7 +1247,6 @@ displayMessage(msg) {
         } else {
             // Fallback إذا لم يوجد القالب
             const locationDiv = document.createElement('div');
-            // ✅ تثبيت الخلفية الخضراء
             locationDiv.style.cssText = `cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid ${borderColor}; color: white; font-size: 1.2rem;`;
             if (clicksRemaining !== undefined && clicksRemaining <= 0) {
                 locationDiv.style.background = '#888';
@@ -1300,7 +1306,7 @@ displayMessage(msg) {
             const clone = template.content.cloneNode(true);
             const voiceMsg = clone.querySelector('.voice-message');
             if (voiceMsg) {
-                // ✅ تثبيت الخلفية الخضراء للمستلم أيضاً
+                // ✅ تثبيت الخلفية الخضراء
                 voiceMsg.style.background = '#4CAF50';
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
@@ -1357,7 +1363,7 @@ displayMessage(msg) {
             const clone = template.content.cloneNode(true);
             const fileCard = clone.querySelector('.file-card');
             if (fileCard) {
-                // ✅ تثبيت الخلفية الخضراء للمستلم أيضاً
+                // ✅ تثبيت الخلفية الخضراء
                 fileCard.style.background = '#4CAF50';
                 fileCard.style.border = `1.5px solid ${borderColor}`;
                 const fileNameEl = fileCard.querySelector('.file-name');
