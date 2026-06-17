@@ -980,7 +980,7 @@ closeConversation() {
     },
     
     
-    // ==================== القسم 23: openChat ====================
+   // ==================== القسم 23: openChat ====================
 openChat(friendId, friendName, friendAvatar) {
     if (this.currentChat && this.currentChat !== friendId) {
         console.log('🧹 تنظيف المحادثة السابقة قبل فتح محادثة جديدة:', this.currentChat);
@@ -992,9 +992,19 @@ openChat(friendId, friendName, friendAvatar) {
     
     this.resetFeatures();
     document.body.classList.add('conversation-open');
-    const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
-    if (nameEl) nameEl.textContent = friendName;
-    if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
+    const nameEl = document.getElementById('conversationName');
+    const avatarEl = document.getElementById('conversationAvatar');
+    
+    // ✅ إخفاء الاسم نهائياً من رأس المحادثة
+    if (nameEl) {
+        nameEl.textContent = '';
+        nameEl.style.display = 'none';
+    }
+    // ✅ عرض الصورة الرمزية فقط
+    if (avatarEl) {
+        avatarEl.textContent = friendAvatar || '👤';
+    }
+    
     document.querySelector('.chat-page').style.display = 'none'; 
     document.getElementById('conversationPage').style.display = 'flex';
     this.displayMessages(friendId);
@@ -1023,7 +1033,7 @@ openChat(friendId, friendName, friendAvatar) {
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
     }, 1000);
-},
+}, 
     
     
 // ==================== القسم 25: displayMessages ====================
