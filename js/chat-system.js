@@ -820,10 +820,16 @@ async disableFeatures() {
     }
     
     this.updateAllButtons();
+    
+    // ✅ تحديث زر الإجراء (بصمة/إرسال)
+    if (typeof window.toggleSendButton === 'function') {
+        setTimeout(() => window.toggleSendButton(), 100);
+    }
+    
     console.log('✅ تم إلغاء تفعيل الميزات');
 },
-    
-    // ==================== القسم 12: resetFeatures ====================
+
+// ==================== القسم 12: resetFeatures ====================
 resetFeatures() {
     console.log('🔄 resetFeatures - إعادة تعيين الميزات');
     
@@ -848,10 +854,14 @@ resetFeatures() {
     }
     
     this.updateAllButtons();
+    
+    // ✅ تحديث زر الإجراء (بصمة/إرسال)
+    if (typeof window.toggleSendButton === 'function') {
+        setTimeout(() => window.toggleSendButton(), 100);
+    }
 },
-    
-    
-   // ==================== القسم 14: updateAllButtons ====================
+
+// ==================== القسم 14: updateAllButtons ====================
 updateAllButtons() {
     const canUse = (this.friendInConversation && this.featuresEnabled);
     
@@ -907,10 +917,15 @@ updateAllButtons() {
     this.updateFeatureToggleUI();
     this.updateKickButtonState();
     
+    // ✅ تحديث زر الإجراء (بصمة/إرسال)
+    if (typeof window.toggleSendButton === 'function') {
+        window.toggleSendButton();
+    }
+    
     console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
 },
 
-    
+
    // ==================== القسم 15: closeConversation ====================
 closeConversation() {
     console.log("🚪 إغلاق صفحة المحادثة والعودة للقائمة الرئيسية");
