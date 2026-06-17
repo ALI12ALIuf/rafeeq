@@ -1102,3 +1102,162 @@ input:checked + .toggle-slider:before {
         min-width: 45px;
     }
 }
+
+
+/* ==================== تنسيق أزرار التسجيل داخل الإطار ==================== */
+
+.message-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--light);
+    border-radius: 25px;
+    padding: 2px 8px;
+    border: 2px solid #2196F3; /* الإطار الأزرق */
+    transition: border-color 0.3s ease;
+}
+
+.message-input-wrapper:focus-within {
+    border-color: #1976D2;
+    box-shadow: 0 0 0 3px rgba(33,150,243,0.15);
+}
+
+.input-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+#messageInput {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 6px 4px;
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+    min-height: 34px;
+    max-height: 120px;
+    width: 100%;
+    min-width: 0;
+}
+
+#actionBtn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+#actionBtn.send-mode {
+    background: var(--primary);
+    color: white;
+}
+
+#actionBtn.send-mode:hover {
+    background: var(--primary-dark);
+}
+
+#recordingControls {
+    display: none;
+    align-items: center;
+    gap: 3px;
+    direction: ltr;
+    flex-shrink: 0;
+}
+
+/* أيقونات الأزرار */
+#cancelRecordBtn,
+#playbackRecordBtn,
+#sendRecordBtn {
+    transition: all 0.2s ease;
+}
+
+#cancelRecordBtn:hover {
+    background: rgba(244,67,54,0.1);
+    transform: scale(1.05);
+}
+
+#playbackRecordBtn:hover {
+    background: rgba(76,175,80,0.1);
+    transform: scale(1.05);
+}
+
+#sendRecordBtn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(33,150,243,0.4);
+}
+
+/* عداد الوقت */
+#recordTimer {
+    font-size: 0.8rem;
+    font-weight: bold;
+    min-width: 42px;
+    text-align: center;
+    direction: ltr;
+    font-family: monospace;
+    transition: color 0.3s ease;
+}
+
+/* حركات الوميض */
+@keyframes blinkRedBlue {
+    0% { color: #2196F3; }
+    50% { color: #f44336; }
+    100% { color: #2196F3; }
+}
+
+@keyframes blinkRed {
+    0% { color: #f44336; }
+    50% { color: #ff8888; }
+    100% { color: #f44336; }
+}
+
+#recordTimer.blinking-warning {
+    animation: blinkRedBlue 0.6s ease-in-out infinite;
+}
+
+#recordTimer.blinking-danger {
+    animation: blinkRed 0.4s ease-in-out infinite;
+}
+
+/* تنسيق الهواتف الصغيرة */
+@media (max-width: 480px) {
+    .message-input-wrapper {
+        padding: 2px 6px;
+        gap: 2px;
+    }
+    
+    #cancelRecordBtn,
+    #playbackRecordBtn {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 0.9rem !important;
+    }
+    
+    #sendRecordBtn {
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 0.8rem !important;
+    }
+    
+    #recordTimer {
+        font-size: 0.7rem;
+        min-width: 36px;
+    }
+    
+    #actionBtn {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+}
