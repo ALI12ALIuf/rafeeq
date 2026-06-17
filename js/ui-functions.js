@@ -234,12 +234,13 @@ window.startVoiceRecording = function() {
                 }
             };
             
+            // ✅ تغيير المدة من 30 ثانية إلى 5 دقائق (300000)
             setTimeout(() => {
                 if (mr.state === 'recording') {
                     mr.stop();
                     btn.onclick = window.handleActionButton;
                 }
-            }, 30000);
+            }, 300000);  // ← 5 دقائق
         })
         .catch(() => alert('يرجى السماح بالوصول إلى الميكروفون'));
 };
