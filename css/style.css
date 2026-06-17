@@ -298,7 +298,7 @@ body.conversation-open .conversation-page {
 .message-input-container { 
     background: var(--card-bg); 
     border-top: 1px solid var(--border); 
-    padding: 12px 16px; 
+    padding: 8px 12px; 
     flex-shrink: 0 !important;
     position: relative !important;
     bottom: 0 !important;
@@ -307,13 +307,94 @@ body.conversation-open .conversation-page {
     overscroll-behavior: none !important;
 }
 
-.message-input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--light); border-radius: 30px; padding: 4px 8px; border: 1px solid var(--border); }
-.message-input-wrapper:focus-within { border-color: var(--primary); }
-.attach-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: transparent; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
-.input-area { flex: 1; display: flex; align-items: center; gap: 4px; }
-#messageInput { flex: 1; background: transparent; border: none; padding: 12px; color: var(--text); font-size: 1rem; outline: none; }
-.emoji-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-.send-btn, .voice-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+.message-input-wrapper { 
+    display: flex; 
+    align-items: center; 
+    gap: 6px; 
+    background: var(--light); 
+    border-radius: 25px; 
+    padding: 2px 6px; 
+    border: 1px solid var(--border); 
+}
+
+.message-input-wrapper:focus-within { 
+    border-color: var(--primary); 
+}
+
+.attach-btn { 
+    width: 38px; 
+    height: 38px; 
+    border-radius: 50%; 
+    border: none; 
+    background: transparent; 
+    color: var(--primary); 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-size: 1.2rem; 
+    flex-shrink: 0;
+}
+
+.input-area { 
+    flex: 1; 
+    display: flex; 
+    align-items: center; 
+    gap: 4px; 
+}
+
+#messageInput { 
+    flex: 1; 
+    background: transparent; 
+    border: none; 
+    padding: 8px 4px; 
+    color: var(--text); 
+    font-size: 0.95rem; 
+    outline: none; 
+    min-height: 36px;
+    max-height: 120px;
+}
+
+/* ✅ زر موحد (يتغير بين البصمة والإرسال) */
+#actionBtn { 
+    width: 38px; 
+    height: 38px; 
+    border-radius: 50%; 
+    border: none; 
+    background: transparent; 
+    color: var(--primary); 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-size: 1.2rem; 
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+#actionBtn:hover {
+    background: rgba(33, 150, 243, 0.1);
+}
+
+#actionBtn.send-mode {
+    background: var(--primary);
+    color: white;
+}
+
+#actionBtn.send-mode:hover {
+    background: var(--primary-dark);
+}
+
+#actionBtn.recording {
+    color: #f44336;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
 
 .conversation-header, .message-input-container {
     pointer-events: auto !important;
