@@ -851,17 +851,25 @@ resetFeatures() {
 },
     
     
-   // ==================== القسم 14: updateAllButtons (معدل - إزالة القفل) ====================
+ // ==================== القسم 14: updateAllButtons (معدل - إزالة القفل مع الحفاظ على الوظيفة) ====================
 updateAllButtons() {
     const canUse = (this.friendInConversation && this.featuresEnabled);
     
     const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
-    // ✅ إزالة القفل نهائياً - جميع الأزرار مفعلة دائماً
     btns.forEach(btn => { 
-        btn.classList.remove('locked');
-        btn.title = '';
-        btn.style.opacity = '1';
-        btn.style.pointerEvents = 'auto';
+        if (canUse) { 
+            // ✅ مفعل: قابل للضغط
+            btn.classList.remove('locked');
+            btn.title = '';
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        } else { 
+            // ✅ غير مفعل: غير قابل للضغط (بدون رمز القفل)
+            btn.classList.remove('locked'); // ❌ إزالة القفل
+            btn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        } 
     });
     
     const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
