@@ -23,30 +23,13 @@ html, body {
     touch-action: manipulation;
 }
 
-/* ==================== القسم 2: متغيرات الألوان (الثيم الأساسي) ==================== */
+/* ==================== القسم 2: متغيرات الألوان (ثيم داكن فقط) ==================== */
 :root {
-    --primary: #2196F3;
-    --primary-dark: #1976D2;
+    --primary: #64B5F6;
+    --primary-dark: #42A5F5;
     --secondary: #FFC107;
     --success: #4CAF50;
     --danger: #f44336;
-    --dark: #333;
-    --light: #f5f5f5;
-    --border: #e0e0e0;
-    --text: #333;
-    --text-light: #666;
-    --bg: #fff;
-    --card-bg: #fff;
-    --shadow: 0 2px 10px rgba(0,0,0,0.1);
-    --radius: 12px;
-    --header-height: 60px;
-    --nav-height: 60px;
-}
-
-/* ==================== القسم 2.1: متغيرات الألوان (الثيم الداكن) ==================== */
-.theme-dark {
-    --primary: #64B5F6;
-    --primary-dark: #42A5F5;
     --dark: #f5f5f5;
     --light: #333;
     --border: #444;
@@ -55,6 +38,9 @@ html, body {
     --bg: #1a1a1a;
     --card-bg: #2d2d2d;
     --shadow: 0 2px 10px rgba(0,0,0,0.3);
+    --radius: 12px;
+    --header-height: 60px;
+    --nav-height: 60px;
 }
 
 /* ==================== القسم 3: أنماط الجسم الرئيسي ==================== */
