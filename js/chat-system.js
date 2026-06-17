@@ -1125,7 +1125,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
-  // ==================== القسم 26: displayMessage (معدل - إصلاح القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل - إصلاح القوالب الثابتة + تثبيت الخلفيات) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1155,9 +1155,11 @@ displayMessage(msg) {
         contentDiv.className = 'message-content';
         
         if (msg.sender === 'me') {
-            contentDiv.style.cssText = 'border: 1.5px solid #2196F3; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
+            // رسائل المرسل (تبقى زرقاء)
+            contentDiv.style.cssText = 'border: 1.5px solid #2196F3; background: #2196F3; color: #ffffff; border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
         } else {
-            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: var(--card-bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
+            // ✅ رسائل المستلم (خلفية داكنة ثابتة)
+            contentDiv.style.cssText = 'border: 1.5px solid #4CAF50; background: #1a1a2e; color: #ffffff; border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;';
         }
         
         const textSpan = document.createElement('span');
@@ -1199,6 +1201,9 @@ displayMessage(msg) {
             const clone = template.content.cloneNode(true);
             const locationDiv = clone.querySelector('.location-card');
             if (locationDiv) {
+                // ✅ تثبيت الخلفية الخضراء للمستلم أيضاً
+                locationDiv.style.background = '#4CAF50';
+                
                 if (clicksRemaining !== undefined && clicksRemaining <= 0) {
                     locationDiv.style.background = '#888';
                     locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
@@ -1235,6 +1240,7 @@ displayMessage(msg) {
         } else {
             // Fallback إذا لم يوجد القالب
             const locationDiv = document.createElement('div');
+            // ✅ تثبيت الخلفية الخضراء
             locationDiv.style.cssText = `cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid ${borderColor}; color: white; font-size: 1.2rem;`;
             if (clicksRemaining !== undefined && clicksRemaining <= 0) {
                 locationDiv.style.background = '#888';
@@ -1294,6 +1300,8 @@ displayMessage(msg) {
             const clone = template.content.cloneNode(true);
             const voiceMsg = clone.querySelector('.voice-message');
             if (voiceMsg) {
+                // ✅ تثبيت الخلفية الخضراء للمستلم أيضاً
+                voiceMsg.style.background = '#4CAF50';
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
                 if (audioEl && msg.data) {
@@ -1308,7 +1316,7 @@ displayMessage(msg) {
             const audio = document.createElement('audio');
             audio.src = msg.data;
             audio.controls = true;
-            audio.style.cssText = `max-width:250px; border-radius:20px; border:1.5px solid ${borderColor};`;
+            audio.style.cssText = `max-width:250px; border-radius:20px; border:1.5px solid ${borderColor}; background: #4CAF50;`;
             div.appendChild(audio);
         }
     } 
@@ -1349,6 +1357,8 @@ displayMessage(msg) {
             const clone = template.content.cloneNode(true);
             const fileCard = clone.querySelector('.file-card');
             if (fileCard) {
+                // ✅ تثبيت الخلفية الخضراء للمستلم أيضاً
+                fileCard.style.background = '#4CAF50';
                 fileCard.style.border = `1.5px solid ${borderColor}`;
                 const fileNameEl = fileCard.querySelector('.file-name');
                 if (fileNameEl) {
