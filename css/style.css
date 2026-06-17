@@ -340,7 +340,7 @@ body.conversation-open .conversation-page {
     display: flex; 
     align-items: center; 
     gap: 4px; 
-    position: relative; /* ✅ لدعم العناصر المطلقة داخله */
+    position: relative;
 }
 
 #messageInput { 
@@ -396,20 +396,18 @@ body.conversation-open .conversation-page {
     100% { transform: scale(1); }
 }
 
-/* ✅ عداد التسجيل */
+/* ✅ عداد التسجيل (بدون خلفية) */
 #recordingTimer {
     display: none;
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    color: #ffffff;
-    font-size: 0.85rem;
+    color: var(--text);
+    font-size: 0.9rem;
     font-weight: bold;
     direction: ltr;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 2px 12px;
-    border-radius: 12px;
+    background: transparent !important;
     pointer-events: none;
     z-index: 5;
     font-family: monospace;
@@ -417,15 +415,15 @@ body.conversation-open .conversation-page {
     letter-spacing: 0.5px;
 }
 
+/* ✅ تحذير: يرمش بين الأزرق والأحمر */
 #recordingTimer.warning {
     animation: blinkWarning 0.5s ease-in-out infinite;
-    color: #ff0000 !important;
 }
 
 @keyframes blinkWarning {
-    0% { color: #ffffff; background: rgba(0, 0, 0, 0.6); }
-    50% { color: #ff0000; background: rgba(255, 0, 0, 0.3); }
-    100% { color: #ffffff; background: rgba(0, 0, 0, 0.6); }
+    0% { color: #2196F3; }
+    50% { color: #ff0000; }
+    100% { color: #2196F3; }
 }
 
 /* ✅ زر إلغاء التسجيل */
