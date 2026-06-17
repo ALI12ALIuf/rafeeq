@@ -120,17 +120,32 @@
             <div class="messages-container" id="messagesContainer"></div>
 
             <!-- ===== القسم 2.2.3.3: مدخل الرسائل ===== -->
-            <div class="message-input-container">
-                <div class="message-input-wrapper">
-                    <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
-                    <div class="input-area">
-                        <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()">
-                    </div>
-                    <!-- ✅ زر واحد يتغير بين البصمة والإرسال -->
-                    <button id="actionBtn" class="voice-btn" onclick="handleActionButton()">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                </div>
+<div class="message-input-container">
+    <div class="message-input-wrapper">
+        <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()">
+        </div>
+        
+        <!-- ✅ أزرار التسجيل (تظهر فقط أثناء التسجيل) -->
+        <div id="recordingControls" style="display:none; align-items:center; gap:6px; direction:ltr;">
+            <button id="cancelRecordBtn" type="button" style="background:none;border:none;color:#f44336;font-size:1.2rem;cursor:pointer;padding:4px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;" title="إلغاء التسجيل">
+                <i class="fas fa-trash"></i>
+            </button>
+            <button id="playbackRecordBtn" type="button" style="background:none;border:none;color:#4CAF50;font-size:1.2rem;cursor:pointer;padding:4px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;" title="سماع البصمة">
+                <i class="fas fa-play"></i>
+            </button>
+            <span id="recordTimer" style="font-size:0.95rem;font-weight:bold;color:#2196F3;min-width:55px;text-align:center;direction:ltr;font-family:monospace;letter-spacing:0.5px;">5:00</span>
+            <button id="sendRecordBtn" type="button" style="background:#2196F3;border:none;border-radius:50%;width:38px;height:38px;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;box-shadow:0 2px 8px rgba(33,150,243,0.3);transition:all 0.2s;" title="إرسال البصمة">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+        
+        <!-- ✅ زر واحد يتغير بين البصمة والإرسال -->
+        <button id="actionBtn" class="voice-btn" onclick="handleActionButton()" style="display:flex;">
+            <i class="fas fa-microphone"></i>
+        </button>
+    </div>
                 
                    <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات ===== -->
                 <div class="attachment-menu" id="attachmentMenu" style="display: none;">
