@@ -67,7 +67,7 @@ async function saveUserAndEnter(user) {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
             await window.db.collection('users').doc(user.uid).set({
-                uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
+                uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 16), // ✅ تغيير من 25 إلى 16
                 email: user.email || '', shareableId: generateShareableId(),
                 bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date()
             });
@@ -139,7 +139,7 @@ async function loadUserData(uid) {
         if (doc.exists) {
             const d = doc.data();
             const pn = document.getElementById('profileName'), pa = document.getElementById('profileAvatarEmoji'), pb = document.getElementById('profileBio'), si = document.getElementById('shareableId'), ca = document.getElementById('currentAvatarEmoji');
-            if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 25);
+            if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 16); // ✅ تغيير من 25 إلى 16
             if (pb) pb.textContent = d.bio || '';
             if (si) si.textContent = d.shareableId || '0000000000';
             const emoji = getEmojiForUser(d);
