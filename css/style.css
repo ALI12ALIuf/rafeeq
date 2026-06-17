@@ -293,7 +293,6 @@ body.conversation-open .conversation-page {
 .message-image { max-width: 200px; max-height: 200px; border-radius: 12px; cursor: pointer; }
 .message-audio { width: 250px; height: 40px; border-radius: 20px; }
 
-
 /* ==================== القسم 13.4: فوتر الإدخال ==================== */
 .message-input-container { 
     background: var(--card-bg); 
@@ -341,6 +340,7 @@ body.conversation-open .conversation-page {
     display: flex; 
     align-items: center; 
     gap: 4px; 
+    position: relative; /* ✅ لدعم العناصر المطلقة داخله */
 }
 
 #messageInput { 
@@ -396,9 +396,67 @@ body.conversation-open .conversation-page {
     100% { transform: scale(1); }
 }
 
+/* ✅ عداد التسجيل */
+#recordingTimer {
+    display: none;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: bold;
+    direction: ltr;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 2px 12px;
+    border-radius: 12px;
+    pointer-events: none;
+    z-index: 5;
+    font-family: monospace;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+}
+
+#recordingTimer.warning {
+    animation: blinkWarning 0.5s ease-in-out infinite;
+    color: #ff0000 !important;
+}
+
+@keyframes blinkWarning {
+    0% { color: #ffffff; background: rgba(0, 0, 0, 0.6); }
+    50% { color: #ff0000; background: rgba(255, 0, 0, 0.3); }
+    100% { color: #ffffff; background: rgba(0, 0, 0, 0.6); }
+}
+
+/* ✅ زر إلغاء التسجيل */
+#cancelRecordingBtn {
+    display: none;
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: #f44336;
+    font-size: 1.1rem;
+    cursor: pointer;
+    z-index: 6;
+    padding: 4px;
+    transition: transform 0.2s;
+}
+
+#cancelRecordingBtn:hover {
+    transform: translateY(-50%) scale(1.15);
+}
+
+#cancelRecordingBtn:active {
+    transform: translateY(-50%) scale(0.9);
+}
+
 .conversation-header, .message-input-container {
     pointer-events: auto !important;
 }
+
 
 /* ==================== القسم 13.5: قائمة المرفقات ==================== */
 .attachment-menu { position: absolute; bottom: 80px; right: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2100; min-width: 150px; border: 1px solid var(--border); }
