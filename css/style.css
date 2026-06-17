@@ -286,7 +286,13 @@ body.conversation-open .conversation-page {
 .message.received { align-self: flex-start; }
 .message-content { padding: 12px 16px; border-radius: 20px; background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); word-wrap: break-word; -webkit-tap-highlight-color: transparent; }
 .message.sent .message-content { background: var(--primary); color: white; }
-.message.received .message-content { background: var(--light); color: var(--text); }
+
+/* ✅ تثبيت خلفية رسائل المستلم على لون داكن ثابت (لا يتغير مع الثيم) */
+.message.received .message-content { 
+    background: #1a1a2e !important; 
+    color: #ffffff !important; 
+}
+
 .message-info { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 2px; font-size: 0.7rem; color: var(--text-light); }
 .message.sent .message-info { color: rgba(255,255,255,0.7); }
 .message-time { font-size: 0.65rem; }
@@ -343,7 +349,7 @@ body.conversation-open .conversation-page {
 }
 
 /* ==================== القسم 13.8: أنماط الثيم الداكن للمحادثة ==================== */
-.theme-dark .message.received .message-content { background: #2d2d2d; color: #fff; }
+/* ✅ تم إزالة تخصيص خلفية رسائل المستلم لأنها أصبحت ثابتة في القسم 13.3 */
 .theme-dark .message.sent .message-content { background: #1976D2; }
 .theme-dark .message-info { color: #999; }
 .theme-dark .message.sent .message-info { color: rgba(255,255,255,0.6); }
