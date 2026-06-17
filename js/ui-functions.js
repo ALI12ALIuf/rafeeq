@@ -248,8 +248,9 @@ window.openEditProfileModal = () => {
 
 window.saveProfile = () => { 
     const n = document.getElementById('editName')?.value?.trim(); 
-    if (!n || n.length > 25) { 
-        alert('الاسم مطلوب ولا يزيد عن 25 حرف'); 
+    // ✅ تغيير من 25 إلى 16
+    if (!n || n.length > 16) { 
+        alert('الاسم مطلوب ولا يزيد عن 16 حرف'); 
         return; 
     } 
     if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { 
