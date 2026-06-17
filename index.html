@@ -443,7 +443,7 @@
 <div class="modal" id="editProfileModal">
     <div class="modal-content">
         <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
-        <div class="edit-field"><label data-i18n="name">الاسم</label><div class="input-wrapper"><input type="text" id="editName" maxlength="25"><span class="char-counter" id="charCounter">0/25</span></div></div>
+        <div class="edit-field"><label data-i18n="name">الاسم</label><div class="input-wrapper"><input type="text" id="editName" maxlength="16"><span class="char-counter" id="charCounter">0/16</span></div></div>
         <div class="edit-field"><label data-i18n="avatar">صورتك الرمزية</label><div class="current-avatar" id="currentAvatarEmoji">👤</div><button class="change-avatar-btn" onclick="openAvatarModal()"><i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span></button></div>
         <div class="modal-actions"><button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button><button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button></div>
         <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
@@ -525,12 +525,12 @@ window.addEventListener('load', function() {
     const nameInput = document.getElementById('editName');
     const charCounter = document.getElementById('charCounter');
     if (nameInput && charCounter) {
-        charCounter.textContent = '0/25';
+        charCounter.textContent = '0/16';
         nameInput.addEventListener('input', function(e) {
             let value = this.value;
-            if (value.length > 25) this.value = value.slice(0, 25);
-            charCounter.textContent = this.value.length + '/25';
-            charCounter.classList.toggle('full', this.value.length >= 25);
+            if (value.length > 16) this.value = value.slice(0, 16);
+            charCounter.textContent = this.value.length + '/16';
+            charCounter.classList.toggle('full', this.value.length >= 16);
         });
     }
     
