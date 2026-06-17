@@ -128,8 +128,9 @@ window.handleMessageKeyPress = e => {
 let _recordingTimer = null;
 let _recordingStartTime = null;
 let _isRecording = false;
-const MAX_RECORDING_DURATION = 300; // 5 دقائق (بالثواني)
-const WARNING_THRESHOLD = 290; // 4:50 دقيقة (290 ثانية)
+let _recordingBlob = null; // ✅ تخزين البصمة المؤقتة
+const MAX_RECORDING_DURATION = 300; // 5 دقائق
+const WARNING_THRESHOLD = 280; // 4:40 (تبقى 20 ثانية)
 
 // دالة تبديل الزر بين البصمة والإرسال
 window.toggleSendButton = function() {
@@ -137,11 +138,9 @@ window.toggleSendButton = function() {
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
-    // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     
     if (!featuresEnabled) {
-        // ❌ الميزات غير مفعلة → زر الإرسال فقط (بدون بصمة)
         btn.className = 'send-mode';
         btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         btn.title = 'إرسال';
@@ -149,16 +148,22 @@ window.toggleSendButton = function() {
         return;
     }
     
-    // ✅ الميزات مفعلة → تحقق من وجود نص
+    // ✅ إذا كانت هناك بصمة مسجلة → زر إرسال
+    if (_recordingBlob) {
+        btn.className = 'send-mode';
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+        btn.title = 'إرسال البصمة';
+        btn.style.display = 'flex';
+        return;
+    }
+    
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
-        // يوجد نص → زر إرسال
         btn.className = 'send-mode';
         btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         btn.title = 'إرسال';
     } else {
-        // لا يوجد نص → زر بصمة
         btn.className = 'voice-btn';
         btn.innerHTML = '<i class="fas fa-microphone"></i>';
         btn.title = 'بصمة صوتية';
@@ -172,19 +177,34 @@ window.handleActionButton = function() {
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
-    // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
-    
     const hasText = input.value.trim().length > 0;
     
+    // ✅ إذا كانت هناك بصمة مسجلة → إرسالها
+    if (_recordingBlob) {
+        ChatSystem.sendVoiceNote(_recordingBlob);
+        _recordingBlob = null;
+        // إخفاء العداد
+        const timer = document.getElementById('recordingTimer');
+        if (timer) timer.style.display = 'none';
+        const cancelBtn = document.getElementById('cancelRecordingBtn');
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        const inputField = document.getElementById('messageInput');
+        if (inputField) {
+            inputField.placeholder = 'اكتب رسالتك...';
+            inputField.disabled = false;
+            inputField.value = '';
+            inputField.focus();
+        }
+        window.toggleSendButton();
+        return;
+    }
+    
     if (hasText) {
-        // ✅ يوجد نص → إرسال (دائماً)
         window.sendMessage();
     } else if (featuresEnabled) {
-        // ✅ لا يوجد نص والميزات مفعلة → تسجيل بصمة
         window.startVoiceRecording();
     }
-    // ❌ إذا كانت الميزات غير مفعلة ولا يوجد نص → لا شيء
 };
 
 // ✅ دالة إيقاف العداد
@@ -195,7 +215,7 @@ function stopRecordingTimer() {
     }
 }
 
-// ✅ دالة بدء العداد التنازلي
+// ✅ دالة بدء العداد التصاعدي
 function startRecordingTimer() {
     if (_recordingTimer) stopRecordingTimer();
     
@@ -208,15 +228,13 @@ function startRecordingTimer() {
         const elapsed = Math.floor((Date.now() - _recordingStartTime) / 1000);
         const remaining = Math.max(0, MAX_RECORDING_DURATION - elapsed);
         
-        // تحديث الوقت المنقضي
+        // ✅ العداد التصاعدي (الوقت المنقضي)
         const elapsedMins = Math.floor(elapsed / 60);
         const elapsedSecs = elapsed % 60;
         const elapsedStr = `${elapsedMins}:${elapsedSecs.toString().padStart(2, '0')}`;
         
-        // تحديث الوقت المتبقي
-        const remMins = Math.floor(remaining / 60);
-        const remSecs = remaining % 60;
-        const remStr = `${remMins}:${remSecs.toString().padStart(2, '0')}`;
+        // ✅ العداد الثابت (5:00)
+        const remStr = '5:00';
         
         const timeEl = document.getElementById('recordingTime');
         const remainEl = document.getElementById('recordingRemaining');
@@ -225,21 +243,21 @@ function startRecordingTimer() {
         if (timeEl) timeEl.textContent = elapsedStr;
         if (remainEl) remainEl.textContent = remStr;
         
-        // ✅ التحذير عند 4:50 (تبقى 10 ثوانٍ)
-        if (remaining <= 10 && timer) {
+        // ✅ التحذير عند 4:40 (تبقى 20 ثانية) - يرمش أزرق/أحمر
+        if (remaining <= 20 && timer) {
             timer.classList.add('warning');
         } else if (timer) {
             timer.classList.remove('warning');
         }
         
-        // إيقاف التسجيل تلقائياً عند انتهاء الوقت
+        // ✅ عند انتهاء المدة، إيقاف التسجيل (لا نرسل تلقائياً)
         if (remaining <= 0) {
-            stopVoiceRecording();
+            stopVoiceRecording(false);
         }
     }, 1000);
 }
 
-// ✅ دالة إيقاف التسجيل (مع أو بدون إلغاء)
+// ✅ دالة إيقاف التسجيل
 function stopVoiceRecording(cancel = false) {
     if (!_isRecording) return;
     
@@ -248,38 +266,33 @@ function stopVoiceRecording(cancel = false) {
     const cancelBtn = document.getElementById('cancelRecordingBtn');
     const input = document.getElementById('messageInput');
     
-    // إذا كان الإلغاء، أبلغ المستخدم
-    if (cancel) {
-        // إيقاف التسجيل بدون إرسال
-        _isRecording = false;
-        stopRecordingTimer();
-        
-        if (btn) {
-            btn.classList.remove('recording');
-            btn.innerHTML = '<i class="fas fa-microphone"></i>';
-            btn.title = 'بصمة صوتية';
-            btn.onclick = window.handleActionButton;
-        }
-        if (timer) timer.style.display = 'none';
-        if (cancelBtn) cancelBtn.style.display = 'none';
-        if (input) {
-            input.placeholder = 'اكتب رسالتك...';
-            input.disabled = false;
-            input.focus();
-        }
-        window.toggleSendButton();
-        return;
+    _isRecording = false;
+    stopRecordingTimer();
+    
+    if (btn) {
+        btn.classList.remove('recording');
+        btn.innerHTML = '<i class="fas fa-microphone"></i>';
+        btn.title = 'بصمة صوتية';
+        btn.onclick = window.handleActionButton;
+    }
+    if (timer) timer.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (input) {
+        input.placeholder = 'اكتب رسالتك...';
+        input.disabled = false;
+        input.focus();
     }
     
-    // إيقاف التسجيل العادي (سيتم إرسال البصمة)
-    if (btn && btn.classList.contains('recording')) {
-        btn.click(); // محاكاة الضغط على زر الإيقاف
+    // ✅ إذا كان إلغاء، مسح البصمة المؤقتة
+    if (cancel) {
+        _recordingBlob = null;
     }
+    
+    window.toggleSendButton();
 }
 
-// دالة تسجيل البصمة الصوتية (مع العداد التنازلي وزر الإلغاء)
+// دالة تسجيل البصمة الصوتية
 window.startVoiceRecording = function() {
-    // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     if (!featuresEnabled) {
         alert('الميزات غير مفعلة');
@@ -287,8 +300,7 @@ window.startVoiceRecording = function() {
     }
     
     if (_isRecording) {
-        // إذا كان التسجيل قيد التقدم، إيقافه
-        stopVoiceRecording();
+        stopVoiceRecording(true);
         return;
     }
     
@@ -316,11 +328,11 @@ window.startVoiceRecording = function() {
         cancelBtn.style.display = 'flex';
         cancelBtn.onclick = function(e) {
             e.stopPropagation();
-            stopVoiceRecording(true); // إلغاء مع مسح البصمة
+            stopVoiceRecording(true);
         };
     }
     if (input) {
-        input.placeholder = 'جاري التسجيل...';
+        input.placeholder = '';
         input.disabled = true;
     }
     
@@ -334,8 +346,8 @@ window.startVoiceRecording = function() {
             btn.title = 'إيقاف التسجيل';
             _isRecording = true;
             _recordingStartTime = Date.now();
+            _recordingBlob = null;
             
-            // ✅ بدء العداد التنازلي
             startRecordingTimer();
             
             mr.ondataavailable = e => {
@@ -343,11 +355,14 @@ window.startVoiceRecording = function() {
             };
             
             mr.onstop = () => {
-                // إيقاف العداد
                 stopRecordingTimer();
-                
                 s.getTracks().forEach(t => t.stop());
                 const blob = new Blob(ch, { type: 'audio/webm' });
+                
+                // ✅ تخزين البصمة مؤقتاً (لا نرسلها تلقائياً)
+                if (blob.size > 0) {
+                    _recordingBlob = blob;
+                }
                 
                 // ✅ إخفاء العداد وزر الإلغاء
                 if (timer) timer.style.display = 'none';
@@ -364,15 +379,30 @@ window.startVoiceRecording = function() {
                 btn.onclick = window.handleActionButton;
                 _isRecording = false;
                 
-                if (blob.size > 0) {
-                    ChatSystem.sendVoiceNote(blob);
+                // ✅ إذا كانت البصمة موجودة، تغيير الزر إلى إرسال
+                if (_recordingBlob) {
+                    btn.className = 'send-mode';
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                    btn.title = 'إرسال البصمة';
+                    // إظهار العداد مع رسالة تأكيد
+                    if (timer) {
+                        timer.style.display = 'block';
+                        timer.classList.remove('warning');
+                        document.getElementById('recordingTime').textContent = '✅';
+                        document.getElementById('recordingRemaining').textContent = 'جاهز للإرسال';
+                        setTimeout(() => {
+                            if (timer && !_isRecording) {
+                                timer.style.display = 'none';
+                            }
+                        }, 2000);
+                    }
                 }
+                
                 window.toggleSendButton();
             };
             
             mr.start();
             
-            // ✅ زر الإيقاف أثناء التسجيل
             btn.onclick = function() {
                 if (mr.state === 'recording') {
                     mr.stop();
@@ -380,7 +410,7 @@ window.startVoiceRecording = function() {
                 }
             };
             
-            // ✅ إيقاف تلقائي بعد 5 دقائق
+            // ✅ إيقاف تلقائي بعد 5 دقائق (بدون إرسال)
             setTimeout(() => {
                 if (mr.state === 'recording') {
                     mr.stop();
@@ -389,7 +419,6 @@ window.startVoiceRecording = function() {
             }, MAX_RECORDING_DURATION * 1000);
         })
         .catch(() => {
-            // ✅ إخفاء العداد وزر الإلغاء في حالة الخطأ
             if (timer) timer.style.display = 'none';
             if (cancelBtn) cancelBtn.style.display = 'none';
             if (input) {
