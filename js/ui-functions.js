@@ -63,10 +63,11 @@ async function loadChats() {
 // ==================== القسم 3: إعداد مستمعي الواجهة ====================
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
-        const m = document.getElementById('attachmentMenu'), ab = document.querySelector('.attach-btn'); 
-        if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) m.style.display = 'none'; 
-        const ep = document.getElementById('emojiPicker'), eb = document.querySelector('.emoji-btn'); 
-        if (ep && eb && !ep.contains(e.target) && !eb.contains(e.target)) ep.style.display = 'none'; 
+        const m = document.getElementById('attachmentMenu'); 
+        const ab = document.querySelector('.attach-btn'); 
+        if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) {
+            m.style.display = 'none'; 
+        }
     }); 
 }
 
@@ -110,19 +111,12 @@ window.handleMessageKeyPress = e => {
     } 
 };
 
-// ==================== القسم 6: قائمة المرفقات والإيموجي ====================
+// ==================== القسم 6: قائمة المرفقات ====================
 window.showAttachmentMenu = () => { 
     const m = document.getElementById('attachmentMenu'); 
-    if (m) m.style.display = m.style.display === 'none' ? 'flex' : 'none'; 
-    const ep = document.getElementById('emojiPicker'); 
-    if (ep) ep.style.display = 'none'; 
-};
-
-window.showEmojiPicker = () => { 
-    const p = document.getElementById('emojiPicker'); 
-    if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'; 
-    const m = document.getElementById('attachmentMenu'); 
-    if (m) m.style.display = 'none'; 
+    if (m) {
+        m.style.display = m.style.display === 'none' ? 'flex' : 'none'; 
+    }
 };
 
 // ==================== القسم 7: إرسال الملفات ====================
