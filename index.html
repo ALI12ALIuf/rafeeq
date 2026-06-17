@@ -123,8 +123,16 @@
             <div class="message-input-container">
                 <div class="message-input-wrapper">
                     <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
-                    <div class="input-area">
+                    <div class="input-area" style="position:relative;">
                         <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()">
+                        <!-- ✅ عداد التسجيل (يظهر أثناء التسجيل) -->
+                        <div id="recordingTimer" style="display:none; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#ffffff; font-size:0.9rem; font-weight:bold; direction:ltr; background:rgba(0,0,0,0.5); padding:2px 10px; border-radius:12px; pointer-events:none; z-index:5; white-space:nowrap;">
+                            <span id="recordingTime">0:00</span> / <span id="recordingRemaining">5:00</span>
+                        </div>
+                        <!-- ✅ زر إلغاء التسجيل -->
+                        <button id="cancelRecordingBtn" style="display:none; position:absolute; left:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; color:#f44336; font-size:1.2rem; cursor:pointer; z-index:6; padding:4px;">
+                            <i class="fas fa-times-circle"></i>
+                        </button>
                     </div>
                     <!-- ✅ زر واحد يتغير بين البصمة والإرسال -->
                     <button id="actionBtn" class="voice-btn" onclick="handleActionButton()">
