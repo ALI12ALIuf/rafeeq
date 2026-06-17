@@ -130,17 +130,33 @@ window.toggleSendButton = function() {
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
+    // ✅ التحقق من تفعيل الميزات
+    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
+    
+    if (!featuresEnabled) {
+        // ❌ الميزات غير مفعلة → زر الإرسال فقط (بدون بصمة)
+        btn.className = 'send-mode';
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+        btn.title = 'إرسال';
+        btn.style.display = 'flex';
+        return;
+    }
+    
+    // ✅ الميزات مفعلة → تحقق من وجود نص
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
+        // يوجد نص → زر إرسال
         btn.className = 'send-mode';
         btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         btn.title = 'إرسال';
     } else {
+        // لا يوجد نص → زر بصمة
         btn.className = 'voice-btn';
         btn.innerHTML = '<i class="fas fa-microphone"></i>';
         btn.title = 'بصمة صوتية';
     }
+    btn.style.display = 'flex';
 };
 
 // دالة معالجة الضغط على الزر
@@ -149,17 +165,30 @@ window.handleActionButton = function() {
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
+    // ✅ التحقق من تفعيل الميزات
+    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
+    
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
+        // ✅ يوجد نص → إرسال (دائماً)
         window.sendMessage();
-    } else {
+    } else if (featuresEnabled) {
+        // ✅ لا يوجد نص والميزات مفعلة → تسجيل بصمة
         window.startVoiceRecording();
     }
+    // ❌ إذا كانت الميزات غير مفعلة ولا يوجد نص → لا شيء
 };
 
 // دالة تسجيل البصمة الصوتية (بدلاً من sendVoiceNote القديمة)
 window.startVoiceRecording = function() {
+    // ✅ التحقق من تفعيل الميزات
+    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
+    if (!featuresEnabled) {
+        alert('الميزات غير مفعلة');
+        return;
+    }
+    
     if (!navigator.mediaDevices?.getUserMedia) {
         alert('المتصفح لا يدعم تسجيل الصوت');
         return;
@@ -192,6 +221,8 @@ window.startVoiceRecording = function() {
                 btn.innerHTML = '<i class="fas fa-microphone"></i>';
                 btn.title = 'بصمة صوتية';
                 btn.onclick = window.handleActionButton;
+                // ✅ تحديث الزر بعد التسجيل
+                window.toggleSendButton();
             };
             
             mr.start();
