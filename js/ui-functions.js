@@ -96,20 +96,123 @@ window.openChat = friendId => {
 // ==================== القسم 5: وظائف إرسال الرسائل ====================
 window.sendMessage = () => { 
     const inp = document.getElementById('messageInput'); 
-    if (inp && inp.value.trim()) ChatSystem.sendMessage(inp.value.trim()).then(s => { 
-        if (s) { 
-            inp.value = ''; 
-            inp.style.height = 'auto'; 
-        } 
-    }); 
+    if (inp && inp.value.trim()) {
+        ChatSystem.sendMessage(inp.value.trim()).then(s => { 
+            if (s) { 
+                inp.value = ''; 
+                inp.style.height = 'auto';
+                // ✅ تحديث الزر بعد الإرسال (يعود إلى وضع البصمة)
+                if (typeof window.toggleSendButton === 'function') {
+                    window.toggleSendButton();
+                }
+            } 
+        }); 
+    }
 };
 
 window.handleMessageKeyPress = e => { 
     if (e.key === 'Enter' && !e.shiftKey) { 
         e.preventDefault(); 
-        window.sendMessage(); 
+        // ✅ استخدام الزر الموحد
+        if (typeof window.handleActionButton === 'function') {
+            window.handleActionButton();
+        } else {
+            window.sendMessage();
+        }
     } 
 };
+
+// ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
+
+// دالة تبديل الزر بين البصمة والإرسال
+window.toggleSendButton = function() {
+    const input = document.getElementById('messageInput');
+    const btn = document.getElementById('actionBtn');
+    if (!input || !btn) return;
+    
+    const hasText = input.value.trim().length > 0;
+    
+    if (hasText) {
+        btn.className = 'send-mode';
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+        btn.title = 'إرسال';
+    } else {
+        btn.className = 'voice-btn';
+        btn.innerHTML = '<i class="fas fa-microphone"></i>';
+        btn.title = 'بصمة صوتية';
+    }
+};
+
+// دالة معالجة الضغط على الزر
+window.handleActionButton = function() {
+    const input = document.getElementById('messageInput');
+    const btn = document.getElementById('actionBtn');
+    if (!input || !btn) return;
+    
+    const hasText = input.value.trim().length > 0;
+    
+    if (hasText) {
+        window.sendMessage();
+    } else {
+        window.startVoiceRecording();
+    }
+};
+
+// دالة تسجيل البصمة الصوتية (بدلاً من sendVoiceNote القديمة)
+window.startVoiceRecording = function() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+        alert('المتصفح لا يدعم تسجيل الصوت');
+        return;
+    }
+    
+    const btn = document.getElementById('actionBtn');
+    if (!btn) return;
+    if (btn.classList.contains('send-mode')) return;
+    
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(s => {
+            const mr = new MediaRecorder(s);
+            const ch = [];
+            
+            btn.classList.add('recording');
+            btn.innerHTML = '<i class="fas fa-stop"></i>';
+            btn.title = 'إيقاف التسجيل';
+            
+            mr.ondataavailable = e => {
+                if (e.data.size > 0) ch.push(e.data);
+            };
+            
+            mr.onstop = () => {
+                s.getTracks().forEach(t => t.stop());
+                const blob = new Blob(ch, { type: 'audio/webm' });
+                if (blob.size > 0) {
+                    ChatSystem.sendVoiceNote(blob);
+                }
+                btn.classList.remove('recording');
+                btn.innerHTML = '<i class="fas fa-microphone"></i>';
+                btn.title = 'بصمة صوتية';
+                btn.onclick = window.handleActionButton;
+            };
+            
+            mr.start();
+            
+            btn.onclick = function() {
+                if (mr.state === 'recording') {
+                    mr.stop();
+                    btn.onclick = window.handleActionButton;
+                }
+            };
+            
+            setTimeout(() => {
+                if (mr.state === 'recording') {
+                    mr.stop();
+                    btn.onclick = window.handleActionButton;
+                }
+            }, 30000);
+        })
+        .catch(() => alert('يرجى السماح بالوصول إلى الميكروفون'));
+};
+
 
 // ==================== القسم 6: قائمة المرفقات ====================
 window.showAttachmentMenu = () => { 
@@ -153,41 +256,6 @@ window.sendFile = () => {
         if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); 
     }; 
     i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
-
-window.sendVoiceNote = () => { 
-    if (!navigator.mediaDevices?.getUserMedia) { 
-        alert('المتصفح لا يدعم تسجيل الصوت'); 
-        return; 
-    } 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { 
-        const mr = new MediaRecorder(s); 
-        const ch = []; 
-        mr.ondataavailable = e => { 
-            if (e.data.size > 0) ch.push(e.data); 
-        }; 
-        mr.onstop = () => { 
-            s.getTracks().forEach(t => t.stop()); 
-            const blob = new Blob(ch, { type: 'audio/webm' }); 
-            if (blob.size > 0) ChatSystem.sendVoiceNote(blob); 
-            const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); 
-            if (sb) sb.style.display = 'flex'; 
-            if (vb) vb.style.display = 'none'; 
-        }; 
-        mr.start(); 
-        const sb = document.querySelector('.send-btn'), vb = document.querySelector('.voice-btn'); 
-        if (sb) sb.style.display = 'none'; 
-        if (vb) { 
-            vb.style.display = 'flex'; 
-            vb.onclick = () => { 
-                if (mr.state === 'recording') mr.stop(); 
-            }; 
-        } 
-        setTimeout(() => { 
-            if (mr.state === 'recording') mr.stop(); 
-        }, 900000); 
-    }).catch(() => alert('يرجى السماح بالوصول إلى الميكروفون')); 
     document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
