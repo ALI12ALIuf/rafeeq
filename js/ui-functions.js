@@ -124,6 +124,13 @@ window.handleMessageKeyPress = e => {
 
 // ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
 
+// ✅ متغيرات التسجيل
+let _recordingTimer = null;
+let _recordingStartTime = null;
+let _isRecording = false;
+const MAX_RECORDING_DURATION = 300; // 5 دقائق (بالثواني)
+const WARNING_THRESHOLD = 290; // 4:50 دقيقة (290 ثانية)
+
 // دالة تبديل الزر بين البصمة والإرسال
 window.toggleSendButton = function() {
     const input = document.getElementById('messageInput');
@@ -180,12 +187,108 @@ window.handleActionButton = function() {
     // ❌ إذا كانت الميزات غير مفعلة ولا يوجد نص → لا شيء
 };
 
-// دالة تسجيل البصمة الصوتية (بدلاً من sendVoiceNote القديمة)
+// ✅ دالة إيقاف العداد
+function stopRecordingTimer() {
+    if (_recordingTimer) {
+        clearInterval(_recordingTimer);
+        _recordingTimer = null;
+    }
+}
+
+// ✅ دالة بدء العداد التنازلي
+function startRecordingTimer() {
+    if (_recordingTimer) stopRecordingTimer();
+    
+    _recordingTimer = setInterval(() => {
+        if (!_isRecording || !_recordingStartTime) {
+            stopRecordingTimer();
+            return;
+        }
+        
+        const elapsed = Math.floor((Date.now() - _recordingStartTime) / 1000);
+        const remaining = Math.max(0, MAX_RECORDING_DURATION - elapsed);
+        
+        // تحديث الوقت المنقضي
+        const elapsedMins = Math.floor(elapsed / 60);
+        const elapsedSecs = elapsed % 60;
+        const elapsedStr = `${elapsedMins}:${elapsedSecs.toString().padStart(2, '0')}`;
+        
+        // تحديث الوقت المتبقي
+        const remMins = Math.floor(remaining / 60);
+        const remSecs = remaining % 60;
+        const remStr = `${remMins}:${remSecs.toString().padStart(2, '0')}`;
+        
+        const timeEl = document.getElementById('recordingTime');
+        const remainEl = document.getElementById('recordingRemaining');
+        const timer = document.getElementById('recordingTimer');
+        
+        if (timeEl) timeEl.textContent = elapsedStr;
+        if (remainEl) remainEl.textContent = remStr;
+        
+        // ✅ التحذير عند 4:50 (تبقى 10 ثوانٍ)
+        if (remaining <= 10 && timer) {
+            timer.classList.add('warning');
+        } else if (timer) {
+            timer.classList.remove('warning');
+        }
+        
+        // إيقاف التسجيل تلقائياً عند انتهاء الوقت
+        if (remaining <= 0) {
+            stopVoiceRecording();
+        }
+    }, 1000);
+}
+
+// ✅ دالة إيقاف التسجيل (مع أو بدون إلغاء)
+function stopVoiceRecording(cancel = false) {
+    if (!_isRecording) return;
+    
+    const btn = document.getElementById('actionBtn');
+    const timer = document.getElementById('recordingTimer');
+    const cancelBtn = document.getElementById('cancelRecordingBtn');
+    const input = document.getElementById('messageInput');
+    
+    // إذا كان الإلغاء، أبلغ المستخدم
+    if (cancel) {
+        // إيقاف التسجيل بدون إرسال
+        _isRecording = false;
+        stopRecordingTimer();
+        
+        if (btn) {
+            btn.classList.remove('recording');
+            btn.innerHTML = '<i class="fas fa-microphone"></i>';
+            btn.title = 'بصمة صوتية';
+            btn.onclick = window.handleActionButton;
+        }
+        if (timer) timer.style.display = 'none';
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        if (input) {
+            input.placeholder = 'اكتب رسالتك...';
+            input.disabled = false;
+            input.focus();
+        }
+        window.toggleSendButton();
+        return;
+    }
+    
+    // إيقاف التسجيل العادي (سيتم إرسال البصمة)
+    if (btn && btn.classList.contains('recording')) {
+        btn.click(); // محاكاة الضغط على زر الإيقاف
+    }
+}
+
+// دالة تسجيل البصمة الصوتية (مع العداد التنازلي وزر الإلغاء)
 window.startVoiceRecording = function() {
     // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     if (!featuresEnabled) {
         alert('الميزات غير مفعلة');
+        return;
+    }
+    
+    if (_isRecording) {
+        // إذا كان التسجيل قيد التقدم، إيقافه
+        stopVoiceRecording();
         return;
     }
     
@@ -198,6 +301,29 @@ window.startVoiceRecording = function() {
     if (!btn) return;
     if (btn.classList.contains('send-mode')) return;
     
+    // ✅ إظهار العداد وزر الإلغاء
+    const timer = document.getElementById('recordingTimer');
+    const cancelBtn = document.getElementById('cancelRecordingBtn');
+    const input = document.getElementById('messageInput');
+    
+    if (timer) {
+        timer.style.display = 'block';
+        timer.classList.remove('warning');
+        document.getElementById('recordingTime').textContent = '0:00';
+        document.getElementById('recordingRemaining').textContent = '5:00';
+    }
+    if (cancelBtn) {
+        cancelBtn.style.display = 'flex';
+        cancelBtn.onclick = function(e) {
+            e.stopPropagation();
+            stopVoiceRecording(true); // إلغاء مع مسح البصمة
+        };
+    }
+    if (input) {
+        input.placeholder = 'جاري التسجيل...';
+        input.disabled = true;
+    }
+    
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(s => {
             const mr = new MediaRecorder(s);
@@ -206,27 +332,47 @@ window.startVoiceRecording = function() {
             btn.classList.add('recording');
             btn.innerHTML = '<i class="fas fa-stop"></i>';
             btn.title = 'إيقاف التسجيل';
+            _isRecording = true;
+            _recordingStartTime = Date.now();
+            
+            // ✅ بدء العداد التنازلي
+            startRecordingTimer();
             
             mr.ondataavailable = e => {
                 if (e.data.size > 0) ch.push(e.data);
             };
             
             mr.onstop = () => {
+                // إيقاف العداد
+                stopRecordingTimer();
+                
                 s.getTracks().forEach(t => t.stop());
                 const blob = new Blob(ch, { type: 'audio/webm' });
-                if (blob.size > 0) {
-                    ChatSystem.sendVoiceNote(blob);
+                
+                // ✅ إخفاء العداد وزر الإلغاء
+                if (timer) timer.style.display = 'none';
+                if (cancelBtn) cancelBtn.style.display = 'none';
+                if (input) {
+                    input.placeholder = 'اكتب رسالتك...';
+                    input.disabled = false;
+                    input.focus();
                 }
+                
                 btn.classList.remove('recording');
                 btn.innerHTML = '<i class="fas fa-microphone"></i>';
                 btn.title = 'بصمة صوتية';
                 btn.onclick = window.handleActionButton;
-                // ✅ تحديث الزر بعد التسجيل
+                _isRecording = false;
+                
+                if (blob.size > 0) {
+                    ChatSystem.sendVoiceNote(blob);
+                }
                 window.toggleSendButton();
             };
             
             mr.start();
             
+            // ✅ زر الإيقاف أثناء التسجيل
             btn.onclick = function() {
                 if (mr.state === 'recording') {
                     mr.stop();
@@ -234,15 +380,25 @@ window.startVoiceRecording = function() {
                 }
             };
             
-            // ✅ تغيير المدة من 30 ثانية إلى 5 دقائق (300000)
+            // ✅ إيقاف تلقائي بعد 5 دقائق
             setTimeout(() => {
                 if (mr.state === 'recording') {
                     mr.stop();
                     btn.onclick = window.handleActionButton;
                 }
-            }, 300000);  // ← 5 دقائق
+            }, MAX_RECORDING_DURATION * 1000);
         })
-        .catch(() => alert('يرجى السماح بالوصول إلى الميكروفون'));
+        .catch(() => {
+            // ✅ إخفاء العداد وزر الإلغاء في حالة الخطأ
+            if (timer) timer.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            if (input) {
+                input.placeholder = 'اكتب رسالتك...';
+                input.disabled = false;
+            }
+            _isRecording = false;
+            alert('يرجى السماح بالوصول إلى الميكروفون');
+        });
 };
 
 
