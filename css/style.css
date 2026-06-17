@@ -320,9 +320,9 @@ body.conversation-open .conversation-page {
 /* ==================== القسم 13.5: قائمة المرفقات ==================== */
 .attachment-menu { 
     position: absolute; 
-    bottom: 70px;              /* ✅ بدلاً من 80px */
-    left: 50%;                 /* ✅ توسيط */
-    transform: translateX(-50%); /* ✅ توسيط */
+    bottom: 70px; 
+    left: 50%; 
+    transform: translateX(-50%); 
     background: var(--card-bg); 
     border-radius: 20px; 
     box-shadow: var(--shadow); 
@@ -335,27 +335,26 @@ body.conversation-open .conversation-page {
     border: 1px solid var(--border); 
 }
 
-/* ✅ إزالة النصوص (الأيقونات فقط) - ضبط الأزرار */
 .attachment-menu button { 
     display: flex; 
     align-items: center; 
-    justify-content: center;    /* ✅ توسيط الأيقونات */
-    gap: 0;                    /* ✅ إزالة المسافة */
+    justify-content: center;
+    gap: 0; 
     padding: 12px 16px; 
     border: none; 
     background: transparent; 
     color: var(--text); 
     cursor: pointer; 
     border-radius: 12px; 
-    font-size: 1.2rem;         /* ✅ تكبير الأيقونات */
+    font-size: 1.2rem;
     width: 100%; 
-    text-align: center;        /* ✅ توسيط */
+    text-align: center;
 }
 
 .attachment-menu button i { 
-    width: auto;               /* ✅ إزالة العرض الثابت */
+    width: auto; 
     color: var(--primary); 
-    font-size: 1.5rem;         /* ✅ تكبير الأيقونة */
+    font-size: 1.5rem; 
 }
 
 /* ==================== القسم 13.6: منتقي الإيموجي ==================== */
