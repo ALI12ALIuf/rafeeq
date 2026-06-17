@@ -967,3 +967,138 @@ input:checked + .toggle-slider:before {
 }
 
 
+/* ==================== القسم: أنماط عداد التسجيل والوميض ==================== */
+
+/* أنماط عداد التسجيل */
+#recordTimer {
+    font-family: monospace;
+    font-size: 0.95rem;
+    font-weight: bold;
+    min-width: 55px;
+    text-align: center;
+    direction: ltr;
+    letter-spacing: 0.5px;
+    transition: color 0.3s ease;
+}
+
+/* حركة الوميض (أزرق ← أحمر) */
+@keyframes blinkRedBlue {
+    0% { color: #2196F3; }
+    50% { color: #f44336; }
+    100% { color: #2196F3; }
+}
+
+/* حركة الوميض (أحمر سريع) */
+@keyframes blinkRed {
+    0% { color: #f44336; }
+    50% { color: #ff8888; }
+    100% { color: #f44336; }
+}
+
+/* كلاسات التطبيق */
+#recordTimer.blinking-warning {
+    animation: blinkRedBlue 0.6s ease-in-out infinite;
+}
+
+#recordTimer.blinking-danger {
+    animation: blinkRed 0.4s ease-in-out infinite;
+}
+
+/* ==================== أنماط أزرار التسجيل ==================== */
+
+/* زر إلغاء التسجيل */
+#cancelRecordBtn {
+    transition: all 0.2s ease;
+}
+
+#cancelRecordBtn:hover {
+    background: rgba(244, 67, 54, 0.1);
+    transform: scale(1.1);
+}
+
+#cancelRecordBtn:active {
+    transform: scale(0.9);
+}
+
+/* زر سماع البصمة */
+#playbackRecordBtn {
+    transition: all 0.2s ease;
+}
+
+#playbackRecordBtn:hover {
+    background: rgba(76, 175, 80, 0.1);
+    transform: scale(1.1);
+}
+
+#playbackRecordBtn:active {
+    transform: scale(0.9);
+}
+
+/* زر إرسال البصمة */
+#sendRecordBtn {
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+#sendRecordBtn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
+}
+
+#sendRecordBtn:active {
+    transform: scale(0.95);
+}
+
+/* ==================== حاوية أزرار التسجيل ==================== */
+#recordingControls {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    direction: ltr;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 25px;
+    border: 1px solid rgba(33, 150, 243, 0.2);
+}
+
+/* ==================== تنسيق حقل الإدخال أثناء التسجيل ==================== */
+#messageInput:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* ==================== توافق مع الثيم الداكن ==================== */
+.theme-dark #recordingControls {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(33, 150, 243, 0.2);
+}
+
+.theme-dark #recordTimer {
+    color: #2196F3;
+}
+
+/* ==================== توافق مع الشاشات الصغيرة ==================== */
+@media (max-width: 480px) {
+    #recordingControls {
+        gap: 4px;
+        padding: 2px 4px;
+    }
+    
+    #cancelRecordBtn,
+    #playbackRecordBtn {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 1rem !important;
+    }
+    
+    #sendRecordBtn {
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 1rem !important;
+    }
+    
+    #recordTimer {
+        font-size: 0.8rem;
+        min-width: 45px;
+    }
+}
