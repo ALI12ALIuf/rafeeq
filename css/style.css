@@ -886,34 +886,3 @@ input:checked + .toggle-slider:before {
 }
 
 
-/* ==================== القسم 21: ستايلات واجهات المكالمات الثابتة ==================== */
-
-@font-face {
-    font-family: 'NotoSansArabic';
-    src: url('../fonts/NotoSansArabic-VariableFont_wdth,wght.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'NotoSans';
-    src: url('../fonts/NotoSans-VariableFont_wdth,wgth.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'NotoColorEmoji';
-    src: url('../fonts/NotoColorEmoji-Regular.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-
-/* تطبيق الخطوط على كل شيء */
-* {
-    font-family: "NotoSansArabic", "NotoSans", "NotoColorEmoji", sans-serif;
-}
-
