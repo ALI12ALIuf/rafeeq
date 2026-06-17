@@ -250,7 +250,7 @@ body.conversation-open .conversation-page {
 
 /* ==================== القسم 13.2: أزرار Mute و Lock ==================== */
 .attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
-.attachment-menu button.locked::after { content: " 🔒"; font-size: 0.8rem; }
+
 
 /* ==================== القسم 13.3: صندوق الرسائل ==================== */
 .messages-container { 
