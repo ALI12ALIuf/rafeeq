@@ -313,9 +313,8 @@ body.conversation-open .conversation-page {
     gap: 6px; 
     background: var(--light); 
     border-radius: 25px; 
-    padding: 4px 8px; 
+    padding: 2px 6px; 
     border: 1px solid var(--border); 
-    min-height: 44px;
 }
 
 .message-input-wrapper:focus-within { 
@@ -323,8 +322,8 @@ body.conversation-open .conversation-page {
 }
 
 .attach-btn { 
-    width: 36px; 
-    height: 36px; 
+    width: 38px; 
+    height: 38px; 
     border-radius: 50%; 
     border: none; 
     background: transparent; 
@@ -333,7 +332,7 @@ body.conversation-open .conversation-page {
     display: flex; 
     align-items: center; 
     justify-content: center; 
-    font-size: 1.1rem; 
+    font-size: 1.2rem; 
     flex-shrink: 0;
 }
 
@@ -342,134 +341,24 @@ body.conversation-open .conversation-page {
     display: flex; 
     align-items: center; 
     gap: 4px; 
-    min-width: 0;
 }
 
 #messageInput { 
     flex: 1; 
     background: transparent; 
     border: none; 
-    padding: 6px 4px; 
+    padding: 8px 4px; 
     color: var(--text); 
-    font-size: 0.9rem; 
+    font-size: 0.95rem; 
     outline: none; 
-    min-height: 32px;
+    min-height: 36px;
     max-height: 120px;
-    width: 100%;
-    min-width: 0;
-}
-
-/* ✅ واجهة التسجيل الصوتي (داخل الإطار) */
-#voiceRecorderUI {
-    display: none;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-    direction: ltr;
-    min-width: 0;
-    padding: 0 2px;
-}
-
-/* العدادات */
-#countdownTimer, #elapsedTimer {
-    font-size: 0.75rem;
-    font-weight: bold;
-    min-width: 32px;
-    font-family: monospace;
-    color: var(--text);
-    text-align: center;
-    flex-shrink: 0;
-}
-
-/* شريط التقدم */
-.progress-bar-container {
-    flex: 1;
-    height: 3px;
-    background: rgba(128, 128, 128, 0.3);
-    border-radius: 2px;
-    position: relative;
-    min-width: 40px;
-    overflow: hidden;
-}
-
-#progressBarVoice {
-    width: 0%;
-    height: 100%;
-    background: #4CAF50;
-    border-radius: 2px;
-    transition: width 0.1s linear;
-}
-
-/* ✅ زر التشغيل (جديد) */
-#playVoiceBtn { 
-    width: 28px; 
-    height: 28px; 
-    border-radius: 50%; 
-    border: none; 
-    background: transparent; 
-    color: var(--primary); 
-    cursor: pointer; 
-    display: none;
-    align-items: center; 
-    justify-content: center; 
-    font-size: 0.85rem; 
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-
-#playVoiceBtn:hover {
-    background: rgba(33, 150, 243, 0.1);
-}
-
-#playVoiceBtn.playing {
-    color: #f44336;
-}
-
-/* أزرار التسجيل */
-#cancelVoiceBtn { 
-    width: 28px; 
-    height: 28px; 
-    border-radius: 50%; 
-    border: none; 
-    background: transparent; 
-    color: #f44336; 
-    cursor: pointer; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    font-size: 0.9rem; 
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-
-#cancelVoiceBtn:hover {
-    background: rgba(244, 67, 54, 0.1);
-}
-
-#sendVoiceBtn { 
-    width: 28px; 
-    height: 28px; 
-    border-radius: 50%; 
-    border: none; 
-    background: #4CAF50; 
-    color: white; 
-    cursor: pointer; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    font-size: 0.85rem; 
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-
-#sendVoiceBtn:hover {
-    background: #43A047;
 }
 
 /* ✅ زر موحد (يتغير بين البصمة والإرسال) */
 #actionBtn { 
-    width: 36px; 
-    height: 36px; 
+    width: 38px; 
+    height: 38px; 
     border-radius: 50%; 
     border: none; 
     background: transparent; 
@@ -478,7 +367,7 @@ body.conversation-open .conversation-page {
     display: flex; 
     align-items: center; 
     justify-content: center; 
-    font-size: 1.1rem; 
+    font-size: 1.2rem; 
     flex-shrink: 0;
     transition: all 0.3s ease;
 }
@@ -505,28 +394,6 @@ body.conversation-open .conversation-page {
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
     100% { transform: scale(1); }
-}
-
-/* وميض التحذير للعدادات */
-#countdownTimer.warning, #elapsedTimer.warning {
-    animation: blinkWarning 0.5s ease-in-out infinite;
-}
-
-@keyframes blinkWarning {
-    0% { color: #f44336; }
-    50% { color: var(--primary); }
-    100% { color: #f44336; }
-}
-
-/* وميض شريط التقدم عند التحذير */
-#progressBarVoice.warning {
-    animation: blinkProgress 0.5s ease-in-out infinite;
-}
-
-@keyframes blinkProgress {
-    0% { background: #f44336; }
-    50% { background: var(--primary); }
-    100% { background: #f44336; }
 }
 
 .conversation-header, .message-input-container {
@@ -565,34 +432,8 @@ body.conversation-open .conversation-page {
 .theme-dark .emoji-categories { border-color: #444; }
 .theme-dark .emoji-categories button.active { background: #444; }
 
-/* ==================== القسم 13.9: حركات الرسائل والتحذير ==================== */
-
-/* حركة ظهور الرسائل */
-@keyframes messagePop { 
-    0% { transform: scale(0.8); opacity: 0; } 
-    100% { transform: scale(1); opacity: 1; } 
-}
-
-/* ✅ حركة وميض التحذير للعدادات (أحمر/أزرق) */
-@keyframes blinkWarning {
-    0% { color: #f44336; }
-    50% { color: var(--primary); }
-    100% { color: #f44336; }
-}
-
-/* ✅ حركة وميض شريط التقدم عند التحذير */
-@keyframes blinkProgress {
-    0% { background: #f44336; }
-    50% { background: var(--primary); }
-    100% { background: #f44336; }
-}
-
-/* ✅ حركة نبض زر البصمة أثناء التسجيل */
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
-}
+/* ==================== القسم 13.9: حركات الرسائل ==================== */
+@keyframes messagePop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
 /* ==================== القسم 13.10: شريط التمرير ==================== */
 .messages-container::-webkit-scrollbar { width: 6px; }
