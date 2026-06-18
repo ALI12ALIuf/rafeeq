@@ -124,6 +124,17 @@ window.handleMessageKeyPress = e => {
 
 // ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
 
+// ==================== متغيرات التسجيل الصوتي ====================
+let voiceRecorder = {
+    mediaRecorder: null,
+    audioChunks: [],
+    startTime: null,
+    timerInterval: null,
+    maxDuration: 300, // 5 دقائق
+    isRecording: false,
+    isCancelled: false,
+};
+
 // دالة تبديل الزر بين البصمة والإرسال
 window.toggleSendButton = function() {
     const input = document.getElementById('messageInput');
@@ -180,7 +191,110 @@ window.handleActionButton = function() {
     // ❌ إذا كانت الميزات غير مفعلة ولا يوجد نص → لا شيء
 };
 
-// دالة تسجيل البصمة الصوتية (بدلاً من sendVoiceNote القديمة)
+// ==================== دالة تحديث العدادات ====================
+function updateVoiceTimers(elapsed) {
+    const remaining = Math.max(0, voiceRecorder.maxDuration - elapsed);
+    const progress = Math.min(100, (elapsed / voiceRecorder.maxDuration) * 100);
+    
+    // عداد تنازلي
+    const countdownEl = document.getElementById('countdownTimer');
+    if (countdownEl) {
+        const mins = Math.floor(remaining / 60);
+        const secs = Math.floor(remaining % 60);
+        countdownEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        
+        // ✅ التحذير عند تبقي 30 ثانية (أي بعد 4:30)
+        if (remaining <= 30 && remaining > 0) {
+            countdownEl.classList.add('warning');
+        } else {
+            countdownEl.classList.remove('warning');
+        }
+    }
+    
+    // عداد تصاعدي
+    const elapsedEl = document.getElementById('elapsedTimer');
+    if (elapsedEl) {
+        const mins = Math.floor(elapsed / 60);
+        const secs = Math.floor(elapsed % 60);
+        elapsedEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // شريط التقدم
+    const progressBar = document.getElementById('progressBarVoice');
+    if (progressBar) {
+        progressBar.style.width = Math.min(100, progress) + '%';
+        // ✅ تغيير لون شريط التقدم عند التحذير (أكثر من 90%)
+        if (progress >= 90) {
+            progressBar.style.background = '#f44336';
+        } else {
+            progressBar.style.background = '#4CAF50';
+        }
+    }
+}
+
+// ==================== إيقاف التسجيل ====================
+function stopVoiceRecording() {
+    if (voiceRecorder.mediaRecorder && voiceRecorder.mediaRecorder.state === 'recording') {
+        voiceRecorder.mediaRecorder.stop();
+    }
+    if (voiceRecorder.timerInterval) {
+        clearInterval(voiceRecorder.timerInterval);
+        voiceRecorder.timerInterval = null;
+    }
+    resetVoiceUI();
+}
+
+// ==================== إلغاء التسجيل ====================
+function cancelVoiceRecording() {
+    voiceRecorder.isCancelled = true;
+    if (voiceRecorder.mediaRecorder && voiceRecorder.mediaRecorder.state === 'recording') {
+        voiceRecorder.mediaRecorder.stop();
+    }
+    if (voiceRecorder.timerInterval) {
+        clearInterval(voiceRecorder.timerInterval);
+        voiceRecorder.timerInterval = null;
+    }
+    resetVoiceUI();
+}
+
+// ==================== إعادة تعيين واجهة التسجيل ====================
+function resetVoiceUI() {
+    const ui = document.getElementById('voiceRecorderUI');
+    const btn = document.getElementById('actionBtn');
+    const countdownEl = document.getElementById('countdownTimer');
+    const elapsedEl = document.getElementById('elapsedTimer');
+    const progressBar = document.getElementById('progressBarVoice');
+    
+    // إخفاء واجهة التسجيل
+    if (ui) ui.style.display = 'none';
+    
+    // إعادة تعيين العدادات
+    if (countdownEl) {
+        countdownEl.textContent = '5:00';
+        countdownEl.classList.remove('warning');
+    }
+    if (elapsedEl) elapsedEl.textContent = '0:00';
+    if (progressBar) {
+        progressBar.style.width = '0%';
+        progressBar.style.background = '#4CAF50';
+    }
+    
+    // إظهار زر البصمة
+    if (btn) {
+        btn.style.display = 'flex';
+        btn.classList.remove('recording');
+        btn.innerHTML = '<i class="fas fa-microphone"></i>';
+        btn.title = 'بصمة صوتية';
+        btn.onclick = window.handleActionButton;
+        window.toggleSendButton();
+    }
+    
+    voiceRecorder.isRecording = false;
+    voiceRecorder.audioChunks = [];
+    voiceRecorder.isCancelled = false;
+}
+
+// ==================== دالة تسجيل البصمة الصوتية (معدلة) ====================
 window.startVoiceRecording = function() {
     // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
@@ -198,52 +312,95 @@ window.startVoiceRecording = function() {
     if (!btn) return;
     if (btn.classList.contains('send-mode')) return;
     
+    // ✅ إخفاء زر البصمة وإظهار واجهة التسجيل
+    btn.style.display = 'none';
+    const ui = document.getElementById('voiceRecorderUI');
+    if (ui) ui.style.display = 'flex';
+    
+    // ✅ إعادة تعيين المتغيرات
+    voiceRecorder.audioChunks = [];
+    voiceRecorder.isRecording = true;
+    voiceRecorder.isCancelled = false;
+    voiceRecorder.startTime = Date.now();
+    
+    // ✅ تحديث العدادات
+    updateVoiceTimers(0);
+    
     navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(s => {
-            const mr = new MediaRecorder(s);
-            const ch = [];
-            
-            btn.classList.add('recording');
-            btn.innerHTML = '<i class="fas fa-stop"></i>';
-            btn.title = 'إيقاف التسجيل';
+        .then(stream => {
+            const mr = new MediaRecorder(stream);
+            voiceRecorder.mediaRecorder = mr;
             
             mr.ondataavailable = e => {
-                if (e.data.size > 0) ch.push(e.data);
+                if (e.data.size > 0) voiceRecorder.audioChunks.push(e.data);
             };
             
             mr.onstop = () => {
-                s.getTracks().forEach(t => t.stop());
-                const blob = new Blob(ch, { type: 'audio/webm' });
-                if (blob.size > 0) {
-                    ChatSystem.sendVoiceNote(blob);
+                stream.getTracks().forEach(t => t.stop());
+                
+                // ✅ إيقاف المؤقت
+                if (voiceRecorder.timerInterval) {
+                    clearInterval(voiceRecorder.timerInterval);
+                    voiceRecorder.timerInterval = null;
                 }
+                
+                // ✅ إخفاء واجهة التسجيل وإظهار زر البصمة
+                if (ui) ui.style.display = 'none';
+                btn.style.display = 'flex';
                 btn.classList.remove('recording');
                 btn.innerHTML = '<i class="fas fa-microphone"></i>';
                 btn.title = 'بصمة صوتية';
                 btn.onclick = window.handleActionButton;
-                // ✅ تحديث الزر بعد التسجيل
+                
+                // ✅ إذا لم يتم الإلغاء ولدينا بيانات → إرسال البصمة
+                if (!voiceRecorder.isCancelled && voiceRecorder.audioChunks.length > 0) {
+                    const blob = new Blob(voiceRecorder.audioChunks, { type: 'audio/webm' });
+                    if (blob.size > 0) {
+                        ChatSystem.sendVoiceNote(blob);
+                    }
+                }
+                
+                voiceRecorder.isRecording = false;
+                voiceRecorder.audioChunks = [];
                 window.toggleSendButton();
             };
             
             mr.start();
             
-            btn.onclick = function() {
-                if (mr.state === 'recording') {
-                    mr.stop();
-                    btn.onclick = window.handleActionButton;
+            // ✅ بدء المؤقت (تحديث كل 100ms)
+            voiceRecorder.timerInterval = setInterval(() => {
+                const elapsed = (Date.now() - voiceRecorder.startTime) / 1000;
+                updateVoiceTimers(elapsed);
+                
+                // ✅ التحقق من الوصول إلى الحد الأقصى (5 دقائق)
+                if (elapsed >= voiceRecorder.maxDuration) {
+                    stopVoiceRecording();
                 }
-            };
-            
-            // ✅ تغيير المدة من 30 ثانية إلى 5 دقائق (300000)
-            setTimeout(() => {
-                if (mr.state === 'recording') {
-                    mr.stop();
-                    btn.onclick = window.handleActionButton;
-                }
-            }, 300000);  // ← 5 دقائق
+            }, 100);
         })
-        .catch(() => alert('يرجى السماح بالوصول إلى الميكروفون'));
+        .catch(() => {
+            alert('يرجى السماح بالوصول إلى الميكروفون');
+            resetVoiceUI();
+        });
 };
+
+// ==================== ربط أزرار واجهة التسجيل ====================
+document.addEventListener('DOMContentLoaded', function() {
+    const cancelBtn = document.getElementById('cancelVoiceBtn');
+    const sendBtn = document.getElementById('sendVoiceBtn');
+    
+    if (cancelBtn) {
+        cancelBtn.onclick = function() {
+            cancelVoiceRecording();
+        };
+    }
+    
+    if (sendBtn) {
+        sendBtn.onclick = function() {
+            stopVoiceRecording();
+        };
+    }
+});
 
 
 // ==================== القسم 6: قائمة المرفقات ====================
