@@ -421,7 +421,7 @@ body.conversation-open .conversation-page {
     transition: width 0.3s;
 }
 
-/* ✅ العدادات */
+/* ✅ العدادات (كلها بلون التطبيق) */
 #voiceCurrentTime {
     color: var(--primary);
     font-weight: bold;
@@ -429,12 +429,13 @@ body.conversation-open .conversation-page {
 }
 
 #voiceMaxTime {
-    color: var(--text-light);
+    color: var(--primary);
+    transition: color 0.3s;
 }
 
-/* ✅ الخط الفاصل بين العدادات */
+/* ✅ الخط الفاصل بين العدادات (بلون التطبيق) */
 #voiceSeparator {
-    color: var(--text-light);
+    color: var(--primary);
     transition: color 0.3s;
 }
 
@@ -459,7 +460,7 @@ body.conversation-open .conversation-page {
     transform: scale(1.05);
 }
 
-/* ✅ تحذير عند 4:40 (وميض) */
+/* ✅ تحذير عند 4:40 (وميض - كل العدادات والخط الفاصل) */
 #voiceRecordingUI.warning #voiceCurrentTime,
 #voiceRecordingUI.warning #voiceSeparator,
 #voiceRecordingUI.warning #voiceMaxTime {
