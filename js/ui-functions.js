@@ -124,17 +124,35 @@ window.handleMessageKeyPress = e => {
 
 // ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
 
+// متغيرات التسجيل العامة
+let _recordingTimer = null;
+let _recordingSeconds = 0;
+let _recordingChunks = [];
+let _mediaRecorder = null;
+let _recordingBlob = null;
+let _isRecording = false;
+let _audioUrl = null;
+let _audioElement = null;
+
+const MAX_RECORDING_SECONDS = 300; // 5 دقائق
+const WARNING_THRESHOLD = 270; // 4:30
+
 // دالة تبديل الزر بين البصمة والإرسال
 window.toggleSendButton = function() {
     const input = document.getElementById('messageInput');
     const btn = document.getElementById('actionBtn');
+    const recordingUI = document.getElementById('voiceRecordingUI');
     if (!input || !btn) return;
     
-    // ✅ التحقق من تفعيل الميزات
+    // إذا كانت واجهة التسجيل نشطة، نخفي الزر
+    if (recordingUI && recordingUI.style.display === 'flex') {
+        btn.style.display = 'none';
+        return;
+    }
+    
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     
     if (!featuresEnabled) {
-        // ❌ الميزات غير مفعلة → زر الإرسال فقط (بدون بصمة)
         btn.className = 'send-mode';
         btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         btn.title = 'إرسال';
@@ -142,16 +160,13 @@ window.toggleSendButton = function() {
         return;
     }
     
-    // ✅ الميزات مفعلة → تحقق من وجود نص
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
-        // يوجد نص → زر إرسال
         btn.className = 'send-mode';
         btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         btn.title = 'إرسال';
     } else {
-        // لا يوجد نص → زر بصمة
         btn.className = 'voice-btn';
         btn.innerHTML = '<i class="fas fa-microphone"></i>';
         btn.title = 'بصمة صوتية';
@@ -165,24 +180,22 @@ window.handleActionButton = function() {
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
-    // ✅ التحقق من تفعيل الميزات
-    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
+    // إذا كانت واجهة التسجيل نشطة، لا تفعل شيء
+    const recordingUI = document.getElementById('voiceRecordingUI');
+    if (recordingUI && recordingUI.style.display === 'flex') return;
     
+    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
-        // ✅ يوجد نص → إرسال (دائماً)
         window.sendMessage();
     } else if (featuresEnabled) {
-        // ✅ لا يوجد نص والميزات مفعلة → تسجيل بصمة
         window.startVoiceRecording();
     }
-    // ❌ إذا كانت الميزات غير مفعلة ولا يوجد نص → لا شيء
 };
 
-// دالة تسجيل البصمة الصوتية (بدلاً من sendVoiceNote القديمة)
+// ===== دالة تسجيل البصمة الصوتية (مع واجهة متقدمة) =====
 window.startVoiceRecording = function() {
-    // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     if (!featuresEnabled) {
         alert('الميزات غير مفعلة');
@@ -194,56 +207,230 @@ window.startVoiceRecording = function() {
         return;
     }
     
+    const input = document.getElementById('messageInput');
     const btn = document.getElementById('actionBtn');
-    if (!btn) return;
-    if (btn.classList.contains('send-mode')) return;
+    const recordingUI = document.getElementById('voiceRecordingUI');
+    const progressFill = document.getElementById('voiceProgressFill');
+    const currentTimeEl = document.getElementById('voiceCurrentTime');
+    const maxTimeEl = document.getElementById('voiceMaxTime');
+    const cancelBtn = document.getElementById('voiceCancelBtn');
+    const sendBtn = document.getElementById('voiceSendBtn');
+    const playBtn = document.getElementById('voicePlayBtn');
     
+    if (!recordingUI || !progressFill || !currentTimeEl) return;
+    
+    // تنظيف أي تسجيل سابق
+    if (_audioUrl) { URL.revokeObjectURL(_audioUrl); _audioUrl = null; }
+    if (_audioElement) { _audioElement = null; }
+    
+    // إظهار واجهة التسجيل وإخفاء حقل الكتابة والزر
+    input.style.display = 'none';
+    recordingUI.style.display = 'flex';
+    recordingUI.classList.remove('warning');
+    btn.style.display = 'none';
+    playBtn.style.display = 'none';
+    sendBtn.style.display = 'flex';
+    cancelBtn.style.display = 'flex';
+    
+    // إعادة تعيين المؤقتات
+    _recordingSeconds = 0;
+    _recordingChunks = [];
+    _recordingBlob = null;
+    _isRecording = true;
+    currentTimeEl.textContent = '0:00';
+    maxTimeEl.textContent = '5:00';
+    progressFill.style.width = '0%';
+    
+    // بدء التسجيل
     navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(s => {
-            const mr = new MediaRecorder(s);
-            const ch = [];
+        .then(stream => {
+            _mediaRecorder = new MediaRecorder(stream);
             
-            btn.classList.add('recording');
-            btn.innerHTML = '<i class="fas fa-stop"></i>';
-            btn.title = 'إيقاف التسجيل';
-            
-            mr.ondataavailable = e => {
-                if (e.data.size > 0) ch.push(e.data);
+            _mediaRecorder.ondataavailable = e => {
+                if (e.data.size > 0) _recordingChunks.push(e.data);
             };
             
-            mr.onstop = () => {
-                s.getTracks().forEach(t => t.stop());
-                const blob = new Blob(ch, { type: 'audio/webm' });
-                if (blob.size > 0) {
-                    ChatSystem.sendVoiceNote(blob);
-                }
-                btn.classList.remove('recording');
-                btn.innerHTML = '<i class="fas fa-microphone"></i>';
-                btn.title = 'بصمة صوتية';
-                btn.onclick = window.handleActionButton;
-                // ✅ تحديث الزر بعد التسجيل
-                window.toggleSendButton();
-            };
-            
-            mr.start();
-            
-            btn.onclick = function() {
-                if (mr.state === 'recording') {
-                    mr.stop();
-                    btn.onclick = window.handleActionButton;
+            _mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(t => t.stop());
+                _isRecording = false;
+                
+                // إنشاء Blob للتسجيل
+                _recordingBlob = new Blob(_recordingChunks, { type: 'audio/webm' });
+                
+                // إنشاء رابط للاستماع
+                if (_audioUrl) URL.revokeObjectURL(_audioUrl);
+                _audioUrl = URL.createObjectURL(_recordingBlob);
+                
+                // إظهار زر التشغيل
+                playBtn.style.display = 'flex';
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                
+                // إظهار زر الإرسال
+                sendBtn.style.display = 'flex';
+                
+                // إيقاف المؤقت
+                if (_recordingTimer) {
+                    clearInterval(_recordingTimer);
+                    _recordingTimer = null;
                 }
             };
             
-            // ✅ تغيير المدة من 30 ثانية إلى 5 دقائق (300000)
-            setTimeout(() => {
-                if (mr.state === 'recording') {
-                    mr.stop();
-                    btn.onclick = window.handleActionButton;
+            _mediaRecorder.start();
+            
+            // بدء المؤقت
+            if (_recordingTimer) clearInterval(_recordingTimer);
+            _recordingTimer = setInterval(() => {
+                if (!_isRecording) return;
+                
+                _recordingSeconds++;
+                const mins = Math.floor(_recordingSeconds / 60);
+                const secs = _recordingSeconds % 60;
+                currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                
+                const percent = (_recordingSeconds / MAX_RECORDING_SECONDS) * 100;
+                progressFill.style.width = Math.min(percent, 100) + '%';
+                
+                if (_recordingSeconds >= WARNING_THRESHOLD) {
+                    recordingUI.classList.add('warning');
                 }
-            }, 300000);  // ← 5 دقائق
+                
+                if (_recordingSeconds >= MAX_RECORDING_SECONDS) {
+                    if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+                        _mediaRecorder.stop();
+                    }
+                }
+            }, 1000);
+            
+            // ===== زر الإلغاء =====
+            cancelBtn.onclick = () => {
+                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+                    _mediaRecorder.stop();
+                }
+                if (_recordingTimer) {
+                    clearInterval(_recordingTimer);
+                    _recordingTimer = null;
+                }
+                resetVoiceUI();
+            };
+            
+            // ===== زر التشغيل/الإيقاف المؤقت =====
+            let isPlaying = false;
+            playBtn.onclick = () => {
+                if (!_recordingBlob) return;
+                
+                if (isPlaying) {
+                    if (_audioElement) {
+                        _audioElement.pause();
+                        _audioElement.currentTime = 0;
+                    }
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    isPlaying = false;
+                    return;
+                }
+                
+                // إنشاء عنصر الصوت للتشغيل
+                if (!_audioElement) {
+                    _audioElement = new Audio(_audioUrl);
+                    _audioElement.onended = () => {
+                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        isPlaying = false;
+                    };
+                }
+                
+                _audioElement.play();
+                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                isPlaying = true;
+            };
+            
+            // ===== زر الإرسال =====
+            sendBtn.onclick = () => {
+                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+                    _mediaRecorder.stop();
+                }
+                if (_recordingTimer) {
+                    clearInterval(_recordingTimer);
+                    _recordingTimer = null;
+                }
+                
+                // إرسال البصمة
+                if (_recordingBlob && _recordingBlob.size > 0) {
+                    ChatSystem.sendVoiceNote(_recordingBlob);
+                }
+                resetVoiceUI();
+            };
+            
+            // تنظيف عند مغادرة الصفحة
+            const cleanup = () => {
+                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+                    _mediaRecorder.stop();
+                }
+                if (_recordingTimer) {
+                    clearInterval(_recordingTimer);
+                    _recordingTimer = null;
+                }
+                if (_audioElement) {
+                    _audioElement.pause();
+                    _audioElement = null;
+                }
+                if (_audioUrl) {
+                    URL.revokeObjectURL(_audioUrl);
+                    _audioUrl = null;
+                }
+                resetVoiceUI();
+            };
+            window._voiceCleanup = cleanup;
+            window.addEventListener('beforeunload', cleanup);
         })
-        .catch(() => alert('يرجى السماح بالوصول إلى الميكروفون'));
+        .catch(() => {
+            alert('يرجى السماح بالوصول إلى الميكروفون');
+            resetVoiceUI();
+        });
 };
+
+// ===== دالة إعادة تعيين واجهة التسجيل =====
+function resetVoiceUI() {
+    const input = document.getElementById('messageInput');
+    const btn = document.getElementById('actionBtn');
+    const recordingUI = document.getElementById('voiceRecordingUI');
+    const playBtn = document.getElementById('voicePlayBtn');
+    
+    if (input) input.style.display = 'block';
+    if (recordingUI) {
+        recordingUI.style.display = 'none';
+        recordingUI.classList.remove('warning');
+    }
+    if (btn) btn.style.display = 'flex';
+    if (playBtn) {
+        playBtn.style.display = 'none';
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    }
+    
+    if (_recordingTimer) {
+        clearInterval(_recordingTimer);
+        _recordingTimer = null;
+    }
+    
+    if (_audioElement) {
+        _audioElement.pause();
+        _audioElement = null;
+    }
+    if (_audioUrl) {
+        URL.revokeObjectURL(_audioUrl);
+        _audioUrl = null;
+    }
+    
+    _recordingBlob = null;
+    _mediaRecorder = null;
+    _recordingChunks = [];
+    _isRecording = false;
+    
+    if (window._voiceCleanup) {
+        window.removeEventListener('beforeunload', window._voiceCleanup);
+        window._voiceCleanup = null;
+    }
+    
+    window.toggleSendButton();
+}
 
 
 // ==================== القسم 6: قائمة المرفقات ====================
