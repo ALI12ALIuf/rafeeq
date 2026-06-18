@@ -128,11 +128,15 @@ window.handleMessageKeyPress = e => {
 let voiceRecorder = {
     mediaRecorder: null,
     audioChunks: [],
+    audioBlob: null,        // ✅ تخزين البصمة المسجلة
+    audioUrl: null,         // ✅ رابط البصمة للتشغيل
+    audioElement: null,     // ✅ عنصر الصوت للتشغيل
     startTime: null,
     timerInterval: null,
-    maxDuration: 300, // 5 دقائق
+    maxDuration: 300,       // 5 دقائق
     isRecording: false,
     isCancelled: false,
+    isPlaying: false,
 };
 
 // دالة تبديل الزر بين البصمة والإرسال
@@ -141,11 +145,9 @@ window.toggleSendButton = function() {
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
-    // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     
     if (!featuresEnabled) {
-        // ❌ الميزات غير مفعلة → زر الإرسال فقط (بدون بصمة)
         btn.className = 'send-mode';
         btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         btn.title = 'إرسال';
@@ -153,16 +155,13 @@ window.toggleSendButton = function() {
         return;
     }
     
-    // ✅ الميزات مفعلة → تحقق من وجود نص
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
-        // يوجد نص → زر إرسال
         btn.className = 'send-mode';
         btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         btn.title = 'إرسال';
     } else {
-        // لا يوجد نص → زر بصمة
         btn.className = 'voice-btn';
         btn.innerHTML = '<i class="fas fa-microphone"></i>';
         btn.title = 'بصمة صوتية';
@@ -176,19 +175,14 @@ window.handleActionButton = function() {
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
-    // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
-    
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
-        // ✅ يوجد نص → إرسال (دائماً)
         window.sendMessage();
     } else if (featuresEnabled) {
-        // ✅ لا يوجد نص والميزات مفعلة → تسجيل بصمة
         window.startVoiceRecording();
     }
-    // ❌ إذا كانت الميزات غير مفعلة ولا يوجد نص → لا شيء
 };
 
 // ==================== دالة تحديث العدادات ====================
@@ -203,7 +197,6 @@ function updateVoiceTimers(elapsed) {
         const secs = Math.floor(remaining % 60);
         countdownEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
         
-        // ✅ التحذير عند تبقي 30 ثانية (أي بعد 4:30)
         if (remaining <= 30 && remaining > 0) {
             countdownEl.classList.add('warning');
         } else {
@@ -217,19 +210,77 @@ function updateVoiceTimers(elapsed) {
         const mins = Math.floor(elapsed / 60);
         const secs = Math.floor(elapsed % 60);
         elapsedEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        
+        // ✅ وميض العداد التصاعدي أيضاً
+        if (remaining <= 30 && remaining > 0) {
+            elapsedEl.classList.add('warning');
+        } else {
+            elapsedEl.classList.remove('warning');
+        }
     }
     
     // شريط التقدم
     const progressBar = document.getElementById('progressBarVoice');
     if (progressBar) {
         progressBar.style.width = Math.min(100, progress) + '%';
-        // ✅ تغيير لون شريط التقدم عند التحذير (أكثر من 90%)
         if (progress >= 90) {
             progressBar.style.background = '#f44336';
+            progressBar.classList.add('warning');
         } else {
             progressBar.style.background = '#4CAF50';
+            progressBar.classList.remove('warning');
         }
     }
+}
+
+// ==================== تشغيل/إيقاف البصمة المسجلة ====================
+function togglePlayVoice() {
+    const playBtn = document.getElementById('playVoiceBtn');
+    if (!playBtn) return;
+    
+    if (!voiceRecorder.audioBlob) {
+        alert('لا توجد بصمة للتشغيل');
+        return;
+    }
+    
+    if (voiceRecorder.isPlaying) {
+        if (voiceRecorder.audioElement) {
+            voiceRecorder.audioElement.pause();
+            voiceRecorder.audioElement.currentTime = 0;
+        }
+        voiceRecorder.isPlaying = false;
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.classList.remove('playing');
+        return;
+    }
+    
+    const audio = new Audio(voiceRecorder.audioUrl);
+    voiceRecorder.audioElement = audio;
+    
+    audio.onplay = () => {
+        voiceRecorder.isPlaying = true;
+        playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        playBtn.classList.add('playing');
+    };
+    
+    audio.onended = () => {
+        voiceRecorder.isPlaying = false;
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.classList.remove('playing');
+    };
+    
+    audio.onerror = () => {
+        voiceRecorder.isPlaying = false;
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.classList.remove('playing');
+        alert('حدث خطأ في تشغيل البصمة');
+    };
+    
+    audio.play().catch(() => {
+        voiceRecorder.isPlaying = false;
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.classList.remove('playing');
+    });
 }
 
 // ==================== إيقاف التسجيل ====================
@@ -241,7 +292,7 @@ function stopVoiceRecording() {
         clearInterval(voiceRecorder.timerInterval);
         voiceRecorder.timerInterval = null;
     }
-    resetVoiceUI();
+    // ✅ لا نستدعي resetVoiceUI هنا، بل نتركها للـ onstop
 }
 
 // ==================== إلغاء التسجيل ====================
@@ -254,29 +305,56 @@ function cancelVoiceRecording() {
         clearInterval(voiceRecorder.timerInterval);
         voiceRecorder.timerInterval = null;
     }
-    resetVoiceUI();
+    // ✅ سيتم استدعاء resetVoiceUI من onstop
 }
 
 // ==================== إعادة تعيين واجهة التسجيل ====================
 function resetVoiceUI() {
     const ui = document.getElementById('voiceRecorderUI');
     const btn = document.getElementById('actionBtn');
+    const input = document.getElementById('messageInput');
     const countdownEl = document.getElementById('countdownTimer');
     const elapsedEl = document.getElementById('elapsedTimer');
     const progressBar = document.getElementById('progressBarVoice');
+    const playBtn = document.getElementById('playVoiceBtn');
+    const sendBtn = document.getElementById('sendVoiceBtn');
     
     // إخفاء واجهة التسجيل
     if (ui) ui.style.display = 'none';
+    
+    // ✅ إعادة النص إلى حقل الإدخال
+    if (input) {
+        input.placeholder = 'اكتب رسالتك...';
+        input.style.opacity = '1';
+    }
+    
+    // ✅ إخفاء زر التشغيل
+    if (playBtn) {
+        playBtn.style.display = 'none';
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.classList.remove('playing');
+    }
+    
+    // ✅ إعادة تعيين زر الإرسال
+    if (sendBtn) {
+        sendBtn.style.background = '#4CAF50';
+        sendBtn.style.opacity = '1';
+        sendBtn.style.pointerEvents = 'auto';
+    }
     
     // إعادة تعيين العدادات
     if (countdownEl) {
         countdownEl.textContent = '5:00';
         countdownEl.classList.remove('warning');
     }
-    if (elapsedEl) elapsedEl.textContent = '0:00';
+    if (elapsedEl) {
+        elapsedEl.textContent = '0:00';
+        elapsedEl.classList.remove('warning');
+    }
     if (progressBar) {
         progressBar.style.width = '0%';
         progressBar.style.background = '#4CAF50';
+        progressBar.classList.remove('warning');
     }
     
     // إظهار زر البصمة
@@ -289,14 +367,24 @@ function resetVoiceUI() {
         window.toggleSendButton();
     }
     
+    // تنظيف كائنات الصوت
+    if (voiceRecorder.audioElement) {
+        voiceRecorder.audioElement.pause();
+        voiceRecorder.audioElement = null;
+    }
+    if (voiceRecorder.audioUrl) {
+        URL.revokeObjectURL(voiceRecorder.audioUrl);
+        voiceRecorder.audioUrl = null;
+    }
+    voiceRecorder.audioBlob = null;
+    voiceRecorder.isPlaying = false;
     voiceRecorder.isRecording = false;
     voiceRecorder.audioChunks = [];
     voiceRecorder.isCancelled = false;
 }
 
-// ==================== دالة تسجيل البصمة الصوتية (معدلة) ====================
+// ==================== دالة تسجيل البصمة الصوتية ====================
 window.startVoiceRecording = function() {
-    // ✅ التحقق من تفعيل الميزات
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     if (!featuresEnabled) {
         alert('الميزات غير مفعلة');
@@ -309,6 +397,7 @@ window.startVoiceRecording = function() {
     }
     
     const btn = document.getElementById('actionBtn');
+    const input = document.getElementById('messageInput');
     if (!btn) return;
     if (btn.classList.contains('send-mode')) return;
     
@@ -317,11 +406,35 @@ window.startVoiceRecording = function() {
     const ui = document.getElementById('voiceRecorderUI');
     if (ui) ui.style.display = 'flex';
     
+    // ✅ إخفاء النص في حقل الإدخال أثناء التسجيل
+    if (input) {
+        input.placeholder = '';
+        input.style.opacity = '0.3';
+    }
+    
+    // ✅ إخفاء زر التشغيل أثناء التسجيل
+    const playBtn = document.getElementById('playVoiceBtn');
+    if (playBtn) {
+        playBtn.style.display = 'none';
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.classList.remove('playing');
+    }
+    
+    // ✅ تعطيل زر الإرسال مؤقتاً
+    const sendBtn = document.getElementById('sendVoiceBtn');
+    if (sendBtn) {
+        sendBtn.style.background = '#888';
+        sendBtn.style.opacity = '0.5';
+        sendBtn.style.pointerEvents = 'none';
+    }
+    
     // ✅ إعادة تعيين المتغيرات
     voiceRecorder.audioChunks = [];
     voiceRecorder.isRecording = true;
     voiceRecorder.isCancelled = false;
     voiceRecorder.startTime = Date.now();
+    voiceRecorder.audioBlob = null;
+    voiceRecorder.audioUrl = null;
     
     // ✅ تحديث العدادات
     updateVoiceTimers(0);
@@ -338,10 +451,37 @@ window.startVoiceRecording = function() {
             mr.onstop = () => {
                 stream.getTracks().forEach(t => t.stop());
                 
-                // ✅ إيقاف المؤقت
                 if (voiceRecorder.timerInterval) {
                     clearInterval(voiceRecorder.timerInterval);
                     voiceRecorder.timerInterval = null;
+                }
+                
+                // ✅ حفظ البصمة للتشغيل (إذا لم يتم الإلغاء)
+                if (!voiceRecorder.isCancelled && voiceRecorder.audioChunks.length > 0) {
+                    const blob = new Blob(voiceRecorder.audioChunks, { type: 'audio/webm' });
+                    if (blob.size > 0) {
+                        voiceRecorder.audioBlob = blob;
+                        voiceRecorder.audioUrl = URL.createObjectURL(blob);
+                        
+                        // ✅ إظهار زر التشغيل
+                        const playBtn = document.getElementById('playVoiceBtn');
+                        if (playBtn) {
+                            playBtn.style.display = 'flex';
+                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        }
+                        
+                        // ✅ تفعيل زر الإرسال
+                        const sendBtn = document.getElementById('sendVoiceBtn');
+                        if (sendBtn) {
+                            sendBtn.style.background = '#4CAF50';
+                            sendBtn.style.opacity = '1';
+                            sendBtn.style.pointerEvents = 'auto';
+                        }
+                    }
+                } else {
+                    // ✅ إذا تم الإلغاء → إعادة تعيين الواجهة
+                    resetVoiceUI();
+                    return;
                 }
                 
                 // ✅ إخفاء واجهة التسجيل وإظهار زر البصمة
@@ -352,27 +492,23 @@ window.startVoiceRecording = function() {
                 btn.title = 'بصمة صوتية';
                 btn.onclick = window.handleActionButton;
                 
-                // ✅ إذا لم يتم الإلغاء ولدينا بيانات → إرسال البصمة
-                if (!voiceRecorder.isCancelled && voiceRecorder.audioChunks.length > 0) {
-                    const blob = new Blob(voiceRecorder.audioChunks, { type: 'audio/webm' });
-                    if (blob.size > 0) {
-                        ChatSystem.sendVoiceNote(blob);
-                    }
+                // ✅ إعادة النص إلى حقل الإدخال
+                if (input) {
+                    input.placeholder = 'اكتب رسالتك...';
+                    input.style.opacity = '1';
                 }
                 
                 voiceRecorder.isRecording = false;
-                voiceRecorder.audioChunks = [];
                 window.toggleSendButton();
             };
             
             mr.start();
             
-            // ✅ بدء المؤقت (تحديث كل 100ms)
+            // ✅ بدء المؤقت
             voiceRecorder.timerInterval = setInterval(() => {
                 const elapsed = (Date.now() - voiceRecorder.startTime) / 1000;
                 updateVoiceTimers(elapsed);
                 
-                // ✅ التحقق من الوصول إلى الحد الأقصى (5 دقائق)
                 if (elapsed >= voiceRecorder.maxDuration) {
                     stopVoiceRecording();
                 }
@@ -388,6 +524,7 @@ window.startVoiceRecording = function() {
 document.addEventListener('DOMContentLoaded', function() {
     const cancelBtn = document.getElementById('cancelVoiceBtn');
     const sendBtn = document.getElementById('sendVoiceBtn');
+    const playBtn = document.getElementById('playVoiceBtn');
     
     if (cancelBtn) {
         cancelBtn.onclick = function() {
@@ -397,7 +534,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (sendBtn) {
         sendBtn.onclick = function() {
-            stopVoiceRecording();
+            // ✅ إذا كانت البصمة موجودة → إيقاف التسجيل وإرسالها
+            if (voiceRecorder.audioBlob) {
+                // إرسال البصمة
+                if (voiceRecorder.audioBlob.size > 0) {
+                    ChatSystem.sendVoiceNote(voiceRecorder.audioBlob);
+                }
+                resetVoiceUI();
+            } else {
+                stopVoiceRecording();
+            }
+        };
+    }
+    
+    // ✅ ربط زر التشغيل
+    if (playBtn) {
+        playBtn.onclick = function() {
+            togglePlayVoice();
         };
     }
 });
