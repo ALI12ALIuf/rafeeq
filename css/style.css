@@ -416,13 +416,53 @@ body.conversation-open .conversation-page {
 #voiceProgressFill {
     width: 0%;
     height: 100%;
-    background: #4CAF50;
+    background: var(--primary);
     border-radius: 2px;
     transition: width 0.3s;
 }
 
-/* تحذير عند 4:30 (وميض) */
-#voiceRecordingUI.warning #voiceCurrentTime {
+/* ✅ العدادات */
+#voiceCurrentTime {
+    color: var(--primary);
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+#voiceMaxTime {
+    color: var(--text-light);
+}
+
+/* ✅ الخط الفاصل بين العدادات */
+#voiceSeparator {
+    color: var(--text-light);
+    transition: color 0.3s;
+}
+
+/* ✅ زر الإرسال (علامة الصح) */
+#voiceSendBtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+}
+
+#voiceSendBtn:hover {
+    background: var(--primary-dark);
+    transform: scale(1.05);
+}
+
+/* ✅ تحذير عند 4:40 (وميض) */
+#voiceRecordingUI.warning #voiceCurrentTime,
+#voiceRecordingUI.warning #voiceSeparator,
+#voiceRecordingUI.warning #voiceMaxTime {
     animation: blinkWarning 0.5s ease-in-out infinite;
 }
 
@@ -433,10 +473,11 @@ body.conversation-open .conversation-page {
 
 @keyframes blinkWarning {
     0% { color: #ff4444; }
-    50% { color: #64B5F6; }
+    50% { color: var(--primary); }
     100% { color: #ff4444; }
 }
 
+/* باقي الأزرار */
 #voiceCancelBtn {
     width: 32px;
     height: 32px;
@@ -457,33 +498,13 @@ body.conversation-open .conversation-page {
     transform: scale(1.05);
 }
 
-#voiceSendBtn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: none;
-    background: #4CAF50;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.1rem;
-    transition: all 0.2s;
-}
-
-#voiceSendBtn:hover {
-    background: #45a049;
-    transform: scale(1.05);
-}
-
 #voicePlayBtn {
     width: 32px;
     height: 32px;
     border-radius: 50%;
     border: none;
     background: rgba(255,255,255,0.1);
-    color: #4CAF50;
+    color: var(--primary);
     cursor: pointer;
     display: none;
     align-items: center;
@@ -493,7 +514,7 @@ body.conversation-open .conversation-page {
 }
 
 #voicePlayBtn:hover {
-    background: rgba(76, 175, 80, 0.2);
+    background: rgba(33, 150, 243, 0.2);
     transform: scale(1.05);
 }
 
