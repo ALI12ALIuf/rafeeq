@@ -130,18 +130,18 @@
                         <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
                             <!-- شريط التقدم -->
                             <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; position:relative; overflow:hidden;">
-                                <div id="voiceProgressFill" style="width:0%; height:100%; background:#4CAF50; border-radius:2px; transition:width 0.3s;"></div>
+                                <div id="voiceProgressFill" style="width:0%; height:100%; background:var(--primary); border-radius:2px; transition:width 0.3s;"></div>
                             </div>
                             
                             <!-- العدادات -->
                             <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-family:monospace; direction:ltr; min-width:100px; justify-content:center;">
-                                <span id="voiceCurrentTime" style="color:#4CAF50; font-weight:bold;">0:00</span>
-                                <span style="color:var(--text-light);">/</span>
+                                <span id="voiceCurrentTime" style="color:var(--primary); font-weight:bold;">0:00</span>
+                                <span id="voiceSeparator" style="color:var(--text-light);">/</span>
                                 <span id="voiceMaxTime" style="color:var(--text-light);">5:00</span>
                             </div>
                             
                             <!-- ✅ زر تشغيل/إيقاف مؤقت (يظهر بعد التسجيل) -->
-                            <button id="voicePlayBtn" style="display:none; width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#4CAF50; cursor:pointer; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s;">
+                            <button id="voicePlayBtn" style="display:none; width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:var(--primary); cursor:pointer; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s;">
                                 <i class="fas fa-play"></i>
                             </button>
                             
@@ -149,7 +149,7 @@
                             <button id="voiceCancelBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#ff4444; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
                                 <i class="fas fa-times"></i>
                             </button>
-                            <button id="voiceSendBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:#4CAF50; color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
+                            <button id="voiceSendBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:var(--primary); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
                                 <i class="fas fa-check"></i>
                             </button>
                         </div>
