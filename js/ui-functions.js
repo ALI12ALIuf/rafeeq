@@ -135,7 +135,7 @@ let _audioUrl = null;
 let _audioElement = null;
 
 const MAX_RECORDING_SECONDS = 300; // 5 دقائق
-const WARNING_THRESHOLD = 270; // 4:30
+const WARNING_THRESHOLD = 280; // ✅ 4:40 (تم التغيير من 270 إلى 280)
 
 // دالة تبديل الزر بين البصمة والإرسال
 window.toggleSendButton = function() {
@@ -314,6 +314,7 @@ window.startVoiceRecording = function() {
                 const percent = (_recordingSeconds / MAX_RECORDING_SECONDS) * 100;
                 progressFill.style.width = Math.min(percent, 100) + '%';
                 
+                // ✅ التحذير عند 4:40 (280 ثانية)
                 if (_recordingSeconds >= WARNING_THRESHOLD) {
                     recordingUI.classList.add('warning');
                 }
