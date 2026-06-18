@@ -229,8 +229,14 @@ window.startVoiceRecording = function() {
     recordingUI.classList.remove('warning');
     btn.style.display = 'none';
     playBtn.style.display = 'none';
-    sendBtn.style.display = 'flex';
+    sendBtn.style.display = 'none';
     cancelBtn.style.display = 'flex';
+    
+    // ✅ زر الإيقاف (نفس زر actionBtn)
+    btn.style.display = 'flex';
+    btn.classList.add('recording');
+    btn.innerHTML = '<i class="fas fa-stop"></i>';
+    btn.title = 'إيقاف التسجيل';
     
     // إعادة تعيين المؤقتات
     _recordingSeconds = 0;
@@ -261,12 +267,16 @@ window.startVoiceRecording = function() {
                 if (_audioUrl) URL.revokeObjectURL(_audioUrl);
                 _audioUrl = URL.createObjectURL(_recordingBlob);
                 
-                // إظهار زر التشغيل
+                // ✅ إظهار زر التشغيل فوراً
                 playBtn.style.display = 'flex';
                 playBtn.innerHTML = '<i class="fas fa-play"></i>';
                 
-                // إظهار زر الإرسال
+                // ✅ إظهار زر الإرسال
                 sendBtn.style.display = 'flex';
+                
+                // ✅ إخفاء زر الإيقاف
+                btn.style.display = 'none';
+                btn.classList.remove('recording');
                 
                 // إيقاف المؤقت
                 if (_recordingTimer) {
@@ -276,6 +286,20 @@ window.startVoiceRecording = function() {
             };
             
             _mediaRecorder.start();
+            
+            // ✅ زر الإيقاف (الضغط على زر actionBtn أثناء التسجيل)
+            btn.onclick = function() {
+                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+                    _mediaRecorder.stop();
+                    btn.onclick = window.handleActionButton;
+                    
+                    // ✅ إظهار زر الاستماع فوراً
+                    playBtn.style.display = 'flex';
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    sendBtn.style.display = 'flex';
+                    btn.style.display = 'none';
+                }
+            };
             
             // بدء المؤقت
             if (_recordingTimer) clearInterval(_recordingTimer);
@@ -297,6 +321,11 @@ window.startVoiceRecording = function() {
                 if (_recordingSeconds >= MAX_RECORDING_SECONDS) {
                     if (_mediaRecorder && _mediaRecorder.state === 'recording') {
                         _mediaRecorder.stop();
+                        btn.onclick = window.handleActionButton;
+                        btn.style.display = 'none';
+                        playBtn.style.display = 'flex';
+                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        sendBtn.style.display = 'flex';
                     }
                 }
             }, 1000);
@@ -399,7 +428,11 @@ function resetVoiceUI() {
         recordingUI.style.display = 'none';
         recordingUI.classList.remove('warning');
     }
-    if (btn) btn.style.display = 'flex';
+    if (btn) {
+        btn.style.display = 'flex';
+        btn.classList.remove('recording');
+        btn.onclick = window.handleActionButton;
+    }
     if (playBtn) {
         playBtn.style.display = 'none';
         playBtn.innerHTML = '<i class="fas fa-play"></i>';
