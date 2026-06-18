@@ -418,7 +418,7 @@ body.conversation-open .conversation-page {
     height: 100%;
     background: var(--primary);
     border-radius: 2px;
-    transition: width 0.3s;
+    transition: width 0.3s, background-color 0.3s;
 }
 
 /* ✅ العدادات (كلها بلون التطبيق) */
@@ -460,7 +460,7 @@ body.conversation-open .conversation-page {
     transform: scale(1.05);
 }
 
-/* ✅ تحذير عند 4:40 (وميض - كل العدادات والخط الفاصل) */
+/* ✅ تحذير عند 4:40 (وميض - العدادات + الخط الفاصل + شريط التقدم) */
 #voiceRecordingUI.warning #voiceCurrentTime,
 #voiceRecordingUI.warning #voiceSeparator,
 #voiceRecordingUI.warning #voiceMaxTime {
@@ -469,13 +469,19 @@ body.conversation-open .conversation-page {
 
 #voiceRecordingUI.warning #voiceProgressFill {
     background: #ff4444;
-    animation: blinkWarning 0.5s ease-in-out infinite;
+    animation: blinkWarningProgress 0.5s ease-in-out infinite;
 }
 
 @keyframes blinkWarning {
     0% { color: #ff4444; }
     50% { color: var(--primary); }
     100% { color: #ff4444; }
+}
+
+@keyframes blinkWarningProgress {
+    0% { background-color: #ff4444; }
+    50% { background-color: var(--primary); }
+    100% { background-color: #ff4444; }
 }
 
 /* باقي الأزرار */
