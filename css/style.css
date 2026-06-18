@@ -396,6 +396,109 @@ body.conversation-open .conversation-page {
     100% { transform: scale(1); }
 }
 
+/* ==================== واجهة التسجيل الصوتي ==================== */
+
+/* حاوية واجهة التسجيل */
+#voiceRecorderUI {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    direction: ltr;
+}
+
+/* تنسيق العدادات */
+#countdownTimer, #elapsedTimer {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    font-weight: bold;
+    min-width: 45px;
+    font-family: monospace;
+    color: var(--text);
+}
+
+/* شريط التقدم */
+#progressBarVoice {
+    width: 0%;
+    height: 100%;
+    background: #4CAF50;
+    border-radius: 2px;
+    transition: width 0.1s linear;
+}
+
+/* حاوية شريط التقدم */
+.progress-bar-container {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    position: relative;
+    min-width: 60px;
+    overflow: hidden;
+}
+
+/* وميض التحذير (أحمر/أزرق) */
+#countdownTimer.warning {
+    animation: blinkWarning 0.5s ease-in-out infinite;
+}
+
+@keyframes blinkWarning {
+    0% { color: #f44336; }
+    50% { color: var(--primary); }
+    100% { color: #f44336; }
+}
+
+/* أزرار التسجيل */
+#cancelVoiceBtn { 
+    width: 32px; 
+    height: 32px; 
+    border-radius: 50%; 
+    border: none; 
+    background: transparent; 
+    color: #f44336; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-size: 1.2rem; 
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+#cancelVoiceBtn:hover {
+    background: rgba(244, 67, 54, 0.1);
+    transform: scale(1.05);
+}
+
+#cancelVoiceBtn:active {
+    transform: scale(0.95);
+}
+
+#sendVoiceBtn { 
+    width: 32px; 
+    height: 32px; 
+    border-radius: 50%; 
+    border: none; 
+    background: #4CAF50; 
+    color: white; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-size: 1rem; 
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+#sendVoiceBtn:hover {
+    background: #43A047;
+    transform: scale(1.05);
+}
+
+#sendVoiceBtn:active {
+    transform: scale(0.95);
+}
+
 .conversation-header, .message-input-container {
     pointer-events: auto !important;
 }
