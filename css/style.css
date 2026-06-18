@@ -293,6 +293,7 @@ body.conversation-open .conversation-page {
 .message-image { max-width: 200px; max-height: 200px; border-radius: 12px; cursor: pointer; }
 .message-audio { width: 250px; height: 40px; border-radius: 20px; }
 
+
 /* ==================== القسم 13.4: فوتر الإدخال ==================== */
 .message-input-container { 
     background: var(--card-bg); 
@@ -340,7 +341,6 @@ body.conversation-open .conversation-page {
     display: flex; 
     align-items: center; 
     gap: 4px; 
-    position: relative;
 }
 
 #messageInput { 
@@ -396,65 +396,9 @@ body.conversation-open .conversation-page {
     100% { transform: scale(1); }
 }
 
-/* ✅ عداد التسجيل (بدون خلفية) */
-#recordingTimer {
-    display: none;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    color: var(--text);
-    font-size: 0.9rem;
-    font-weight: bold;
-    direction: ltr;
-    background: transparent !important;
-    pointer-events: none;
-    z-index: 5;
-    font-family: monospace;
-    white-space: nowrap;
-    letter-spacing: 0.5px;
-}
-
-/* ✅ تحذير: يرمش بين الأزرق والأحمر */
-#recordingTimer.warning {
-    animation: blinkWarning 0.5s ease-in-out infinite;
-}
-
-@keyframes blinkWarning {
-    0% { color: #2196F3; }
-    50% { color: #ff0000; }
-    100% { color: #2196F3; }
-}
-
-/* ✅ زر إلغاء التسجيل */
-#cancelRecordingBtn {
-    display: none;
-    position: absolute;
-    left: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: transparent;
-    border: none;
-    color: #f44336;
-    font-size: 1.1rem;
-    cursor: pointer;
-    z-index: 6;
-    padding: 4px;
-    transition: transform 0.2s;
-}
-
-#cancelRecordingBtn:hover {
-    transform: translateY(-50%) scale(1.15);
-}
-
-#cancelRecordingBtn:active {
-    transform: translateY(-50%) scale(0.9);
-}
-
 .conversation-header, .message-input-container {
     pointer-events: auto !important;
 }
-
 
 /* ==================== القسم 13.5: قائمة المرفقات ==================== */
 .attachment-menu { position: absolute; bottom: 80px; right: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2100; min-width: 150px; border: 1px solid var(--border); }
