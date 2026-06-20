@@ -44,11 +44,21 @@ async getContactName(userId) {
 },
    
 
-    // ==================== القسم 3: init ====================
+ // ==================== القسم 3: init ====================
 init() { 
     this.loadAllChats(); 
     this.setupFeatureButton();
-},
+    
+    // ✅ تخزين مرجع القالب الثابت لقائمة المحادثات
+    this.chatItemTemplate = document.getElementById('chatItemTemplate');
+    
+    // ✅ التحقق من وجود القالب
+    if (!this.chatItemTemplate) {
+        console.warn('⚠️ قالب chatItemTemplate غير موجود في HTML');
+    } else {
+        console.log('✅ تم تحميل قالب chatItemTemplate بنجاح');
+    }
+},   
     
 
     // ==================== القسم 4: setupFeatureButton ====================
