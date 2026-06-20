@@ -878,7 +878,8 @@ resetFeatures() {
 updateAllButtons() {
     const canUse = (this.friendInConversation && this.featuresEnabled);
     
-    const btns = document.querySelectorAll('#attachmentMenu button[data-dc]');
+    // ✅ استخدام class="attach-option" بدلاً من data-dc
+    const btns = document.querySelectorAll('#attachmentMenu .attach-option');
     btns.forEach(btn => { 
         if (canUse) { 
             btn.classList.remove('locked'); 
