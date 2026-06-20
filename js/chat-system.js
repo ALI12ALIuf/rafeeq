@@ -1156,6 +1156,34 @@ setupVoiceControls(clone, audioEl) {
 
 
 // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+
+// ✅ دالة مساعدة لإعداد زر التحميل (موحدة للصور والفيديو والملف)
+function setupDownload(btn, chunkId, filename, fallbackUrl) {
+    if (!btn) return;
+    btn.dataset.chunkId = chunkId;
+    btn.dataset.filename = filename || 'ملف';
+    btn.onclick = function(e) {
+        e.stopPropagation();
+        const cid = this.dataset.chunkId;
+        const fname = this.dataset.filename || 'ملف';
+        let url = null;
+        if (window.CallSystem?.incomingFileInfo?.[cid]) {
+            const info = window.CallSystem.incomingFileInfo[cid];
+            url = info.blobUrl || (info.data && URL.createObjectURL(info.data));
+            if (url && !info.blobUrl) info.blobUrl = url;
+        }
+        if (!url && fallbackUrl) url = fallbackUrl;
+        if (url?.startsWith('blob:')) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fname;
+            a.click();
+        } else {
+            alert('⚠️ الملف غير متاح للتحميل');
+        }
+    };
+}
+
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1181,7 +1209,6 @@ displayMessage(msg) {
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1190,7 +1217,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1286,7 +1313,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (معدل - إزالة أكواد منع القائمة) ====================
+    // ==================== معالجة الصورة (معدل - زر ثابت) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1294,13 +1321,15 @@ displayMessage(msg) {
             const wrapper = clone.querySelector('.message-image-wrapper');
             if (wrapper) {
                 wrapper.style.border = `2px solid ${borderColor}`;
+                wrapper.dataset.chunkId = msg.id;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
                     img.src = msg.data;
-                    img.dataset.chunkId = msg._chunkId || msg.id;
                     img.onclick = () => this.showImagePreview(msg.data);
-                    // ✅ تم إزالة oncontextmenu و ondragstart
                 }
+                // ✅ إعداد زر التحميل
+                const btn = wrapper.querySelector('.download-btn-overlay');
+                setupDownload(btn, msg.id, msg.fileName || 'صورة', msg.data);
             }
             div.appendChild(clone);
         } else {
@@ -1329,7 +1358,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (معدل - إزالة أكواد منع القائمة) ====================
+    // ==================== معالجة الفيديو (معدل - زر ثابت) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1337,18 +1366,22 @@ displayMessage(msg) {
             const thumbnail = clone.querySelector('.video-thumbnail');
             if (thumbnail) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
-                thumbnail.dataset.chunkId = msg._chunkId || msg.id;
+                thumbnail.dataset.chunkId = msg.id;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
                 if (source && msg.data) {
                     source.src = msg.data;
                     video.load();
                 }
+                // منع تشغيل المعاينة عند الضغط على زر التحميل
                 thumbnail.onclick = (e) => {
-                    e.stopPropagation();
-                    this.showVideoPreview(msg.data);
+                    if (!e.target.closest('.download-btn-overlay')) {
+                        this.showVideoPreview(msg.data);
+                    }
                 };
-                // ✅ تم إزالة oncontextmenu و ondragstart و setAttribute والأنماط
+                // ✅ إعداد زر التحميل
+                const btn = thumbnail.querySelector('.download-btn-overlay');
+                setupDownload(btn, msg.id, msg.fileName || 'فيديو', msg.data);
             }
             div.appendChild(clone);
         } else {
@@ -1356,7 +1389,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (معدل - دعم التحميل المتكرر) ====================
+    // ==================== معالجة الملف (معدل - زر ثابت) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1369,47 +1402,9 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn) {
-                    // ✅ تخزين معرف الملف في الزر
-                    const chunkId = msg._chunkId || msg.id;
-                    downloadBtn.dataset.chunkId = chunkId;
-                    downloadBtn.dataset.filename = msg.fileName || 'ملف';
-                    
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const chunkId = downloadBtn.dataset.chunkId;
-                        const filename = downloadBtn.dataset.filename || 'ملف';
-                        
-                        // ✅ محاولة الحصول على الـ Blob URL من incomingFileInfo
-                        let url = null;
-                        if (typeof CallSystem !== 'undefined' && CallSystem.incomingFileInfo && CallSystem.incomingFileInfo[chunkId]) {
-                            const fileInfo = CallSystem.incomingFileInfo[chunkId];
-                            if (fileInfo.blobUrl) {
-                                url = fileInfo.blobUrl;
-                            } else if (fileInfo.data) {
-                                // إعادة إنشاء Blob URL من البيانات المخزنة
-                                const newUrl = URL.createObjectURL(fileInfo.data);
-                                fileInfo.blobUrl = newUrl;
-                                url = newUrl;
-                            }
-                        }
-                        
-                        // ✅ إذا لم نجد البيانات، نحاول استخدام msg.data
-                        if (!url && msg.data) {
-                            url = msg.data;
-                        }
-                        
-                        if (url && url.startsWith('blob:')) {
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = filename;
-                            link.click();
-                        } else {
-                            alert('⚠️ انتهت صلاحية الملف أو لا يمكن تحميله');
-                        }
-                    };
-                }
+                // ✅ إعداد زر التحميل
+                const btn = fileCard.querySelector('.download-file-btn');
+                setupDownload(btn, msg.id, msg.fileName || 'ملف', msg.data);
             }
             div.appendChild(clone);
         } else {
