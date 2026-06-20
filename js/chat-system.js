@@ -1323,7 +1323,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (معدل - زر ثابت) ====================
+    // ==================== معالجة الصورة (معدل - دعم Blob) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1334,8 +1334,13 @@ displayMessage(msg) {
                 wrapper.dataset.chunkId = msg.id;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                    // ✅ إذا كان msg.data من نوع Blob، أنشئ URL
+                    if (msg.data instanceof Blob) {
+                        img.src = URL.createObjectURL(msg.data);
+                    } else {
+                        img.src = msg.data;
+                    }
+                    img.onclick = () => this.showImagePreview(img.src);
                 }
                 const btn = wrapper.querySelector('.download-btn-overlay');
                 setupDownload(btn, msg.id, msg.fileName || 'صورة', msg.data);
@@ -1357,7 +1362,12 @@ displayMessage(msg) {
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
                 if (audioEl && msg.data) {
-                    audioEl.src = msg.data;
+                    // ✅ إذا كان msg.data من نوع Blob، أنشئ URL
+                    if (msg.data instanceof Blob) {
+                        audioEl.src = URL.createObjectURL(msg.data);
+                    } else {
+                        audioEl.src = msg.data;
+                    }
                     this.setupVoiceControls(clone, audioEl);
                 }
             }
@@ -1367,7 +1377,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (معدل - زر ثابت) ====================
+    // ==================== معالجة الفيديو (معدل - دعم Blob) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1379,12 +1389,19 @@ displayMessage(msg) {
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
                 if (source && msg.data) {
-                    source.src = msg.data;
+                    // ✅ إذا كان msg.data من نوع Blob، أنشئ URL
+                    if (msg.data instanceof Blob) {
+                        source.src = URL.createObjectURL(msg.data);
+                    } else {
+                        source.src = msg.data;
+                    }
                     video.load();
                 }
                 thumbnail.onclick = (e) => {
                     if (!e.target.closest('.download-btn-overlay')) {
-                        this.showVideoPreview(msg.data);
+                        // ✅ استخدم source.src لعرض المعاينة
+                        const videoSrc = source?.src;
+                        if (videoSrc) this.showVideoPreview(videoSrc);
                     }
                 };
                 const btn = thumbnail.querySelector('.download-btn-overlay');
@@ -1396,7 +1413,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (معدل - زر ثابت) ====================
+    // ==================== معالجة الملف (معدل - دعم Blob) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
