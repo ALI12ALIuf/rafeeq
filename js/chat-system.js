@@ -10,6 +10,9 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
+    // ✅ قالب عنصر المحادثة (ثابت)
+    chatItemTemplate: null,
+    
     // ==================== القسم 2.5: دالة تحديث زر التفعيل ====================
 updateFeatureToggleUI() {
     const toggleInput = document.getElementById('featureToggleInput');
