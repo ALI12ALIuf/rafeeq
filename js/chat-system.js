@@ -1154,6 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
+
 // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
@@ -1296,6 +1297,7 @@ displayMessage(msg) {
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
                     img.src = msg.data;
+                    img.dataset.chunkId = msg._chunkId || msg.id;
                     img.onclick = () => this.showImagePreview(msg.data);
                     // ✅ تم إزالة oncontextmenu و ondragstart
                 }
@@ -1335,6 +1337,7 @@ displayMessage(msg) {
             const thumbnail = clone.querySelector('.video-thumbnail');
             if (thumbnail) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
+                thumbnail.dataset.chunkId = msg._chunkId || msg.id;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
                 if (source && msg.data) {
@@ -1353,7 +1356,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل - دعم التحميل المتكرر) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1367,13 +1370,44 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
+                if (downloadBtn) {
+                    // ✅ تخزين معرف الملف في الزر
+                    const chunkId = msg._chunkId || msg.id;
+                    downloadBtn.dataset.chunkId = chunkId;
+                    downloadBtn.dataset.filename = msg.fileName || 'ملف';
+                    
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
+                        const chunkId = downloadBtn.dataset.chunkId;
+                        const filename = downloadBtn.dataset.filename || 'ملف';
+                        
+                        // ✅ محاولة الحصول على الـ Blob URL من incomingFileInfo
+                        let url = null;
+                        if (typeof CallSystem !== 'undefined' && CallSystem.incomingFileInfo && CallSystem.incomingFileInfo[chunkId]) {
+                            const fileInfo = CallSystem.incomingFileInfo[chunkId];
+                            if (fileInfo.blobUrl) {
+                                url = fileInfo.blobUrl;
+                            } else if (fileInfo.data) {
+                                // إعادة إنشاء Blob URL من البيانات المخزنة
+                                const newUrl = URL.createObjectURL(fileInfo.data);
+                                fileInfo.blobUrl = newUrl;
+                                url = newUrl;
+                            }
+                        }
+                        
+                        // ✅ إذا لم نجد البيانات، نحاول استخدام msg.data
+                        if (!url && msg.data) {
+                            url = msg.data;
+                        }
+                        
+                        if (url && url.startsWith('blob:')) {
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = filename;
+                            link.click();
+                        } else {
+                            alert('⚠️ انتهت صلاحية الملف أو لا يمكن تحميله');
+                        }
                     };
                 }
             }
