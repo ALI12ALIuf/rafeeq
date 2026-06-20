@@ -64,16 +64,30 @@
         </div>
 
         <!-- ===== القسم 2.2.2: صفحة الدردشة (Chat) ===== -->
-        <div class="page chat-page">
-            <div class="search-container">
-                <div class="search-box">
-                    <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
-                    <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
-                </div>
-                <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
-            </div>
-            <div class="chats-list" id="chatsList"></div>
+<div class="page chat-page">
+    <div class="search-container">
+        <div class="search-box">
+            <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
+            <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
         </div>
+        <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
+    </div>
+    <div class="chats-list" id="chatsList"></div>
+    
+    <!-- ✅ قالب عنصر المحادثة (ثابت) -->
+    <template id="chatItemTemplate">
+        <div class="chat-item" onclick="">
+            <div class="chat-avatar-emoji"></div>
+            <div class="chat-info">
+                <h4></h4>
+                <p class="last-message"></p>
+            </div>
+            <div class="chat-meta">
+                <span class="chat-time"></span>
+            </div>
+        </div>
+    </template>
+</div>
 
         <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
