@@ -1325,10 +1325,13 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
-    if (!c) return;
+    if (!c) {
+        console.error('❌ messagesContainer غير موجود');
+        return;
+    }
     
     const formatDateTime = (dateObj) => {
         const year = dateObj.getFullYear();
@@ -1345,13 +1348,18 @@ displayMessage(msg) {
     const dateTime = formatDateTime(new Date(msg.time));
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
-    const template = document.getElementById('messageWrapperTemplate');
+    // ✅ إنشاء العنصر الرئيسي (مع Fallback آمن)
     let div;
-    if (template) {
-        div = template.content.cloneNode(true).firstElementChild;
-    } else {
-        // Fallback إذا لم يوجد القالب
+    const template = document.getElementById('messageWrapperTemplate');
+    
+    if (template && template.content) {
+        const clone = template.content.cloneNode(true);
+        div = clone.firstElementChild;
+    }
+    
+    // ✅ إذا لم ينجح القالب، استخدم Fallback
+    if (!div) {
+        console.warn('⚠️ استخدام Fallback لإنشاء عنصر الرسالة');
         div = document.createElement('div');
         div.className = 'message';
     }
@@ -1361,24 +1369,45 @@ displayMessage(msg) {
     
     // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        contentDiv.style.cssText = `
-            border: 1.5px solid ${borderColor};
-            background: var(--bg);
-            color: var(--text);
-            border-radius: 18px;
-            padding: 10px 14px;
-            max-width: 100%;
-            word-wrap: break-word;
-            position: relative;
-        `;
-        
-        const textSpan = document.createElement('span');
-        textSpan.style.cssText = 'font-size: 1rem; line-height: 1.4; display: block;';
-        textSpan.innerHTML = this.escapeHtml(msg.text);
-        contentDiv.appendChild(textSpan);
-        div.appendChild(contentDiv);
+        // ✅ استخدام القالب الثابت للرسالة النصية
+        const textTemplate = document.getElementById('textMessageTemplate');
+        if (textTemplate && textTemplate.content) {
+            const clone = textTemplate.content.cloneNode(true);
+            const contentDiv = clone.querySelector('.message-content');
+            const textSpan = contentDiv?.querySelector('.message-text');
+            
+            if (contentDiv) {
+                contentDiv.style.border = `1.5px solid ${borderColor}`;
+                contentDiv.style.background = 'var(--bg)';
+                contentDiv.style.color = 'var(--text)';
+            }
+            
+            if (textSpan) {
+                textSpan.innerHTML = this.escapeHtml(msg.text);
+            }
+            
+            div.appendChild(clone);
+        } else {
+            // ✅ Fallback للرسائل النصية
+            console.warn('⚠️ قالب textMessageTemplate غير موجود، استخدام Fallback');
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.style.cssText = `
+                border: 1.5px solid ${borderColor};
+                background: var(--bg);
+                color: var(--text);
+                border-radius: 18px;
+                padding: 10px 14px;
+                max-width: 100%;
+                word-wrap: break-word;
+                position: relative;
+            `;
+            const textSpan = document.createElement('span');
+            textSpan.style.cssText = 'font-size: 1rem; line-height: 1.4; display: block;';
+            textSpan.innerHTML = this.escapeHtml(msg.text);
+            contentDiv.appendChild(textSpan);
+            div.appendChild(contentDiv);
+        }
         
         // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
@@ -1410,9 +1439,8 @@ displayMessage(msg) {
         const maxClicks = locationData.maxClicks;
         let clicksRemaining = locationData.clicksRemaining;
         
-        // ✅ استخدام القالب الثابت للموقع
         const templateLoc = document.getElementById('locationMessageTemplate');
-        if (templateLoc) {
+        if (templateLoc && templateLoc.content) {
             const clone = templateLoc.content.cloneNode(true);
             const locationDiv = clone.querySelector('.location-card');
             if (locationDiv) {
@@ -1452,37 +1480,14 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback
-            const locationDiv = document.createElement('div');
-            locationDiv.style.cssText = `cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid ${borderColor}; color: white; font-size: 1.2rem;`;
-            if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                locationDiv.style.background = '#888';
-                locationDiv.innerHTML = `<i class="fas fa-lock"></i>`;
-                locationDiv.style.cursor = 'default';
-            } else {
-                locationDiv.innerHTML = `<i class="fas fa-map-marker-alt"></i>`;
-                locationDiv.onclick = (e) => {
-                    e.stopPropagation();
-                    if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
-                    window.open(locationUrl, '_blank');
-                    if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
-                        clicksRemaining--;
-                        if (clicksRemaining <= 0) {
-                            locationDiv.style.background = '#888';
-                            locationDiv.innerHTML = `<i class="fas fa-lock"></i>`;
-                            locationDiv.onclick = () => {};
-                        }
-                    }
-                };
-            }
-            div.appendChild(locationDiv);
+            console.warn('⚠️ قالب locationMessageTemplate غير موجود');
         }
     }
     
     // ==================== معالجة الصورة ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
-        if (templateImg) {
+        if (templateImg && templateImg.content) {
             const clone = templateImg.content.cloneNode(true);
             const wrapper = clone.querySelector('.message-image-wrapper');
             if (wrapper) {
@@ -1497,21 +1502,14 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback
-            const img = document.createElement('img');
-            img.src = msg.data;
-            img.style.cssText = `max-width:200px; max-height:200px; border-radius:12px; border:2px solid ${borderColor}; cursor:pointer;`;
-            img.onclick = () => this.showImagePreview(msg.data);
-            img.oncontextmenu = (e) => e.preventDefault();
-            img.ondragstart = (e) => e.preventDefault();
-            div.appendChild(img);
+            console.warn('⚠️ قالب imageMessageTemplate غير موجود');
         }
     }
     
     // ==================== معالجة البصمة الصوتية ====================
     else if (msg.type === 'voice') {
         const templateVoice = document.getElementById('voiceMessageTemplate');
-        if (templateVoice) {
+        if (templateVoice && templateVoice.content) {
             const clone = templateVoice.content.cloneNode(true);
             const voiceMsg = clone.querySelector('.voice-message');
             if (voiceMsg) {
@@ -1525,19 +1523,14 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback
-            const audio = document.createElement('audio');
-            audio.src = msg.data;
-            audio.controls = true;
-            audio.style.cssText = `max-width:250px; border-radius:20px; border:1.5px solid ${borderColor}; background: #4CAF50;`;
-            div.appendChild(audio);
+            console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
         }
     }
     
     // ==================== معالجة الفيديو ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
-        if (templateVideo) {
+        if (templateVideo && templateVideo.content) {
             const clone = templateVideo.content.cloneNode(true);
             const thumbnail = clone.querySelector('.video-thumbnail');
             if (thumbnail) {
@@ -1555,20 +1548,14 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback
-            const video = document.createElement('video');
-            video.src = msg.data;
-            video.style.cssText = `max-width:250px; max-height:200px; border-radius:12px; border:2px solid ${borderColor}; cursor:pointer;`;
-            video.preload = 'metadata';
-            video.onclick = () => this.showVideoPreview(msg.data);
-            div.appendChild(video);
+            console.warn('⚠️ قالب videoMessageTemplate غير موجود');
         }
     }
     
     // ==================== معالجة الملف ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
-        if (templateFile) {
+        if (templateFile && templateFile.content) {
             const clone = templateFile.content.cloneNode(true);
             const fileCard = clone.querySelector('.file-card');
             if (fileCard) {
@@ -1591,18 +1578,7 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback
-            const fileDiv = document.createElement('div');
-            fileDiv.style.cssText = `background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1.5px solid ${borderColor};`;
-            fileDiv.innerHTML = `
-                <span style="font-size:1.5rem;">📄</span>
-                <span style="color:white;font-weight:bold;flex:1;word-break:break-all;">${this.escapeHtml(msg.fileName || 'ملف')}</span>
-                <button onclick="this.parentElement.querySelector('a').click()" style="background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:36px;height:36px;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
-                    <i class="fas fa-download"></i>
-                </button>
-                <a href="${msg.data}" download="${msg.fileName || 'ملف'}" style="display:none;"></a>
-            `;
-            div.appendChild(fileDiv);
+            console.warn('⚠️ قالب fileMessageTemplate غير موجود');
         }
     }
     
