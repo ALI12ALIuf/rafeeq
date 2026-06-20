@@ -1698,7 +1698,7 @@ async sendImage(file) {
             });
         } else alert('فشل إرسال الصورة');
     }
-}
+},
 
 // ==================== القسم 31: sendVideoFile (معدل - دعم _chunkId) ====================
 async sendVideoFile(file) { 
@@ -1745,7 +1745,7 @@ async sendVideoFile(file) {
             } catch (error) { alert('فشل معالجة الفيديو'); }
         } else alert('فشل إرسال الفيديو');
     }
-}
+},
 
 // ==================== القسم 32: sendFile (معدل - دعم _chunkId) ====================
 async sendFile(file) { 
@@ -1781,7 +1781,7 @@ async sendFile(file) {
             });
         } else alert('فشل إرسال الملف');
     }
-}
+},
 
 // ==================== القسم 33: sendVoiceNote (معدل - دعم _chunkId) ====================
 async sendVoiceNote(audioBlob) { 
@@ -1816,7 +1816,7 @@ async sendVoiceNote(audioBlob) {
             });
         } else alert('فشل إرسال البصمة الصوتية');
     }
-}
+},
 
     // ==================== القسم 34: shareLocationDirect ====================
     
