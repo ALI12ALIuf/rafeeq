@@ -11,13 +11,13 @@ window.showFriendsList = function() {
 // ==================== القسم 2: تحميل قائمة الأصدقاء (معدل - استخدام القالب الثابت) ====================
 let friendsLoaded = false;
 
-async function loadFriendsList() {
+async function loadFriendsList(force = false) {
     if (!window.auth?.currentUser) return;
     const list = document.getElementById('friendsList'); 
     if (!list) return;
     
-    // ✅ إذا كانت القائمة محملة مسبقاً، لا نعيد التحميل
-    if (friendsLoaded && list.children.length > 0) {
+    // ✅ إذا كانت القائمة محملة وليس هناك طلب إعادة تحميل، تخطى
+    if (friendsLoaded && !force) {
         console.log('⏭️ قائمة الأصدقاء محملة مسبقاً، تخطي التحميل');
         return;
     }
@@ -33,46 +33,47 @@ async function loadFriendsList() {
         if (!doc.exists) return;
         const friends = doc.data().friends || [];
         
+        // ✅ مسح القائمة فقط عند التحميل الأول أو التحديث
+        list.innerHTML = '';
+        
         if (!friends.length) { 
             list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا يوجد أصدقاء</h3><p>لم تضف أي أصدقاء بعد</p></div>`; 
             friendsLoaded = true;
             return; 
         }
         
-        // ✅ لا نمسح القائمة، نضيف العناصر فقط إذا كانت فارغة
-        if (list.children.length === 0) {
-            for (const fid of friends) {
-                try {
-                    const f = await window.db.collection('users').doc(fid).get();
-                    if (f.exists) { 
-                        const d = f.data();
-                        
-                        const clone = template.content.cloneNode(true);
-                        const userItem = clone.querySelector('.user-item');
-                        
-                        const avatar = userItem.querySelector('.user-avatar-emoji');
-                        const name = userItem.querySelector('.user-info h4');
-                        const idText = userItem.querySelector('.user-info p');
-                        const chatBtn = userItem.querySelector('.chat-btn');
-                        const removeBtn = userItem.querySelector('.remove-btn');
-                        
-                        if (avatar) avatar.textContent = getEmojiForUser(d);
-                        if (name) name.textContent = d.name || 'مستخدم';
-                        if (idText) idText.textContent = d.shareableId || '';
-                        
-                        if (chatBtn) chatBtn.onclick = () => openChat(fid);
-                        if (removeBtn) removeBtn.onclick = () => removeFriend(fid);
-                        
-                        list.appendChild(clone);
-                    }
-                } catch (e) {
-                    console.warn('خطأ في تحميل صديق:', e);
+        for (const fid of friends) {
+            try {
+                const f = await window.db.collection('users').doc(fid).get();
+                if (f.exists) { 
+                    const d = f.data();
+                    
+                    const clone = template.content.cloneNode(true);
+                    const userItem = clone.querySelector('.user-item');
+                    
+                    const avatar = userItem.querySelector('.user-avatar-emoji');
+                    const name = userItem.querySelector('.user-info h4');
+                    const idText = userItem.querySelector('.user-info p');
+                    const chatBtn = userItem.querySelector('.chat-btn');
+                    const removeBtn = userItem.querySelector('.remove-btn');
+                    
+                    if (avatar) avatar.textContent = getEmojiForUser(d);
+                    if (name) name.textContent = d.name || 'مستخدم';
+                    if (idText) idText.textContent = d.shareableId || '';
+                    
+                    if (chatBtn) chatBtn.onclick = () => openChat(fid);
+                    if (removeBtn) removeBtn.onclick = () => removeFriend(fid);
+                    
+                    list.appendChild(clone);
                 }
+            } catch (e) {
+                console.warn('خطأ في تحميل صديق:', e);
             }
         }
         
         friendsLoaded = true;
         
+        // ✅ إذا لم تظهر أي عناصر، عرض رسالة فارغة
         if (list.children.length === 0) {
             list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا يوجد أصدقاء</h3><p>لم تضف أي أصدقاء بعد</p></div>`;
         }
@@ -80,17 +81,14 @@ async function loadFriendsList() {
     } catch (e) { 
         console.error('خطأ في loadFriendsList:', e);
         list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>خطأ</h3><p>حاول تحديث الصفحة</p></div>`; 
+        friendsLoaded = true;
     }
 }
 
 // ✅ دالة لتحديث قائمة الأصدقاء (إعادة تحميل كامل)
 function refreshFriends() {
-    const list = document.getElementById('friendsList');
-    if (list) {
-        list.innerHTML = '';
-        friendsLoaded = false;
-        loadFriendsList();
-    }
+    friendsLoaded = false;
+    loadFriendsList(true);
 }
 
 // ==================== القسم 3: حذف صديق ====================
@@ -130,13 +128,13 @@ window.showFriendRequests = function() {
 // ==================== القسم 6: تحميل طلبات الصداقة (معدل - استخدام القالب الثابت) ====================
 let requestsLoaded = false;
 
-async function loadFriendRequests() {
+async function loadFriendRequests(force = false) {
     if (!window.auth?.currentUser) return;
     const list = document.getElementById('friendRequestsList'); 
     if (!list) return;
     
-    // ✅ إذا كانت القائمة محملة مسبقاً، لا نعيد التحميل
-    if (requestsLoaded && list.children.length > 0) {
+    // ✅ إذا كانت القائمة محملة وليس هناك طلب إعادة تحميل، تخطى
+    if (requestsLoaded && !force) {
         console.log('⏭️ قائمة طلبات الصداقة محملة مسبقاً، تخطي التحميل');
         return;
     }
@@ -153,52 +151,53 @@ async function loadFriendRequests() {
             .where('status', '==', 'pending')
             .get();
             
+        // ✅ مسح القائمة فقط عند التحميل الأول أو التحديث
+        list.innerHTML = '';
+            
         if (s.empty) { 
             list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3><p>لم يرسل لك أحد طلب صداقة بعد</p></div>`; 
             requestsLoaded = true;
             return; 
         }
         
-        // ✅ لا نمسح القائمة، نضيف العناصر فقط إذا كانت فارغة
-        if (list.children.length === 0) {
-            let reqs = [];
-            s.forEach(d => reqs.push({ id: d.id, ...d.data() }));
-            reqs.sort((a, b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
-            
-            for (const r of reqs) {
-                try {
-                    const sender = await window.db.collection('users').doc(r.from).get();
-                    if (sender.exists) { 
-                        const sd = sender.data();
-                        
-                        const clone = template.content.cloneNode(true);
-                        const userItem = clone.querySelector('.user-item');
-                        
-                        if (userItem) userItem.id = `request-${r.id}`;
-                        
-                        const avatar = userItem.querySelector('.user-avatar-emoji');
-                        const name = userItem.querySelector('.user-info h4');
-                        const idText = userItem.querySelector('.user-info p');
-                        const acceptBtn = userItem.querySelector('.accept-btn');
-                        const rejectBtn = userItem.querySelector('.reject-btn');
-                        
-                        if (avatar) avatar.textContent = getEmojiForUser(sd);
-                        if (name) name.textContent = sd.name || 'مستخدم';
-                        if (idText) idText.textContent = sd.shareableId || '';
-                        
-                        if (acceptBtn) acceptBtn.onclick = () => acceptFriendRequest(r.id, r.from);
-                        if (rejectBtn) rejectBtn.onclick = () => rejectFriendRequest(r.id);
-                        
-                        list.appendChild(clone);
-                    }
-                } catch (e) {
-                    console.warn('خطأ في تحميل طلب:', e);
+        let reqs = [];
+        s.forEach(d => reqs.push({ id: d.id, ...d.data() }));
+        reqs.sort((a, b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+        
+        for (const r of reqs) {
+            try {
+                const sender = await window.db.collection('users').doc(r.from).get();
+                if (sender.exists) { 
+                    const sd = sender.data();
+                    
+                    const clone = template.content.cloneNode(true);
+                    const userItem = clone.querySelector('.user-item');
+                    
+                    if (userItem) userItem.id = `request-${r.id}`;
+                    
+                    const avatar = userItem.querySelector('.user-avatar-emoji');
+                    const name = userItem.querySelector('.user-info h4');
+                    const idText = userItem.querySelector('.user-info p');
+                    const acceptBtn = userItem.querySelector('.accept-btn');
+                    const rejectBtn = userItem.querySelector('.reject-btn');
+                    
+                    if (avatar) avatar.textContent = getEmojiForUser(sd);
+                    if (name) name.textContent = sd.name || 'مستخدم';
+                    if (idText) idText.textContent = sd.shareableId || '';
+                    
+                    if (acceptBtn) acceptBtn.onclick = () => acceptFriendRequest(r.id, r.from);
+                    if (rejectBtn) rejectBtn.onclick = () => rejectFriendRequest(r.id);
+                    
+                    list.appendChild(clone);
                 }
+            } catch (e) {
+                console.warn('خطأ في تحميل طلب:', e);
             }
         }
         
         requestsLoaded = true;
         
+        // ✅ إذا لم تظهر أي عناصر، عرض رسالة فارغة
         if (list.children.length === 0) {
             list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3><p>لم يرسل لك أحد طلب صداقة بعد</p></div>`;
         }
@@ -206,17 +205,14 @@ async function loadFriendRequests() {
     } catch (e) { 
         console.error('خطأ في loadFriendRequests:', e);
         list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>خطأ</h3><p>حاول تحديث الصفحة</p></div>`; 
+        requestsLoaded = true;
     }
 }
 
 // ✅ دالة لتحديث قائمة طلبات الصداقة (إعادة تحميل كامل)
 function refreshRequests() {
-    const list = document.getElementById('friendRequestsList');
-    if (list) {
-        list.innerHTML = '';
-        requestsLoaded = false;
-        loadFriendRequests();
-    }
+    requestsLoaded = false;
+    loadFriendRequests(true);
 }
 
 // ==================== القسم 7: قبول طلب صداقة ====================
