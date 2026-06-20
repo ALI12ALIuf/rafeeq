@@ -656,28 +656,68 @@ window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    if (img) { 
+        img.src = ''; 
+        img.style.transform = 'scale(1)';
+        img.style.width = '100%';
+        img.style.height = '100%';
+    }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    if (video) { 
+        video.pause(); 
+        video.src = ''; 
+    }
 };
 
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    
+    // ✅ حفظ الحجم الحالي للصورة
+    const currentTransform = img.style.transform || 'scale(1)';
+    
+    // ✅ استخدام Canvas للحصول على الصورة مع الحفاظ على الجودة
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    const width = img.naturalWidth || img.width || 800;
+    const height = img.naturalHeight || img.height || 600;
+    
+    canvas.width = width;
+    canvas.height = height;
+    
+    ctx.drawImage(img, 0, 0, width, height);
+    
+    canvas.toBlob(function(blob) {
+        if (!blob) {
+            // Fallback إذا فشل Canvas
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = 'image.jpg';
+            link.click();
+            return;
+        }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'image.jpg';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }, 'image/jpeg', 0.95);
+    
+    // ✅ إعادة الحجم بعد التحميل
+    img.style.transform = currentTransform;
 };
 
 window.downloadPreviewVideo = function() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
+    
+    // ✅ للفيديو: استخدام الرابط مباشرة
     const link = document.createElement('a');
     link.href = video.src;
     link.download = 'video.mp4';
