@@ -652,139 +652,27 @@ window.getEmojiForUser = u => {
 };
 
 // ==================== القسم 14: دوال إغلاق المعاينات ====================
-
-// ✅ دالة لتكبير الصورة إلى وضع ملء الشاشة
-window.toggleFullscreenImage = function() {
-    const modal = document.getElementById('imagePreviewModal');
-    const img = document.getElementById('previewImage');
-    if (!modal || !img) return;
-    
-    // ✅ التحقق من وجود Fullscreen API
-    if (!document.fullscreenEnabled && !document.webkitFullscreenEnabled) {
-        // إذا كان Fullscreen غير مدعوم، نكبّر الصورة في المودال
-        if (img.style.transform === 'scale(2)') {
-            img.style.transform = 'scale(1)';
-        } else {
-            img.style.transform = 'scale(2)';
-        }
-        return;
-    }
-    
-    // ✅ التبديل إلى وضع ملء الشاشة
-    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        // الدخول إلى وضع ملء الشاشة
-        const element = modal;
-        if (element.requestFullscreen) {
-            element.requestFullscreen();
-        } else if (element.webkitRequestFullscreen) {
-            element.webkitRequestFullscreen();
-        }
-        // تغيير أيقونة الزر
-        const btn = document.querySelector('#imagePreviewModal .fa-expand')?.closest('button');
-        if (btn) {
-            btn.innerHTML = '<i class="fas fa-compress"></i>';
-        }
-    } else {
-        // الخروج من وضع ملء الشاشة
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-        }
-        // تغيير أيقونة الزر
-        const btn = document.querySelector('#imagePreviewModal .fa-compress')?.closest('button');
-        if (btn) {
-            btn.innerHTML = '<i class="fas fa-expand"></i>';
-        }
-    }
-};
-
-// ✅ مراقبة تغيير حالة Fullscreen لتحديث الأيقونة
-document.addEventListener('fullscreenchange', function() {
-    const btn = document.querySelector('#imagePreviewModal .fa-compress, #imagePreviewModal .fa-expand')?.closest('button');
-    if (btn) {
-        if (document.fullscreenElement) {
-            btn.innerHTML = '<i class="fas fa-compress"></i>';
-        } else {
-            btn.innerHTML = '<i class="fas fa-expand"></i>';
-        }
-    }
-});
-
-document.addEventListener('webkitfullscreenchange', function() {
-    const btn = document.querySelector('#imagePreviewModal .fa-compress, #imagePreviewModal .fa-expand')?.closest('button');
-    if (btn) {
-        if (document.webkitFullscreenElement) {
-            btn.innerHTML = '<i class="fas fa-compress"></i>';
-        } else {
-            btn.innerHTML = '<i class="fas fa-expand"></i>';
-        }
-    }
-});
-
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { 
-        img.src = ''; 
-        img.style.transform = 'scale(1)';
-        img.style.width = '100%';
-        img.style.height = '100%';
-    }
-    // ✅ الخروج من Fullscreen إذا كان نشطاً
-    if (document.fullscreenElement) {
-        document.exitFullscreen();
-    } else if (document.webkitFullscreenElement) {
-        document.webkitExitFullscreen();
-    }
+    if (img) { img.src = ''; img.style.transform = 'none'; }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { 
-        video.pause(); 
-        video.src = ''; 
-    }
-    // ✅ الخروج من Fullscreen إذا كان نشطاً
-    if (document.fullscreenElement) {
-        document.exitFullscreen();
-    } else if (document.webkitFullscreenElement) {
-        document.webkitExitFullscreen();
-    }
+    if (video) { video.pause(); video.src = ''; }
 };
 
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
-    
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    const width = img.naturalWidth || img.width || 800;
-    const height = img.naturalHeight || img.height || 600;
-    
-    canvas.width = width;
-    canvas.height = height;
-    
-    ctx.drawImage(img, 0, 0, width, height);
-    
-    canvas.toBlob(function(blob) {
-        if (!blob) {
-            const link = document.createElement('a');
-            link.href = img.src;
-            link.download = 'image.jpg';
-            link.click();
-            return;
-        }
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'image.jpg';
-        link.click();
-        URL.revokeObjectURL(link.href);
-    }, 'image/jpeg', 0.95);
+    const link = document.createElement('a');
+    link.href = img.src;
+    link.download = 'image.jpg';
+    link.click();
 };
 
 window.downloadPreviewVideo = function() {
