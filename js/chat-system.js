@@ -1140,13 +1140,10 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل - استخدام var(--bg)) ====================
+ // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
-    const div = document.createElement('div'); 
-    div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`; 
-    div.id = `msg-${msg.id}`;
     
     const formatDateTime = (dateObj) => {
         const year = dateObj.getFullYear();
@@ -1161,15 +1158,26 @@ displayMessage(msg) {
     };
     
     const dateTime = formatDateTime(new Date(msg.time));
-    
-    // تعريف borderColor حسب المرسل
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
+    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
+    const template = document.getElementById('messageWrapperTemplate');
+    let div;
+    if (template) {
+        div = template.content.cloneNode(true).firstElementChild;
+    } else {
+        // Fallback إذا لم يوجد القالب
+        div = document.createElement('div');
+        div.className = 'message';
+    }
+    
+    div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
+    div.id = `msg-${msg.id}`;
+    
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
-        
-        // ✅ استخدام var(--bg) و var(--text) لتتوافق مع الثيم
         contentDiv.style.cssText = `
             border: 1.5px solid ${borderColor};
             background: var(--bg);
@@ -1187,6 +1195,7 @@ displayMessage(msg) {
         contentDiv.appendChild(textSpan);
         div.appendChild(contentDiv);
         
+        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1197,7 +1206,9 @@ displayMessage(msg) {
             timeSeparator.textContent = dateTime;
             c.appendChild(timeSeparator);
         }
-    } 
+    }
+    
+    // ==================== معالجة الموقع ====================
     else if (msg.type === 'location') {
         let locationData = msg.data;
         let locationUrl = '';
@@ -1214,13 +1225,12 @@ displayMessage(msg) {
         const maxClicks = locationData.maxClicks;
         let clicksRemaining = locationData.clicksRemaining;
         
-        // استخدام القالب الثابت للموقع
-        const template = document.getElementById('locationMessageTemplate');
-        if (template) {
-            const clone = template.content.cloneNode(true);
+        // ✅ استخدام القالب الثابت للموقع
+        const templateLoc = document.getElementById('locationMessageTemplate');
+        if (templateLoc) {
+            const clone = templateLoc.content.cloneNode(true);
             const locationDiv = clone.querySelector('.location-card');
             if (locationDiv) {
-                // ✅ تثبيت الخلفية الخضراء
                 locationDiv.style.background = '#4CAF50';
                 
                 if (clicksRemaining !== undefined && clicksRemaining <= 0) {
@@ -1257,7 +1267,7 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback إذا لم يوجد القالب
+            // Fallback
             const locationDiv = document.createElement('div');
             locationDiv.style.cssText = `cursor: pointer; background: #4CAF50; border-radius: 12px; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid ${borderColor}; color: white; font-size: 1.2rem;`;
             if (clicksRemaining !== undefined && clicksRemaining <= 0) {
@@ -1283,11 +1293,12 @@ displayMessage(msg) {
             div.appendChild(locationDiv);
         }
     }
+    
+    // ==================== معالجة الصورة ====================
     else if (msg.type === 'image') {
-        // استخدام القالب الثابت للصورة
-        const template = document.getElementById('imageMessageTemplate');
-        if (template) {
-            const clone = template.content.cloneNode(true);
+        const templateImg = document.getElementById('imageMessageTemplate');
+        if (templateImg) {
+            const clone = templateImg.content.cloneNode(true);
             const wrapper = clone.querySelector('.message-image-wrapper');
             if (wrapper) {
                 wrapper.style.border = `2px solid ${borderColor}`;
@@ -1301,7 +1312,7 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback إذا لم يوجد القالب
+            // Fallback
             const img = document.createElement('img');
             img.src = msg.data;
             img.style.cssText = `max-width:200px; max-height:200px; border-radius:12px; border:2px solid ${borderColor}; cursor:pointer;`;
@@ -1310,39 +1321,39 @@ displayMessage(msg) {
             img.ondragstart = (e) => e.preventDefault();
             div.appendChild(img);
         }
-    } 
+    }
+    
+    // ==================== معالجة البصمة الصوتية ====================
     else if (msg.type === 'voice') {
-        // استخدام القالب الثابت للبصمة الصوتية
-        const template = document.getElementById('voiceMessageTemplate');
-        if (template) {
-            const clone = template.content.cloneNode(true);
+        const templateVoice = document.getElementById('voiceMessageTemplate');
+        if (templateVoice) {
+            const clone = templateVoice.content.cloneNode(true);
             const voiceMsg = clone.querySelector('.voice-message');
             if (voiceMsg) {
-                // ✅ تثبيت الخلفية الخضراء
                 voiceMsg.style.background = '#4CAF50';
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
                 if (audioEl && msg.data) {
                     audioEl.src = msg.data;
-                    // استخدام الدالة المساعدة لإعداد أزرار التحكم
                     this.setupVoiceControls(clone, audioEl);
                 }
             }
             div.appendChild(clone);
         } else {
-            // Fallback إذا لم يوجد القالب
+            // Fallback
             const audio = document.createElement('audio');
             audio.src = msg.data;
             audio.controls = true;
             audio.style.cssText = `max-width:250px; border-radius:20px; border:1.5px solid ${borderColor}; background: #4CAF50;`;
             div.appendChild(audio);
         }
-    } 
+    }
+    
+    // ==================== معالجة الفيديو ====================
     else if (msg.type === 'video') {
-        // استخدام القالب الثابت للفيديو
-        const template = document.getElementById('videoMessageTemplate');
-        if (template) {
-            const clone = template.content.cloneNode(true);
+        const templateVideo = document.getElementById('videoMessageTemplate');
+        if (templateVideo) {
+            const clone = templateVideo.content.cloneNode(true);
             const thumbnail = clone.querySelector('.video-thumbnail');
             if (thumbnail) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
@@ -1359,7 +1370,7 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback إذا لم يوجد القالب
+            // Fallback
             const video = document.createElement('video');
             video.src = msg.data;
             video.style.cssText = `max-width:250px; max-height:200px; border-radius:12px; border:2px solid ${borderColor}; cursor:pointer;`;
@@ -1367,15 +1378,15 @@ displayMessage(msg) {
             video.onclick = () => this.showVideoPreview(msg.data);
             div.appendChild(video);
         }
-    } 
+    }
+    
+    // ==================== معالجة الملف ====================
     else if (msg.type === 'file') {
-        // استخدام القالب الثابت للملف
-        const template = document.getElementById('fileMessageTemplate');
-        if (template) {
-            const clone = template.content.cloneNode(true);
+        const templateFile = document.getElementById('fileMessageTemplate');
+        if (templateFile) {
+            const clone = templateFile.content.cloneNode(true);
             const fileCard = clone.querySelector('.file-card');
             if (fileCard) {
-                // ✅ تثبيت الخلفية الخضراء
                 fileCard.style.background = '#4CAF50';
                 fileCard.style.border = `1.5px solid ${borderColor}`;
                 const fileNameEl = fileCard.querySelector('.file-name');
@@ -1395,7 +1406,7 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
         } else {
-            // Fallback إذا لم يوجد القالب
+            // Fallback
             const fileDiv = document.createElement('div');
             fileDiv.style.cssText = `background: #4CAF50; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 280px; border: 1.5px solid ${borderColor};`;
             fileDiv.innerHTML = `
@@ -1410,9 +1421,10 @@ displayMessage(msg) {
         }
     }
     
+    // ✅ إضافة الرسالة إلى الحاوية
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
-},                   
+},
 
 // ==================== القسم 26.1: showImagePreview ====================
 showImagePreview(imageSrc) {
