@@ -20,10 +20,18 @@ function clearStack() {
 }
 
 // ==================== القسم 2: تحميل المحادثات (معدل - استخدام القالب الثابت) ====================
+let chatsLoaded = false;
+
 async function loadChats() { 
     if (!window.auth || !window.auth.currentUser) return; 
     const list = document.getElementById('chatsList'); 
     if (!list) return; 
+    
+    // ✅ إذا كانت القائمة محملة مسبقاً، لا نعيد التحميل
+    if (chatsLoaded && list.children.length > 0) {
+        console.log('⏭️ قائمة المحادثات محملة مسبقاً، تخطي التحميل');
+        return;
+    }
     
     // ✅ استخدام القالب من ChatSystem
     const template = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
@@ -39,57 +47,57 @@ async function loadChats() {
         
         if (!friends.length) { 
             list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
+            chatsLoaded = true;
             return; 
         } 
         
-        // ✅ مسح القائمة قبل إعادة التعبئة
-        list.innerHTML = '';
-        
-        for (const fid of friends) { 
-            try { 
-                const fdoc = await window.db.collection('users').doc(fid).get(); 
-                if (fdoc.exists) { 
-                    const f = fdoc.data(); 
-                    const key = `chat_${fid}`; 
-                    let lm = 'اضغط لبدء المحادثة', lt = ''; 
-                    
-                    try { 
-                        const h = JSON.parse(localStorage.getItem(key)) || []; 
-                        if (h.length > 0) { 
-                            const l = h[h.length - 1]; 
-                            if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
-                            else if (l.type === 'image') lm = '📷 صورة'; 
-                            else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; 
-                            else if (l.type === 'video') lm = '🎥 فيديو'; 
-                            else if (l.type === 'file') lm = '📎 ملف'; 
-                            lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
-                        } 
-                    } catch (e) {} 
-                    
-                    // ✅ استخدام القالب الثابت بدلاً من إنشاء HTML
-                    const clone = template.content.cloneNode(true);
-                    const chatItem = clone.querySelector('.chat-item');
-                    
-                    // تعبئة البيانات
-                    const avatar = chatItem.querySelector('.chat-avatar-emoji');
-                    const name = chatItem.querySelector('.chat-info h4');
-                    const lastMsg = chatItem.querySelector('.last-message');
-                    const time = chatItem.querySelector('.chat-time');
-                    
-                    if (avatar) avatar.textContent = window.getEmojiForUser(f);
-                    if (name) name.textContent = f.name || 'مستخدم';
-                    if (lastMsg) lastMsg.textContent = lm;
-                    if (time) time.textContent = lt || '';
-                    
-                    // ربط حدث النقر
-                    chatItem.onclick = () => openChat(fid);
-                    
-                    list.appendChild(clone);
+        // ✅ لا نمسح القائمة، نضيف العناصر فقط إذا كانت فارغة
+        if (list.children.length === 0) {
+            for (const fid of friends) { 
+                try { 
+                    const fdoc = await window.db.collection('users').doc(fid).get(); 
+                    if (fdoc.exists) { 
+                        const f = fdoc.data(); 
+                        const key = `chat_${fid}`; 
+                        let lm = 'اضغط لبدء المحادثة', lt = ''; 
+                        
+                        try { 
+                            const h = JSON.parse(localStorage.getItem(key)) || []; 
+                            if (h.length > 0) { 
+                                const l = h[h.length - 1]; 
+                                if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
+                                else if (l.type === 'image') lm = '📷 صورة'; 
+                                else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; 
+                                else if (l.type === 'video') lm = '🎥 فيديو'; 
+                                else if (l.type === 'file') lm = '📎 ملف'; 
+                                lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
+                            } 
+                        } catch (e) {} 
+                        
+                        const clone = template.content.cloneNode(true);
+                        const chatItem = clone.querySelector('.chat-item');
+                        
+                        const avatar = chatItem.querySelector('.chat-avatar-emoji');
+                        const name = chatItem.querySelector('.chat-info h4');
+                        const lastMsg = chatItem.querySelector('.last-message');
+                        const time = chatItem.querySelector('.chat-time');
+                        
+                        if (avatar) avatar.textContent = window.getEmojiForUser(f);
+                        if (name) name.textContent = f.name || 'مستخدم';
+                        if (lastMsg) lastMsg.textContent = lm;
+                        if (time) time.textContent = lt || '';
+                        
+                        chatItem.onclick = () => openChat(fid);
+                        
+                        list.appendChild(clone);
+                    } 
+                } catch (e) {
+                    console.warn('خطأ في تحميل صديق:', e);
                 } 
-            } catch (e) {
-                console.warn('خطأ في تحميل صديق:', e);
             } 
-        } 
+        }
+        
+        chatsLoaded = true;
         
         // ✅ إذا لم تظهر أي عناصر، عرض رسالة فارغة
         if (list.children.length === 0) {
@@ -101,6 +109,17 @@ async function loadChats() {
         list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>حدث خطأ</h3><p>حاول تحديث الصفحة</p></div>`;
     } 
 }
+
+// ✅ دالة لتحديث قائمة المحادثات (إعادة تحميل كامل)
+function refreshChats() {
+    const list = document.getElementById('chatsList');
+    if (list) {
+        list.innerHTML = '';
+        chatsLoaded = false;
+        loadChats();
+    }
+}
+
 // ==================== القسم 3: إعداد مستمعي الواجهة ====================
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
@@ -142,7 +161,6 @@ window.sendMessage = () => {
             if (s) { 
                 inp.value = ''; 
                 inp.style.height = 'auto';
-                // ✅ تحديث الزر بعد الإرسال (يعود إلى وضع البصمة)
                 if (typeof window.toggleSendButton === 'function') {
                     window.toggleSendButton();
                 }
@@ -154,7 +172,6 @@ window.sendMessage = () => {
 window.handleMessageKeyPress = e => { 
     if (e.key === 'Enter' && !e.shiftKey) { 
         e.preventDefault(); 
-        // ✅ استخدام الزر الموحد
         if (typeof window.handleActionButton === 'function') {
             window.handleActionButton();
         } else {
@@ -165,7 +182,6 @@ window.handleMessageKeyPress = e => {
 
 // ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
 
-// متغيرات التسجيل العامة
 let _recordingTimer = null;
 let _recordingSeconds = 0;
 let _recordingChunks = [];
@@ -175,17 +191,15 @@ let _isRecording = false;
 let _audioUrl = null;
 let _audioElement = null;
 
-const MAX_RECORDING_SECONDS = 300; // 5 دقائق
-const WARNING_THRESHOLD = 280; // ✅ 4:40 (تم التغيير من 270 إلى 280)
+const MAX_RECORDING_SECONDS = 300;
+const WARNING_THRESHOLD = 280;
 
-// دالة تبديل الزر بين البصمة والإرسال
 window.toggleSendButton = function() {
     const input = document.getElementById('messageInput');
     const btn = document.getElementById('actionBtn');
     const recordingUI = document.getElementById('voiceRecordingUI');
     if (!input || !btn) return;
     
-    // إذا كانت واجهة التسجيل نشطة، نخفي الزر
     if (recordingUI && recordingUI.style.display === 'flex') {
         btn.style.display = 'none';
         return;
@@ -215,13 +229,11 @@ window.toggleSendButton = function() {
     btn.style.display = 'flex';
 };
 
-// دالة معالجة الضغط على الزر
 window.handleActionButton = function() {
     const input = document.getElementById('messageInput');
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
-    // إذا كانت واجهة التسجيل نشطة، لا تفعل شيء
     const recordingUI = document.getElementById('voiceRecordingUI');
     if (recordingUI && recordingUI.style.display === 'flex') return;
     
@@ -235,7 +247,6 @@ window.handleActionButton = function() {
     }
 };
 
-// ===== دالة تسجيل البصمة الصوتية (مع واجهة متقدمة) =====
 window.startVoiceRecording = function() {
     const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     if (!featuresEnabled) {
@@ -260,11 +271,9 @@ window.startVoiceRecording = function() {
     
     if (!recordingUI || !progressFill || !currentTimeEl) return;
     
-    // تنظيف أي تسجيل سابق
     if (_audioUrl) { URL.revokeObjectURL(_audioUrl); _audioUrl = null; }
     if (_audioElement) { _audioElement = null; }
     
-    // إظهار واجهة التسجيل وإخفاء حقل الكتابة والزر
     input.style.display = 'none';
     recordingUI.style.display = 'flex';
     recordingUI.classList.remove('warning');
@@ -273,13 +282,11 @@ window.startVoiceRecording = function() {
     sendBtn.style.display = 'none';
     cancelBtn.style.display = 'flex';
     
-    // ✅ زر الإيقاف (نفس زر actionBtn)
     btn.style.display = 'flex';
     btn.classList.add('recording');
     btn.innerHTML = '<i class="fas fa-stop"></i>';
     btn.title = 'إيقاف التسجيل';
     
-    // إعادة تعيين المؤقتات
     _recordingSeconds = 0;
     _recordingChunks = [];
     _recordingBlob = null;
@@ -288,7 +295,6 @@ window.startVoiceRecording = function() {
     maxTimeEl.textContent = '5:00';
     progressFill.style.width = '0%';
     
-    // بدء التسجيل
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
             _mediaRecorder = new MediaRecorder(stream);
@@ -301,25 +307,17 @@ window.startVoiceRecording = function() {
                 stream.getTracks().forEach(t => t.stop());
                 _isRecording = false;
                 
-                // إنشاء Blob للتسجيل
                 _recordingBlob = new Blob(_recordingChunks, { type: 'audio/webm' });
                 
-                // إنشاء رابط للاستماع
                 if (_audioUrl) URL.revokeObjectURL(_audioUrl);
                 _audioUrl = URL.createObjectURL(_recordingBlob);
                 
-                // ✅ إظهار زر التشغيل فوراً
                 playBtn.style.display = 'flex';
                 playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                
-                // ✅ إظهار زر الإرسال
                 sendBtn.style.display = 'flex';
-                
-                // ✅ إخفاء زر الإيقاف
                 btn.style.display = 'none';
                 btn.classList.remove('recording');
                 
-                // إيقاف المؤقت
                 if (_recordingTimer) {
                     clearInterval(_recordingTimer);
                     _recordingTimer = null;
@@ -328,13 +326,10 @@ window.startVoiceRecording = function() {
             
             _mediaRecorder.start();
             
-            // ✅ زر الإيقاف (الضغط على زر actionBtn أثناء التسجيل)
             btn.onclick = function() {
                 if (_mediaRecorder && _mediaRecorder.state === 'recording') {
                     _mediaRecorder.stop();
                     btn.onclick = window.handleActionButton;
-                    
-                    // ✅ إظهار زر الاستماع فوراً
                     playBtn.style.display = 'flex';
                     playBtn.innerHTML = '<i class="fas fa-play"></i>';
                     sendBtn.style.display = 'flex';
@@ -342,7 +337,6 @@ window.startVoiceRecording = function() {
                 }
             };
             
-            // بدء المؤقت
             if (_recordingTimer) clearInterval(_recordingTimer);
             _recordingTimer = setInterval(() => {
                 if (!_isRecording) return;
@@ -355,7 +349,6 @@ window.startVoiceRecording = function() {
                 const percent = (_recordingSeconds / MAX_RECORDING_SECONDS) * 100;
                 progressFill.style.width = Math.min(percent, 100) + '%';
                 
-                // ✅ التحذير عند 4:40 (280 ثانية)
                 if (_recordingSeconds >= WARNING_THRESHOLD) {
                     recordingUI.classList.add('warning');
                 }
@@ -372,7 +365,6 @@ window.startVoiceRecording = function() {
                 }
             }, 1000);
             
-            // ===== زر الإلغاء =====
             cancelBtn.onclick = () => {
                 if (_mediaRecorder && _mediaRecorder.state === 'recording') {
                     _mediaRecorder.stop();
@@ -384,7 +376,6 @@ window.startVoiceRecording = function() {
                 resetVoiceUI();
             };
             
-            // ===== زر التشغيل/الإيقاف المؤقت =====
             let isPlaying = false;
             playBtn.onclick = () => {
                 if (!_recordingBlob) return;
@@ -399,7 +390,6 @@ window.startVoiceRecording = function() {
                     return;
                 }
                 
-                // إنشاء عنصر الصوت للتشغيل
                 if (!_audioElement) {
                     _audioElement = new Audio(_audioUrl);
                     _audioElement.onended = () => {
@@ -413,7 +403,6 @@ window.startVoiceRecording = function() {
                 isPlaying = true;
             };
             
-            // ===== زر الإرسال =====
             sendBtn.onclick = () => {
                 if (_mediaRecorder && _mediaRecorder.state === 'recording') {
                     _mediaRecorder.stop();
@@ -423,14 +412,12 @@ window.startVoiceRecording = function() {
                     _recordingTimer = null;
                 }
                 
-                // إرسال البصمة
                 if (_recordingBlob && _recordingBlob.size > 0) {
                     ChatSystem.sendVoiceNote(_recordingBlob);
                 }
                 resetVoiceUI();
             };
             
-            // تنظيف عند مغادرة الصفحة
             const cleanup = () => {
                 if (_mediaRecorder && _mediaRecorder.state === 'recording') {
                     _mediaRecorder.stop();
@@ -458,7 +445,6 @@ window.startVoiceRecording = function() {
         });
 };
 
-// ===== دالة إعادة تعيين واجهة التسجيل =====
 function resetVoiceUI() {
     const input = document.getElementById('messageInput');
     const btn = document.getElementById('actionBtn');
@@ -506,7 +492,6 @@ function resetVoiceUI() {
     
     window.toggleSendButton();
 }
-
 
 // ==================== القسم 6: قائمة المرفقات ====================
 window.showAttachmentMenu = () => { 
@@ -670,7 +655,7 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات (المضافة) ====================
+// ==================== القسم 14: دوال إغلاق المعاينات ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
