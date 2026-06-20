@@ -2,7 +2,7 @@
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 // ✅ دالة مساعدة لإعداد زر التحميل (خارج كائن ChatSystem)
-function setupDownload(btn, chunkId, filename, fallbackUrl) {
+function setupDownload(btn, chunkId, filename, fallbackData) {
     if (!btn) return;
     btn.dataset.chunkId = chunkId;
     btn.dataset.filename = filename || 'ملف';
@@ -11,17 +11,37 @@ function setupDownload(btn, chunkId, filename, fallbackUrl) {
         const cid = this.dataset.chunkId;
         const fname = this.dataset.filename || 'ملف';
         let url = null;
+        let blobData = null;
+        
+        // ✅ البحث عن الـ blob في incomingFileInfo
         if (window.CallSystem?.incomingFileInfo?.[cid]) {
             const info = window.CallSystem.incomingFileInfo[cid];
-            url = info.blobUrl || (info.data && URL.createObjectURL(info.data));
-            if (url && !info.blobUrl) info.blobUrl = url;
+            if (info.data instanceof Blob) {
+                blobData = info.data;
+                url = URL.createObjectURL(info.data);
+            } else if (info.blobUrl) {
+                url = info.blobUrl;
+            }
         }
-        if (!url && fallbackUrl) url = fallbackUrl;
-        if (url?.startsWith('blob:')) {
+        
+        // ✅ إذا لم نجد، استخدم fallbackData (الـ Blob الأصلي)
+        if (!url && fallbackData instanceof Blob) {
+            blobData = fallbackData;
+            url = URL.createObjectURL(fallbackData);
+        }
+        
+        // ✅ إذا كان fallbackData هو URL، استخدمه مباشرة
+        if (!url && typeof fallbackData === 'string' && fallbackData.startsWith('blob:')) {
+            url = fallbackData;
+        }
+        
+        if (url) {
             const a = document.createElement('a');
             a.href = url;
             a.download = fname;
             a.click();
+            // ✅ تحرير الـ URL بعد التحميل
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
         } else {
             alert('⚠️ الملف غير متاح للتحميل');
         }
@@ -29,17 +49,6 @@ function setupDownload(btn, chunkId, filename, fallbackUrl) {
 }
 
 const ChatSystem = {
-    currentChat: null, messages: {},
-    friendInConversation: false,
-    
-    featuresEnabled: false,
-    featureRequestPending: false,
-    featureRequestReceived: false,
-    featureBlinkInterval: null,
-    
-    // ✅ قالب عنصر المحادثة (ثابت)
-    chatItemTemplate: null,
-    
     // ... باقي الكود ...
     
     // ==================== القسم 2.5: دالة تحديث زر التفعيل ====================
