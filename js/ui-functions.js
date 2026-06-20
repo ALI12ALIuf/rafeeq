@@ -19,20 +19,32 @@ function clearStack() {
     window._pageStack = [];
 }
 
-// ==================== القسم 2: تحميل المحادثات ====================
+// ==================== القسم 2: تحميل المحادثات (معدل - استخدام القالب الثابت) ====================
 async function loadChats() { 
     if (!window.auth || !window.auth.currentUser) return; 
     const list = document.getElementById('chatsList'); 
     if (!list) return; 
+    
+    // ✅ استخدام القالب من ChatSystem
+    const template = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
+    if (!template) {
+        console.warn('⚠️ قالب chatItemTemplate غير موجود');
+        return;
+    }
+    
     try { 
         const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); 
         if (!udoc.exists) return; 
         const friends = udoc.data().friends || []; 
+        
         if (!friends.length) { 
             list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
             return; 
         } 
-        let html = ''; 
+        
+        // ✅ مسح القائمة قبل إعادة التعبئة
+        list.innerHTML = '';
+        
         for (const fid of friends) { 
             try { 
                 const fdoc = await window.db.collection('users').doc(fid).get(); 
@@ -40,6 +52,7 @@ async function loadChats() {
                     const f = fdoc.data(); 
                     const key = `chat_${fid}`; 
                     let lm = 'اضغط لبدء المحادثة', lt = ''; 
+                    
                     try { 
                         const h = JSON.parse(localStorage.getItem(key)) || []; 
                         if (h.length > 0) { 
@@ -52,14 +65,42 @@ async function loadChats() {
                             lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
                         } 
                     } catch (e) {} 
-                    html += `<div class="chat-item" onclick="openChat('${fid}')"><div class="chat-avatar-emoji">${window.getEmojiForUser(f)}</div><div class="chat-info"><h4>${f.name || 'مستخدم'}</h4><p class="last-message">${lm}</p></div><div class="chat-meta"><span class="chat-time">${lt || ''}</span></div></div>`; 
+                    
+                    // ✅ استخدام القالب الثابت بدلاً من إنشاء HTML
+                    const clone = template.content.cloneNode(true);
+                    const chatItem = clone.querySelector('.chat-item');
+                    
+                    // تعبئة البيانات
+                    const avatar = chatItem.querySelector('.chat-avatar-emoji');
+                    const name = chatItem.querySelector('.chat-info h4');
+                    const lastMsg = chatItem.querySelector('.last-message');
+                    const time = chatItem.querySelector('.chat-time');
+                    
+                    if (avatar) avatar.textContent = window.getEmojiForUser(f);
+                    if (name) name.textContent = f.name || 'مستخدم';
+                    if (lastMsg) lastMsg.textContent = lm;
+                    if (time) time.textContent = lt || '';
+                    
+                    // ربط حدث النقر
+                    chatItem.onclick = () => openChat(fid);
+                    
+                    list.appendChild(clone);
                 } 
-            } catch (e) {} 
+            } catch (e) {
+                console.warn('خطأ في تحميل صديق:', e);
+            } 
         } 
-        list.innerHTML = html || `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`; 
-    } catch (e) {} 
+        
+        // ✅ إذا لم تظهر أي عناصر، عرض رسالة فارغة
+        if (list.children.length === 0) {
+            list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`;
+        }
+        
+    } catch (e) {
+        console.error('خطأ في loadChats:', e);
+        list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>حدث خطأ</h3><p>حاول تحديث الصفحة</p></div>`;
+    } 
 }
-
 // ==================== القسم 3: إعداد مستمعي الواجهة ====================
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
