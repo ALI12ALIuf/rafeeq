@@ -1260,6 +1260,7 @@ async sendFileDirect(file, type) {
     }
 },
 
+// ==================== 13.1 معالجة استلام الملفات (معدل - الاحتفاظ بالبيانات للتحميل المتكرر) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -1267,7 +1268,10 @@ handleChunkMessage(msg) {
             type: msg.type,
             fileName: msg.fileName,
             total: msg.total,
-            received: 0
+            received: 0,
+            blobUrl: null,      // ✅ لتخزين الـ Blob URL
+            data: null,         // ✅ لتخزين الـ Blob نفسه
+            chunks: []          // ✅ لتخزين الأجزاء مؤقتاً
         };
         ChatSystem.showProgressBar('جاري استلام الملف...', 0);
     }
@@ -1300,6 +1304,10 @@ handleChunkMessage(msg) {
         const blob = new Blob([fullBuffer], { type: mimeType });
         const objectUrl = URL.createObjectURL(blob);
         
+        // ✅ تخزين الـ Blob URL والبيانات للاستخدام المستقبلي
+        this.incomingFileInfo[msg.id].blobUrl = objectUrl;
+        this.incomingFileInfo[msg.id].data = blob;
+        
         const displayMsg = {
             id: msg.id,
             type: msg.type === 'location' ? 'text' : msg.type,
@@ -1307,7 +1315,8 @@ handleChunkMessage(msg) {
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _blobUrl: objectUrl
+            _blobUrl: objectUrl,
+            _chunkId: msg.id   // ✅ ربط الرسالة بالبيانات المخزنة
         };
         
         if (ChatSystem.currentChat) {
@@ -1315,11 +1324,16 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        delete this.incomingChunks[msg.id];
-        delete this.incomingFileInfo[msg.id];
+        // ✅ لا نحذف البيانات فوراً، بل نتركها للتحميل المتكرر
+        // سيتم تنظيفها عند إغلاق المحادثة أو عند تنظيف البيانات
+        // delete this.incomingChunks[msg.id];
+        // delete this.incomingFileInfo[msg.id];
+        
+        console.log(`✅ تم استلام الملف: ${msg.fileName || 'ملف'} (${msg.type})`);
     }
 },
 
+// ==================== 13.2 ضغط الصورة ====================
 compressImage(file) {
     return new Promise((resolve) => {
         const reader = new FileReader();
