@@ -461,22 +461,28 @@
     <div class="message"></div>
 </template>
 
-<!-- 5.1: قالب الصورة -->
+<!-- 5.1: قالب الصورة (معدل - إضافة زر تحميل) -->
 <template id="imageMessageTemplate">
-    <div class="message-image-wrapper">
+    <div class="message-image-wrapper" data-chunk-id="">
         <img class="message-image-content" src="" alt="صورة" loading="lazy">
+        <button class="download-btn-overlay" data-chunk-id="" data-filename="" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:36px;height:36px;color:white;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;z-index:5;">
+            <i class="fas fa-download"></i>
+        </button>
     </div>
 </template>
 
-<!-- 5.2: قالب الفيديو -->
+<!-- 5.2: قالب الفيديو (معدل - إضافة زر تحميل) -->
 <template id="videoMessageTemplate">
-    <div class="message-content video-thumbnail">
+    <div class="message-content video-thumbnail" data-chunk-id="">
         <video class="video-thumbnail-content" preload="metadata" playsinline>
             <source src="" type="video/mp4">
         </video>
         <div class="video-play-overlay">
             <i class="fas fa-expand"></i>
         </div>
+        <button class="download-btn-overlay" data-chunk-id="" data-filename="" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:36px;height:36px;color:white;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;z-index:5;">
+            <i class="fas fa-download"></i>
+        </button>
     </div>
 </template>
 
@@ -502,14 +508,14 @@
     </div>
 </template>
 
-<!-- 5.4: قالب الملف -->
+<!-- 5.4: قالب الملف (معدل - إضافة data-filename) -->
 <template id="fileMessageTemplate">
     <div class="message-content file-card">
         <div class="file-icon">📄</div>
         <div class="file-info">
             <div class="file-name"></div>
         </div>
-        <button class="download-file-btn">
+        <button class="download-file-btn" data-chunk-id="" data-filename="">
             <i class="fas fa-download"></i>
         </button>
     </div>
