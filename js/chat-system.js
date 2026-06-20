@@ -1683,7 +1683,7 @@ async sendImage(file) {
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         const result = await this.sendFileWithRetry(file, 'image');
         if (result && result.success && result.fileId) {
-            const msgId = result.fileId;  // ✅ استخدام نفس fileId
+            const msgId = result.fileId;
             const tempUrl = URL.createObjectURL(file);
             this.displayMessage({ 
                 id: msgId, 
@@ -1694,11 +1694,11 @@ async sendImage(file) {
                 time: new Date().toISOString(), 
                 status: 'sent', 
                 _blobUrl: tempUrl,
-                _chunkId: msgId  // ✅ ربط _chunkId
+                _chunkId: msgId
             });
         } else alert('فشل إرسال الصورة');
     }
-},
+},  // ✅ إضافة فاصلة
 
 // ==================== القسم 31: sendVideoFile (معدل - دعم _chunkId) ====================
 async sendVideoFile(file) { 
@@ -1728,7 +1728,7 @@ async sendVideoFile(file) {
         const result = await this.sendFileWithRetry(file, 'video');
         if (result && result.success && result.fileId) {
             try {
-                const msgId = result.fileId;  // ✅ استخدام نفس fileId
+                const msgId = result.fileId;
                 const tempUrl = URL.createObjectURL(file);
                 
                 this.displayMessage({ 
@@ -1740,12 +1740,12 @@ async sendVideoFile(file) {
                     time: new Date().toISOString(), 
                     status: 'sent', 
                     _blobUrl: tempUrl,
-                    _chunkId: msgId  // ✅ ربط _chunkId
+                    _chunkId: msgId
                 });
             } catch (error) { alert('فشل معالجة الفيديو'); }
         } else alert('فشل إرسال الفيديو');
     }
-},
+},  // ✅ إضافة فاصلة
 
 // ==================== القسم 32: sendFile (معدل - دعم _chunkId) ====================
 async sendFile(file) { 
@@ -1766,7 +1766,7 @@ async sendFile(file) {
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         const result = await this.sendFileWithRetry(file, 'file');
         if (result && result.success && result.fileId) {
-            const msgId = result.fileId;  // ✅ استخدام نفس fileId
+            const msgId = result.fileId;
             const tempUrl = URL.createObjectURL(file);
             this.displayMessage({ 
                 id: msgId, 
@@ -1777,11 +1777,11 @@ async sendFile(file) {
                 time: new Date().toISOString(), 
                 status: 'sent', 
                 _blobUrl: tempUrl,
-                _chunkId: msgId  // ✅ ربط _chunkId
+                _chunkId: msgId
             });
         } else alert('فشل إرسال الملف');
     }
-},
+},  // ✅ إضافة فاصلة
 
 // ==================== القسم 33: sendVoiceNote (معدل - دعم _chunkId) ====================
 async sendVoiceNote(audioBlob) { 
@@ -1802,7 +1802,7 @@ async sendVoiceNote(audioBlob) {
     if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
         const result = await this.sendFileWithRetry(audioBlob, 'voice');
         if (result && result.success && result.fileId) {
-            const msgId = result.fileId;  // ✅ استخدام نفس fileId
+            const msgId = result.fileId;
             const tempUrl = URL.createObjectURL(audioBlob);
             this.displayMessage({ 
                 id: msgId, 
@@ -1812,11 +1812,11 @@ async sendVoiceNote(audioBlob) {
                 time: new Date().toISOString(), 
                 status: 'sent', 
                 _blobUrl: tempUrl,
-                _chunkId: msgId  // ✅ ربط _chunkId
+                _chunkId: msgId
             });
         } else alert('فشل إرسال البصمة الصوتية');
     }
-},
+},  // ✅ إضافة فاصلة
 
     // ==================== القسم 34: shareLocationDirect ====================
     
