@@ -2007,8 +2007,7 @@ updateLastMessage(friendId, lastMessage) {
     }); 
 },
 
-
-   // ==================== القسم 37: closeChat ====================
+    // ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2028,12 +2027,27 @@ closeChat() {
         localStorage.setItem(key, JSON.stringify(filteredMessages));
         console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
         
+        // ✅ تنظيف Blob URLs من جميع العناصر
         document.querySelectorAll('img, video, audio').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
                 URL.revokeObjectURL(el.src);
                 el.src = '';
             }
         });
+        
+        // ✅ تنظيف بيانات الملفات المخزنة في CallSystem
+        if (typeof CallSystem !== 'undefined') {
+            if (CallSystem.incomingFileInfo) {
+                for (const id in CallSystem.incomingFileInfo) {
+                    if (CallSystem.incomingFileInfo[id].blobUrl) {
+                        URL.revokeObjectURL(CallSystem.incomingFileInfo[id].blobUrl);
+                    }
+                }
+            }
+            CallSystem.incomingChunks = {};
+            CallSystem.incomingFileInfo = {};
+            console.log('🧹 تم تنظيف بيانات الملفات المخزنة في CallSystem');
+        }
     }
     
     this.featuresEnabled = false;
@@ -2077,57 +2091,67 @@ closeChat() {
 },
 
     
-    // ==================== القسم 40: تنظيف بيانات المحادثة ====================
-    cleanConversationData(chatId, cleanAll = false) {
-        console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
-        
-        const key = `chat_${chatId}`;
-        if (cleanAll) {
-            localStorage.removeItem(key);
-            delete this.messages[chatId];
-            console.log('✅ تم مسح localStorage بالكامل');
-        } else {
-            const messages = this.messages[chatId] || [];
-            const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
-            this.messages[chatId] = textMessages;
-            localStorage.setItem(key, JSON.stringify(textMessages));
-            console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+   // ==================== القسم 40: تنظيف بيانات المحادثة ====================
+cleanConversationData(chatId, cleanAll = false) {
+    console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
+    
+    const key = `chat_${chatId}`;
+    if (cleanAll) {
+        localStorage.removeItem(key);
+        delete this.messages[chatId];
+        console.log('✅ تم مسح localStorage بالكامل');
+    } else {
+        const messages = this.messages[chatId] || [];
+        const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
+        this.messages[chatId] = textMessages;
+        localStorage.setItem(key, JSON.stringify(textMessages));
+        console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+    }
+    
+    // ✅ تنظيف Blob URLs من جميع العناصر
+    document.querySelectorAll('img, video, audio').forEach(el => {
+        if (el.src && el.src.startsWith('blob:')) {
+            URL.revokeObjectURL(el.src);
+            el.src = '';
         }
-        
-        document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
-                el.src = '';
+    });
+    
+    if (this.currentChat === chatId) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+        }
+    }
+    
+    // ✅ تنظيف بيانات الملفات المخزنة في CallSystem
+    if (typeof CallSystem !== 'undefined') {
+        if (CallSystem.incomingFileInfo) {
+            for (const id in CallSystem.incomingFileInfo) {
+                if (CallSystem.incomingFileInfo[id].blobUrl) {
+                    URL.revokeObjectURL(CallSystem.incomingFileInfo[id].blobUrl);
+                }
             }
-        });
-        
-        if (this.currentChat === chatId) {
-            const messagesContainer = document.getElementById('messagesContainer');
-            if (messagesContainer) {
-                messagesContainer.innerHTML = '';
-            }
         }
-        
-        if (typeof CallSystem !== 'undefined') {
-            CallSystem.incomingChunks = {};
-            CallSystem.incomingFileInfo = {};
-            CallSystem._callIceCandidates = [];
-            CallSystem._answerIceCandidates = [];
-        }
-        
-        this._pendingIceCandidates = [];
-        this._responseIceCandidates = [];
-        if (this._batchTimer) {
-            clearTimeout(this._batchTimer);
-            this._batchTimer = null;
-        }
-        if (this._responseBatchTimer) {
-            clearTimeout(this._responseBatchTimer);
-            this._responseBatchTimer = null;
-        }
-        
-        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
-    },
+        CallSystem.incomingChunks = {};
+        CallSystem.incomingFileInfo = {};
+        CallSystem._callIceCandidates = [];
+        CallSystem._answerIceCandidates = [];
+        console.log('🧹 تم تنظيف بيانات الملفات المخزنة في CallSystem');
+    }
+    
+    this._pendingIceCandidates = [];
+    this._responseIceCandidates = [];
+    if (this._batchTimer) {
+        clearTimeout(this._batchTimer);
+        this._batchTimer = null;
+    }
+    if (this._responseBatchTimer) {
+        clearTimeout(this._responseBatchTimer);
+        this._responseBatchTimer = null;
+    }
+    
+    console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
+}, 
     
     
     // ==================== القسم 38: escapeHtml ====================
@@ -2145,12 +2169,27 @@ function performGlobalCleanup() {
         CallSystem.cleanupDynamicElements();
     }
     
+    // ✅ تنظيف Blob URLs من جميع العناصر
     document.querySelectorAll('img, video, audio').forEach(el => {
         if (el.src && el.src.startsWith('blob:')) {
             URL.revokeObjectURL(el.src);
             el.src = '';
         }
     });
+    
+    // ✅ تنظيف بيانات الملفات المخزنة في CallSystem
+    if (typeof CallSystem !== 'undefined') {
+        if (CallSystem.incomingFileInfo) {
+            for (const id in CallSystem.incomingFileInfo) {
+                if (CallSystem.incomingFileInfo[id].blobUrl) {
+                    URL.revokeObjectURL(CallSystem.incomingFileInfo[id].blobUrl);
+                }
+            }
+        }
+        CallSystem.incomingChunks = {};
+        CallSystem.incomingFileInfo = {};
+        console.log('🧹 تم تنظيف بيانات الملفات المخزنة');
+    }
     
     const modals = ['incomingCall', 'audioCallUI', 'videoCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
     modals.forEach(id => {
@@ -2208,13 +2247,14 @@ function performGlobalCleanup() {
     console.log('✅ اكتمل التنظيف الشامل للموقع');
 }
 
+// ✅ تشغيل التنظيف عند تحميل الصفحة
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', performGlobalCleanup);
 } else {
     performGlobalCleanup();
 }
 
-// ✅ الحل النهائي والثابت للمتصفحات والهواتف عند ظهور واختفاء الكيبورد
+// ==================== القسم 42: تثبيت واجهة المحادثة عند ظهور الكيبورد ====================
 const initVisualViewportFix = () => {
     if (!window.visualViewport) return;
 
@@ -2237,13 +2277,14 @@ const initVisualViewportFix = () => {
     window.visualViewport.addEventListener('scroll', fixViewportHeight);
 };
 
+// ✅ تشغيل تثبيت الكيبورد عند تحميل الصفحة
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initVisualViewportFix);
 } else {
     initVisualViewportFix();
 }
 
-// 🛡️ تأمين شامل: منع سحب الواجهة بالخطأ للأعلى عند لمس الهيدر أو شريط الكتابة
+// ==================== القسم 43: منع سحب الواجهة بالخطأ عند لمس الهيدر أو شريط الكتابة ====================
 document.addEventListener('touchmove', function(e) {
     if (document.body.classList.contains('conversation-open')) {
         const isMessagesContainer = e.target.closest('.messages-container');
@@ -2253,13 +2294,14 @@ document.addEventListener('touchmove', function(e) {
     }
 }, { passive: false });
 
-// 🛡️ جدار حماية صارم: منع تكبير أو تصغير الموقع نهائياً بالإصبعين أو النقر المزدوج
+// ==================== القسم 44: منع تكبير أو تصغير الموقع بالإصبعين أو النقر المزدوج ====================
 document.addEventListener('touchstart', function (e) {
     if (e.touches.length > 1) {
         e.preventDefault();
     }
 }, { passive: false });
 
+// ==================== القسم 45: منع النقر المزدوج للتكبير ====================
 let lastTouchEnd = 0;
 document.addEventListener('touchend', function (e) {
     const now = (new Date()).getTime();
@@ -2268,3 +2310,4 @@ document.addEventListener('touchend', function (e) {
     }
     lastTouchEnd = now;
 }, { passive: false });
+
