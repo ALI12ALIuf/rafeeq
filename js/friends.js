@@ -291,55 +291,136 @@ function setupFriendRequestsListener(userId) {
     } catch (e) {}
 }
 
-// ==================== القسم 12: البحث عن مستخدم ====================
+// ==================== القسم 12: البحث عن مستخدم (معدل - استخدام القالب الثابت) ====================
 window.findUserById = async function() {
-    const inp = document.getElementById('searchInput'), rc = document.getElementById('searchResultsContainer');
+    const inp = document.getElementById('searchInput');
+    const rc = document.getElementById('searchResultsContainer');
     if (!inp || !rc) return;
+    
     const q = inp.value.trim();
     if (!q) { 
         rc.style.display = 'none'; 
         return; 
     }
-    rc.style.display = 'block'; 
-    rc.innerHTML = `<div style="text-align:center;padding:10px;">جاري البحث...</div>`;
+    
+    // ✅ إظهار حاوية النتائج وعرض "جاري البحث..."
+    rc.style.display = 'block';
+    rc.innerHTML = `<div style="text-align:center;padding:10px;color:var(--text-light);">جاري البحث...</div>`;
+    
+    // ✅ الحصول على القالب الثابت
+    const template = document.getElementById('searchResultTemplate');
+    if (!template) {
+        console.warn('⚠️ قالب searchResultTemplate غير موجود');
+        rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">حدث خطأ في البحث</div>`;
+        return;
+    }
+    
     try {
         const s = await window.db.collection('users').where('shareableId', '==', q).get();
+        
+        // ✅ حالة 1: لا يوجد مستخدم
         if (s.empty) { 
-            rc.innerHTML = `<div style="text-align:center;padding:15px;">لا يوجد مستخدم</div>`; 
+            rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">🔍 لا يوجد مستخدم بهذا المعرف</div>`; 
             return; 
         }
-        const u = s.docs[0].data(), uid = s.docs[0].id, cu = window.auth?.currentUser;
+        
+        const u = s.docs[0].data();
+        const uid = s.docs[0].id;
+        const cu = window.auth?.currentUser;
+        
+        // ✅ حالة 2: المستخدم هو نفسه (حساب شخصي)
         if (cu && uid === cu.uid) { 
-            rc.innerHTML = `<div style="text-align:center;padding:15px;">هذا حسابك الشخصي</div>`; 
+            rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">👤 هذا حسابك الشخصي</div>`; 
             return; 
         }
-        let btn = 'إضافة', dis = '';
+        
+        // ✅ تحديد حالة العلاقة مع المستخدم
+        let btnText = 'إضافة';
+        let btnDisabled = false;
+        let btnStyle = 'background:var(--primary);';
+        let isFriend = false;
+        let isPending = false;
+        let btnAction = null;
+        
         if (cu) { 
-            const me = await window.db.collection('users').doc(cu.uid).get(); 
-            if ((me.data().friends||[]).includes(uid)) { 
-                btn = 'أصدقاء'; 
-                dis = 'disabled style="opacity:0.5;"'; 
+            const me = await window.db.collection('users').doc(cu.uid).get();
+            const myFriends = me.data().friends || [];
+            
+            // ✅ حالة 3: المستخدم صديق بالفعل
+            if (myFriends.includes(uid)) { 
+                btnText = '💬 دردشة'; 
+                btnDisabled = false;
+                btnStyle = 'background:#4CAF50;';
+                isFriend = true;
+                btnAction = () => openChat(uid);
             } else { 
+                // ✅ التحقق من وجود طلب صداقة معلق
                 const er = await window.db.collection('friendRequests')
                     .where('from','==',cu.uid)
                     .where('to','==',uid)
                     .where('status','==','pending')
                     .get(); 
                 if (!er.empty) { 
-                    btn = 'طلب معلق'; 
-                    dis = 'disabled style="opacity:0.5;"'; 
-                } 
+                    btnText = '⏳ طلب معلق'; 
+                    btnDisabled = true;
+                    btnStyle = 'background:#888;cursor:not-allowed;';
+                    isPending = true;
+                    btnAction = null;
+                } else {
+                    // ✅ حالة 4: مستخدم جديد (يمكن إضافة)
+                    btnText = '➕ إضافة';
+                    btnDisabled = false;
+                    btnStyle = 'background:var(--primary);';
+                    btnAction = () => addNewFriend(uid);
+                }
             } 
+        } else {
+            // ✅ إذا لم يكن هناك مستخدم مسجل دخول
+            btnText = 'تسجيل دخول';
+            btnDisabled = true;
+            btnStyle = 'background:#888;cursor:not-allowed;';
+            btnAction = null;
         }
-        rc.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:8px;">
-            <div style="width:40px;height:40px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;">${getEmojiForUser(u)}</div>
-            <div style="flex:1;"><h4>${u.name}</h4><p style="color:var(--text-light);">${u.shareableId}</p></div>
-            ${cu?`<button onclick="addNewFriend('${uid}')" ${dis}>${btn}</button>`:''}
-        </div>`;
+        
+        // ✅ استخدام القالب الثابت لإنشاء النتيجة
+        const clone = template.content.cloneNode(true);
+        const resultItem = clone.querySelector('.search-result-item');
+        
+        // تعبئة البيانات
+        const avatar = resultItem.querySelector('.search-result-avatar');
+        const name = resultItem.querySelector('.search-result-info h4');
+        const idText = resultItem.querySelector('.search-result-info p');
+        const actionBtn = resultItem.querySelector('.search-action-btn');
+        
+        if (avatar) avatar.textContent = getEmojiForUser(u);
+        if (name) name.textContent = u.name || 'مستخدم';
+        if (idText) idText.textContent = u.shareableId || '';
+        
+        // إعداد الزر حسب الحالة
+        if (actionBtn) {
+            actionBtn.textContent = btnText;
+            actionBtn.style.cssText = `padding:6px 14px;border:none;border-radius:20px;${btnStyle}color:white;cursor:${btnDisabled ? 'not-allowed' : 'pointer'};font-size:0.85rem;`;
+            
+            if (btnDisabled) {
+                actionBtn.disabled = true;
+            }
+            
+            // ✅ ربط حدث الزر
+            if (btnAction) {
+                actionBtn.onclick = btnAction;
+            }
+        }
+        
+        // ✅ مسح النتائج السابقة وإضافة النتيجة الجديدة
+        rc.innerHTML = '';
+        rc.appendChild(clone);
+        
     } catch (e) { 
-        rc.innerHTML = `<div style="text-align:center;padding:15px;">حدث خطأ</div>`; 
+        console.error('خطأ في البحث:', e);
+        rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">❌ حدث خطأ في البحث</div>`; 
     }
 };
+    
 
 // ==================== القسم 13: إخفاء نتائج البحث ====================
 window.hideSearchResults = function() { 
