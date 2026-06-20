@@ -341,7 +341,8 @@ window.findUserById = async function() {
         const s = await window.db.collection('users').where('shareableId', '==', q).get();
         
         if (s.empty) { 
-            rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">🔍 لا يوجد مستخدم بهذا المعرف</div>`; 
+            // ✅ تعديل الرسالة هنا (بدون علامة 🔍)
+            rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">لا يوجد مستخدم ID</div>`; 
             return; 
         }
         
@@ -393,7 +394,6 @@ window.findUserById = async function() {
             const myFriends = me.data().friends || [];
             
             if (myFriends.includes(uid)) { 
-                // ✅ صديق: أيقونة دردشة (أزرق)
                 btnIcon = 'fa-comment';
                 btnDisabled = false;
                 btnStyle = 'background:var(--primary);color:white;';
@@ -405,13 +405,11 @@ window.findUserById = async function() {
                     .where('status','==','pending')
                     .get(); 
                 if (!er.empty) { 
-                    // ✅ طلب معلق: أيقونة ساعة (رمادي معطل)
                     btnIcon = 'fa-clock';
                     btnDisabled = true;
                     btnStyle = 'background:#555;color:#888;cursor:not-allowed;';
                     btnAction = null;
                 } else {
-                    // ✅ مستخدم جديد: علامة زائد (أزرق)
                     btnIcon = 'fa-plus';
                     btnDisabled = false;
                     btnStyle = 'background:var(--primary);color:white;';
@@ -422,7 +420,6 @@ window.findUserById = async function() {
                 }
             } 
         } else {
-            // ✅ غير مسجل دخول: قفل (رمادي معطل)
             btnIcon = 'fa-lock';
             btnDisabled = true;
             btnStyle = 'background:#555;color:#888;cursor:not-allowed;';
@@ -442,7 +439,6 @@ window.findUserById = async function() {
         if (idText) idText.textContent = u.shareableId || '';
         
         if (actionBtn) {
-            // ✅ زر بأيقونة فقط (بدون نص)
             actionBtn.innerHTML = `<i class="fas ${btnIcon}"></i>`;
             actionBtn.style.cssText = `padding:8px 12px;border:none;border-radius:20px;${btnStyle}font-size:1rem;cursor:${btnDisabled ? 'not-allowed' : 'pointer'};display:flex;align-items:center;justify-content:center;gap:4px;min-width:40px;`;
             
