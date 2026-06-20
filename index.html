@@ -64,44 +64,44 @@
         </div>
 
         <!-- ===== القسم 2.2.2: صفحة الدردشة (Chat) ===== -->
-<div class="page chat-page">
-    <div class="search-container">
-        <div class="search-box">
-            <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
-            <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
-        </div>
-        <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
-        
-        <!-- ✅ قالب نتيجة البحث (ثابت) -->
-        <template id="searchResultTemplate">
-            <div class="search-result-item" style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--card-bg);border-radius:var(--radius);margin-bottom:4px;">
-                <div class="search-result-avatar" style="width:40px;height:40px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;"></div>
-                <div class="search-result-info" style="flex:1;">
-                    <h4 style="margin:0;font-size:0.95rem;"></h4>
-                    <p style="margin:0;color:var(--text-light);font-size:0.8rem;"></p>
+        <div class="page chat-page">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
+                    <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
                 </div>
-                <div class="search-result-action">
-                    <button class="search-action-btn" style="padding:6px 14px;border:none;border-radius:20px;background:var(--primary);color:white;cursor:pointer;font-size:0.85rem;"></button>
+                <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
+                
+                <!-- ✅ قالب نتيجة البحث (ثابت) -->
+                <template id="searchResultTemplate">
+                    <div class="search-result-item" style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--card-bg);border-radius:var(--radius);margin-bottom:4px;">
+                        <div class="search-result-avatar" style="width:40px;height:40px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;"></div>
+                        <div class="search-result-info" style="flex:1;">
+                            <h4 style="margin:0;font-size:0.95rem;"></h4>
+                            <p style="margin:0;color:var(--text-light);font-size:0.8rem;"></p>
+                        </div>
+                        <div class="search-result-action">
+                            <button class="search-action-btn" style="padding:6px 14px;border:none;border-radius:20px;background:var(--primary);color:white;cursor:pointer;font-size:0.85rem;"></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div class="chats-list" id="chatsList"></div>
+            
+            <!-- ✅ قالب عنصر المحادثة (ثابت) -->
+            <template id="chatItemTemplate">
+                <div class="chat-item" onclick="">
+                    <div class="chat-avatar-emoji"></div>
+                    <div class="chat-info">
+                        <h4></h4>
+                        <p class="last-message"></p>
+                    </div>
+                    <div class="chat-meta">
+                        <span class="chat-time"></span>
+                    </div>
                 </div>
-            </div>
-        </template>
-    </div>
-    <div class="chats-list" id="chatsList"></div>
-    
-    <!-- ✅ قالب عنصر المحادثة (ثابت) -->
-    <template id="chatItemTemplate">
-        <div class="chat-item" onclick="">
-            <div class="chat-avatar-emoji"></div>
-            <div class="chat-info">
-                <h4></h4>
-                <p class="last-message"></p>
-            </div>
-            <div class="chat-meta">
-                <span class="chat-time"></span>
-            </div>
+            </template>
         </div>
-    </template>
-</div>
 
         <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
@@ -110,11 +110,10 @@
             <div class="conversation-header">
                 <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
                 
-                <!-- ===== القسم 2.2.3.1.1: معلومات المستخدم (تم إخفاء الاسم) ===== -->
+                <!-- ===== القسم 2.2.3.1.1: معلومات المستخدم ===== -->
                 <div class="conversation-user-info" style="gap:0;">
                     <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
                     <div class="conversation-user-details">
-                        <!-- ❌ تم إخفاء الاسم نهائياً -->
                         <h3 id="conversationName" style="display:none;"></h3>
                         <span class="conversation-status" id="conversationStatus" style="font-size:0.85rem;"></span>
                     </div>
@@ -154,26 +153,19 @@
                     <div class="input-area">
                         <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()">
                         
-                        <!-- ===== واجهة تسجيل البصمة (تظهر أثناء التسجيل) ===== -->
+                        <!-- ===== واجهة تسجيل البصمة ===== -->
                         <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
-                            <!-- شريط التقدم -->
                             <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; position:relative; overflow:hidden;">
                                 <div id="voiceProgressFill" style="width:0%; height:100%; background:var(--primary); border-radius:2px; transition:width 0.3s;"></div>
                             </div>
-                            
-                            <!-- العدادات -->
                             <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-family:monospace; direction:ltr; min-width:100px; justify-content:center;">
                                 <span id="voiceCurrentTime" style="color:var(--primary); font-weight:bold;">0:00</span>
                                 <span id="voiceSeparator" style="color:var(--primary);">/</span>
                                 <span id="voiceMaxTime" style="color:var(--primary);">5:00</span>
                             </div>
-                            
-                            <!-- ✅ زر تشغيل/إيقاف مؤقت (يظهر بعد التسجيل) -->
                             <button id="voicePlayBtn" style="display:none; width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:var(--primary); cursor:pointer; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s;">
                                 <i class="fas fa-play"></i>
                             </button>
-                            
-                            <!-- أزرار التحكم -->
                             <button id="voiceCancelBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#ff4444; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -183,19 +175,20 @@
                         </div>
                     </div>
                     
-                    <!-- ✅ زر واحد يتغير بين البصمة والإرسال -->
                     <button id="actionBtn" class="voice-btn" onclick="handleActionButton()">
                         <i class="fas fa-microphone"></i>
                     </button>
                 </div>
                 
-    <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
-<div class="attachment-menu" id="attachmentMenu" style="display: none;">
-    <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
-    <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
-    <button class="attach-option" onclick="sendFile()"><i class="fas fa-file"></i> ملف</button>
-    <button class="attach-option" onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
-</div>
+                <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
+                <div class="attachment-menu" id="attachmentMenu" style="display: none;">
+                    <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
+                    <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
+                    <button class="attach-option" onclick="sendFile()"><i class="fas fa-file"></i> ملف</button>
+                    <button class="attach-option" onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
+                </div>
+            </div>
+        </div>
 
         <!-- ===== القسم 2.2.4: صفحة الملف الشخصي (Profile) ===== -->
         <div class="page profile-page">
@@ -222,63 +215,62 @@
         </div>
 
         <!-- ===== القسم 2.2.5: الصفحات الفرعية للملف الشخصي ===== -->
-<div class="profile-pages">
-    <div class="profile-subpage" id="tripsPage" style="display: none;">
-        <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
-        <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
-    </div>
-    <div class="profile-subpage" id="friendsPage" style="display: none;">
-        <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friends">الأصدقاء</h3></div>
-        <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
-    </div>
-    <div class="profile-subpage" id="friendRequestsPage" style="display: none;">
-        <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friend_requests">طلبات الصداقة</h3></div>
-        <div class="users-list" id="friendRequestsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friend_requests">لا توجد طلبات</h3><p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p></div></div>
-    </div>
-    
-    <!-- ✅ قالب عنصر الصديق (ثابت) -->
-    <template id="friendItemTemplate">
-        <div class="user-item">
-            <div class="user-avatar-emoji"></div>
-            <div class="user-info">
-                <h4></h4>
-                <p></p>
+        <div class="profile-pages">
+            <div class="profile-subpage" id="tripsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
+                <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
             </div>
-            <div class="user-actions">
-                <button class="action-btn chat-btn" title="محادثة">
-                    <i class="fas fa-comment"></i>
-                </button>
-                <button class="action-btn remove-btn" title="حذف" style="background:var(--danger);color:white;">
-                    <i class="fas fa-user-minus"></i>
-                </button>
+            <div class="profile-subpage" id="friendsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friends">الأصدقاء</h3></div>
+                <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
             </div>
+            <div class="profile-subpage" id="friendRequestsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friend_requests">طلبات الصداقة</h3></div>
+                <div class="users-list" id="friendRequestsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friend_requests">لا توجد طلبات</h3><p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p></div></div>
+            </div>
+            
+            <!-- ✅ قالب عنصر الصديق (ثابت) -->
+            <template id="friendItemTemplate">
+                <div class="user-item">
+                    <div class="user-avatar-emoji"></div>
+                    <div class="user-info">
+                        <h4></h4>
+                        <p></p>
+                    </div>
+                    <div class="user-actions">
+                        <button class="action-btn chat-btn" title="محادثة">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                        <button class="action-btn remove-btn" title="حذف" style="background:var(--danger);color:white;">
+                            <i class="fas fa-user-minus"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- ✅ قالب طلب الصداقة (ثابت) -->
+            <template id="friendRequestTemplate">
+                <div class="user-item" id="">
+                    <div class="user-avatar-emoji"></div>
+                    <div class="user-info">
+                        <h4></h4>
+                        <p></p>
+                    </div>
+                    <div class="user-actions">
+                        <button class="action-btn accept-btn" style="background:var(--success);color:white;" title="قبول">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button class="action-btn reject-btn" style="background:var(--danger);color:white;" title="رفض">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
         </div>
-    </template>
-    
-    <!-- ✅ قالب طلب الصداقة (ثابت) -->
-    <template id="friendRequestTemplate">
-        <div class="user-item" id="">
-            <div class="user-avatar-emoji"></div>
-            <div class="user-info">
-                <h4></h4>
-                <p></p>
-            </div>
-            <div class="user-actions">
-                <button class="action-btn accept-btn" style="background:var(--success);color:white;" title="قبول">
-                    <i class="fas fa-check"></i>
-                </button>
-                <button class="action-btn reject-btn" style="background:var(--danger);color:white;" title="رفض">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        </div>
-    </template>
-</div>
 
         <!-- ===== القسم 2.2.6: صفحة الإعدادات (Settings) ===== -->
         <div class="page settings-page">
             <div class="settings-list">
-                <!-- ✅ تم حذف زر تبديل الثيم -->
                 <div class="settings-item" onclick="openLanguageModal()">
                     <div class="settings-item-left"><i class="fas fa-globe"></i><span data-i18n="language">اللغة</span></div>
                     <i class="fas fa-chevron-left"></i>
@@ -300,7 +292,7 @@
     </nav>
 </div>
 
-<!-- ==================== القسم 4: العناصر الثابتة (بدلاً من الإنشاء الديناميكي) ==================== -->
+<!-- ==================== القسم 4: العناصر الثابتة ==================== -->
 
 <!-- 4.1: شاشة المكالمة الواردة -->
 <div id="incomingCall" style="display:none; position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0e27;z-index:9999;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:system-ui,sans-serif;">
@@ -322,7 +314,7 @@
     </div>
 </div>
 
-<!-- 4.2: واجهة المكالمة الصوتية (ثابتة) -->
+<!-- 4.2: واجهة المكالمة الصوتية -->
 <div id="audioCallUI" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:#0a0e27;">
     <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;color:white;">
         <div id="callAvatar" style="font-size:6rem;margin-bottom:15px;animation:float 3s ease-in-out infinite;">👤</div>
@@ -344,7 +336,7 @@
     </div>
 </div>
 
-<!-- 4.3: واجهة المكالمة المرئية (ثابتة) -->
+<!-- 4.3: واجهة المكالمة المرئية -->
 <div id="videoCallUI" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:#0a0e27;">
     <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#0a0e27;"></video>
     <video id="localVideo" autoplay playsinline muted style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;border:3px solid rgba(255,255,255,0.3);cursor:pointer;box-shadow:0 5px 20px rgba(0,0,0,0.3);transition:all 0.3s ease;"></video>
@@ -464,11 +456,11 @@
 
 <!-- ==================== القسم 5: قوالب الرسائل الثابتة ==================== -->
 
-<!-- 5.0: قالب غلاف الرسالة (جديد) -->
+<!-- 5.0: قالب غلاف الرسالة -->
 <template id="messageWrapperTemplate">
     <div class="message"></div>
 </template>
-    
+
 <!-- 5.1: قالب الصورة -->
 <template id="imageMessageTemplate">
     <div class="message-image-wrapper">
