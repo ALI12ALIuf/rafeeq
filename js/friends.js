@@ -16,7 +16,6 @@ async function loadFriendsList(force = false) {
     const list = document.getElementById('friendsList'); 
     if (!list) return;
     
-    // ✅ إذا كانت القائمة محملة وليس هناك طلب إعادة تحميل، تخطى
     if (friendsLoaded && !force) {
         console.log('⏭️ قائمة الأصدقاء محملة مسبقاً، تخطي التحميل');
         return;
@@ -33,7 +32,6 @@ async function loadFriendsList(force = false) {
         if (!doc.exists) return;
         const friends = doc.data().friends || [];
         
-        // ✅ مسح القائمة فقط عند التحميل الأول أو التحديث
         list.innerHTML = '';
         
         if (!friends.length) { 
@@ -73,7 +71,6 @@ async function loadFriendsList(force = false) {
         
         friendsLoaded = true;
         
-        // ✅ إذا لم تظهر أي عناصر، عرض رسالة فارغة
         if (list.children.length === 0) {
             list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا يوجد أصدقاء</h3><p>لم تضف أي أصدقاء بعد</p></div>`;
         }
@@ -85,7 +82,6 @@ async function loadFriendsList(force = false) {
     }
 }
 
-// ✅ دالة لتحديث قائمة الأصدقاء (إعادة تحميل كامل)
 function refreshFriends() {
     friendsLoaded = false;
     loadFriendsList(true);
@@ -99,7 +95,7 @@ window.removeFriend = async function(friendId) {
         await window.db.collection('users').doc(uid).update({ friends: FieldValue.arrayRemove(friendId) }); 
         await window.db.collection('users').doc(friendId).update({ friends: FieldValue.arrayRemove(uid) }); 
         await updateFriendsCount(); 
-        refreshFriends(); // ✅ استخدام دالة التحديث بدلاً من التحميل العادي
+        refreshFriends();
         alert('تم حذف الصديق بنجاح'); 
     } catch (e) { 
         alert('حدث خطأ'); 
@@ -133,7 +129,6 @@ async function loadFriendRequests(force = false) {
     const list = document.getElementById('friendRequestsList'); 
     if (!list) return;
     
-    // ✅ إذا كانت القائمة محملة وليس هناك طلب إعادة تحميل، تخطى
     if (requestsLoaded && !force) {
         console.log('⏭️ قائمة طلبات الصداقة محملة مسبقاً، تخطي التحميل');
         return;
@@ -151,7 +146,6 @@ async function loadFriendRequests(force = false) {
             .where('status', '==', 'pending')
             .get();
             
-        // ✅ مسح القائمة فقط عند التحميل الأول أو التحديث
         list.innerHTML = '';
             
         if (s.empty) { 
@@ -197,7 +191,6 @@ async function loadFriendRequests(force = false) {
         
         requestsLoaded = true;
         
-        // ✅ إذا لم تظهر أي عناصر، عرض رسالة فارغة
         if (list.children.length === 0) {
             list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3><p>لم يرسل لك أحد طلب صداقة بعد</p></div>`;
         }
@@ -209,7 +202,6 @@ async function loadFriendRequests(force = false) {
     }
 }
 
-// ✅ دالة لتحديث قائمة طلبات الصداقة (إعادة تحميل كامل)
 function refreshRequests() {
     requestsLoaded = false;
     loadFriendRequests(true);
@@ -226,8 +218,8 @@ window.acceptFriendRequest = async function(requestId, senderId) {
         document.getElementById(`request-${requestId}`)?.remove();
         await updateFriendRequestsCount(); 
         await updateFriendsCount();
-        refreshFriends(); // ✅ تحديث قائمة الأصدقاء
-        refreshRequests(); // ✅ تحديث قائمة الطلبات
+        refreshFriends();
+        refreshRequests();
         if (!document.querySelectorAll('[id^="request-"]').length) {
             document.getElementById('friendRequestsList').innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3></div>`;
             requestsLoaded = true;
@@ -244,7 +236,7 @@ window.rejectFriendRequest = async function(requestId) {
         await window.db.collection('friendRequests').doc(requestId).update({ status: 'rejected', respondedAt: new Date() }); 
         document.getElementById(`request-${requestId}`)?.remove(); 
         await updateFriendRequestsCount(); 
-        refreshRequests(); // ✅ تحديث قائمة الطلبات
+        refreshRequests();
         if (!document.querySelectorAll('[id^="request-"]').length) {
             document.getElementById('friendRequestsList').innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3></div>`;
             requestsLoaded = true;
@@ -317,13 +309,13 @@ function setupFriendRequestsListener(userId) {
                 const c = document.getElementById('friendRequestsCount'); 
                 if (c) c.textContent = formatNumber(s.size); 
                 if (document.getElementById('friendRequestsPage')?.style.display === 'block') {
-                    refreshRequests(); // ✅ استخدام التحديث بدلاً من التحميل العادي
+                    refreshRequests();
                 }
             }); 
     } catch (e) {}
 }
 
-// ==================== القسم 12: البحث عن مستخدم (معدل - استخدام القالب الثابت) ====================
+// ==================== القسم 12: البحث عن مستخدم (معدل - أيقونات فقط) ====================
 window.findUserById = async function() {
     const inp = document.getElementById('searchInput');
     const rc = document.getElementById('searchResultsContainer');
@@ -357,16 +349,43 @@ window.findUserById = async function() {
         const uid = s.docs[0].id;
         const cu = window.auth?.currentUser;
         
-        if (cu && uid === cu.uid) { 
-            rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">👤 هذا حسابك الشخصي</div>`; 
-            return; 
+        // ✅ حساب شخصي: اسم + صورة + ID (بدون زر)
+        if (cu && uid === cu.uid) {
+            const clone = template.content.cloneNode(true);
+            const resultItem = clone.querySelector('.search-result-item');
+            
+            const avatar = resultItem.querySelector('.search-result-avatar');
+            const name = resultItem.querySelector('.search-result-info h4');
+            const idText = resultItem.querySelector('.search-result-info p');
+            const actionBtn = resultItem.querySelector('.search-action-btn');
+            
+            if (avatar) avatar.textContent = getEmojiForUser(u);
+            if (name) {
+                name.textContent = u.name || 'مستخدم';
+                name.style.color = 'var(--primary)';
+            }
+            if (idText) idText.textContent = u.shareableId || '';
+            
+            if (actionBtn) {
+                actionBtn.style.display = 'none';
+            }
+            
+            rc.innerHTML = '';
+            rc.appendChild(clone);
+            
+            setTimeout(() => {
+                if (rc.style.display !== 'none') {
+                    hideSearchResults();
+                }
+            }, 5000);
+            
+            return;
         }
         
-        let btnText = 'إضافة';
+        // ✅ تحديد حالة العلاقة مع المستخدم (للمستخدمين الآخرين)
+        let btnIcon = '';
         let btnDisabled = false;
-        let btnStyle = 'background:var(--primary);';
-        let isFriend = false;
-        let isPending = false;
+        let btnStyle = '';
         let btnAction = null;
         
         if (cu) { 
@@ -374,10 +393,10 @@ window.findUserById = async function() {
             const myFriends = me.data().friends || [];
             
             if (myFriends.includes(uid)) { 
-                btnText = '💬 دردشة'; 
+                // ✅ صديق: أيقونة دردشة (أزرق)
+                btnIcon = 'fa-comment';
                 btnDisabled = false;
-                btnStyle = 'background:#4CAF50;';
-                isFriend = true;
+                btnStyle = 'background:var(--primary);color:white;';
                 btnAction = () => openChat(uid);
             } else { 
                 const er = await window.db.collection('friendRequests')
@@ -386,22 +405,27 @@ window.findUserById = async function() {
                     .where('status','==','pending')
                     .get(); 
                 if (!er.empty) { 
-                    btnText = '⏳ طلب معلق'; 
+                    // ✅ طلب معلق: أيقونة ساعة (رمادي معطل)
+                    btnIcon = 'fa-clock';
                     btnDisabled = true;
-                    btnStyle = 'background:#888;cursor:not-allowed;';
-                    isPending = true;
+                    btnStyle = 'background:#555;color:#888;cursor:not-allowed;';
                     btnAction = null;
                 } else {
-                    btnText = '➕ إضافة';
+                    // ✅ مستخدم جديد: علامة زائد (أزرق)
+                    btnIcon = 'fa-plus';
                     btnDisabled = false;
-                    btnStyle = 'background:var(--primary);';
-                    btnAction = () => addNewFriend(uid);
+                    btnStyle = 'background:var(--primary);color:white;';
+                    btnAction = () => {
+                        addNewFriend(uid);
+                        hideSearchResults();
+                    };
                 }
             } 
         } else {
-            btnText = 'تسجيل دخول';
+            // ✅ غير مسجل دخول: قفل (رمادي معطل)
+            btnIcon = 'fa-lock';
             btnDisabled = true;
-            btnStyle = 'background:#888;cursor:not-allowed;';
+            btnStyle = 'background:#555;color:#888;cursor:not-allowed;';
             btnAction = null;
         }
         
@@ -418,8 +442,9 @@ window.findUserById = async function() {
         if (idText) idText.textContent = u.shareableId || '';
         
         if (actionBtn) {
-            actionBtn.textContent = btnText;
-            actionBtn.style.cssText = `padding:6px 14px;border:none;border-radius:20px;${btnStyle}color:white;cursor:${btnDisabled ? 'not-allowed' : 'pointer'};font-size:0.85rem;`;
+            // ✅ زر بأيقونة فقط (بدون نص)
+            actionBtn.innerHTML = `<i class="fas ${btnIcon}"></i>`;
+            actionBtn.style.cssText = `padding:8px 12px;border:none;border-radius:20px;${btnStyle}font-size:1rem;cursor:${btnDisabled ? 'not-allowed' : 'pointer'};display:flex;align-items:center;justify-content:center;gap:4px;min-width:40px;`;
             
             if (btnDisabled) {
                 actionBtn.disabled = true;
@@ -442,8 +467,12 @@ window.findUserById = async function() {
 // ==================== القسم 13: إخفاء نتائج البحث ====================
 window.hideSearchResults = function() { 
     const rc = document.getElementById('searchResultsContainer'); 
+    const inp = document.getElementById('searchInput');
     if (rc) { 
         rc.style.display = 'none'; 
         rc.innerHTML = ''; 
-    } 
+    }
+    if (inp) {
+        inp.value = '';
+    }
 };
