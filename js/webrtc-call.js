@@ -1211,7 +1211,7 @@ showCallUI(type) {
 async sendFileDirect(file, type) {
     if (!this.dc || this.dc.readyState !== 'open') {
         console.log('❌ Data Channel غير مفتوح');
-        return false;
+        return { success: false, fileId: null };
     }
     
     try {
@@ -1225,12 +1225,12 @@ async sendFileDirect(file, type) {
         const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize);
         const fileId = Date.now().toString();
         
-        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
+        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء) - ID: ${fileId}`);
         
         for (let i = 0; i < totalChunks; i++) {
             if (this.dc.readyState !== 'open') {
                 ChatSystem.hideProgressBar();
-                return false;
+                return { success: false, fileId: null };
             }
             const start = i * chunkSize;
             const end = Math.min(start + chunkSize, arrayBuffer.byteLength);
@@ -1251,12 +1251,12 @@ async sendFileDirect(file, type) {
             await new Promise(r => setTimeout(r, 50));
         }
         ChatSystem.hideProgressBar();
-        console.log('✅ تم إرسال الملف بنجاح');
-        return true;
+        console.log(`✅ تم إرسال الملف بنجاح مع ID: ${fileId}`);
+        return { success: true, fileId: fileId };  // ✅ إرجاع fileId
     } catch (e) {
         console.error('❌ فشل إرسال الملف:', e);
         ChatSystem.hideProgressBar();
-        return false;
+        return { success: false, fileId: null };
     }
 },
 
