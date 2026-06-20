@@ -22,18 +22,17 @@ function clearStack() {
 // ==================== القسم 2: تحميل المحادثات (معدل - استخدام القالب الثابت) ====================
 let chatsLoaded = false;
 
-async function loadChats() { 
+async function loadChats(force = false) { 
     if (!window.auth || !window.auth.currentUser) return; 
     const list = document.getElementById('chatsList'); 
     if (!list) return; 
     
-    // ✅ إذا كانت القائمة محملة مسبقاً، لا نعيد التحميل
-    if (chatsLoaded && list.children.length > 0) {
+    // ✅ إذا كانت القائمة محملة وليس هناك طلب إعادة تحميل، تخطى
+    if (chatsLoaded && !force) {
         console.log('⏭️ قائمة المحادثات محملة مسبقاً، تخطي التحميل');
         return;
     }
     
-    // ✅ استخدام القالب من ChatSystem
     const template = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
     if (!template) {
         console.warn('⚠️ قالب chatItemTemplate غير موجود');
@@ -45,57 +44,57 @@ async function loadChats() {
         if (!udoc.exists) return; 
         const friends = udoc.data().friends || []; 
         
+        // ✅ مسح القائمة فقط عند التحميل الأول أو التحديث
+        list.innerHTML = '';
+        
         if (!friends.length) { 
             list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
             chatsLoaded = true;
             return; 
         } 
         
-        // ✅ لا نمسح القائمة، نضيف العناصر فقط إذا كانت فارغة
-        if (list.children.length === 0) {
-            for (const fid of friends) { 
-                try { 
-                    const fdoc = await window.db.collection('users').doc(fid).get(); 
-                    if (fdoc.exists) { 
-                        const f = fdoc.data(); 
-                        const key = `chat_${fid}`; 
-                        let lm = 'اضغط لبدء المحادثة', lt = ''; 
-                        
-                        try { 
-                            const h = JSON.parse(localStorage.getItem(key)) || []; 
-                            if (h.length > 0) { 
-                                const l = h[h.length - 1]; 
-                                if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
-                                else if (l.type === 'image') lm = '📷 صورة'; 
-                                else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; 
-                                else if (l.type === 'video') lm = '🎥 فيديو'; 
-                                else if (l.type === 'file') lm = '📎 ملف'; 
-                                lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
-                            } 
-                        } catch (e) {} 
-                        
-                        const clone = template.content.cloneNode(true);
-                        const chatItem = clone.querySelector('.chat-item');
-                        
-                        const avatar = chatItem.querySelector('.chat-avatar-emoji');
-                        const name = chatItem.querySelector('.chat-info h4');
-                        const lastMsg = chatItem.querySelector('.last-message');
-                        const time = chatItem.querySelector('.chat-time');
-                        
-                        if (avatar) avatar.textContent = window.getEmojiForUser(f);
-                        if (name) name.textContent = f.name || 'مستخدم';
-                        if (lastMsg) lastMsg.textContent = lm;
-                        if (time) time.textContent = lt || '';
-                        
-                        chatItem.onclick = () => openChat(fid);
-                        
-                        list.appendChild(clone);
-                    } 
-                } catch (e) {
-                    console.warn('خطأ في تحميل صديق:', e);
+        for (const fid of friends) { 
+            try { 
+                const fdoc = await window.db.collection('users').doc(fid).get(); 
+                if (fdoc.exists) { 
+                    const f = fdoc.data(); 
+                    const key = `chat_${fid}`; 
+                    let lm = 'اضغط لبدء المحادثة', lt = ''; 
+                    
+                    try { 
+                        const h = JSON.parse(localStorage.getItem(key)) || []; 
+                        if (h.length > 0) { 
+                            const l = h[h.length - 1]; 
+                            if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
+                            else if (l.type === 'image') lm = '📷 صورة'; 
+                            else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; 
+                            else if (l.type === 'video') lm = '🎥 فيديو'; 
+                            else if (l.type === 'file') lm = '📎 ملف'; 
+                            lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
+                        } 
+                    } catch (e) {} 
+                    
+                    const clone = template.content.cloneNode(true);
+                    const chatItem = clone.querySelector('.chat-item');
+                    
+                    const avatar = chatItem.querySelector('.chat-avatar-emoji');
+                    const name = chatItem.querySelector('.chat-info h4');
+                    const lastMsg = chatItem.querySelector('.last-message');
+                    const time = chatItem.querySelector('.chat-time');
+                    
+                    if (avatar) avatar.textContent = window.getEmojiForUser(f);
+                    if (name) name.textContent = f.name || 'مستخدم';
+                    if (lastMsg) lastMsg.textContent = lm;
+                    if (time) time.textContent = lt || '';
+                    
+                    chatItem.onclick = () => openChat(fid);
+                    
+                    list.appendChild(clone);
                 } 
+            } catch (e) {
+                console.warn('خطأ في تحميل صديق:', e);
             } 
-        }
+        } 
         
         chatsLoaded = true;
         
@@ -107,17 +106,14 @@ async function loadChats() {
     } catch (e) {
         console.error('خطأ في loadChats:', e);
         list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>حدث خطأ</h3><p>حاول تحديث الصفحة</p></div>`;
+        chatsLoaded = true;
     } 
 }
 
 // ✅ دالة لتحديث قائمة المحادثات (إعادة تحميل كامل)
 function refreshChats() {
-    const list = document.getElementById('chatsList');
-    if (list) {
-        list.innerHTML = '';
-        chatsLoaded = false;
-        loadChats();
-    }
+    chatsLoaded = false;
+    loadChats(true);
 }
 
 // ==================== القسم 3: إعداد مستمعي الواجهة ====================
