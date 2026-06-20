@@ -1260,7 +1260,7 @@ async sendFileDirect(file, type) {
     }
 },
 
-// ==================== 13.1 معالجة استلام الملفات (معدل - الاحتفاظ بالبيانات للتحميل المتكرر) ====================
+// ==================== 13.1 معالجة استلام الملفات (معدل - تخزين Blob مباشرة) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -1269,7 +1269,6 @@ handleChunkMessage(msg) {
             fileName: msg.fileName,
             total: msg.total,
             received: 0,
-            blobUrl: null,      // ✅ لتخزين الـ Blob URL
             data: null,         // ✅ لتخزين الـ Blob نفسه
             chunks: []          // ✅ لتخزين الأجزاء مؤقتاً
         };
@@ -1302,20 +1301,18 @@ handleChunkMessage(msg) {
         else if (msg.type === 'voice') mimeType = 'audio/webm';
         
         const blob = new Blob([fullBuffer], { type: mimeType });
-        const objectUrl = URL.createObjectURL(blob);
         
-        // ✅ تخزين الـ Blob URL والبيانات للاستخدام المستقبلي
-        this.incomingFileInfo[msg.id].blobUrl = objectUrl;
+        // ✅ تخزين الـ Blob فقط (بدون URL)
         this.incomingFileInfo[msg.id].data = blob;
         
+        // ✅ displayMsg يحتوي على الـ Blob مباشرة
         const displayMsg = {
             id: msg.id,
             type: msg.type === 'location' ? 'text' : msg.type,
-            data: objectUrl,
+            data: blob,  // ✅ تخزين الـ Blob مباشرة
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _blobUrl: objectUrl,
             _chunkId: msg.id   // ✅ ربط الرسالة بالبيانات المخزنة
         };
         
@@ -1324,12 +1321,10 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        // ✅ لا نحذف البيانات فوراً، بل نتركها للتحميل المتكرر
+        // ✅ لا نحذف البيانات فوراً
         // سيتم تنظيفها عند إغلاق المحادثة أو عند تنظيف البيانات
-        // delete this.incomingChunks[msg.id];
-        // delete this.incomingFileInfo[msg.id];
         
-        console.log(`✅ تم استلام الملف: ${msg.fileName || 'ملف'} (${msg.type})`);
+        console.log(`✅ تم استلام الملف: ${msg.fileName || 'ملف'} (${msg.type}) - مخزن كـ Blob`);
     }
 },
 
