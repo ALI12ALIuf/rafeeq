@@ -874,70 +874,241 @@ resetFeatures() {
     }
 },
 
-// ==================== القسم 14: updateAllButtons ====================
-updateAllButtons() {
-    const canUse = (this.friendInConversation && this.featuresEnabled);
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+displayMessage(msg) {
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return;
     
-    // ✅ استخدام class="attach-option" بدلاً من data-dc
-    const btns = document.querySelectorAll('#attachmentMenu .attach-option');
-    btns.forEach(btn => { 
-        if (canUse) { 
-            btn.classList.remove('locked'); 
-            btn.title = ''; 
-            btn.style.opacity = '1';
-            btn.style.pointerEvents = 'auto';
-        } else { 
-            btn.classList.add('locked'); 
-            btn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
-            btn.style.opacity = '0.5';
-            btn.style.pointerEvents = 'none';
-        } 
-    });
+    const formatDateTime = (dateObj) => {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        let hours = dateObj.getHours();
+        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        const formattedHours = String(hours).padStart(2, '0');
+        return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
+    };
     
-    const audioCallBtn = document.querySelector('[onclick="startAudioCall()"]') || 
-                         document.querySelector('.audio-call-btn') ||
-                         document.querySelector('#audioCallBtn') ||
-                         document.querySelector('button[data-call="audio"]');
+    const dateTime = formatDateTime(new Date(msg.time));
+    const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
-                         document.querySelector('.video-call-btn') ||
-                         document.querySelector('#videoCallBtn') ||
-                         document.querySelector('button[data-call="video"]');
+    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
+    const template = document.getElementById('messageWrapperTemplate');
+    let div;
+    if (template) {
+        div = template.content.cloneNode(true).firstElementChild;
+    } else {
+        console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
+        return;
+    }
     
-    if (audioCallBtn) {
-        if (canUse) {
-            audioCallBtn.style.opacity = '1';
-            audioCallBtn.style.pointerEvents = 'auto';
-            audioCallBtn.title = 'مكالمة صوتية';
+    div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
+    div.id = `msg-${msg.id}`;
+    
+    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    if (msg.type === 'text') {
+        // ✅ استخدام القالب الثابت للرسالة النصية
+        const textTemplate = document.getElementById('textMessageTemplate');
+        if (textTemplate) {
+            const clone = textTemplate.content.cloneNode(true);
+            const contentDiv = clone.querySelector('.message-content');
+            const textSpan = contentDiv?.querySelector('.message-text');
+            
+            if (contentDiv) {
+                contentDiv.style.border = `1.5px solid ${borderColor}`;
+                contentDiv.style.background = 'var(--bg)';
+                contentDiv.style.color = 'var(--text)';
+            }
+            
+            if (textSpan) {
+                textSpan.innerHTML = this.escapeHtml(msg.text);
+            }
+            
+            div.appendChild(clone);
         } else {
-            audioCallBtn.style.opacity = '0.5';
-            audioCallBtn.style.pointerEvents = 'none';
-            audioCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            console.warn('⚠️ قالب textMessageTemplate غير موجود');
+        }
+        
+        // ✅ إضافة فاصل زمني كل 10 رسائل
+        const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
+        const currentMessageCount = existingTextMessages.length;
+        
+        if (currentMessageCount % 10 === 0) {
+            const timeSeparator = document.createElement('div');
+            timeSeparator.className = 'time-separator';
+            timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
+            timeSeparator.textContent = dateTime;
+            c.appendChild(timeSeparator);
         }
     }
     
-    if (videoCallBtn) {
-        if (canUse) {
-            videoCallBtn.style.opacity = '1';
-            videoCallBtn.style.pointerEvents = 'auto';
-            videoCallBtn.title = 'مكالمة فيديو';
+    // ==================== معالجة الموقع ====================
+    else if (msg.type === 'location') {
+        let locationData = msg.data;
+        let locationUrl = '';
+        
+        if (typeof locationData === 'object' && locationData.url) {
+            locationUrl = locationData.url;
+        } else if (typeof locationData === 'string') {
+            const match = locationData.match(/https?:\/\/[^\s]+/);
+            locationUrl = match ? match[0] : locationData;
         } else {
-            videoCallBtn.style.opacity = '0.5';
-            videoCallBtn.style.pointerEvents = 'none';
-            videoCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
+            locationUrl = '#';
+        }
+        
+        const maxClicks = locationData.maxClicks;
+        let clicksRemaining = locationData.clicksRemaining;
+        
+        const templateLoc = document.getElementById('locationMessageTemplate');
+        if (templateLoc) {
+            const clone = templateLoc.content.cloneNode(true);
+            const locationDiv = clone.querySelector('.location-card');
+            if (locationDiv) {
+                locationDiv.style.background = '#4CAF50';
+                
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                    locationDiv.style.background = '#888';
+                    locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                    locationDiv.style.border = 'none';
+                } else {
+                    locationDiv.style.border = `1.5px solid ${borderColor}`;
+                    locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
+                    locationDiv.onclick = (e) => {
+                        e.stopPropagation();
+                        if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
+                        window.open(locationUrl, '_blank');
+                        if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                            clicksRemaining--;
+                            msg.data.clicksRemaining = clicksRemaining;
+                            if (clicksRemaining <= 0) {
+                                locationDiv.style.background = '#888';
+                                locationDiv.style.cursor = 'default';
+                                locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                                locationDiv.onclick = () => {};
+                            }
+                            if (ChatSystem.currentChat) {
+                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                                const msgIndex = messages.findIndex(m => m.id === msg.id);
+                                if (msgIndex !== -1) {
+                                    messages[msgIndex].data.clicksRemaining = clicksRemaining;
+                                    ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                                }
+                            }
+                        }
+                    };
+                }
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب locationMessageTemplate غير موجود');
         }
     }
     
-    this.updateFeatureToggleUI();
-    this.updateKickButtonState();
-    
-    // ✅ تحديث زر الإجراء (بصمة/إرسال)
-    if (typeof window.toggleSendButton === 'function') {
-        window.toggleSendButton();
+    // ==================== معالجة الصورة ====================
+    else if (msg.type === 'image') {
+        const templateImg = document.getElementById('imageMessageTemplate');
+        if (templateImg) {
+            const clone = templateImg.content.cloneNode(true);
+            const wrapper = clone.querySelector('.message-image-wrapper');
+            if (wrapper) {
+                wrapper.style.border = `2px solid ${borderColor}`;
+                const img = wrapper.querySelector('.message-image-content');
+                if (img) {
+                    img.src = msg.data;
+                    img.onclick = () => this.showImagePreview(msg.data);
+                    img.oncontextmenu = (e) => e.preventDefault();
+                    img.ondragstart = (e) => e.preventDefault();
+                }
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب imageMessageTemplate غير موجود');
+        }
     }
     
-    console.log(`🎛️ تحديث الأزرار: friendInConversation=${this.friendInConversation}, featuresEnabled=${this.featuresEnabled}, canUse=${canUse}`);
+    // ==================== معالجة البصمة الصوتية ====================
+    else if (msg.type === 'voice') {
+        const templateVoice = document.getElementById('voiceMessageTemplate');
+        if (templateVoice) {
+            const clone = templateVoice.content.cloneNode(true);
+            const voiceMsg = clone.querySelector('.voice-message');
+            if (voiceMsg) {
+                voiceMsg.style.background = '#4CAF50';
+                voiceMsg.style.border = `1.5px solid ${borderColor}`;
+                const audioEl = voiceMsg.querySelector('.voice-audio-element');
+                if (audioEl && msg.data) {
+                    audioEl.src = msg.data;
+                    this.setupVoiceControls(clone, audioEl);
+                }
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
+        }
+    }
+    
+    // ==================== معالجة الفيديو ====================
+    else if (msg.type === 'video') {
+        const templateVideo = document.getElementById('videoMessageTemplate');
+        if (templateVideo) {
+            const clone = templateVideo.content.cloneNode(true);
+            const thumbnail = clone.querySelector('.video-thumbnail');
+            if (thumbnail) {
+                thumbnail.style.border = `2px solid ${borderColor}`;
+                const video = thumbnail.querySelector('.video-thumbnail-content');
+                const source = video?.querySelector('source');
+                if (source && msg.data) {
+                    source.src = msg.data;
+                    video.load();
+                }
+                thumbnail.onclick = (e) => {
+                    e.stopPropagation();
+                    this.showVideoPreview(msg.data);
+                };
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب videoMessageTemplate غير موجود');
+        }
+    }
+    
+    // ==================== معالجة الملف ====================
+    else if (msg.type === 'file') {
+        const templateFile = document.getElementById('fileMessageTemplate');
+        if (templateFile) {
+            const clone = templateFile.content.cloneNode(true);
+            const fileCard = clone.querySelector('.file-card');
+            if (fileCard) {
+                fileCard.style.background = '#4CAF50';
+                fileCard.style.border = `1.5px solid ${borderColor}`;
+                const fileNameEl = fileCard.querySelector('.file-name');
+                if (fileNameEl) {
+                    fileNameEl.textContent = msg.fileName || 'ملف';
+                }
+                const downloadBtn = fileCard.querySelector('.download-file-btn');
+                if (downloadBtn && msg.data) {
+                    downloadBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const link = document.createElement('a');
+                        link.href = msg.data;
+                        link.download = msg.fileName || 'ملف';
+                        link.click();
+                    };
+                }
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب fileMessageTemplate غير موجود');
+        }
+    }
+    
+    // ✅ إضافة الرسالة إلى الحاوية
+    c.appendChild(div); 
+    c.scrollTop = c.scrollHeight;
 },
+
 
 
    // ==================== القسم 15: closeConversation ====================
