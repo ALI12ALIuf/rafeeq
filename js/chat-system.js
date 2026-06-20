@@ -1,6 +1,33 @@
 // ========== chat-system.js - النسخة المعدلة (قوالب ثابتة + setupVoiceControls) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
+// ✅ دالة مساعدة لإعداد زر التحميل (خارج كائن ChatSystem)
+function setupDownload(btn, chunkId, filename, fallbackUrl) {
+    if (!btn) return;
+    btn.dataset.chunkId = chunkId;
+    btn.dataset.filename = filename || 'ملف';
+    btn.onclick = function(e) {
+        e.stopPropagation();
+        const cid = this.dataset.chunkId;
+        const fname = this.dataset.filename || 'ملف';
+        let url = null;
+        if (window.CallSystem?.incomingFileInfo?.[cid]) {
+            const info = window.CallSystem.incomingFileInfo[cid];
+            url = info.blobUrl || (info.data && URL.createObjectURL(info.data));
+            if (url && !info.blobUrl) info.blobUrl = url;
+        }
+        if (!url && fallbackUrl) url = fallbackUrl;
+        if (url?.startsWith('blob:')) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fname;
+            a.click();
+        } else {
+            alert('⚠️ الملف غير متاح للتحميل');
+        }
+    };
+}
+
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
@@ -12,6 +39,8 @@ const ChatSystem = {
     
     // ✅ قالب عنصر المحادثة (ثابت)
     chatItemTemplate: null,
+    
+    // ... باقي الكود ...
     
     // ==================== القسم 2.5: دالة تحديث زر التفعيل ====================
 updateFeatureToggleUI() {
@@ -1156,34 +1185,6 @@ setupVoiceControls(clone, audioEl) {
 
 
 // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
-
-// ✅ دالة مساعدة لإعداد زر التحميل (موحدة للصور والفيديو والملف)
-function setupDownload(btn, chunkId, filename, fallbackUrl) {
-    if (!btn) return;
-    btn.dataset.chunkId = chunkId;
-    btn.dataset.filename = filename || 'ملف';
-    btn.onclick = function(e) {
-        e.stopPropagation();
-        const cid = this.dataset.chunkId;
-        const fname = this.dataset.filename || 'ملف';
-        let url = null;
-        if (window.CallSystem?.incomingFileInfo?.[cid]) {
-            const info = window.CallSystem.incomingFileInfo[cid];
-            url = info.blobUrl || (info.data && URL.createObjectURL(info.data));
-            if (url && !info.blobUrl) info.blobUrl = url;
-        }
-        if (!url && fallbackUrl) url = fallbackUrl;
-        if (url?.startsWith('blob:')) {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fname;
-            a.click();
-        } else {
-            alert('⚠️ الملف غير متاح للتحميل');
-        }
-    };
-}
-
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1327,7 +1328,6 @@ displayMessage(msg) {
                     img.src = msg.data;
                     img.onclick = () => this.showImagePreview(msg.data);
                 }
-                // ✅ إعداد زر التحميل
                 const btn = wrapper.querySelector('.download-btn-overlay');
                 setupDownload(btn, msg.id, msg.fileName || 'صورة', msg.data);
             }
@@ -1373,13 +1373,11 @@ displayMessage(msg) {
                     source.src = msg.data;
                     video.load();
                 }
-                // منع تشغيل المعاينة عند الضغط على زر التحميل
                 thumbnail.onclick = (e) => {
                     if (!e.target.closest('.download-btn-overlay')) {
                         this.showVideoPreview(msg.data);
                     }
                 };
-                // ✅ إعداد زر التحميل
                 const btn = thumbnail.querySelector('.download-btn-overlay');
                 setupDownload(btn, msg.id, msg.fileName || 'فيديو', msg.data);
             }
@@ -1402,7 +1400,6 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                // ✅ إعداد زر التحميل
                 const btn = fileCard.querySelector('.download-file-btn');
                 setupDownload(btn, msg.id, msg.fileName || 'ملف', msg.data);
             }
