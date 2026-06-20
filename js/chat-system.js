@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1285,7 +1285,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - إزالة أكواد منع القائمة) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1297,8 +1297,7 @@ displayMessage(msg) {
                 if (img) {
                     img.src = msg.data;
                     img.onclick = () => this.showImagePreview(msg.data);
-                    img.oncontextmenu = (e) => e.preventDefault();
-                    img.ondragstart = (e) => e.preventDefault();
+                    // ✅ تم إزالة oncontextmenu و ondragstart
                 }
             }
             div.appendChild(clone);
@@ -1328,7 +1327,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (معدل - إزالة أكواد منع القائمة) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1346,6 +1345,7 @@ displayMessage(msg) {
                     e.stopPropagation();
                     this.showVideoPreview(msg.data);
                 };
+                // ✅ تم إزالة oncontextmenu و ondragstart و setAttribute والأنماط
             }
             div.appendChild(clone);
         } else {
