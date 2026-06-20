@@ -27,7 +27,6 @@ async function loadChats(force = false) {
     const list = document.getElementById('chatsList'); 
     if (!list) return; 
     
-    // ✅ إذا كانت القائمة محملة وليس هناك طلب إعادة تحميل، تخطى
     if (chatsLoaded && !force) {
         console.log('⏭️ قائمة المحادثات محملة مسبقاً، تخطي التحميل');
         return;
@@ -44,7 +43,6 @@ async function loadChats(force = false) {
         if (!udoc.exists) return; 
         const friends = udoc.data().friends || []; 
         
-        // ✅ مسح القائمة فقط عند التحميل الأول أو التحديث
         list.innerHTML = '';
         
         if (!friends.length) { 
@@ -98,7 +96,6 @@ async function loadChats(force = false) {
         
         chatsLoaded = true;
         
-        // ✅ إذا لم تظهر أي عناصر، عرض رسالة فارغة
         if (list.children.length === 0) {
             list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`;
         }
@@ -110,7 +107,6 @@ async function loadChats(force = false) {
     } 
 }
 
-// ✅ دالة لتحديث قائمة المحادثات (إعادة تحميل كامل)
 function refreshChats() {
     chatsLoaded = false;
     loadChats(true);
@@ -545,6 +541,10 @@ window.closeConversation = () => {
     CallSystem.endCall(); 
     ChatSystem.closeChat();
     
+    if (typeof window.hideSearchResults === 'function') {
+        window.hideSearchResults();
+    }
+    
     setTimeout(() => {
         const lastPage = popPage();
         
@@ -725,6 +725,11 @@ function setupNavigation() {
         document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); 
         document.body.classList.remove('profile-subpage-open'); 
         document.body.classList.remove('conversation-open'); 
+        
+        if (typeof window.hideSearchResults === 'function') {
+            window.hideSearchResults();
+        }
+        
         if (id === 'chat') loadChats(); 
         nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); 
     } 
