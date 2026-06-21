@@ -1463,17 +1463,21 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview (معدل - تخزين _blobData) ====================
+// ==================== القسم 26.1: showImagePreview (معدل - إنشاء رابط جديد من _blobData) ====================
 showImagePreview(imageSrc, blobData, mimeType) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (!modal || !img) return;
     
-    img.src = imageSrc;
-    // ✅ تخزين البيانات في عنصر المعاينة للاستخدام عند التحميل
+    // ✅ إذا كانت هناك بيانات خام، أنشئ رابط جديد للمعاينة
     if (blobData) {
+        const blob = new Blob([blobData], { type: mimeType || 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+        img.src = url;
         img._blobData = blobData;
         img._mimeType = mimeType || 'image/jpeg';
+    } else {
+        img.src = imageSrc;
     }
     
     modal.style.display = 'flex';
@@ -1641,7 +1645,7 @@ downloadPreviewVideo() {
     link.download = 'video.mp4';
     link.click();
 },
-    
+
 
     // ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
