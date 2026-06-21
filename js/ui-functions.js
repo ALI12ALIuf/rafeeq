@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة المعدلة (مع دوال إغلاق المعاينات) ==========
+// ========== ui-functions.js - النسخة المعدلة (Base64) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -263,7 +263,11 @@ window.startVoiceRecording = function() {
     
     if (!recordingUI || !progressFill || !currentTimeEl) return;
     
-    if (_audioUrl) { URL.revokeObjectURL(_audioUrl); _audioUrl = null; }
+    // ✅ إزالة أي URL سابق (لن نستخدم Blob URL بعد الآن)
+    if (_audioUrl) { 
+        try { URL.revokeObjectURL(_audioUrl); } catch(e) {}
+        _audioUrl = null; 
+    }
     if (_audioElement) { _audioElement = null; }
     
     input.style.display = 'none';
@@ -301,8 +305,12 @@ window.startVoiceRecording = function() {
                 
                 _recordingBlob = new Blob(_recordingChunks, { type: 'audio/webm' });
                 
-                if (_audioUrl) URL.revokeObjectURL(_audioUrl);
-                _audioUrl = URL.createObjectURL(_recordingBlob);
+                // ✅ استخدام Base64 بدلاً من Blob URL
+                if (_audioUrl) { 
+                    try { URL.revokeObjectURL(_audioUrl); } catch(e) {}
+                    _audioUrl = null; 
+                }
+                // سنقوم بتحويل إلى Base64 عند الإرسال
                 
                 playBtn.style.display = 'flex';
                 playBtn.innerHTML = '<i class="fas fa-play"></i>';
@@ -382,17 +390,24 @@ window.startVoiceRecording = function() {
                     return;
                 }
                 
-                if (!_audioElement) {
-                    _audioElement = new Audio(_audioUrl);
-                    _audioElement.onended = () => {
-                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                        isPlaying = false;
-                    };
-                }
-                
-                _audioElement.play();
-                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                isPlaying = true;
+                // ✅ استخدام Base64 بدلاً من Blob URL
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64 = e.target.result;
+                    if (!_audioElement) {
+                        _audioElement = new Audio(base64);
+                        _audioElement.onended = () => {
+                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                            isPlaying = false;
+                        };
+                    } else {
+                        _audioElement.src = base64;
+                    }
+                    _audioElement.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                    isPlaying = true;
+                };
+                reader.readAsDataURL(_recordingBlob);
             };
             
             sendBtn.onclick = () => {
@@ -423,7 +438,7 @@ window.startVoiceRecording = function() {
                     _audioElement = null;
                 }
                 if (_audioUrl) {
-                    URL.revokeObjectURL(_audioUrl);
+                    try { URL.revokeObjectURL(_audioUrl); } catch(e) {}
                     _audioUrl = null;
                 }
                 resetVoiceUI();
@@ -468,7 +483,7 @@ function resetVoiceUI() {
         _audioElement = null;
     }
     if (_audioUrl) {
-        URL.revokeObjectURL(_audioUrl);
+        try { URL.revokeObjectURL(_audioUrl); } catch(e) {}
         _audioUrl = null;
     }
     
