@@ -1307,7 +1307,10 @@ handleChunkMessage(msg) {
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _blobUrl: objectUrl
+            _blobUrl: objectUrl,
+            // ✅ تخزين البيانات الخام للاستخدام لاحقاً
+            _blobData: fullBuffer,
+            _mimeType: mimeType
         };
         
         if (ChatSystem.currentChat) {
