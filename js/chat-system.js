@@ -1026,6 +1026,10 @@ openChat(friendId, friendName, friendAvatar) {
     if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
     document.querySelector('.chat-page').style.display = 'none'; 
     document.getElementById('conversationPage').style.display = 'flex';
+    
+    // ✅ تحميل الرسائل النصية من localStorage إلى this.messages
+    this.loadChatMessages(friendId);
+    
     this.displayMessages(friendId);
     
     setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
@@ -1053,23 +1057,43 @@ openChat(friendId, friendName, friendAvatar) {
         }
     }, 1000);
 },
-    
-    
-// ==================== القسم 25: displayMessages ====================
-    displayMessages(friendId) { 
-        const c = document.getElementById('messagesContainer'); 
-        if (!c) return; 
-        c.innerHTML = ''; 
-        const messages = this.messages[friendId] || [];
-        
-        messages.forEach(msg => {
+
+// ==================== القسم 23.1: loadChatMessages (جديد) ====================
+loadChatMessages(friendId) {
+    const key = `chat_${friendId}`;
+    try {
+        const stored = JSON.parse(localStorage.getItem(key)) || [];
+        if (!this.messages[friendId]) {
+            this.messages[friendId] = [];
+        }
+        stored.forEach(msg => {
             if (msg.type === 'text') {
-                this.displayMessage(msg);
+                const existingIndex = this.messages[friendId].findIndex(m => m.id === msg.id);
+                if (existingIndex === -1) {
+                    this.messages[friendId].push(msg);
+                }
             }
         });
-        
-        c.scrollTop = c.scrollHeight;
-    },
+    } catch (e) {
+        console.warn('⚠️ فشل تحميل الرسائل:', e);
+    }
+},
+    
+    
+// ==================== القسم 25: displayMessages (معدل) ====================
+displayMessages(friendId) { 
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return; 
+    c.innerHTML = ''; 
+    const messages = this.messages[friendId] || [];
+    
+    // ✅ عرض جميع أنواع الرسائل
+    messages.forEach(msg => {
+        this.displayMessage(msg);
+    });
+    
+    c.scrollTop = c.scrollHeight;
+},
 
 // ==================== القسم 26.0: setupVoiceControls (دالة مساعدة للبصمة الصوتية) ====================
 setupVoiceControls(clone, audioEl) {
@@ -2006,12 +2030,9 @@ setupLocationSwipe(locationData) {
     
     
     // ==================== القسم 35: saveMessage ====================
-    saveMessage(friendId, message) { 
-        if (message.type !== 'text') {
-            console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
-            return;
-        }
-        
+saveMessage(friendId, message) { 
+    // ✅ حفظ النصوص فقط في localStorage
+    if (message.type === 'text') {
         const key = `chat_${friendId}`; 
         let messages = []; 
         try { 
@@ -2045,9 +2066,19 @@ setupLocationSwipe(locationData) {
                 } catch (e3) {}
             }
         }
-        
-        this.messages[friendId] = messages; 
-    },
+    }
+    
+    // ✅ تخزين جميع الرسائل في this.messages (مع _blobData)
+    if (!this.messages[friendId]) {
+        this.messages[friendId] = [];
+    }
+    const existingIndex = this.messages[friendId].findIndex(m => m.id === message.id);
+    if (existingIndex === -1) {
+        this.messages[friendId].push(message);
+    } else {
+        this.messages[friendId][existingIndex] = message;
+    }
+},
     
 
    // ==================== القسم 36: updateLastMessage ====================
