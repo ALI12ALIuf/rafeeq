@@ -1277,7 +1277,7 @@ blobToBase64(blob) {
     });
 },
 
-// ==================== 9.4.1 معالجة أجزاء الملفات (معدل - دعم الملفات المتعددة + حفظ مؤقت) ====================
+// ==================== 9.4.1 معالجة أجزاء الملفات (معدل - استخدام _base64Data فقط) ====================
 
 handleChunkMessage(msg) {
     // ✅ استخدام msg.id كمفتاح فريد لكل ملف
@@ -1290,7 +1290,7 @@ handleChunkMessage(msg) {
             fileName: msg.fileName,
             total: msg.total,
             received: 0,
-            isComplete: false  // ✅ إضافة علامة للإكتمال
+            isComplete: false
         };
         ChatSystem.showProgressBar('جاري استلام الملف...', 0);
     }
@@ -1307,35 +1307,25 @@ handleChunkMessage(msg) {
     if (this.incomingFileInfo[fileId].received === msg.total) {
         const fullBase64 = this.incomingChunks[fileId];
         
-        // تحديد نوع MIME
+        // ✅ تحديد نوع MIME
         let mimeType = 'application/octet-stream';
-        let dataPrefix = '';
-        if (msg.type === 'image') {
-            mimeType = 'image/jpeg';
-            dataPrefix = 'data:image/jpeg;base64,';
-        } else if (msg.type === 'video') {
-            mimeType = 'video/mp4';
-            dataPrefix = 'data:video/mp4;base64,';
-        } else if (msg.type === 'voice') {
-            mimeType = 'audio/webm';
-            dataPrefix = 'data:audio/webm;base64,';
-        } else if (msg.type === 'file') {
-            dataPrefix = 'data:application/octet-stream;base64,';
-        }
+        if (msg.type === 'image') mimeType = 'image/jpeg';
+        else if (msg.type === 'video') mimeType = 'video/mp4';
+        else if (msg.type === 'voice') mimeType = 'audio/webm';
+        else if (msg.type === 'file') mimeType = 'application/octet-stream';
         
-        const dataUrl = dataPrefix + fullBase64;
-        
-        // ✅ عرض الرسالة مع علامة _temp: true (مؤقتة)
+        // ✅ ✅ ✅ إنشاء الرسالة مع _base64Data فقط (بدون data: prefix)
         const displayMsg = {
             id: msg.id,
             type: msg.type,
-            data: dataUrl,
+            _base64Data: fullBase64,          // ✅ البيانات النقية فقط (بدون prefix)
+            _mimeType: mimeType,               // ✅ نوع الملف
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
             _isBase64: true,
-            _fileId: fileId,     // ✅ حفظ معرف الملف
-            _temp: true          // ✅ ✅ ✅ علامة مؤقتة (سيتم مسحها عند الإغلاق)
+            _fileId: fileId,
+            _temp: true                        // ✅ علامة مؤقتة (سيتم مسحها عند الإغلاق)
         };
         
         // ✅ ✅ ✅ حفظ في localStorage فوراً (كمؤقت)
@@ -1345,9 +1335,13 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        // ✅ ✅ ✅ لا نحذف أي شيء من الذاكرة المؤقتة هنا
-        // سيتم التنظيف عند إغلاق المحادثة أو إنهاء المكالمة أو تحديث الصفحة
-        console.log(`📦 تم استلام الملف بالكامل: ${fileId} - تم حفظه مؤقتاً في localStorage`);
+        // ✅ ✅ ✅ تنظيف الذاكرة المؤقتة فقط (وليس localStorage)
+        setTimeout(() => {
+            delete this.incomingChunks[fileId];
+            delete this.incomingFileInfo[fileId];
+        }, 5000);
+        
+        console.log(`📦 تم استلام الملف بالكامل: ${fileId} - تم حفظه مؤقتاً في localStorage (بدون data: prefix)`);
     }
 },
 
@@ -1386,6 +1380,7 @@ compressImage(file) {
         reader.readAsDataURL(file);
     });
 },
+
 
 // ==================== 14. إنهاء المكالمة (معدل - تستخدم واجهات ثابتة) ====================
     
