@@ -1342,17 +1342,19 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        // ✅ ✅ ✅ الحل الأساسي: لا نحذف الملف فوراً، بل نؤجل الحذف
-        // نضع علامة اكتمال ونحذف بعد 5 ثواني (لإعطاء وقت للملف التالي)
-        this.incomingFileInfo[fileId].isComplete = true;
-        
-        // ✅ حذف الملف بعد 5 ثواني (وليس فوراً)
-        setTimeout(() => {
-            delete this.incomingChunks[fileId];
-            delete this.incomingFileInfo[fileId];
-            console.log(`🧹 تم تنظيف بيانات الملف: ${fileId}`);
-        }, 5000);
+        // ✅ ✅ ✅ البيانات تبقى في الذاكرة المؤقتة
+        // لا نحذف أي شيء هنا!
+        // سيتم التنظيف عند إغلاق المحادثة أو إنهاء المكالمة أو تحديث الصفحة
+        console.log(`📦 تم استلام الملف بالكامل: ${fileId} - سيتم الاحتفاظ به مؤقتاً`);
     }
+},
+
+// ✅ دالة لتنظيف الذاكرة المؤقتة للملفات
+clearIncomingChunks() {
+    const count = Object.keys(this.incomingChunks).length;
+    this.incomingChunks = {};
+    this.incomingFileInfo = {};
+    console.log(`🧹 تم تنظيف الذاكرة المؤقتة للملفات (${count} ملف)`);
 },
 
 compressImage(file) {
@@ -1387,6 +1389,9 @@ compressImage(file) {
     
     endCall() {
         console.log('📞 إنهاء المكالمة...');
+        
+        // ✅ تنظيف الذاكرة المؤقتة عند إنهاء المكالمة
+        this.clearIncomingChunks();
         
         if (this.currentCallId && ChatSystem.currentChat) {
             this.sendSignal(ChatSystem.currentChat, { type: 'call_ended' });
