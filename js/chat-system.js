@@ -1153,7 +1153,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
-// ==================== القسم 26: displayMessage (معدل - Base64) ====================
+// ==================== القسم 26: displayMessage (معدل - استخدام _base64Data) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1283,7 +1283,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (Base64) ====================
+    // ==================== معالجة الصورة (باستخدام _base64Data) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1292,12 +1292,17 @@ displayMessage(msg) {
             if (wrapper) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
-                if (img) {
-                    // ✅ استخدام Base64 مباشرة (msg.data يحتوي على data:image/jpeg;base64,...)
-                    img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                if (img && msg._base64Data) {
+                    // ✅ استخدام _base64Data + _mimeType بدلاً من msg.data
+                    const dataUrl = `data:${msg._mimeType || 'image/jpeg'};base64,${msg._base64Data}`;
+                    img.src = dataUrl;
+                    img.onclick = () => this.showImagePreview(msg._base64Data, msg._mimeType || 'image/jpeg');
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
+                } else if (img && msg.data) {
+                    // ✅ Fallback للتوافق مع الإصدارات القديمة
+                    img.src = msg.data;
+                    img.onclick = () => this.showImagePreview(msg.data);
                 }
             }
             div.appendChild(clone);
@@ -1306,7 +1311,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة البصمة الصوتية (Base64) ====================
+    // ==================== معالجة البصمة الصوتية (باستخدام _base64Data) ====================
     else if (msg.type === 'voice') {
         const templateVoice = document.getElementById('voiceMessageTemplate');
         if (templateVoice) {
@@ -1316,8 +1321,13 @@ displayMessage(msg) {
                 voiceMsg.style.background = '#4CAF50';
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
-                if (audioEl && msg.data) {
-                    // ✅ استخدام Base64 مباشرة
+                if (audioEl && msg._base64Data) {
+                    // ✅ استخدام _base64Data + _mimeType
+                    const dataUrl = `data:${msg._mimeType || 'audio/webm'};base64,${msg._base64Data}`;
+                    audioEl.src = dataUrl;
+                    this.setupVoiceControls(clone, audioEl);
+                } else if (audioEl && msg.data) {
+                    // ✅ Fallback للتوافق مع الإصدارات القديمة
                     audioEl.src = msg.data;
                     this.setupVoiceControls(clone, audioEl);
                 }
@@ -1328,7 +1338,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (Base64) ====================
+    // ==================== معالجة الفيديو (باستخدام _base64Data) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1338,14 +1348,23 @@ displayMessage(msg) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
-                if (source && msg.data) {
-                    // ✅ استخدام Base64 مباشرة
+                if (source && msg._base64Data) {
+                    // ✅ استخدام _base64Data + _mimeType
+                    const dataUrl = `data:${msg._mimeType || 'video/mp4'};base64,${msg._base64Data}`;
+                    source.src = dataUrl;
+                    video.load();
+                } else if (source && msg.data) {
+                    // ✅ Fallback للتوافق مع الإصدارات القديمة
                     source.src = msg.data;
                     video.load();
                 }
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
-                    this.showVideoPreview(msg.data);
+                    if (msg._base64Data) {
+                        this.showVideoPreview(msg._base64Data, msg._mimeType || 'video/mp4');
+                    } else if (msg.data) {
+                        this.showVideoPreview(msg.data);
+                    }
                 };
             }
             div.appendChild(clone);
@@ -1354,7 +1373,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (Base64 - مع دعم التحميل المتكرر) ====================
+    // ==================== معالجة الملف (باستخدام _base64Data) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1368,15 +1387,25 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
+                if (downloadBtn) {
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
                         
-                        // ✅ ✅ ✅ الحل: تحويل Base64 إلى Blob للتحميل (يعمل في Chrome)
+                        // ✅ ✅ ✅ استخدام _base64Data (وليس msg.data)
+                        let base64Data = msg._base64Data;
+                        let mimeType = msg._mimeType || 'application/octet-stream';
+                        
+                        // ✅ Fallback: محاولة استخراج من msg.data
+                        if (!base64Data && msg.data) {
+                            base64Data = msg.data.split(',')[1] || msg.data;
+                        }
+                        
+                        if (!base64Data) {
+                            alert('⚠️ البيانات غير متاحة للتحميل');
+                            return;
+                        }
+                        
                         try {
-                            // استخراج الـ Base64 من data: URL
-                            const base64Data = msg.data.split(',')[1] || msg.data;
-                            
                             // تحويل Base64 إلى Blob
                             const byteCharacters = atob(base64Data);
                             const byteNumbers = new Array(byteCharacters.length);
@@ -1384,7 +1413,7 @@ displayMessage(msg) {
                                 byteNumbers[i] = byteCharacters.charCodeAt(i);
                             }
                             const byteArray = new Uint8Array(byteNumbers);
-                            const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+                            const blob = new Blob([byteArray], { type: mimeType });
                             
                             // إنشاء URL مؤقت للتحميل
                             const blobUrl = URL.createObjectURL(blob);
@@ -1397,13 +1426,18 @@ displayMessage(msg) {
                             
                             // تنظيف URL المؤقت
                             setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                            console.log(`✅ تم تحميل الملف: ${msg.fileName}`);
                         } catch (err) {
+                            console.error('❌ فشل تحويل Base64 إلى Blob:', err);
                             // ✅ Fallback: استخدام data: URL مباشرة
-                            console.warn('⚠️ فشل تحويل Base64 إلى Blob، استخدام data: URL بدلاً من ذلك');
-                            const link = document.createElement('a');
-                            link.href = msg.data;
-                            link.download = msg.fileName || 'ملف';
-                            link.click();
+                            if (msg.data) {
+                                const link = document.createElement('a');
+                                link.href = msg.data;
+                                link.download = msg.fileName || 'ملف';
+                                link.click();
+                            } else {
+                                alert('⚠️ فشل تحميل الملف');
+                            }
                         }
                     };
                 }
@@ -1419,117 +1453,42 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview (Base64) ====================
-showImagePreview(imageSrc) {
+// ==================== القسم 26.1: showImagePreview (باستخدام _base64Data) ====================
+showImagePreview(base64Data, mimeType) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (!modal || !img) return;
     
-    // ✅ استخدام Base64 مباشرة (data:image)
-    img.src = imageSrc;
-    modal.style.display = 'flex';
+    // ✅ إذا كانت base64Data تحتوي على data: prefix بالفعل، استخدمها مباشرة
+    if (base64Data && base64Data.startsWith('data:')) {
+        img.src = base64Data;
+    } else if (base64Data) {
+        // ✅ استخدام _base64Data مع data: prefix
+        img.src = `data:${mimeType || 'image/jpeg'};base64,${base64Data}`;
+    } else {
+        return;
+    }
     
+    modal.style.display = 'flex';
     this.setupImageZoom(modal, img);
 },
 
-// ==================== القسم 26.1.1: setupImageZoom ====================
-setupImageZoom(modal, img) {
-    if (img._zoomCleanup) {
-        img._zoomCleanup();
-        img._zoomCleanup = null;
-    }
-    
-    let currentScale = 1;
-    let initialDistance = 0;
-    let initialScale = 1;
-    let startX = 0, startY = 0;
-    let translateX = 0, translateY = 0;
-    let isTouching = false;
-    
-    const minScale = 0.8;
-    const maxScale = 3;
-    
-    const updateTransform = () => {
-        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
-    };
-    
-    const touchStartHandler = (e) => {
-        e.preventDefault();
-        const touches = e.touches;
-        
-        if (touches.length === 2) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            initialDistance = Math.hypot(dx, dy);
-            initialScale = currentScale;
-            isTouching = false;
-        } else if (touches.length === 1) {
-            startX = touches[0].clientX - translateX;
-            startY = touches[0].clientY - translateY;
-            isTouching = true;
-        }
-    };
-    
-    const touchMoveHandler = (e) => {
-        e.preventDefault();
-        const touches = e.touches;
-        
-        if (touches.length === 2 && initialDistance > 0) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            const newDistance = Math.hypot(dx, dy);
-            let newScale = initialScale * (newDistance / initialDistance);
-            newScale = Math.min(maxScale, Math.max(minScale, newScale));
-            
-            if (newScale !== currentScale) {
-                currentScale = newScale;
-                updateTransform();
-            }
-        } else if (touches.length === 1 && isTouching && currentScale > 1) {
-            translateX = touches[0].clientX - startX;
-            translateY = touches[0].clientY - startY;
-            
-            const maxTranslateX = (currentScale - 1) * 200;
-            const maxTranslateY = (currentScale - 1) * 200;
-            translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
-            translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
-            
-            updateTransform();
-        }
-    };
-    
-    const touchEndHandler = (e) => {
-        e.preventDefault();
-        initialDistance = 0;
-        isTouching = false;
-        
-        if (currentScale < 0.95) {
-            currentScale = 1;
-            translateX = 0;
-            translateY = 0;
-            updateTransform();
-        }
-    };
-    
-    img.addEventListener('touchstart', touchStartHandler);
-    img.addEventListener('touchmove', touchMoveHandler, { passive: false });
-    img.addEventListener('touchend', touchEndHandler);
-    
-    img._zoomCleanup = () => {
-        img.removeEventListener('touchstart', touchStartHandler);
-        img.removeEventListener('touchmove', touchMoveHandler);
-        img.removeEventListener('touchend', touchEndHandler);
-    };
-},
-
-// ==================== القسم 26.2: showVideoPreview (Base64) ====================
-showVideoPreview(videoSrc) {
+// ==================== القسم 26.2: showVideoPreview (باستخدام _base64Data) ====================
+showVideoPreview(base64Data, mimeType) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (!modal || !video) return;
     
-    // ✅ استخدام Base64 مباشرة (data:video)
-    video.src = videoSrc;
+    // ✅ إذا كانت base64Data تحتوي على data: prefix بالفعل، استخدمها مباشرة
+    if (base64Data && base64Data.startsWith('data:')) {
+        video.src = base64Data;
+    } else if (base64Data) {
+        // ✅ استخدام _base64Data مع data: prefix
+        video.src = `data:${mimeType || 'video/mp4'};base64,${base64Data}`;
+    } else {
+        return;
+    }
+    
     modal.style.display = 'flex';
     video.play().catch(() => {});
 },
@@ -1553,20 +1512,66 @@ closeVideoPreview() {
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    
+    // ✅ استخراج Base64 من src
+    const base64Data = img.src.split(',')[1];
+    if (!base64Data) {
+        alert('⚠️ لا يمكن تحميل الصورة');
+        return;
+    }
+    
+    try {
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/jpeg' });
+        
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = 'image.jpg';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (err) {
+        console.error('❌ فشل تحميل الصورة:', err);
+        alert('⚠️ فشل تحميل الصورة');
+    }
 },
 
 // ✅ دالة تحميل الفيديو (تعمل مع Base64)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
+    
+    // ✅ استخراج Base64 من src
+    const base64Data = video.src.split(',')[1];
+    if (!base64Data) {
+        alert('⚠️ لا يمكن تحميل الفيديو');
+        return;
+    }
+    
+    try {
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'video/mp4' });
+        
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = 'video.mp4';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (err) {
+        console.error('❌ فشل تحميل الفيديو:', err);
+        alert('⚠️ فشل تحميل الفيديو');
+    }
 },
 
     // ==================== القسم 27: sendMessage ====================
@@ -2016,7 +2021,7 @@ setupLocationSwipe(locationData) {
 }, 
     
     
-    // ==================== القسم 35: saveMessage ====================
+   // ==================== القسم 35: saveMessage ====================
 saveMessage(friendId, message) { 
     // ✅ ✅ ✅ نحفظ فقط:
     // 1. النصوص (type === 'text')
