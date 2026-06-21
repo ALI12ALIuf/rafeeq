@@ -1056,20 +1056,19 @@ openChat(friendId, friendName, friendAvatar) {
     
     
 // ==================== القسم 25: displayMessages ====================
-    displayMessages(friendId) { 
-        const c = document.getElementById('messagesContainer'); 
-        if (!c) return; 
-        c.innerHTML = ''; 
-        const messages = this.messages[friendId] || [];
-        
-        messages.forEach(msg => {
-            if (msg.type === 'text') {
-                this.displayMessage(msg);
-            }
-        });
-        
-        c.scrollTop = c.scrollHeight;
-    },
+displayMessages(friendId) { 
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return; 
+    c.innerHTML = ''; 
+    const messages = this.messages[friendId] || [];
+    
+    // ✅ ✅ ✅ عرض جميع الرسائل (نصوص ووسائط مؤقتة)
+    messages.forEach(msg => {
+        this.displayMessage(msg);
+    });
+    
+    c.scrollTop = c.scrollHeight;
+},
 
 // ==================== القسم 26.0: setupVoiceControls (دالة مساعدة للبصمة الصوتية) ====================
 setupVoiceControls(clone, audioEl) {
@@ -1154,7 +1153,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل - Base64) ====================
+// ==================== القسم 26: displayMessage (معدل - Base64) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1355,7 +1354,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (Base64) ====================
+    // ==================== معالجة الملف (Base64 - مع دعم التحميل المتكرر) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1372,11 +1371,40 @@ displayMessage(msg) {
                 if (downloadBtn && msg.data) {
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
-                        // ✅ تحويل Base64 إلى Blob للتحميل
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
+                        
+                        // ✅ ✅ ✅ الحل: تحويل Base64 إلى Blob للتحميل (يعمل في Chrome)
+                        try {
+                            // استخراج الـ Base64 من data: URL
+                            const base64Data = msg.data.split(',')[1] || msg.data;
+                            
+                            // تحويل Base64 إلى Blob
+                            const byteCharacters = atob(base64Data);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+                            
+                            // إنشاء URL مؤقت للتحميل
+                            const blobUrl = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = blobUrl;
+                            link.download = msg.fileName || 'ملف';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            // تنظيف URL المؤقت
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                        } catch (err) {
+                            // ✅ Fallback: استخدام data: URL مباشرة
+                            console.warn('⚠️ فشل تحويل Base64 إلى Blob، استخدام data: URL بدلاً من ذلك');
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = msg.fileName || 'ملف';
+                            link.click();
+                        }
                     };
                 }
             }
@@ -1989,49 +2017,52 @@ setupLocationSwipe(locationData) {
     
     
     // ==================== القسم 35: saveMessage ====================
-    saveMessage(friendId, message) { 
-        // ✅ نحتفظ بالوسائط إذا كانت تحتوي على _isBase64
-        if (message.type !== 'text' && !message._isBase64) {
-            console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
-            return;
-        }
-        
-        const key = `chat_${friendId}`; 
-        let messages = []; 
-        try { 
-            messages = JSON.parse(localStorage.getItem(key)) || []; 
-        } catch (e) { 
-            messages = []; 
-        }
-        
-        messages.push(message); 
-        
-        if (messages.length > 100) {
-            const excessCount = messages.length - 100;
-            const removeCount = excessCount + 50;
-            messages = messages.slice(removeCount);
-            console.log(`🧹 تم حذف ${removeCount} رسالة قديمة (الحد الأقصى 100 رسالة)`);
-        }
-        
+saveMessage(friendId, message) { 
+    // ✅ ✅ ✅ نحفظ فقط:
+    // 1. النصوص (type === 'text')
+    // 2. الوسائط المؤقتة (_temp === true) - سيتم مسحها عند الإغلاق
+    if (message.type !== 'text' && !message._temp) {
+        console.log(`📝 الوسائط (${message.type}) لن تُحفظ - ليست مؤقتة`);
+        return;
+    }
+    
+    const key = `chat_${friendId}`; 
+    let messages = []; 
+    try { 
+        messages = JSON.parse(localStorage.getItem(key)) || []; 
+    } catch (e) { 
+        messages = []; 
+    }
+    
+    messages.push(message); 
+    
+    // ✅ الحفاظ على 200 رسالة (بدلاً من 100)
+    if (messages.length > 200) {
+        const excessCount = messages.length - 200;
+        const removeCount = excessCount + 50;
+        messages = messages.slice(removeCount);
+        console.log(`🧹 تم حذف ${removeCount} رسالة قديمة (الحد الأقصى 200 رسالة)`);
+    }
+    
+    try { 
+        localStorage.setItem(key, JSON.stringify(messages)); 
+    } catch (e) {
+        const removeCount = Math.min(50, messages.length);
+        messages = messages.slice(removeCount);
         try { 
             localStorage.setItem(key, JSON.stringify(messages)); 
-        } catch (e) {
-            const removeCount = Math.min(50, messages.length);
-            messages = messages.slice(removeCount);
+            console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة قديمة`);
+        } catch (e2) { 
+            messages = messages.slice(-50);
             try { 
                 localStorage.setItem(key, JSON.stringify(messages)); 
-                console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة قديمة`);
-            } catch (e2) { 
-                messages = messages.slice(-50);
-                try { 
-                    localStorage.setItem(key, JSON.stringify(messages)); 
-                    console.log(`🧹 مساحة غير كافية - تم الاحتفاظ بآخر 50 رسالة فقط`);
-                } catch (e3) {}
-            }
+                console.log(`🧹 مساحة غير كافية - تم الاحتفاظ بآخر 50 رسالة فقط`);
+            } catch (e3) {}
         }
-        
-        this.messages[friendId] = messages; 
-    },
+    }
+    
+    this.messages[friendId] = messages; 
+},
     
 
    // ==================== القسم 36: updateLastMessage ====================
@@ -2046,7 +2077,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-  // ==================== القسم 37: closeChat ====================
+// ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2061,22 +2092,24 @@ closeChat() {
     const chatId = this.currentChat;
     
     if (chatId) {
-        console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
+        console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات');
         
         this.cleanConversationData(chatId, false);
         
         const key = `chat_${chatId}`;
         const messages = this.messages[chatId] || [];
-        // ✅ نحتفظ بالنصوص والوسائط (Base64) لأنها مخزنة كنص
-        const filteredMessages = messages.filter(msg => msg.type === 'text' || msg._isBase64);
+        
+        // ✅ ✅ ✅ نحتفظ فقط بالنصوص (type === 'text')
+        // ✅ ✅ ✅ نمسح جميع الوسائط المؤقتة (_temp: true)
+        const filteredMessages = messages.filter(msg => msg.type === 'text');
         this.messages[chatId] = filteredMessages;
         localStorage.setItem(key, JSON.stringify(filteredMessages));
-        console.log('✅ تم تنظيف الملفات والوسائط من localStorage (تم الاحتفاظ بـ Base64)');
+        console.log('✅ تم مسح جميع الوسائط المؤقتة (صور، فيديو، ملفات، بصمات)');
+        console.log(`✅ تم الاحتفاظ بـ ${filteredMessages.length} رسالة نصية فقط`);
         
-        // ✅ إزالة أي عناصر DOM تحتوي على Base64 (لا حاجة لـ revokeObjectURL)
+        // ✅ إزالة أي عناصر DOM تحتوي على Base64
         document.querySelectorAll('img, video, audio').forEach(el => {
             if (el.src && el.src.startsWith('data:')) {
-                // لا نحتاج إلى revoke لأنها بيانات مضمّنة
                 el.src = '';
             }
         });
@@ -2120,7 +2153,7 @@ closeChat() {
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
-}, 
+},
 
     
     // ==================== القسم 40: تنظيف بيانات المحادثة ====================
