@@ -1308,7 +1308,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (معدل - دعم _blobData) ====================
+    // ==================== معالجة الصورة (معدل - دعم _blobData + تمرير البيانات للمعاينة) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1318,7 +1318,6 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    // ✅ استخدام _blobData إذا كان موجوداً
                     if (msg._blobData) {
                         const blob = new Blob([msg._blobData], { type: msg._mimeType || 'image/jpeg' });
                         const url = URL.createObjectURL(blob);
@@ -1328,12 +1327,10 @@ displayMessage(msg) {
                     } else {
                         img.src = msg.data;
                     }
+                    // ✅ عند النقر على الصورة، تمرير _blobData إلى showImagePreview
                     img.onclick = () => {
                         if (img._blobData) {
-                            const blob = new Blob([img._blobData], { type: img._mimeType || 'image/jpeg' });
-                            const url = URL.createObjectURL(blob);
-                            this.showImagePreview(url);
-                            setTimeout(() => URL.revokeObjectURL(url), 5000);
+                            this.showImagePreview(img.src, img._blobData, img._mimeType);
                         } else {
                             this.showImagePreview(msg.data);
                         }
@@ -1466,15 +1463,20 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview ====================
-showImagePreview(imageSrc) {
+// ==================== القسم 26.1: showImagePreview (معدل - تخزين _blobData) ====================
+showImagePreview(imageSrc, blobData, mimeType) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (!modal || !img) return;
     
     img.src = imageSrc;
-    modal.style.display = 'flex';
+    // ✅ تخزين البيانات في عنصر المعاينة للاستخدام عند التحميل
+    if (blobData) {
+        img._blobData = blobData;
+        img._mimeType = mimeType || 'image/jpeg';
+    }
     
+    modal.style.display = 'flex';
     this.setupImageZoom(modal, img);
 },
 
@@ -1579,12 +1581,18 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات ====================
+// ==================== القسم 26.3: دوال إغلاق المعاينات (معدل - الحفاظ على _blobData) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    if (img) { 
+        img.src = ''; 
+        img.style.transform = 'none';
+        // ✅ لا تمسح _blobData (يُحتفظ بها للتحميل لاحقاً)
+        // img._blobData = null;  // ❌ لا تفعل هذا
+        // img._mimeType = null;  // ❌ لا تفعل هذا
+    }
 },
 
 closeVideoPreview() {
@@ -1594,13 +1602,35 @@ closeVideoPreview() {
     if (video) { video.pause(); video.src = ''; }
 },
 
+// ==================== تنزيل الصورة من المعاينة (معدل - استخدام _blobData المخزن) ====================
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    
+    // ✅ استخدام _blobData المخزن في عنصر المعاينة
+    if (img._blobData) {
+        try {
+            const blob = new Blob([img._blobData], { type: img._mimeType || 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'image.jpg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        } catch (error) {
+            console.error('❌ فشل تنزيل الصورة:', error);
+        }
+    } else {
+        // ✅ Fallback: استخدام الرابط الموجود
+        const link = document.createElement('a');
+        link.href = img.src;
+        link.download = 'image.jpg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 },
 
 downloadPreviewVideo() {
@@ -1610,7 +1640,7 @@ downloadPreviewVideo() {
     link.href = video.src;
     link.download = 'video.mp4';
     link.click();
-},  
+},
     
 
     // ==================== القسم 27: sendMessage ====================
