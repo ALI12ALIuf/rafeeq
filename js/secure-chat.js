@@ -2,6 +2,7 @@
 // نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
 
 
+
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
     keyCache: new Map(),
