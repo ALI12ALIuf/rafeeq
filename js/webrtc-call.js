@@ -1313,7 +1313,17 @@ handleChunkMessage(msg) {
             _mimeType: mimeType
         };
         
+        // ✅ تخزين الرسالة في this.messages مع _blobData
         if (ChatSystem.currentChat) {
+            if (!ChatSystem.messages[ChatSystem.currentChat]) {
+                ChatSystem.messages[ChatSystem.currentChat] = [];
+            }
+            const existingIndex = ChatSystem.messages[ChatSystem.currentChat].findIndex(m => m.id === displayMsg.id);
+            if (existingIndex === -1) {
+                ChatSystem.messages[ChatSystem.currentChat].push(displayMsg);
+            } else {
+                ChatSystem.messages[ChatSystem.currentChat][existingIndex] = displayMsg;
+            }
             ChatSystem.displayMessage(displayMsg);
         }
         ChatSystem.hideProgressBar();
