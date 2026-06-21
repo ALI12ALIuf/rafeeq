@@ -2046,11 +2046,17 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-   // ==================== القسم 37: closeChat ====================
+  // ==================== القسم 37: closeChat ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
     console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
+    
+    // ✅ تنظيف الذاكرة المؤقتة للملفات عند إغلاق المحادثة
+    if (typeof CallSystem !== 'undefined' && CallSystem.clearIncomingChunks) {
+        CallSystem.clearIncomingChunks();
+        console.log('✅ تم تنظيف الذاكرة المؤقتة للملفات');
+    }
     
     const chatId = this.currentChat;
     
@@ -2114,7 +2120,7 @@ closeChat() {
     this.friendInConversation = false;
     
     console.log('✅ closeChat - انتهى');
-},
+}, 
 
     
     // ==================== القسم 40: تنظيف بيانات المحادثة ====================
