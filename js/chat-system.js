@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة + دعم _blobData) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1180,7 +1180,6 @@ displayMessage(msg) {
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1188,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1285,7 +1284,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - دعم _blobData) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1295,8 +1294,26 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                    // ✅ استخدام _blobData إذا كان موجوداً
+                    if (msg._blobData) {
+                        const blob = new Blob([msg._blobData], { type: msg._mimeType || 'image/jpeg' });
+                        const url = URL.createObjectURL(blob);
+                        img.src = url;
+                        img._blobData = msg._blobData;
+                        img._mimeType = msg._mimeType || 'image/jpeg';
+                    } else {
+                        img.src = msg.data;
+                    }
+                    img.onclick = () => {
+                        if (img._blobData) {
+                            const blob = new Blob([img._blobData], { type: img._mimeType || 'image/jpeg' });
+                            const url = URL.createObjectURL(blob);
+                            this.showImagePreview(url);
+                            setTimeout(() => URL.revokeObjectURL(url), 5000);
+                        } else {
+                            this.showImagePreview(msg.data);
+                        }
+                    };
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
                 }
@@ -1328,7 +1345,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (معدل - دعم _blobData) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1338,13 +1355,29 @@ displayMessage(msg) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
-                if (source && msg.data) {
-                    source.src = msg.data;
-                    video.load();
+                if (source) {
+                    if (msg._blobData) {
+                        const blob = new Blob([msg._blobData], { type: msg._mimeType || 'video/mp4' });
+                        const url = URL.createObjectURL(blob);
+                        source.src = url;
+                        video.load();
+                        video._blobData = msg._blobData;
+                        video._mimeType = msg._mimeType || 'video/mp4';
+                    } else if (msg.data) {
+                        source.src = msg.data;
+                        video.load();
+                    }
                 }
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
-                    this.showVideoPreview(msg.data);
+                    if (video._blobData) {
+                        const blob = new Blob([video._blobData], { type: video._mimeType || 'video/mp4' });
+                        const url = URL.createObjectURL(blob);
+                        this.showVideoPreview(url);
+                        setTimeout(() => URL.revokeObjectURL(url), 5000);
+                    } else if (msg.data) {
+                        this.showVideoPreview(msg.data);
+                    }
                 };
             }
             div.appendChild(clone);
@@ -1353,7 +1386,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل - دعم _blobData) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1367,14 +1400,35 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
-                    };
+                if (downloadBtn) {
+                    if (msg._blobData) {
+                        downloadBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            try {
+                                const blob = new Blob([msg._blobData], { type: msg._mimeType || 'application/octet-stream' });
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = msg.fileName || 'ملف';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                            } catch (error) {
+                                console.error('❌ فشل التحميل:', error);
+                            }
+                        };
+                    } else if (msg.data) {
+                        downloadBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = msg.fileName || 'ملف';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        };
+                    }
                 }
             }
             div.appendChild(clone);
@@ -2077,58 +2131,77 @@ closeChat() {
 },
 
     
-    // ==================== القسم 40: تنظيف بيانات المحادثة ====================
-    cleanConversationData(chatId, cleanAll = false) {
-        console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
-        
-        const key = `chat_${chatId}`;
-        if (cleanAll) {
-            localStorage.removeItem(key);
-            delete this.messages[chatId];
-            console.log('✅ تم مسح localStorage بالكامل');
-        } else {
-            const messages = this.messages[chatId] || [];
-            const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
-            this.messages[chatId] = textMessages;
-            localStorage.setItem(key, JSON.stringify(textMessages));
-            console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+    // ==================== القسم 40: تنظيف بيانات المحادثة (معدل - تنظيف _blobData) ====================
+cleanConversationData(chatId, cleanAll = false) {
+    console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
+    
+    const key = `chat_${chatId}`;
+    if (cleanAll) {
+        localStorage.removeItem(key);
+        delete this.messages[chatId];
+        console.log('✅ تم مسح localStorage بالكامل');
+    } else {
+        const messages = this.messages[chatId] || [];
+        const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
+        this.messages[chatId] = textMessages;
+        localStorage.setItem(key, JSON.stringify(textMessages));
+        console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+    }
+    
+    // ✅ تنظيف Blob URLs والبيانات المخزنة
+    document.querySelectorAll('img, video, audio').forEach(el => {
+        if (el.src && el.src.startsWith('blob:')) {
+            URL.revokeObjectURL(el.src);
+            el.src = '';
         }
-        
-        document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
-                el.src = '';
+        // ✅ تنظيف البيانات المخزنة
+        if (el._blobData) {
+            el._blobData = null;
+        }
+        if (el._mimeType) {
+            el._mimeType = null;
+        }
+    });
+    
+    // ✅ تنظيف الرسائل المخزنة في this.messages
+    if (this.messages[chatId]) {
+        this.messages[chatId].forEach(msg => {
+            if (msg._blobData) {
+                msg._blobData = null;
+            }
+            if (msg._mimeType) {
+                msg._mimeType = null;
             }
         });
-        
-        if (this.currentChat === chatId) {
-            const messagesContainer = document.getElementById('messagesContainer');
-            if (messagesContainer) {
-                messagesContainer.innerHTML = '';
-            }
-        }
-        
-        if (typeof CallSystem !== 'undefined') {
-            CallSystem.incomingChunks = {};
-            CallSystem.incomingFileInfo = {};
-            CallSystem._callIceCandidates = [];
-            CallSystem._answerIceCandidates = [];
-        }
-        
-        this._pendingIceCandidates = [];
-        this._responseIceCandidates = [];
-        if (this._batchTimer) {
-            clearTimeout(this._batchTimer);
-            this._batchTimer = null;
-        }
-        if (this._responseBatchTimer) {
-            clearTimeout(this._responseBatchTimer);
-            this._responseBatchTimer = null;
-        }
-        
-        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
-    },
+    }
     
+    if (this.currentChat === chatId) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+        }
+    }
+    
+    if (typeof CallSystem !== 'undefined') {
+        CallSystem.incomingChunks = {};
+        CallSystem.incomingFileInfo = {};
+        CallSystem._callIceCandidates = [];
+        CallSystem._answerIceCandidates = [];
+    }
+    
+    this._pendingIceCandidates = [];
+    this._responseIceCandidates = [];
+    if (this._batchTimer) {
+        clearTimeout(this._batchTimer);
+        this._batchTimer = null;
+    }
+    if (this._responseBatchTimer) {
+        clearTimeout(this._responseBatchTimer);
+        this._responseBatchTimer = null;
+    }
+    
+    console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
+},
     
     // ==================== القسم 38: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
