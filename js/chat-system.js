@@ -1394,7 +1394,7 @@ displayMessage(msg) {
                     if (video._blobData) {
                         const blob = new Blob([video._blobData], { type: video._mimeType || 'video/mp4' });
                         const url = URL.createObjectURL(blob);
-                        this.showVideoPreview(url);
+                        this.showVideoPreview(url, video._blobData, video._mimeType);
                         setTimeout(() => URL.revokeObjectURL(url), 5000);
                     } else if (msg.data) {
                         this.showVideoPreview(msg.data);
@@ -1574,13 +1574,22 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview ====================
-showVideoPreview(videoSrc) {
+// ==================== القسم 26.2: showVideoPreview (معدل - دعم _blobData) ====================
+showVideoPreview(videoSrc, blobData, mimeType) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (!modal || !video) return;
     
-    video.src = videoSrc;
+    if (blobData) {
+        const blob = new Blob([blobData], { type: mimeType || 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        video.src = url;
+        video._blobData = blobData;
+        video._mimeType = mimeType || 'video/mp4';
+    } else {
+        video.src = videoSrc;
+    }
+    
     modal.style.display = 'flex';
     video.play().catch(() => {});
 },
@@ -1603,7 +1612,13 @@ closeVideoPreview() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    if (video) { 
+        video.pause(); 
+        video.src = '';
+        // ✅ لا تمسح _blobData (يُحتفظ بها للتحميل لاحقاً)
+        // video._blobData = null;  // ❌ لا تفعل هذا
+        // video._mimeType = null;  // ❌ لا تفعل هذا
+    }
 },
 
 // ==================== تنزيل الصورة من المعاينة (معدل - استخدام _blobData المخزن) ====================
@@ -1623,27 +1638,61 @@ downloadPreviewImage() {
             link.click();
             document.body.removeChild(link);
             setTimeout(() => URL.revokeObjectURL(url), 5000);
+            return;
         } catch (error) {
             console.error('❌ فشل تنزيل الصورة:', error);
         }
-    } else {
-        // ✅ Fallback: استخدام الرابط الموجود
+    }
+    
+    // ✅ Fallback: استخدام الرابط الموجود
+    try {
         const link = document.createElement('a');
         link.href = img.src;
         link.download = 'image.jpg';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    } catch (error) {
+        console.error('❌ فشل تنزيل الصورة (fallback):', error);
+        alert('فشل تحميل الصورة، حاول مرة أخرى');
     }
 },
 
+// ==================== تنزيل الفيديو من المعاينة (معدل - استخدام _blobData المخزن) ====================
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
+    
+    // ✅ استخدام _blobData المخزن في عنصر المعاينة
+    if (video._blobData) {
+        try {
+            const blob = new Blob([video._blobData], { type: video._mimeType || 'video/mp4' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'video.mp4';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            return;
+        } catch (error) {
+            console.error('❌ فشل تنزيل الفيديو:', error);
+        }
+    }
+    
+    // ✅ Fallback: استخدام الرابط الموجود
+    try {
+        const link = document.createElement('a');
+        link.href = video.src;
+        link.download = 'video.mp4';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (error) {
+        console.error('❌ فشل تنزيل الفيديو (fallback):', error);
+        alert('فشل تحميل الفيديو، حاول مرة أخرى');
+    }
 },
 
 
