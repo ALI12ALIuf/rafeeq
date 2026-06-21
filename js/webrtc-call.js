@@ -1277,7 +1277,7 @@ blobToBase64(blob) {
     });
 },
 
-// ==================== 9.4.1 معالجة أجزاء الملفات (معدل - دعم الملفات المتعددة) ====================
+// ==================== 9.4.1 معالجة أجزاء الملفات (معدل - دعم الملفات المتعددة + حفظ مؤقت) ====================
 
 handleChunkMessage(msg) {
     // ✅ استخدام msg.id كمفتاح فريد لكل ملف
@@ -1325,7 +1325,7 @@ handleChunkMessage(msg) {
         
         const dataUrl = dataPrefix + fullBase64;
         
-        // ✅ عرض الرسالة
+        // ✅ عرض الرسالة مع علامة _temp: true (مؤقتة)
         const displayMsg = {
             id: msg.id,
             type: msg.type,
@@ -1334,18 +1334,20 @@ handleChunkMessage(msg) {
             sender: 'friend',
             time: new Date().toISOString(),
             _isBase64: true,
-            _fileId: fileId  // ✅ حفظ معرف الملف
+            _fileId: fileId,     // ✅ حفظ معرف الملف
+            _temp: true          // ✅ ✅ ✅ علامة مؤقتة (سيتم مسحها عند الإغلاق)
         };
         
+        // ✅ ✅ ✅ حفظ في localStorage فوراً (كمؤقت)
         if (ChatSystem.currentChat) {
+            ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
             ChatSystem.displayMessage(displayMsg);
         }
         ChatSystem.hideProgressBar();
         
-        // ✅ ✅ ✅ البيانات تبقى في الذاكرة المؤقتة
-        // لا نحذف أي شيء هنا!
+        // ✅ ✅ ✅ لا نحذف أي شيء من الذاكرة المؤقتة هنا
         // سيتم التنظيف عند إغلاق المحادثة أو إنهاء المكالمة أو تحديث الصفحة
-        console.log(`📦 تم استلام الملف بالكامل: ${fileId} - سيتم الاحتفاظ به مؤقتاً`);
+        console.log(`📦 تم استلام الملف بالكامل: ${fileId} - تم حفظه مؤقتاً في localStorage`);
     }
 },
 
