@@ -1224,9 +1224,11 @@ async sendFileDirect(file, type) {
         const base64String = await this.blobToBase64(blobToSend);
         const chunkSize = 16000; // عدد الأحرف في كل جزء
         const totalChunks = Math.ceil(base64String.length / chunkSize);
-        const fileId = Date.now().toString();
         
-        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
+        // ✅ معرف فريد للملف (يتم إرساله مع كل جزء)
+        const fileId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6);
+        
+        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء) | ID: ${fileId}`);
         
         for (let i = 0; i < totalChunks; i++) {
             if (this.dc.readyState !== 'open') {
@@ -1275,27 +1277,35 @@ blobToBase64(blob) {
     });
 },
 
+// ==================== 9.4.1 معالجة أجزاء الملفات (معدل - دعم الملفات المتعددة) ====================
+
 handleChunkMessage(msg) {
-    if (!this.incomingChunks[msg.id]) {
-        this.incomingChunks[msg.id] = '';
-        this.incomingFileInfo[msg.id] = {
+    // ✅ استخدام msg.id كمفتاح فريد لكل ملف
+    const fileId = msg.id;
+    
+    if (!this.incomingChunks[fileId]) {
+        this.incomingChunks[fileId] = '';  // تخزين Base64 كسلسلة نصية
+        this.incomingFileInfo[fileId] = {
             type: msg.type,
             fileName: msg.fileName,
             total: msg.total,
-            received: 0
+            received: 0,
+            isComplete: false  // ✅ إضافة علامة للإكتمال
         };
         ChatSystem.showProgressBar('جاري استلام الملف...', 0);
     }
     
-    // تجميع أجزاء Base64
-    this.incomingChunks[msg.id] += msg.data;
-    this.incomingFileInfo[msg.id].received++;
-    const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
+    // ✅ تجميع أجزاء Base64
+    this.incomingChunks[fileId] += msg.data;
+    this.incomingFileInfo[fileId].received++;
+    
+    const progress = (this.incomingFileInfo[fileId].received / msg.total) * 100;
     const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
     ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
     
-    if (this.incomingFileInfo[msg.id].received === msg.total) {
-        const fullBase64 = this.incomingChunks[msg.id];
+    // ✅ عند اكتمال الملف
+    if (this.incomingFileInfo[fileId].received === msg.total) {
+        const fullBase64 = this.incomingChunks[fileId];
         
         // تحديد نوع MIME
         let mimeType = 'application/octet-stream';
@@ -1315,6 +1325,7 @@ handleChunkMessage(msg) {
         
         const dataUrl = dataPrefix + fullBase64;
         
+        // ✅ عرض الرسالة
         const displayMsg = {
             id: msg.id,
             type: msg.type,
@@ -1322,7 +1333,8 @@ handleChunkMessage(msg) {
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _isBase64: true
+            _isBase64: true,
+            _fileId: fileId  // ✅ حفظ معرف الملف
         };
         
         if (ChatSystem.currentChat) {
@@ -1330,8 +1342,16 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        delete this.incomingChunks[msg.id];
-        delete this.incomingFileInfo[msg.id];
+        // ✅ ✅ ✅ الحل الأساسي: لا نحذف الملف فوراً، بل نؤجل الحذف
+        // نضع علامة اكتمال ونحذف بعد 5 ثواني (لإعطاء وقت للملف التالي)
+        this.incomingFileInfo[fileId].isComplete = true;
+        
+        // ✅ حذف الملف بعد 5 ثواني (وليس فوراً)
+        setTimeout(() => {
+            delete this.incomingChunks[fileId];
+            delete this.incomingFileInfo[fileId];
+            console.log(`🧹 تم تنظيف بيانات الملف: ${fileId}`);
+        }, 5000);
     }
 },
 
