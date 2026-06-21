@@ -1,5 +1,5 @@
-// ========== webrtc-call.js - النسخة المعدلة (واجهات ثابتة) ==========
-// جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
+// ========== webrtc-call.js - النسخة المعدلة (Base64) ==========
+// جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات (Base64)
 
 const CallSystem = {
     pc: null, dc: null,           // ✅ خاصة بالميزات (دردشة، ملفات، موقع)
@@ -1206,7 +1206,7 @@ showCallUI(type) {
         }
     },
     
-    // ==================== 13. إرسال الملفات ====================
+    // ==================== 13. إرسال الملفات (Base64) ====================
 
 async sendFileDirect(file, type) {
     if (!this.dc || this.dc.readyState !== 'open') {
@@ -1220,9 +1220,10 @@ async sendFileDirect(file, type) {
             blobToSend = await this.compressImage(file);
         }
         
-        const arrayBuffer = await blobToSend.arrayBuffer();
-        const chunkSize = 16000;
-        const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize);
+        // تحويل الملف إلى Base64
+        const base64String = await this.blobToBase64(blobToSend);
+        const chunkSize = 16000; // عدد الأحرف في كل جزء
+        const totalChunks = Math.ceil(base64String.length / chunkSize);
         const fileId = Date.now().toString();
         
         console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
@@ -1233,12 +1234,12 @@ async sendFileDirect(file, type) {
                 return false;
             }
             const start = i * chunkSize;
-            const end = Math.min(start + chunkSize, arrayBuffer.byteLength);
-            const chunk = arrayBuffer.slice(start, end);
+            const end = Math.min(start + chunkSize, base64String.length);
+            const chunk = base64String.substring(start, end);
             
             const chunkData = {
                 type: type,
-                data: Array.from(new Uint8Array(chunk)),
+                data: chunk,
                 chunk: i,
                 total: totalChunks,
                 id: fileId,
@@ -1251,7 +1252,7 @@ async sendFileDirect(file, type) {
             await new Promise(r => setTimeout(r, 50));
         }
         ChatSystem.hideProgressBar();
-        console.log('✅ تم إرسال الملف بنجاح');
+        console.log('✅ تم إرسال الملف بنجاح (Base64)');
         return true;
     } catch (e) {
         console.error('❌ فشل إرسال الملف:', e);
@@ -1260,9 +1261,23 @@ async sendFileDirect(file, type) {
     }
 },
 
+// دالة مساعدة لتحويل Blob/File إلى Base64
+blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            // إزالة الجزء "data:image/jpeg;base64," من البداية
+            const base64 = reader.result.split(',')[1] || reader.result;
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+},
+
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
-        this.incomingChunks[msg.id] = [];
+        this.incomingChunks[msg.id] = '';
         this.incomingFileInfo[msg.id] = {
             type: msg.type,
             fileName: msg.fileName,
@@ -1272,42 +1287,42 @@ handleChunkMessage(msg) {
         ChatSystem.showProgressBar('جاري استلام الملف...', 0);
     }
     
-    const chunkData = new Uint8Array(msg.data);
-    this.incomingChunks[msg.id][msg.chunk] = chunkData;
+    // تجميع أجزاء Base64
+    this.incomingChunks[msg.id] += msg.data;
     this.incomingFileInfo[msg.id].received++;
     const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
     const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
     ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
     
     if (this.incomingFileInfo[msg.id].received === msg.total) {
-        let totalLength = 0;
-        for (let i = 0; i < msg.total; i++) {
-            totalLength += this.incomingChunks[msg.id][i].length;
-        }
+        const fullBase64 = this.incomingChunks[msg.id];
         
-        const fullBuffer = new Uint8Array(totalLength);
-        let offset = 0;
-        for (let i = 0; i < msg.total; i++) {
-            fullBuffer.set(this.incomingChunks[msg.id][i], offset);
-            offset += this.incomingChunks[msg.id][i].length;
-        }
-        
+        // تحديد نوع MIME
         let mimeType = 'application/octet-stream';
-        if (msg.type === 'image') mimeType = 'image/jpeg';
-        else if (msg.type === 'video') mimeType = 'video/mp4';
-        else if (msg.type === 'voice') mimeType = 'audio/webm';
+        let dataPrefix = '';
+        if (msg.type === 'image') {
+            mimeType = 'image/jpeg';
+            dataPrefix = 'data:image/jpeg;base64,';
+        } else if (msg.type === 'video') {
+            mimeType = 'video/mp4';
+            dataPrefix = 'data:video/mp4;base64,';
+        } else if (msg.type === 'voice') {
+            mimeType = 'audio/webm';
+            dataPrefix = 'data:audio/webm;base64,';
+        } else if (msg.type === 'file') {
+            dataPrefix = 'data:application/octet-stream;base64,';
+        }
         
-        const blob = new Blob([fullBuffer], { type: mimeType });
-        const objectUrl = URL.createObjectURL(blob);
+        const dataUrl = dataPrefix + fullBase64;
         
         const displayMsg = {
             id: msg.id,
-            type: msg.type === 'location' ? 'text' : msg.type,
-            data: objectUrl,
+            type: msg.type,
+            data: dataUrl,
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _blobUrl: objectUrl
+            _isBase64: true
         };
         
         if (ChatSystem.currentChat) {
@@ -1501,4 +1516,4 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-console.log('✅ WebRTC Call System جاهز - مع دعم الواجهات الثابتة');
+console.log('✅ WebRTC Call System جاهز - مع دعم Base64');
