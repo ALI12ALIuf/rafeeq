@@ -1273,7 +1273,7 @@ async sendFileDirect(file, type) {
     }
 },
 
-// ✅ دالة handleChunkMessage المعدلة (تنظيف فوري للذاكرة)
+// ✅ دالة handleChunkMessage (مع الحفاظ على روابط الميديا للتحميل المتكرر)
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -1328,10 +1328,13 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        // ✅ تنظيف فوري للذاكرة (بدون setTimeout)
+        // ✅ تنظيف فوري للذاكرة (نحذف الـ chunks فقط، ونبقي الـ objectUrl حياً)
         delete this.incomingChunks[msg.id];
         delete this.incomingFileInfo[msg.id];
         console.log(`🧹 تم تفريغ ذاكرة العنصر المكتمل بنجاح: ${msg.id}`);
+        
+        // ❌ لا نقوم بـ revokeObjectURL للحفاظ على الروابط للتحميل المتكرر
+        // URL.revokeObjectURL(objectUrl); // معطل
     }
 },
 
