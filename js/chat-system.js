@@ -1351,7 +1351,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (النظام الجديد فقط - window.open) ====================
+    // ==================== معالجة الملف (التحميل المباشر - fetch + Blob) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1371,30 +1371,36 @@ displayMessage(msg) {
                     downloadBtn.removeAttribute('download');
                     downloadBtn.removeAttribute('target');
                     
-                    // ✅ النظام الجديد: window.open
+                    // ✅ التحميل المباشر: fetch + Blob
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         
-                        try {
-                            const win = window.open(msg.data, '_blank');
-                            if (win) {
-                                win.document.title = msg.fileName || 'ملف';
-                                console.log(`✅ [النظام الجديد] تم تحميل الملف: ${msg.fileName}`);
-                            } else {
+                        const fileName = msg.fileName || 'ملف';
+                        
+                        fetch(msg.data)
+                            .then(response => {
+                                if (!response.ok) throw new Error('فشل تحميل الملف');
+                                return response.blob();
+                            })
+                            .then(blob => {
+                                const url = URL.createObjectURL(blob);
                                 const link = document.createElement('a');
-                                link.href = msg.data;
-                                link.download = msg.fileName || 'ملف';
+                                link.href = url;
+                                link.download = fileName;
                                 link.style.display = 'none';
                                 document.body.appendChild(link);
                                 link.click();
-                                setTimeout(() => document.body.removeChild(link), 100);
-                                console.log(`✅ [البديل] تم تحميل الملف: ${msg.fileName}`);
-                            }
-                        } catch (error) {
-                            console.error('❌ فشل تحميل الملف:', error);
-                            window.location.href = msg.data;
-                        }
+                                setTimeout(() => {
+                                    document.body.removeChild(link);
+                                    URL.revokeObjectURL(url);
+                                }, 100);
+                                console.log(`✅ تم تحميل الملف: ${fileName}`);
+                            })
+                            .catch(error => {
+                                console.error('❌ فشل تحميل الملف:', error);
+                                alert('فشل تحميل الملف. حاول مرة أخرى.');
+                            });
                     };
                 }
             }
@@ -1520,7 +1526,7 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات (نفس نظام الملفات - window.open مع timestamp) ====================
+// ==================== القسم 26.3: دوال إغلاق المعاينات (التحميل المباشر - fetch + Blob) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1537,24 +1543,68 @@ closeVideoPreview() {
     // if (video) { video.pause(); video.src = ''; }
 },
 
-// ✅ تحميل الصورة (نفس نظام الملفات - window.open مع timestamp)
+// ✅ تحميل الصورة (التحميل المباشر - fetch + Blob)
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
     
-    const url = img.src + (img.src.includes('?') ? '&' : '?') + 't=' + Date.now();
-    window.open(url, '_blank');
-    console.log('✅ [نظام الملفات] تم تحميل الصورة');
+    const fileName = 'image.jpg';
+    
+    fetch(img.src)
+        .then(response => {
+            if (!response.ok) throw new Error('فشل تحميل الصورة');
+            return response.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 100);
+            console.log('✅ تم تحميل الصورة:', fileName);
+        })
+        .catch(error => {
+            console.error('❌ فشل تحميل الصورة:', error);
+            alert('فشل تحميل الصورة. حاول مرة أخرى.');
+        });
 },
 
-// ✅ تحميل الفيديو (نفس نظام الملفات - window.open مع timestamp)
+// ✅ تحميل الفيديو (التحميل المباشر - fetch + Blob)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
     
-    const url = video.src + (video.src.includes('?') ? '&' : '?') + 't=' + Date.now();
-    window.open(url, '_blank');
-    console.log('✅ [نظام الملفات] تم تحميل الفيديو');
+    const fileName = 'video.mp4';
+    
+    fetch(video.src)
+        .then(response => {
+            if (!response.ok) throw new Error('فشل تحميل الفيديو');
+            return response.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 100);
+            console.log('✅ تم تحميل الفيديو:', fileName);
+        })
+        .catch(error => {
+            console.error('❌ فشل تحميل الفيديو:', error);
+            alert('فشل تحميل الفيديو. حاول مرة أخرى.');
+        });
 },
 
     // ==================== القسم 27: sendMessage ====================
