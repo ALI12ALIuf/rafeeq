@@ -2198,7 +2198,7 @@ cleanConversationData(chatId, cleanAll = false) {
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة ====================
+// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة (معدل - بدون revokeObjectURL) ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
@@ -2206,10 +2206,13 @@ function performGlobalCleanup() {
         CallSystem.cleanupDynamicElements();
     }
     
+    // ✅ تم تعطيل revokeObjectURL للحفاظ على روابط الميديا للتحميل المتكرر
     document.querySelectorAll('img, video, audio').forEach(el => {
         if (el.src && el.src.startsWith('blob:')) {
-            URL.revokeObjectURL(el.src);
-            el.src = '';
+            // ❌ تم تعطيل هذه الأسطر لمنع فقدان روابط الميديا
+            // URL.revokeObjectURL(el.src);
+            // el.src = '';
+            console.log('🔒 تم الاحتفاظ برابط الميديا (performGlobalCleanup)');
         }
     });
     
