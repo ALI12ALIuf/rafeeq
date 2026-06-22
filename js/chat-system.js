@@ -1527,7 +1527,7 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات ====================
+// ==================== القسم 26.3: دوال إغلاق المعاينات (معدلة - نظام window.open) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1542,23 +1542,59 @@ closeVideoPreview() {
     if (video) { video.pause(); video.src = ''; }
 },
 
+// ✅ دالة تحميل الصورة (النظام الجديد - window.open)
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    
+    try {
+        const win = window.open(img.src, '_blank');
+        if (win) {
+            win.document.title = 'image.jpg';
+            console.log('✅ [النظام الجديد] تم تحميل الصورة');
+        } else {
+            // حل بديل إذا منع المتصفح النافذة المنبثقة
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = 'image.jpg';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => document.body.removeChild(link), 100);
+            console.log('✅ [البديل] تم تحميل الصورة');
+        }
+    } catch (error) {
+        console.error('❌ فشل تحميل الصورة:', error);
+        window.location.href = img.src;
+    }
 },
 
+// ✅ دالة تحميل الفيديو (النظام الجديد - window.open)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-},  
+    
+    try {
+        const win = window.open(video.src, '_blank');
+        if (win) {
+            win.document.title = 'video.mp4';
+            console.log('✅ [النظام الجديد] تم تحميل الفيديو');
+        } else {
+            // حل بديل إذا منع المتصفح النافذة المنبثقة
+            const link = document.createElement('a');
+            link.href = video.src;
+            link.download = 'video.mp4';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => document.body.removeChild(link), 100);
+            console.log('✅ [البديل] تم تحميل الفيديو');
+        }
+    } catch (error) {
+        console.error('❌ فشل تحميل الفيديو:', error);
+        window.location.href = video.src;
+    }
+},
     
 
     // ==================== القسم 27: sendMessage ====================
