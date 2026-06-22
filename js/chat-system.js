@@ -2068,7 +2068,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-   // ==================== القسم 37: closeChat ====================
+ // ==================== القسم 37: closeChat (معدل - بدون revokeObjectURL) ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2088,12 +2088,8 @@ closeChat() {
         localStorage.setItem(key, JSON.stringify(filteredMessages));
         console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
         
-        document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
-                el.src = '';
-            }
-        });
+        // ✅ تمت إزالة revokeObjectURL نهائياً
+        // روابط الميديا تبقى حية للتحميل المتكرر
     }
     
     this.featuresEnabled = false;
@@ -2136,58 +2132,53 @@ closeChat() {
     console.log('✅ closeChat - انتهى');
 },
 
+    // ==================== القسم 40: تنظيف بيانات المحادثة (معدل - بدون revokeObjectURL) ====================
+cleanConversationData(chatId, cleanAll = false) {
+    console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
     
-    // ==================== القسم 40: تنظيف بيانات المحادثة ====================
-    cleanConversationData(chatId, cleanAll = false) {
-        console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
-        
-        const key = `chat_${chatId}`;
-        if (cleanAll) {
-            localStorage.removeItem(key);
-            delete this.messages[chatId];
-            console.log('✅ تم مسح localStorage بالكامل');
-        } else {
-            const messages = this.messages[chatId] || [];
-            const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
-            this.messages[chatId] = textMessages;
-            localStorage.setItem(key, JSON.stringify(textMessages));
-            console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+    const key = `chat_${chatId}`;
+    if (cleanAll) {
+        localStorage.removeItem(key);
+        delete this.messages[chatId];
+        console.log('✅ تم مسح localStorage بالكامل');
+    } else {
+        const messages = this.messages[chatId] || [];
+        const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
+        this.messages[chatId] = textMessages;
+        localStorage.setItem(key, JSON.stringify(textMessages));
+        console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+    }
+    
+    // ✅ تمت إزالة revokeObjectURL نهائياً
+    // روابط الميديا تبقى حية للتحميل المتكرر
+    
+    if (this.currentChat === chatId) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
         }
-        
-        document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
-                el.src = '';
-            }
-        });
-        
-        if (this.currentChat === chatId) {
-            const messagesContainer = document.getElementById('messagesContainer');
-            if (messagesContainer) {
-                messagesContainer.innerHTML = '';
-            }
-        }
-        
-        if (typeof CallSystem !== 'undefined') {
-            CallSystem.incomingChunks = {};
-            CallSystem.incomingFileInfo = {};
-            CallSystem._callIceCandidates = [];
-            CallSystem._answerIceCandidates = [];
-        }
-        
-        this._pendingIceCandidates = [];
-        this._responseIceCandidates = [];
-        if (this._batchTimer) {
-            clearTimeout(this._batchTimer);
-            this._batchTimer = null;
-        }
-        if (this._responseBatchTimer) {
-            clearTimeout(this._responseBatchTimer);
-            this._responseBatchTimer = null;
-        }
-        
-        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
-    },
+    }
+    
+    if (typeof CallSystem !== 'undefined') {
+        CallSystem.incomingChunks = {};
+        CallSystem.incomingFileInfo = {};
+        CallSystem._callIceCandidates = [];
+        CallSystem._answerIceCandidates = [];
+    }
+    
+    this._pendingIceCandidates = [];
+    this._responseIceCandidates = [];
+    if (this._batchTimer) {
+        clearTimeout(this._batchTimer);
+        this._batchTimer = null;
+    }
+    if (this._responseBatchTimer) {
+        clearTimeout(this._responseBatchTimer);
+        this._responseBatchTimer = null;
+    }
+    
+    console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
+},
     
     
     // ==================== القسم 38: escapeHtml ====================
@@ -2197,7 +2188,7 @@ closeChat() {
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة ====================
+// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة (معدل - بدون revokeObjectURL) ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
@@ -2205,12 +2196,8 @@ function performGlobalCleanup() {
         CallSystem.cleanupDynamicElements();
     }
     
-    document.querySelectorAll('img, video, audio').forEach(el => {
-        if (el.src && el.src.startsWith('blob:')) {
-            URL.revokeObjectURL(el.src);
-            el.src = '';
-        }
-    });
+    // ✅ تمت إزالة revokeObjectURL نهائياً
+    // روابط الميديا تبقى حية للتحميل المتكرر
     
     const modals = ['incomingCall', 'audioCallUI', 'videoCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
     modals.forEach(id => {
