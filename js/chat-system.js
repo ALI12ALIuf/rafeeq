@@ -1351,7 +1351,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (النظام الجديد فقط - window.open) ====================
+    // ==================== معالجة الملف (النظام الجذري - window.open مع timestamp) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1371,17 +1371,20 @@ displayMessage(msg) {
                     downloadBtn.removeAttribute('download');
                     downloadBtn.removeAttribute('target');
                     
-                    // ✅ النظام الجديد: window.open
+                    // ✅ النظام الجذري: window.open مع timestamp
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         
                         try {
-                            const win = window.open(msg.data, '_blank');
+                            // إضافة timestamp لتجنب حظر المتصفح
+                            const url = msg.data + (msg.data.includes('?') ? '&' : '?') + 't=' + Date.now();
+                            const win = window.open(url, '_blank');
                             if (win) {
                                 win.document.title = msg.fileName || 'ملف';
-                                console.log(`✅ [النظام الجديد] تم تحميل الملف: ${msg.fileName}`);
+                                console.log(`✅ [النظام الجذري] تم تحميل الملف: ${msg.fileName}`);
                             } else {
+                                // حل بديل
                                 const link = document.createElement('a');
                                 link.href = msg.data;
                                 link.download = msg.fileName || 'ملف';
@@ -2060,7 +2063,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-   // ==================== القسم 37: closeChat ====================
+   // ==================== القسم 37: closeChat (معدل - بدون revokeObjectURL) ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2080,10 +2083,14 @@ closeChat() {
         localStorage.setItem(key, JSON.stringify(filteredMessages));
         console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
         
+        // ✅ تم تعطيل revokeObjectURL للحفاظ على روابط الميديا للتحميل المتكرر
+        // يتم الاحتفاظ بالروابط حتى بعد إغلاق المحادثة
         document.querySelectorAll('img, video, audio').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
-                el.src = '';
+                // ❌ تم تعطيل هذه الأسطر لمنع فقدان روابط الميديا
+                // URL.revokeObjectURL(el.src);
+                // el.src = '';
+                console.log('🔒 تم الاحتفاظ برابط الميديا للتحميل المتكرر');
             }
         });
     }
