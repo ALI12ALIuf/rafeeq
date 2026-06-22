@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1353,7 +1353,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (باستخدام رابط HTML مخفي) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1368,12 +1368,26 @@ displayMessage(msg) {
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn && msg.data) {
+                    // ✅ باستخدام رابط HTML مخفي بدلاً من إنشاء رابط برمجي
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
+                        const link = document.getElementById('downloadFileLink');
+                        if (link) {
+                            link.href = msg.data;
+                            link.download = msg.fileName || 'ملف';
+                            link.click();
+                            console.log(`✅ تم تحميل الملف: ${msg.fileName || 'ملف'}`);
+                        } else {
+                            // حل بديل إذا لم يوجد الرابط
+                            const fallbackLink = document.createElement('a');
+                            fallbackLink.href = msg.data;
+                            fallbackLink.download = msg.fileName || 'ملف';
+                            fallbackLink.style.display = 'none';
+                            document.body.appendChild(fallbackLink);
+                            fallbackLink.click();
+                            document.body.removeChild(fallbackLink);
+                            console.log(`✅ [بديل] تم تحميل الملف: ${msg.fileName || 'ملف'}`);
+                        }
                     };
                 }
             }
@@ -1501,40 +1515,71 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات ====================
+// ==================== القسم 26.3: دوال إغلاق المعاينات (باستخدام روابط HTML مخفية) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (img) { img.src = ''; img.style.transform = 'none'; }
 },
 
 closeVideoPreview() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (video) { video.pause(); video.src = ''; }
 },
 
+// ✅ تحميل الصورة (باستخدام رابط HTML مخفي)
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    
+    const link = document.getElementById('downloadImageLink');
+    if (link) {
+        link.href = img.src;
+        link.download = 'image.jpg';
+        link.click();
+        console.log('✅ تم تحميل الصورة');
+    } else {
+        // حل بديل إذا لم يوجد الرابط
+        const fallbackLink = document.createElement('a');
+        fallbackLink.href = img.src;
+        fallbackLink.download = 'image.jpg';
+        fallbackLink.style.display = 'none';
+        document.body.appendChild(fallbackLink);
+        fallbackLink.click();
+        document.body.removeChild(fallbackLink);
+        console.log('✅ [بديل] تم تحميل الصورة');
+    }
 },
 
+// ✅ تحميل الفيديو (باستخدام رابط HTML مخفي)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-},  
     
-
+    const link = document.getElementById('downloadVideoLink');
+    if (link) {
+        link.href = video.src;
+        link.download = 'video.mp4';
+        link.click();
+        console.log('✅ تم تحميل الفيديو');
+    } else {
+        // حل بديل إذا لم يوجد الرابط
+        const fallbackLink = document.createElement('a');
+        fallbackLink.href = video.src;
+        fallbackLink.download = 'video.mp4';
+        fallbackLink.style.display = 'none';
+        document.body.appendChild(fallbackLink);
+        fallbackLink.click();
+        document.body.removeChild(fallbackLink);
+        console.log('✅ [بديل] تم تحميل الفيديو');
+    }
+},
+    
     // ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
     if (!this.currentChat || !text.trim()) return false; 
