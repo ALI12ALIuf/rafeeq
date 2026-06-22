@@ -651,7 +651,7 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات (التحميل المباشر - fetch + Blob) ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (معرف فريد لكل تحميل) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -668,12 +668,14 @@ window.closeVideoPreview = function() {
     // if (video) { video.pause(); video.src = ''; }
 };
 
-// ✅ تحميل الصورة (التحميل المباشر - fetch + Blob)
+// ✅ تحميل الصورة (معرف فريد لكل تحميل)
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
     
-    const fileName = 'image.jpg';
+    // ✅ معرف فريد لكل تحميل
+    const uniqueId = Date.now();
+    const fileName = `image_${uniqueId}.jpg`;
     
     fetch(img.src)
         .then(response => {
@@ -700,12 +702,14 @@ window.downloadPreviewImage = function() {
         });
 };
 
-// ✅ تحميل الفيديو (التحميل المباشر - fetch + Blob)
+// ✅ تحميل الفيديو (معرف فريد لكل تحميل)
 window.downloadPreviewVideo = function() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
     
-    const fileName = 'video.mp4';
+    // ✅ معرف فريد لكل تحميل
+    const uniqueId = Date.now();
+    const fileName = `video_${uniqueId}.mp4`;
     
     fetch(video.src)
         .then(response => {
