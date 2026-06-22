@@ -651,7 +651,7 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (النظام الجديد - fetch + Blob) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -666,22 +666,59 @@ window.closeVideoPreview = function() {
     if (video) { video.pause(); video.src = ''; }
 };
 
+// ✅ تحميل الصورة (النظام الجديد - fetch + Blob)
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    
+    // استخراج اسم الملف
+    const fileName = 'image.jpg';
+    
+    fetch(img.src)
+        .then(response => response.blob())
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            console.log('✅ [النظام الجديد] تم تحميل الصورة:', fileName);
+        })
+        .catch(error => {
+            console.error('❌ فشل تحميل الصورة:', error);
+            // حل بديل: فتح الصورة في نافذة جديدة
+            window.open(img.src, '_blank');
+        });
 };
 
+// ✅ تحميل الفيديو (النظام الجديد - fetch + Blob)
 window.downloadPreviewVideo = function() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
+    
+    const fileName = 'video.mp4';
+    
+    fetch(video.src)
+        .then(response => response.blob())
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            console.log('✅ [النظام الجديد] تم تحميل الفيديو:', fileName);
+        })
+        .catch(error => {
+            console.error('❌ فشل تحميل الفيديو:', error);
+            // حل بديل: فتح الفيديو في نافذة جديدة
+            window.open(video.src, '_blank');
+        });
 };
 
 // ==================== القسم 15: دوال مساعدة ====================
