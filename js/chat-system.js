@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1353,7 +1353,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (تحميل خلفي مباشر) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1368,12 +1368,18 @@ displayMessage(msg) {
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn && msg.data) {
+                    // ✅ تحميل خلفي مباشر بدون فتح نافذة
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
+                        
                         const link = document.createElement('a');
                         link.href = msg.data;
                         link.download = msg.fileName || 'ملف';
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
                         link.click();
+                        document.body.removeChild(link);
+                        console.log(`✅ تم تحميل الملف: ${msg.fileName || 'ملف'}`);
                     };
                 }
             }
@@ -1501,40 +1507,54 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات ====================
+    // ==================== القسم 26.3: دوال إغلاق المعاينات (تحميل خلفي مباشر) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (img) { img.src = ''; img.style.transform = 'none'; }
 },
 
 closeVideoPreview() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (video) { video.pause(); video.src = ''; }
 },
 
+// ✅ تحميل الصورة (تحميل خلفي مباشر - بدون فتح نافذة)
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
+    
     const link = document.createElement('a');
     link.href = img.src;
     link.download = 'image.jpg';
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    console.log('✅ تم تحميل الصورة');
 },
 
+// ✅ تحميل الفيديو (تحميل خلفي مباشر - بدون فتح نافذة)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
+    
     const link = document.createElement('a');
     link.href = video.src;
     link.download = 'video.mp4';
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
-},  
-    
+    document.body.removeChild(link);
+    console.log('✅ تم تحميل الفيديو');
+},
 
+    
     // ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
     if (!this.currentChat || !text.trim()) return false; 
@@ -2008,7 +2028,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-   // ==================== القسم 37: closeChat ====================
+   // ==================== القسم 37: closeChat (معدل - بدون revokeObjectURL) ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2028,12 +2048,14 @@ closeChat() {
         localStorage.setItem(key, JSON.stringify(filteredMessages));
         console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
         
-        document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
-                el.src = '';
-            }
-        });
+        // ✅ تمت إزالة revokeObjectURL نهائياً
+        // روابط الميديا تبقى حية للتحميل المتكرر
+        // document.querySelectorAll('img, video, audio').forEach(el => {
+        //     if (el.src && el.src.startsWith('blob:')) {
+        //         URL.revokeObjectURL(el.src);
+        //         el.src = '';
+        //     }
+        // });
     }
     
     this.featuresEnabled = false;
@@ -2077,58 +2099,58 @@ closeChat() {
 },
 
     
-    // ==================== القسم 40: تنظيف بيانات المحادثة ====================
-    cleanConversationData(chatId, cleanAll = false) {
-        console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
-        
-        const key = `chat_${chatId}`;
-        if (cleanAll) {
-            localStorage.removeItem(key);
-            delete this.messages[chatId];
-            console.log('✅ تم مسح localStorage بالكامل');
-        } else {
-            const messages = this.messages[chatId] || [];
-            const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
-            this.messages[chatId] = textMessages;
-            localStorage.setItem(key, JSON.stringify(textMessages));
-            console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
-        }
-        
-        document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
-                el.src = '';
-            }
-        });
-        
-        if (this.currentChat === chatId) {
-            const messagesContainer = document.getElementById('messagesContainer');
-            if (messagesContainer) {
-                messagesContainer.innerHTML = '';
-            }
-        }
-        
-        if (typeof CallSystem !== 'undefined') {
-            CallSystem.incomingChunks = {};
-            CallSystem.incomingFileInfo = {};
-            CallSystem._callIceCandidates = [];
-            CallSystem._answerIceCandidates = [];
-        }
-        
-        this._pendingIceCandidates = [];
-        this._responseIceCandidates = [];
-        if (this._batchTimer) {
-            clearTimeout(this._batchTimer);
-            this._batchTimer = null;
-        }
-        if (this._responseBatchTimer) {
-            clearTimeout(this._responseBatchTimer);
-            this._responseBatchTimer = null;
-        }
-        
-        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
-    },
+    // ==================== القسم 40: تنظيف بيانات المحادثة (معدل - بدون revokeObjectURL) ====================
+cleanConversationData(chatId, cleanAll = false) {
+    console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
     
+    const key = `chat_${chatId}`;
+    if (cleanAll) {
+        localStorage.removeItem(key);
+        delete this.messages[chatId];
+        console.log('✅ تم مسح localStorage بالكامل');
+    } else {
+        const messages = this.messages[chatId] || [];
+        const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
+        this.messages[chatId] = textMessages;
+        localStorage.setItem(key, JSON.stringify(textMessages));
+        console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+    }
+    
+    // ✅ تمت إزالة revokeObjectURL نهائياً
+    // روابط الميديا تبقى حية للتحميل المتكرر
+    // document.querySelectorAll('img, video, audio').forEach(el => {
+    //     if (el.src && el.src.startsWith('blob:')) {
+    //         URL.revokeObjectURL(el.src);
+    //         el.src = '';
+    //     }
+    // });
+    
+    if (this.currentChat === chatId) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+        }
+    }
+    
+    if (typeof CallSystem !== 'undefined') {
+        CallSystem.incomingChunks = {};
+        CallSystem.incomingFileInfo = {};
+        CallSystem._callIceCandidates = [];
+        CallSystem._answerIceCandidates = [];
+    }
+    
+    this._pendingIceCandidates = [];
+    this._responseIceCandidates = [];
+    if (this._batchTimer) {
+        clearTimeout(this._batchTimer);
+        this._batchTimer = null;
+    }
+    if (this._responseBatchTimer) {
+        clearTimeout(this._responseBatchTimer);
+        this._responseBatchTimer = null;
+    }
+    
+    console.log('✅ اكتمل مسح بيانات المحادثة:', c'currentChat   
     
     // ==================== القسم 38: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
@@ -2137,7 +2159,7 @@ closeChat() {
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة ====================
+// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة (معدل - بدون revokeObjectURL) ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
@@ -2145,12 +2167,14 @@ function performGlobalCleanup() {
         CallSystem.cleanupDynamicElements();
     }
     
-    document.querySelectorAll('img, video, audio').forEach(el => {
-        if (el.src && el.src.startsWith('blob:')) {
-            URL.revokeObjectURL(el.src);
-            el.src = '';
-        }
-    });
+    // ✅ تمت إزالة revokeObjectURL نهائياً
+    // روابط الميديا تبقى حية للتحميل المتكرر
+    // document.querySelectorAll('img, video, audio').forEach(el => {
+    //     if (el.src && el.src.startsWith('blob:')) {
+    //         URL.revokeObjectURL(el.src);
+    //         el.src = '';
+    //     }
+    // });
     
     const modals = ['incomingCall', 'audioCallUI', 'videoCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
     modals.forEach(id => {
