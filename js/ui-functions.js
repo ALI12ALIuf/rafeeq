@@ -651,38 +651,88 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
+// ==================== القسم 14: دوال إغلاق المعاينات + روابط تحميل مباشرة ====================
+
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
+    const downloadLink = document.getElementById('previewDownloadLink');
+    
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    if (img) { 
+        img.src = ''; 
+        img.style.transform = 'none'; 
+    }
+    if (downloadLink) {
+        downloadLink.href = '#';
+        downloadLink.download = '';
+    }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
+    const downloadLink = document.getElementById('previewVideoDownloadLink');
+    
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    if (video) { 
+        video.pause(); 
+        video.src = ''; 
+    }
+    if (downloadLink) {
+        downloadLink.href = '#';
+        downloadLink.download = '';
+    }
 };
 
-window.downloadPreviewImage = function() {
+// ✅ دالة عرض معاينة الصورة مع رابط تحميل مباشر
+window.showImagePreview = function(imageSrc, fileName = 'image.jpg') {
+    const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    const downloadLink = document.getElementById('previewDownloadLink');
+    
+    if (!modal || !img) return;
+    
+    img.src = imageSrc;
+    
+    // ✅ تحديث رابط التحميل المباشر
+    if (downloadLink) {
+        downloadLink.href = imageSrc;
+        downloadLink.download = fileName;
+        downloadLink.title = `تحميل ${fileName}`;
+    }
+    
+    modal.style.display = 'flex';
+    
+    // إعداد التكبير والتصغير
+    if (typeof window.setupImageZoom === 'function') {
+        window.setupImageZoom(modal, img);
+    }
 };
 
-window.downloadPreviewVideo = function() {
+// ✅ دالة عرض معاينة الفيديو مع رابط تحميل مباشر
+window.showVideoPreview = function(videoSrc, fileName = 'video.mp4') {
+    const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
+    const downloadLink = document.getElementById('previewVideoDownloadLink');
+    
+    if (!modal || !video) return;
+    
+    video.src = videoSrc;
+    
+    // ✅ تحديث رابط التحميل المباشر
+    if (downloadLink) {
+        downloadLink.href = videoSrc;
+        downloadLink.download = fileName;
+        downloadLink.title = `تحميل ${fileName}`;
+    }
+    
+    modal.style.display = 'flex';
+    video.play().catch(() => {});
 };
+
+// ❌ تم إزالة downloadPreviewImage() و downloadPreviewVideo() - لم تعد هناك حاجة لهما
+// لأن التحميل يتم عبر الرابط المباشر <a> بدلاً من زر button
 
 // ==================== القسم 15: دوال مساعدة ====================
 function formatNumber(num) { 
