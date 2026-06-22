@@ -1180,7 +1180,6 @@ displayMessage(msg) {
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1188,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1210,7 +1209,6 @@ displayMessage(msg) {
             console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1353,7 +1351,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (النظام الجديد - window.open) ====================
+    // ==================== معالجة الملف (النظام الجديد فقط - window.open) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1368,24 +1366,22 @@ displayMessage(msg) {
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn && msg.data) {
-                    // ✅ إزالة أي خصائص href أو download قديمة
+                    // ✅ إزالة أي خصائص قديمة
                     downloadBtn.removeAttribute('href');
                     downloadBtn.removeAttribute('download');
                     downloadBtn.removeAttribute('target');
                     
-                    // ✅ النظام الجديد: استخدام window.open
+                    // ✅ النظام الجديد: window.open
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         
                         try {
-                            // محاولة فتح الملف في نافذة جديدة
                             const win = window.open(msg.data, '_blank');
                             if (win) {
                                 win.document.title = msg.fileName || 'ملف';
                                 console.log(`✅ [النظام الجديد] تم تحميل الملف: ${msg.fileName}`);
                             } else {
-                                // حل بديل إذا منع المتصفح النافذة المنبثقة
                                 const link = document.createElement('a');
                                 link.href = msg.data;
                                 link.download = msg.fileName || 'ملف';
@@ -1397,7 +1393,6 @@ displayMessage(msg) {
                             }
                         } catch (error) {
                             console.error('❌ فشل تحميل الملف:', error);
-                            // حل أخير: فتح الرابط مباشرة
                             window.location.href = msg.data;
                         }
                     };
@@ -1409,7 +1404,6 @@ displayMessage(msg) {
         }
     }
     
-    // ✅ إضافة الرسالة إلى الحاوية
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
@@ -1422,7 +1416,6 @@ showImagePreview(imageSrc) {
     
     img.src = imageSrc;
     modal.style.display = 'flex';
-    
     this.setupImageZoom(modal, img);
 },
 
@@ -1527,7 +1520,7 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات (معدلة - نظام window.open) ====================
+// ==================== القسم 26.3: دوال إغلاق المعاينات (النظام الجديد فقط) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1542,7 +1535,7 @@ closeVideoPreview() {
     if (video) { video.pause(); video.src = ''; }
 },
 
-// ✅ دالة تحميل الصورة (النظام الجديد - window.open)
+// ✅ تحميل الصورة (النظام الجديد فقط)
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
@@ -1553,7 +1546,6 @@ downloadPreviewImage() {
             win.document.title = 'image.jpg';
             console.log('✅ [النظام الجديد] تم تحميل الصورة');
         } else {
-            // حل بديل إذا منع المتصفح النافذة المنبثقة
             const link = document.createElement('a');
             link.href = img.src;
             link.download = 'image.jpg';
@@ -1569,7 +1561,7 @@ downloadPreviewImage() {
     }
 },
 
-// ✅ دالة تحميل الفيديو (النظام الجديد - window.open)
+// ✅ تحميل الفيديو (النظام الجديد فقط)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
@@ -1580,7 +1572,6 @@ downloadPreviewVideo() {
             win.document.title = 'video.mp4';
             console.log('✅ [النظام الجديد] تم تحميل الفيديو');
         } else {
-            // حل بديل إذا منع المتصفح النافذة المنبثقة
             const link = document.createElement('a');
             link.href = video.src;
             link.download = 'video.mp4';
@@ -1595,7 +1586,6 @@ downloadPreviewVideo() {
         window.location.href = video.src;
     }
 },
-    
 
     // ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
