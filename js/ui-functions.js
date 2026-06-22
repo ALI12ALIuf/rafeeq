@@ -651,7 +651,7 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات (تحميل خلفي مباشر) ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (نظام التحميل المتكرر) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -668,34 +668,26 @@ window.closeVideoPreview = function() {
     // if (video) { video.pause(); video.src = ''; }
 };
 
-// ✅ تحميل الصورة (تحميل خلفي مباشر - بدون فتح نافذة)
+// ✅ تحميل الصورة (نظام التحميل المتكرر - window.open مع timestamp)
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
     
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    console.log('✅ تم تحميل الصورة');
+    // ✅ استخدام window.open مع timestamp (يعمل دائماً)
+    const url = img.src + (img.src.includes('?') ? '&' : '?') + 't=' + Date.now();
+    window.open(url, '_blank');
+    console.log('✅ تم فتح الصورة للتحميل');
 };
 
-// ✅ تحميل الفيديو (تحميل خلفي مباشر - بدون فتح نافذة)
+// ✅ تحميل الفيديو (نظام التحميل المتكرر - window.open مع timestamp)
 window.downloadPreviewVideo = function() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
     
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    console.log('✅ تم تحميل الفيديو');
+    // ✅ استخدام window.open مع timestamp (يعمل دائماً)
+    const url = video.src + (video.src.includes('?') ? '&' : '?') + 't=' + Date.now();
+    window.open(url, '_blank');
+    console.log('✅ تم فتح الفيديو للتحميل');
 };
 
 // ==================== القسم 15: دوال مساعدة ====================
