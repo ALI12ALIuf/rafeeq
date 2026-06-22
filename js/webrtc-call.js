@@ -1248,7 +1248,7 @@ async sendFileDirect(file, type) {
             const progress = ((i + 1) / totalChunks) * 100;
             const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
             ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-            await new Promise(r => setTimeout(r, 50));
+            await new Promise(r => setTimeout(r, 5));  // ✅ تم التعديل: 50 → 5
         }
         ChatSystem.hideProgressBar();
         console.log('✅ تم إرسال الملف بنجاح');
@@ -1315,8 +1315,12 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        delete this.incomingChunks[msg.id];
-        delete this.incomingFileInfo[msg.id];
+        // ✅ تم التعديل: تنظيف متأخر لتفادي تضارب البيانات
+        setTimeout(() => {
+            delete this.incomingChunks[msg.id];
+            delete this.incomingFileInfo[msg.id];
+            console.log(`🧹 تم تفريغ ذاكرة العنصر المكتمل بنجاح: ${msg.id}`);
+        }, 100);
     }
 },
 
