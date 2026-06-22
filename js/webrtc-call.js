@@ -791,14 +791,27 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // ✅ معالجة Chunks الملفات
             if (msg.chunk !== undefined) {
                 this.handleChunkMessage(msg);
                 return;
             }
             
-            const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
-            if (ChatSystem.currentChat) {
-                ChatSystem.displayMessage(displayMsg);
+            // ✅ معالجة الرسائل المعروفة فقط (منع إنشاء رسائل وهمية)
+            if (msg.type === 'text' || msg.type === 'location' || msg.type === 'image' || msg.type === 'video' || msg.type === 'voice' || msg.type === 'file') {
+                const displayMsg = { 
+                    id: msg.id || Date.now().toString(), 
+                    type: msg.type, 
+                    data: msg.data, 
+                    fileName: msg.fileName, 
+                    sender: 'friend', 
+                    time: new Date().toISOString() 
+                };
+                if (ChatSystem.currentChat) {
+                    ChatSystem.displayMessage(displayMsg);
+                }
+            } else {
+                console.log('📨 استلام رسالة غير معروفة:', msg.type);
             }
         } catch (error) {
             console.error('خطأ في معالجة الرسالة:', error);
@@ -1248,7 +1261,7 @@ async sendFileDirect(file, type) {
             const progress = ((i + 1) / totalChunks) * 100;
             const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
             ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-            await new Promise(r => setTimeout(r, 5));  // ✅ تم التعديل: 50 → 5
+            await new Promise(r => setTimeout(r, 5));
         }
         ChatSystem.hideProgressBar();
         console.log('✅ تم إرسال الملف بنجاح');
@@ -1260,6 +1273,7 @@ async sendFileDirect(file, type) {
     }
 },
 
+// ✅ دالة handleChunkMessage المعدلة (تنظيف فوري للذاكرة)
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -1304,10 +1318,9 @@ handleChunkMessage(msg) {
             id: msg.id,
             type: msg.type === 'location' ? 'text' : msg.type,
             data: objectUrl,
-            fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+            fileName: msg.fileName || (msg.type === 'image' ? 'image.jpg' : msg.type === 'video' ? 'video.mp4' : 'file.bin'),
             sender: 'friend',
-            time: new Date().toISOString(),
-            _blobUrl: objectUrl
+            time: new Date().toISOString()
         };
         
         if (ChatSystem.currentChat) {
@@ -1315,12 +1328,10 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        // ✅ تم التعديل: تنظيف متأخر لتفادي تضارب البيانات
-        setTimeout(() => {
-            delete this.incomingChunks[msg.id];
-            delete this.incomingFileInfo[msg.id];
-            console.log(`🧹 تم تفريغ ذاكرة العنصر المكتمل بنجاح: ${msg.id}`);
-        }, 100);
+        // ✅ تنظيف فوري للذاكرة (بدون setTimeout)
+        delete this.incomingChunks[msg.id];
+        delete this.incomingFileInfo[msg.id];
+        console.log(`🧹 تم تفريغ ذاكرة العنصر المكتمل بنجاح: ${msg.id}`);
     }
 },
 
