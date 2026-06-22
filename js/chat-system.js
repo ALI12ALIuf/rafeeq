@@ -1520,7 +1520,7 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات (النظام النهائي - fetch + Blob مع download) ====================
+// ==================== القسم 26.3: دوال إغلاق المعاينات (نفس نظام الملفات - window.open مع timestamp) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1537,62 +1537,24 @@ closeVideoPreview() {
     // if (video) { video.pause(); video.src = ''; }
 },
 
-// ✅ تحميل الصورة (النظام النهائي - fetch + Blob مع download)
+// ✅ تحميل الصورة (نفس نظام الملفات - window.open مع timestamp)
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
     
-    const fileName = 'image.jpg';
-    
-    fetch(img.src)
-        .then(response => {
-            if (!response.ok) throw new Error('فشل تحميل الصورة');
-            return response.blob();
-        })
-        .then(blob => {
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-            console.log('✅ تم تحميل الصورة:', fileName);
-        })
-        .catch(error => {
-            console.error('❌ فشل تحميل الصورة:', error);
-            alert('فشل تحميل الصورة. حاول مرة أخرى.');
-        });
+    const url = img.src + (img.src.includes('?') ? '&' : '?') + 't=' + Date.now();
+    window.open(url, '_blank');
+    console.log('✅ [نظام الملفات] تم تحميل الصورة');
 },
 
-// ✅ تحميل الفيديو (النظام النهائي - fetch + Blob مع download)
+// ✅ تحميل الفيديو (نفس نظام الملفات - window.open مع timestamp)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
     
-    const fileName = 'video.mp4';
-    
-    fetch(video.src)
-        .then(response => {
-            if (!response.ok) throw new Error('فشل تحميل الفيديو');
-            return response.blob();
-        })
-        .then(blob => {
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-            console.log('✅ تم تحميل الفيديو:', fileName);
-        })
-        .catch(error => {
-            console.error('❌ فشل تحميل الفيديو:', error);
-            alert('فشل تحميل الفيديو. حاول مرة أخرى.');
-        });
+    const url = video.src + (video.src.includes('?') ? '&' : '?') + 't=' + Date.now();
+    window.open(url, '_blank');
+    console.log('✅ [نظام الملفات] تم تحميل الفيديو');
 },
 
     // ==================== القسم 27: sendMessage ====================
