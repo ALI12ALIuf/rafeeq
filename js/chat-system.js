@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة + روابط تحميل مباشرة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1180,7 +1180,6 @@ displayMessage(msg) {
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1188,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1210,7 +1209,6 @@ displayMessage(msg) {
             console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1285,7 +1283,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - زر تحميل كرابط) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1299,6 +1297,15 @@ displayMessage(msg) {
                     img.onclick = () => this.showImagePreview(msg.data);
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
+                }
+                
+                // ✅ تحديث زر التحميل (رابط مباشر)
+                const downloadBtn = wrapper.querySelector('.download-btn');
+                if (downloadBtn && msg.data) {
+                    downloadBtn.href = msg.data;
+                    const fileName = msg.fileName || `image_${msg.id || Date.now()}.jpg`;
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
                 }
             }
             div.appendChild(clone);
@@ -1328,7 +1335,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (معدل - زر تحميل كرابط) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1346,6 +1353,15 @@ displayMessage(msg) {
                     e.stopPropagation();
                     this.showVideoPreview(msg.data);
                 };
+                
+                // ✅ تحديث زر التحميل (رابط مباشر)
+                const downloadBtn = thumbnail.querySelector('.download-btn');
+                if (downloadBtn && msg.data) {
+                    downloadBtn.href = msg.data;
+                    const fileName = msg.fileName || `video_${msg.id || Date.now()}.mp4`;
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
+                }
             }
             div.appendChild(clone);
         } else {
@@ -1353,7 +1369,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل - زر تحميل كرابط) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1366,15 +1382,14 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
+                
+                // ✅ زر التحميل كرابط مباشر (بدلاً من onclick)
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
-                    };
+                    downloadBtn.href = msg.data;
+                    const fileName = msg.fileName || `file_${msg.id || Date.now()}`;
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
                 }
             }
             div.appendChild(clone);
