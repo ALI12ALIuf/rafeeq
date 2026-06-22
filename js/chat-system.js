@@ -1351,7 +1351,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (التحميل المباشر - fetch + Blob) ====================
+    // ==================== معالجة الملف (معرف فريد لكل تحميل) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1371,12 +1371,13 @@ displayMessage(msg) {
                     downloadBtn.removeAttribute('download');
                     downloadBtn.removeAttribute('target');
                     
-                    // ✅ التحميل المباشر: fetch + Blob
+                    // ✅ معرف فريد لكل تحميل
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         
-                        const fileName = msg.fileName || 'ملف';
+                        const uniqueId = Date.now();
+                        const fileName = `${msg.fileName || 'ملف'}_${uniqueId}`;
                         
                         fetch(msg.data)
                             .then(response => {
@@ -1526,7 +1527,7 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات (التحميل المباشر - fetch + Blob) ====================
+// ==================== القسم 26.3: دوال إغلاق المعاينات (معرف فريد لكل تحميل) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1543,12 +1544,14 @@ closeVideoPreview() {
     // if (video) { video.pause(); video.src = ''; }
 },
 
-// ✅ تحميل الصورة (التحميل المباشر - fetch + Blob)
+// ✅ تحميل الصورة (معرف فريد لكل تحميل)
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
     
-    const fileName = 'image.jpg';
+    // ✅ معرف فريد لكل تحميل
+    const uniqueId = Date.now();
+    const fileName = `image_${uniqueId}.jpg`;
     
     fetch(img.src)
         .then(response => {
@@ -1575,12 +1578,14 @@ downloadPreviewImage() {
         });
 },
 
-// ✅ تحميل الفيديو (التحميل المباشر - fetch + Blob)
+// ✅ تحميل الفيديو (معرف فريد لكل تحميل)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
     
-    const fileName = 'video.mp4';
+    // ✅ معرف فريد لكل تحميل
+    const uniqueId = Date.now();
+    const fileName = `video_${uniqueId}.mp4`;
     
     fetch(video.src)
         .then(response => {
