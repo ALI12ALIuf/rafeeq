@@ -651,37 +651,51 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (تحميل خلفي مباشر) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (img) { img.src = ''; img.style.transform = 'none'; }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (video) { video.pause(); video.src = ''; }
 };
 
+// ✅ تحميل الصورة (تحميل خلفي مباشر - بدون فتح نافذة)
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
+    
     const link = document.createElement('a');
     link.href = img.src;
     link.download = 'image.jpg';
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    console.log('✅ تم تحميل الصورة');
 };
 
+// ✅ تحميل الفيديو (تحميل خلفي مباشر - بدون فتح نافذة)
 window.downloadPreviewVideo = function() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
+    
     const link = document.createElement('a');
     link.href = video.src;
     link.download = 'video.mp4';
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    console.log('✅ تم تحميل الفيديو');
 };
 
 // ==================== القسم 15: دوال مساعدة ====================
