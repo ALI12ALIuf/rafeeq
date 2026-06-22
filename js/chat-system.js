@@ -2150,7 +2150,8 @@ cleanConversationData(chatId, cleanAll = false) {
         this._responseBatchTimer = null;
     }
     
-    console.log('✅ اكتمل مسح بيانات المحادثة:', c'currentChat   
+    console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
+},
     
     // ==================== القسم 38: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
