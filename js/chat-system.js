@@ -1285,7 +1285,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - مع زر تحميل) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1294,11 +1294,26 @@ displayMessage(msg) {
             if (wrapper) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
+                // ✅ زر تحميل الصورة
+                const downloadBtn = wrapper.querySelector('.download-media-btn');
                 if (img) {
                     img.src = msg.data;
                     img.onclick = () => this.showImagePreview(msg.data);
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
+                }
+                if (downloadBtn && msg.data) {
+                    downloadBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const link = document.createElement('a');
+                        link.href = msg.data;
+                        link.download = 'image.jpg';
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        console.log('✅ تم تحميل الصورة');
+                    };
                 }
             }
             div.appendChild(clone);
@@ -1328,7 +1343,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (معدل - مع زر تحميل) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1338,6 +1353,8 @@ displayMessage(msg) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
+                // ✅ زر تحميل الفيديو
+                const downloadBtn = thumbnail.querySelector('.download-media-btn');
                 if (source && msg.data) {
                     source.src = msg.data;
                     video.load();
@@ -1346,6 +1363,19 @@ displayMessage(msg) {
                     e.stopPropagation();
                     this.showVideoPreview(msg.data);
                 };
+                if (downloadBtn && msg.data) {
+                    downloadBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const link = document.createElement('a');
+                        link.href = msg.data;
+                        link.download = 'video.mp4';
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        console.log('✅ تم تحميل الفيديو');
+                    };
+                }
             }
             div.appendChild(clone);
         } else {
