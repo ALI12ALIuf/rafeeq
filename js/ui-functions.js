@@ -651,74 +651,43 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات (النظام الجديد - fetch + Blob) ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (النظام الجذري - window.open مع timestamp) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (img) { img.src = ''; img.style.transform = 'none'; }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (video) { video.pause(); video.src = ''; }
 };
 
-// ✅ تحميل الصورة (النظام الجديد - fetch + Blob)
+// ✅ تحميل الصورة (النظام الجذري - window.open مع timestamp)
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
     
-    // استخراج اسم الملف
-    const fileName = 'image.jpg';
-    
-    fetch(img.src)
-        .then(response => response.blob())
-        .then(blob => {
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            console.log('✅ [النظام الجديد] تم تحميل الصورة:', fileName);
-        })
-        .catch(error => {
-            console.error('❌ فشل تحميل الصورة:', error);
-            // حل بديل: فتح الصورة في نافذة جديدة
-            window.open(img.src, '_blank');
-        });
+    // إضافة timestamp لتجنب حظر المتصفح
+    const url = img.src + (img.src.includes('?') ? '&' : '?') + 't=' + Date.now();
+    window.open(url, '_blank');
+    console.log('✅ [النظام الجذري] تم تحميل الصورة');
 };
 
-// ✅ تحميل الفيديو (النظام الجديد - fetch + Blob)
+// ✅ تحميل الفيديو (النظام الجذري - window.open مع timestamp)
 window.downloadPreviewVideo = function() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
     
-    const fileName = 'video.mp4';
-    
-    fetch(video.src)
-        .then(response => response.blob())
-        .then(blob => {
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            console.log('✅ [النظام الجديد] تم تحميل الفيديو:', fileName);
-        })
-        .catch(error => {
-            console.error('❌ فشل تحميل الفيديو:', error);
-            // حل بديل: فتح الفيديو في نافذة جديدة
-            window.open(video.src, '_blank');
-        });
+    // إضافة timestamp لتجنب حظر المتصفح
+    const url = video.src + (video.src.includes('?') ? '&' : '?') + 't=' + Date.now();
+    window.open(url, '_blank');
+    console.log('✅ [النظام الجذري] تم تحميل الفيديو');
 };
 
 // ==================== القسم 15: دوال مساعدة ====================
