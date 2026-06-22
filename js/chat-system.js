@@ -1637,122 +1637,131 @@ async sendMessage(text) {
     },
     
     // ==================== القسم 30: sendImage ====================
-    async sendImage(file) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return;
-        }
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            const success = await this.sendFileWithRetry(file, 'image');
-            if (success) {
-                const msgId = Date.now().toString();
-                const tempUrl = URL.createObjectURL(file);
-                this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-            } else alert('فشل إرسال الصورة');
-        }
-    },
+async sendImage(file) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        const success = await this.sendFileWithRetry(file, 'image');
+        if (success) {
+            const msgId = Date.now().toString();
+            const tempUrl = URL.createObjectURL(file);
+            this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+        } else alert('فشل إرسال الصورة');
+    }
+},
 
 // ==================== القسم 31: sendVideoFile ====================
-    async sendVideoFile(file) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return;
-        }
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        try {
-            await SecureChatSystem.validateVideo(file);
-        } catch (error) {
-            alert(error.message);
-            return;
-        }
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
-            const success = await this.sendFileWithRetry(file, 'video');
-            if (success) {
-                try {
-                    const msgId = Date.now().toString();
-                    const tempUrl = URL.createObjectURL(file);
-                    
-                    this.displayMessage({ id: msgId, type: 'video', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-                    
-                } catch (error) { alert('فشل معالجة الفيديو'); }
-            } else alert('فشل إرسال الفيديو');
-        }
-    },
-
-// ==================== القسم 32: sendFile ====================
-    async sendFile(file) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return;
-        }
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            const success = await this.sendFileWithRetry(file, 'file');
-            if (success) {
+async sendVideoFile(file) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    try {
+        await SecureChatSystem.validateVideo(file);
+    } catch (error) {
+        alert(error.message);
+        return;
+    }
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
+        const success = await this.sendFileWithRetry(file, 'video');
+        if (success) {
+            try {
                 const msgId = Date.now().toString();
                 const tempUrl = URL.createObjectURL(file);
-                this.displayMessage({ id: msgId, type: 'file', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-            } else alert('فشل إرسال الملف');
-        }
-    },
+                
+                this.displayMessage({ id: msgId, type: 'video', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                
+            } catch (error) { alert('فشل معالجة الفيديو'); }
+        } else alert('فشل إرسال الفيديو');
+    }
+},
 
-// ==================== القسم 33: sendVoiceNote ====================
-    async sendVoiceNote(audioBlob) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return;
-        }
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            const success = await this.sendFileWithRetry(audioBlob, 'voice');
-            if (success) {
-                const msgId = Date.now().toString();
-                const tempUrl = URL.createObjectURL(audioBlob);
-                this.displayMessage({ id: msgId, type: 'voice', data: tempUrl, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-            } else alert('فشل إرسال البصمة الصوتية');
-        }
-    },
+// ==================== القسم 32: sendFile ====================
+async sendFile(file) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        const success = await this.sendFileWithRetry(file, 'file');
+        if (success) {
+            const msgId = Date.now().toString();
+            const tempUrl = URL.createObjectURL(file);
+            this.displayMessage({ id: msgId, type: 'file', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+        } else alert('فشل إرسال الملف');
+    }
+},
 
-
+// ==================== القسم 33: sendVoiceNote (معدل - إضافة fileName) ====================
+async sendVoiceNote(audioBlob) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        const success = await this.sendFileWithRetry(audioBlob, 'voice');
+        if (success) {
+            const msgId = Date.now().toString();
+            const tempUrl = URL.createObjectURL(audioBlob);
+            // ✅ إضافة fileName للبصمة الصوتية
+            const fileName = `voice_${msgId}.webm`;
+            this.displayMessage({ 
+                id: msgId, 
+                type: 'voice', 
+                data: tempUrl, 
+                fileName: fileName,  // ✅ تم الإضافة
+                sender: 'me', 
+                time: new Date().toISOString(), 
+                status: 'sent', 
+                _blobUrl: tempUrl 
+            });
+        } else alert('فشل إرسال البصمة الصوتية');
+    }
+},
     
     // ==================== القسم 34: shareLocationDirect ====================
     
