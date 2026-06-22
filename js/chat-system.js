@@ -2159,21 +2159,12 @@ cleanConversationData(chatId, cleanAll = false) {
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 40: تنظيف بيانات المحادثة (معدل - بدون revokeObjectURL) ====================
-cleanConversationData(chatId, cleanAll = false) {
-    console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
+// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة (معدل - بدون revokeObjectURL) ====================
+function performGlobalCleanup() {
+    console.log('🧹 بدء التنظيف الشامل للموقع...');
     
-    const key = `chat_${chatId}`;
-    if (cleanAll) {
-        localStorage.removeItem(key);
-        delete this.messages[chatId];
-        console.log('✅ تم مسح localStorage بالكامل');
-    } else {
-        const messages = this.messages[chatId] || [];
-        const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
-        this.messages[chatId] = textMessages;
-        localStorage.setItem(key, JSON.stringify(textMessages));
-        console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+    if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
+        CallSystem.cleanupDynamicElements();
     }
     
     // ✅ تمت إزالة revokeObjectURL نهائياً
@@ -2185,33 +2176,61 @@ cleanConversationData(chatId, cleanAll = false) {
     //     }
     // });
     
-    if (this.currentChat === chatId) {
-        const messagesContainer = document.getElementById('messagesContainer');
-        if (messagesContainer) {
-            messagesContainer.innerHTML = '';
+    const modals = ['incomingCall', 'audioCallUI', 'videoCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
+    modals.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.display = 'none';
+            if (id === 'imagePreviewModal') {
+                const img = document.getElementById('previewImage');
+                if (img) img.src = '';
+            }
+            if (id === 'videoPreviewModal') {
+                const video = document.getElementById('previewVideo');
+                if (video) { video.pause(); video.src = ''; }
+            }
+            if (id === 'audioCallUI' || id === 'videoCallUI') {
+                const rv = document.getElementById('remoteVideo');
+                if (rv) rv.srcObject = null;
+                const lv = document.getElementById('localVideo');
+                if (lv) lv.srcObject = null;
+            }
+        }
+    });
+    
+    const attachmentMenu = document.getElementById('attachmentMenu');
+    if (attachmentMenu) attachmentMenu.style.display = 'none';
+    
+    const emojiPicker = document.getElementById('emojiPicker');
+    if (emojiPicker) emojiPicker.style.display = 'none';
+    
+    document.body.classList.remove('in-call');
+    
+    if (typeof CallSystem !== 'undefined') {
+        if (CallSystem._callBatchTimer) {
+            clearTimeout(CallSystem._callBatchTimer);
+            CallSystem._callBatchTimer = null;
+        }
+        if (CallSystem._answerBatchTimer) {
+            clearTimeout(CallSystem._answerBatchTimer);
+            CallSystem._answerBatchTimer = null;
+        }
+        if (CallSystem.keepAliveInterval) {
+            clearInterval(CallSystem.keepAliveInterval);
+            CallSystem.keepAliveInterval = null;
+        }
+        if (CallSystem.keepAliveIntervalCall) {
+            clearInterval(CallSystem.keepAliveIntervalCall);
+            CallSystem.keepAliveIntervalCall = null;
+        }
+        if (CallSystem._incomingCallTimeout) {
+            clearTimeout(CallSystem._incomingCallTimeout);
+            CallSystem._incomingCallTimeout = null;
         }
     }
     
-    if (typeof CallSystem !== 'undefined') {
-        CallSystem.incomingChunks = {};
-        CallSystem.incomingFileInfo = {};
-        CallSystem._callIceCandidates = [];
-        CallSystem._answerIceCandidates = [];
-    }
-    
-    this._pendingIceCandidates = [];
-    this._responseIceCandidates = [];
-    if (this._batchTimer) {
-        clearTimeout(this._batchTimer);
-        this._batchTimer = null;
-    }
-    if (this._responseBatchTimer) {
-        clearTimeout(this._responseBatchTimer);
-        this._responseBatchTimer = null;
-    }
-    
-    console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
-},
+    console.log('✅ اكتمل التنظيف الشامل للموقع');
+}
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', performGlobalCleanup);
