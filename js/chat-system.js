@@ -1353,7 +1353,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (معدل) ====================
+    // ==================== معالجة الملف (النظام الجديد - window.open) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1368,13 +1368,38 @@ displayMessage(msg) {
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn && msg.data) {
-                    // ✅ ربط الرابط والاسم مباشرة بزر الـ HTML كأمر تحميل شرعي
-                    downloadBtn.href = msg.data;
-                    downloadBtn.download = msg.fileName || 'ملف';
-                    // ✅ إلغاء دالة المحاكاة القديمة
+                    // ✅ إزالة أي خصائص href أو download قديمة
+                    downloadBtn.removeAttribute('href');
+                    downloadBtn.removeAttribute('download');
+                    downloadBtn.removeAttribute('target');
+                    
+                    // ✅ النظام الجديد: استخدام window.open
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
-                        console.log(`📥 يتم الآن تحميل الملف بنجاح: ${msg.fileName}`);
+                        e.preventDefault();
+                        
+                        try {
+                            // محاولة فتح الملف في نافذة جديدة
+                            const win = window.open(msg.data, '_blank');
+                            if (win) {
+                                win.document.title = msg.fileName || 'ملف';
+                                console.log(`✅ [النظام الجديد] تم تحميل الملف: ${msg.fileName}`);
+                            } else {
+                                // حل بديل إذا منع المتصفح النافذة المنبثقة
+                                const link = document.createElement('a');
+                                link.href = msg.data;
+                                link.download = msg.fileName || 'ملف';
+                                link.style.display = 'none';
+                                document.body.appendChild(link);
+                                link.click();
+                                setTimeout(() => document.body.removeChild(link), 100);
+                                console.log(`✅ [البديل] تم تحميل الملف: ${msg.fileName}`);
+                            }
+                        } catch (error) {
+                            console.error('❌ فشل تحميل الملف:', error);
+                            // حل أخير: فتح الرابط مباشرة
+                            window.location.href = msg.data;
+                        }
                     };
                 }
             }
