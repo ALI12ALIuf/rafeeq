@@ -1285,7 +1285,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (معدل - مع زر تحميل) ====================
+    // ==================== معالجة الصورة ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1294,26 +1294,11 @@ displayMessage(msg) {
             if (wrapper) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
-                // ✅ زر تحميل الصورة
-                const downloadBtn = wrapper.querySelector('.download-media-btn');
                 if (img) {
                     img.src = msg.data;
                     img.onclick = () => this.showImagePreview(msg.data);
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
-                }
-                if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = 'image.jpg';
-                        link.style.display = 'none';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        console.log('✅ تم تحميل الصورة');
-                    };
                 }
             }
             div.appendChild(clone);
@@ -1343,7 +1328,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (معدل - مع زر تحميل) ====================
+    // ==================== معالجة الفيديو ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1353,8 +1338,6 @@ displayMessage(msg) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
-                // ✅ زر تحميل الفيديو
-                const downloadBtn = thumbnail.querySelector('.download-media-btn');
                 if (source && msg.data) {
                     source.src = msg.data;
                     video.load();
@@ -1363,19 +1346,6 @@ displayMessage(msg) {
                     e.stopPropagation();
                     this.showVideoPreview(msg.data);
                 };
-                if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = 'video.mp4';
-                        link.style.display = 'none';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        console.log('✅ تم تحميل الفيديو');
-                    };
-                }
             }
             div.appendChild(clone);
         } else {
@@ -1537,7 +1507,7 @@ showVideoPreview(videoSrc) {
     video.play().catch(() => {});
 },
 
-    // ==================== القسم 26.3: دوال إغلاق المعاينات (تحميل خلفي مباشر) ====================
+        // ==================== القسم 26.3: دوال إغلاق المعاينات (نظام التحميل المتكرر) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1554,34 +1524,26 @@ closeVideoPreview() {
     // if (video) { video.pause(); video.src = ''; }
 },
 
-// ✅ تحميل الصورة (تحميل خلفي مباشر - بدون فتح نافذة)
+// ✅ تحميل الصورة (نظام التحميل المتكرر - window.open مع timestamp)
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
     
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    console.log('✅ تم تحميل الصورة');
+    // ✅ استخدام window.open مع timestamp (يعمل دائماً)
+    const url = img.src + (img.src.includes('?') ? '&' : '?') + 't=' + Date.now();
+    window.open(url, '_blank');
+    console.log('✅ تم فتح الصورة للتحميل');
 },
 
-// ✅ تحميل الفيديو (تحميل خلفي مباشر - بدون فتح نافذة)
+// ✅ تحميل الفيديو (نظام التحميل المتكرر - window.open مع timestamp)
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
     
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    console.log('✅ تم تحميل الفيديو');
+    // ✅ استخدام window.open مع timestamp (يعمل دائماً)
+    const url = video.src + (video.src.includes('?') ? '&' : '?') + 't=' + Date.now();
+    window.open(url, '_blank');
+    console.log('✅ تم فتح الفيديو للتحميل');
 },
 
     
