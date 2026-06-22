@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1353,7 +1353,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1368,12 +1368,13 @@ displayMessage(msg) {
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn && msg.data) {
+                    // ✅ ربط الرابط والاسم مباشرة بزر الـ HTML كأمر تحميل شرعي
+                    downloadBtn.href = msg.data;
+                    downloadBtn.download = msg.fileName || 'ملف';
+                    // ✅ إلغاء دالة المحاكاة القديمة
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
+                        console.log(`📥 يتم الآن تحميل الملف بنجاح: ${msg.fileName}`);
                     };
                 }
             }
