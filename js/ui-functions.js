@@ -651,37 +651,69 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (باستخدام روابط HTML مخفية) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (img) { img.src = ''; img.style.transform = 'none'; }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    // ✅ الاحتفاظ بالرابط للتحميل المتكرر
+    // if (video) { video.pause(); video.src = ''; }
 };
 
+// ✅ تحميل الصورة (باستخدام رابط HTML مخفي)
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    
+    const link = document.getElementById('downloadImageLink');
+    if (link) {
+        link.href = img.src;
+        link.download = 'image.jpg';
+        link.click();
+        console.log('✅ تم تحميل الصورة');
+    } else {
+        // حل بديل إذا لم يوجد الرابط
+        const fallbackLink = document.createElement('a');
+        fallbackLink.href = img.src;
+        fallbackLink.download = 'image.jpg';
+        fallbackLink.style.display = 'none';
+        document.body.appendChild(fallbackLink);
+        fallbackLink.click();
+        document.body.removeChild(fallbackLink);
+        console.log('✅ [بديل] تم تحميل الصورة');
+    }
 };
 
+// ✅ تحميل الفيديو (باستخدام رابط HTML مخفي)
 window.downloadPreviewVideo = function() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
+    
+    const link = document.getElementById('downloadVideoLink');
+    if (link) {
+        link.href = video.src;
+        link.download = 'video.mp4';
+        link.click();
+        console.log('✅ تم تحميل الفيديو');
+    } else {
+        // حل بديل إذا لم يوجد الرابط
+        const fallbackLink = document.createElement('a');
+        fallbackLink.href = video.src;
+        fallbackLink.download = 'video.mp4';
+        fallbackLink.style.display = 'none';
+        document.body.appendChild(fallbackLink);
+        fallbackLink.click();
+        document.body.removeChild(fallbackLink);
+        console.log('✅ [بديل] تم تحميل الفيديو');
+    }
 };
 
 // ==================== القسم 15: دوال مساعدة ====================
