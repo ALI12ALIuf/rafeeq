@@ -2136,58 +2136,60 @@ closeChat() {
 },
 
     
-    // ==================== القسم 40: تنظيف بيانات المحادثة ====================
-    cleanConversationData(chatId, cleanAll = false) {
-        console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
-        
-        const key = `chat_${chatId}`;
-        if (cleanAll) {
-            localStorage.removeItem(key);
-            delete this.messages[chatId];
-            console.log('✅ تم مسح localStorage بالكامل');
-        } else {
-            const messages = this.messages[chatId] || [];
-            const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
-            this.messages[chatId] = textMessages;
-            localStorage.setItem(key, JSON.stringify(textMessages));
-            console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
-        }
-        
-        document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
-                el.src = '';
-            }
-        });
-        
-        if (this.currentChat === chatId) {
-            const messagesContainer = document.getElementById('messagesContainer');
-            if (messagesContainer) {
-                messagesContainer.innerHTML = '';
-            }
-        }
-        
-        if (typeof CallSystem !== 'undefined') {
-            CallSystem.incomingChunks = {};
-            CallSystem.incomingFileInfo = {};
-            CallSystem._callIceCandidates = [];
-            CallSystem._answerIceCandidates = [];
-        }
-        
-        this._pendingIceCandidates = [];
-        this._responseIceCandidates = [];
-        if (this._batchTimer) {
-            clearTimeout(this._batchTimer);
-            this._batchTimer = null;
-        }
-        if (this._responseBatchTimer) {
-            clearTimeout(this._responseBatchTimer);
-            this._responseBatchTimer = null;
-        }
-        
-        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
-    },
+ // ==================== القسم 40: تنظيف بيانات المحادثة (معدل - بدون revokeObjectURL) ====================
+cleanConversationData(chatId, cleanAll = false) {
+    console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
     
+    const key = `chat_${chatId}`;
+    if (cleanAll) {
+        localStorage.removeItem(key);
+        delete this.messages[chatId];
+        console.log('✅ تم مسح localStorage بالكامل');
+    } else {
+        const messages = this.messages[chatId] || [];
+        const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
+        this.messages[chatId] = textMessages;
+        localStorage.setItem(key, JSON.stringify(textMessages));
+        console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+    }
+    
+    // ✅ تم تعطيل revokeObjectURL للحفاظ على روابط الميديا للتحميل المتكرر
+    document.querySelectorAll('img, video, audio').forEach(el => {
+        if (el.src && el.src.startsWith('blob:')) {
+            // ❌ تم تعطيل هذه الأسطر لمنع فقدان روابط الميديا
+            // URL.revokeObjectURL(el.src);
+            // el.src = '';
+            console.log('🔒 تم الاحتفاظ برابط الميديا للتحميل المتكرر');
+        }
+    });
+    
+    if (this.currentChat === chatId) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+        }
+    }
+    
+    if (typeof CallSystem !== 'undefined') {
+        CallSystem.incomingChunks = {};
+        CallSystem.incomingFileInfo = {};
+        CallSystem._callIceCandidates = [];
+        CallSystem._answerIceCandidates = [];
+    }
+    
+    this._pendingIceCandidates = [];
+    this._responseIceCandidates = [];
+    if (this._batchTimer) {
+        clearTimeout(this._batchTimer);
+        this._batchTimer = null;
+    }
+    if (this._responseBatchTimer) {
+        clearTimeout(this._responseBatchTimer);
+        this._responseBatchTimer = null;
+    }
+    
+    console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
+},   
     
     // ==================== القسم 38: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
