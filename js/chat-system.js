@@ -1167,7 +1167,7 @@ const ChatSystem = {
         };
     },
 
-    // ==================== القسم 26: displayMessage (معدل نهائياً - دعم التحميل المتكرر) ====================
+    // ==================== القسم 26: displayMessage (معدل نهائياً - مع إصلاح زر التحميل) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1187,7 +1187,7 @@ displayMessage(msg) {
     const dateTime = formatDateTime(new Date(msg.time));
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    // ✅ إنشاء العنصر الرئيسي
+    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
     const template = document.getElementById('messageWrapperTemplate');
     let div;
     if (template) {
@@ -1296,7 +1296,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (معدل نهائياً - window.open + إعادة إنشاء الرابط) ====================
+    // ==================== معالجة الصورة (معدل نهائياً - زر تحميل يعمل دائماً) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1314,7 +1314,7 @@ displayMessage(msg) {
                     img.ondragstart = (e) => e.preventDefault();
                 }
                 
-                // ✅ زر التحميل - إعادة إنشاء الرابط عند كل ضغطة
+                // ✅ زر التحميل - يعمل دائماً
                 if (downloadBtn) {
                     const fileId = msg._fileId || msg.id;
                     const fileName = msg.fileName || `image_${msg.id}.jpg`;
@@ -1324,43 +1324,46 @@ displayMessage(msg) {
                     downloadBtn.download = fileName;
                     downloadBtn.title = `تحميل ${fileName}`;
                     
-                    // ✅ إزالة أي مستمعات سابقة
+                    // ✅ استبدال الزر وإضافة مستمع جديد (لحل مشكلة cloneNode)
                     const newBtn = downloadBtn.cloneNode(true);
                     downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
                     
                     newBtn.addEventListener('click', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
+                        console.log(`🖱️ تم الضغط على زر تحميل الصورة: ${fileId}`);
                         
                         const cached = ChatSystem._getFile(fileId);
                         if (cached && cached.data) {
                             try {
                                 const blob = new Blob([cached.data], { type: cached.mimeType || 'image/jpeg' });
                                 const url = URL.createObjectURL(blob);
-                                
-                                // ✅ فتح الرابط في نافذة جديدة
-                                const win = window.open(url, '_blank');
-                                if (win) {
-                                    setTimeout(() => URL.revokeObjectURL(url), 10000);
-                                    console.log(`✅ تم تحميل الصورة (window.open): ${fileId}`);
-                                } else {
-                                    // Fallback: استخدام link.click()
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = cached.fileName || fileName;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    setTimeout(() => URL.revokeObjectURL(url), 5000);
-                                    console.log(`✅ تم تحميل الصورة (fallback): ${fileId}`);
-                                }
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = cached.fileName || fileName;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                console.log(`✅ تم تحميل الصورة: ${fileId}`);
                             } catch(err) {
-                                console.warn(`⚠️ فشل تحميل الصورة: ${fileId}`, err);
-                                window.open(msg.data, '_blank');
+                                console.error('❌ فشل تحميل الصورة:', err);
+                                // Fallback
+                                const link = document.createElement('a');
+                                link.href = msg.data;
+                                link.download = fileName;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
                             }
                         } else {
-                            window.open(msg.data, '_blank');
                             console.warn(`⚠️ لا يوجد بيانات في الكاش للصورة: ${fileId}`);
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
                         }
                     }, { once: false });
                 }
@@ -1392,7 +1395,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (معدل نهائياً - window.open + إعادة إنشاء الرابط) ====================
+    // ==================== معالجة الفيديو (معدل نهائياً - زر تحميل يعمل دائماً) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1415,7 +1418,7 @@ displayMessage(msg) {
                     this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
                 };
                 
-                // ✅ زر التحميل - إعادة إنشاء الرابط عند كل ضغطة
+                // ✅ زر التحميل - يعمل دائماً
                 if (downloadBtn) {
                     const fileId = msg._fileId || msg.id;
                     const fileName = msg.fileName || `video_${msg.id}.mp4`;
@@ -1430,34 +1433,38 @@ displayMessage(msg) {
                     newBtn.addEventListener('click', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
+                        console.log(`🖱️ تم الضغط على زر تحميل الفيديو: ${fileId}`);
                         
                         const cached = ChatSystem._getFile(fileId);
                         if (cached && cached.data) {
                             try {
                                 const blob = new Blob([cached.data], { type: cached.mimeType || 'video/mp4' });
                                 const url = URL.createObjectURL(blob);
-                                
-                                const win = window.open(url, '_blank');
-                                if (win) {
-                                    setTimeout(() => URL.revokeObjectURL(url), 10000);
-                                    console.log(`✅ تم تحميل الفيديو (window.open): ${fileId}`);
-                                } else {
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = cached.fileName || fileName;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    setTimeout(() => URL.revokeObjectURL(url), 5000);
-                                    console.log(`✅ تم تحميل الفيديو (fallback): ${fileId}`);
-                                }
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = cached.fileName || fileName;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                console.log(`✅ تم تحميل الفيديو: ${fileId}`);
                             } catch(err) {
-                                console.warn(`⚠️ فشل تحميل الفيديو: ${fileId}`, err);
-                                window.open(msg.data, '_blank');
+                                console.error('❌ فشل تحميل الفيديو:', err);
+                                const link = document.createElement('a');
+                                link.href = msg.data;
+                                link.download = fileName;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
                             }
                         } else {
-                            window.open(msg.data, '_blank');
                             console.warn(`⚠️ لا يوجد بيانات في الكاش للفيديو: ${fileId}`);
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
                         }
                     }, { once: false });
                 }
@@ -1468,7 +1475,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (معدل نهائياً - window.open + إعادة إنشاء الرابط) ====================
+    // ==================== معالجة الملف (معدل نهائياً - زر تحميل يعمل دائماً) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1484,7 +1491,7 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 
-                // ✅ زر التحميل - إعادة إنشاء الرابط عند كل ضغطة
+                // ✅ زر التحميل - يعمل دائماً
                 if (downloadBtn) {
                     const fileId = msg._fileId || msg.id;
                     const fileName = msg.fileName || `file_${msg.id}`;
@@ -1499,34 +1506,38 @@ displayMessage(msg) {
                     newBtn.addEventListener('click', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
+                        console.log(`🖱️ تم الضغط على زر تحميل الملف: ${fileId}`);
                         
                         const cached = ChatSystem._getFile(fileId);
                         if (cached && cached.data) {
                             try {
                                 const blob = new Blob([cached.data], { type: cached.mimeType || 'application/octet-stream' });
                                 const url = URL.createObjectURL(blob);
-                                
-                                const win = window.open(url, '_blank');
-                                if (win) {
-                                    setTimeout(() => URL.revokeObjectURL(url), 10000);
-                                    console.log(`✅ تم تحميل الملف (window.open): ${fileId}`);
-                                } else {
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = cached.fileName || fileName;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    setTimeout(() => URL.revokeObjectURL(url), 5000);
-                                    console.log(`✅ تم تحميل الملف (fallback): ${fileId}`);
-                                }
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = cached.fileName || fileName;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                console.log(`✅ تم تحميل الملف: ${fileId}`);
                             } catch(err) {
-                                console.warn(`⚠️ فشل تحميل الملف: ${fileId}`, err);
-                                window.open(msg.data, '_blank');
+                                console.error('❌ فشل تحميل الملف:', err);
+                                const link = document.createElement('a');
+                                link.href = msg.data;
+                                link.download = fileName;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
                             }
                         } else {
-                            window.open(msg.data, '_blank');
                             console.warn(`⚠️ لا يوجد بيانات في الكاش للملف: ${fileId}`);
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
                         }
                     }, { once: false });
                 }
