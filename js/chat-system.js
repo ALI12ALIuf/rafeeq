@@ -1167,7 +1167,7 @@ const ChatSystem = {
         };
     },
 
-    // ==================== القسم 26: displayMessage (النظام اليدوي الحقيقي) ====================
+    // ==================== القسم 26: displayMessage (معدل نهائياً - دعم التحميل المتكرر) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1187,6 +1187,7 @@ displayMessage(msg) {
     const dateTime = formatDateTime(new Date(msg.time));
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
+    // ✅ إنشاء العنصر الرئيسي
     const template = document.getElementById('messageWrapperTemplate');
     let div;
     if (template) {
@@ -1295,7 +1296,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (النظام اليدوي الحقيقي) ====================
+    // ==================== معالجة الصورة (معدل نهائياً - window.open + إعادة إنشاء الرابط) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1313,34 +1314,55 @@ displayMessage(msg) {
                     img.ondragstart = (e) => e.preventDefault();
                 }
                 
-                // ✅ النظام اليدوي الحقيقي - تعيين الرابط مرة واحدة عند العرض
+                // ✅ زر التحميل - إعادة إنشاء الرابط عند كل ضغطة
                 if (downloadBtn) {
                     const fileId = msg._fileId || msg.id;
                     const fileName = msg.fileName || `image_${msg.id}.jpg`;
                     
-                    const cached = this._getFile(fileId);
-                    if (cached && cached.data) {
-                        try {
-                            const blob = new Blob([cached.data], { type: cached.mimeType || 'image/jpeg' });
-                            const url = URL.createObjectURL(blob);
-                            downloadBtn.href = url;
-                            downloadBtn.download = cached.fileName || fileName;
-                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
-                            console.log(`🔗 تم تعيين رابط التحميل للصورة: ${fileId}`);
-                        } catch(e) {
-                            downloadBtn.href = msg.data;
-                            downloadBtn.download = fileName;
-                            downloadBtn.title = `تحميل ${fileName}`;
-                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للصورة: ${fileId}`);
-                        }
-                    } else {
-                        downloadBtn.href = msg.data;
-                        downloadBtn.download = fileName;
-                        downloadBtn.title = `تحميل ${fileName}`;
-                        console.log(`🔗 تم تعيين رابط التحميل للصورة (fallback): ${fileId}`);
-                    }
+                    // تعيين الرابط الأولي
+                    downloadBtn.href = '#';
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
                     
-                    // ❌ لا يوجد onclick هنا - المستخدم يضغط على الرابط مباشرة
+                    // ✅ إزالة أي مستمعات سابقة
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const cached = ChatSystem._getFile(fileId);
+                        if (cached && cached.data) {
+                            try {
+                                const blob = new Blob([cached.data], { type: cached.mimeType || 'image/jpeg' });
+                                const url = URL.createObjectURL(blob);
+                                
+                                // ✅ فتح الرابط في نافذة جديدة
+                                const win = window.open(url, '_blank');
+                                if (win) {
+                                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                                    console.log(`✅ تم تحميل الصورة (window.open): ${fileId}`);
+                                } else {
+                                    // Fallback: استخدام link.click()
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = cached.fileName || fileName;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                    console.log(`✅ تم تحميل الصورة (fallback): ${fileId}`);
+                                }
+                            } catch(err) {
+                                console.warn(`⚠️ فشل تحميل الصورة: ${fileId}`, err);
+                                window.open(msg.data, '_blank');
+                            }
+                        } else {
+                            window.open(msg.data, '_blank');
+                            console.warn(`⚠️ لا يوجد بيانات في الكاش للصورة: ${fileId}`);
+                        }
+                    }, { once: false });
                 }
             }
             div.appendChild(clone);
@@ -1370,7 +1392,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (النظام اليدوي الحقيقي) ====================
+    // ==================== معالجة الفيديو (معدل نهائياً - window.open + إعادة إنشاء الرابط) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1393,34 +1415,51 @@ displayMessage(msg) {
                     this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
                 };
                 
-                // ✅ النظام اليدوي الحقيقي - تعيين الرابط مرة واحدة عند العرض
+                // ✅ زر التحميل - إعادة إنشاء الرابط عند كل ضغطة
                 if (downloadBtn) {
                     const fileId = msg._fileId || msg.id;
                     const fileName = msg.fileName || `video_${msg.id}.mp4`;
                     
-                    const cached = this._getFile(fileId);
-                    if (cached && cached.data) {
-                        try {
-                            const blob = new Blob([cached.data], { type: cached.mimeType || 'video/mp4' });
-                            const url = URL.createObjectURL(blob);
-                            downloadBtn.href = url;
-                            downloadBtn.download = cached.fileName || fileName;
-                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
-                            console.log(`🔗 تم تعيين رابط التحميل للفيديو: ${fileId}`);
-                        } catch(e) {
-                            downloadBtn.href = msg.data;
-                            downloadBtn.download = fileName;
-                            downloadBtn.title = `تحميل ${fileName}`;
-                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للفيديو: ${fileId}`);
-                        }
-                    } else {
-                        downloadBtn.href = msg.data;
-                        downloadBtn.download = fileName;
-                        downloadBtn.title = `تحميل ${fileName}`;
-                        console.log(`🔗 تم تعيين رابط التحميل للفيديو (fallback): ${fileId}`);
-                    }
+                    downloadBtn.href = '#';
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
                     
-                    // ❌ لا يوجد onclick هنا - المستخدم يضغط على الرابط مباشرة
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const cached = ChatSystem._getFile(fileId);
+                        if (cached && cached.data) {
+                            try {
+                                const blob = new Blob([cached.data], { type: cached.mimeType || 'video/mp4' });
+                                const url = URL.createObjectURL(blob);
+                                
+                                const win = window.open(url, '_blank');
+                                if (win) {
+                                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                                    console.log(`✅ تم تحميل الفيديو (window.open): ${fileId}`);
+                                } else {
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = cached.fileName || fileName;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                    console.log(`✅ تم تحميل الفيديو (fallback): ${fileId}`);
+                                }
+                            } catch(err) {
+                                console.warn(`⚠️ فشل تحميل الفيديو: ${fileId}`, err);
+                                window.open(msg.data, '_blank');
+                            }
+                        } else {
+                            window.open(msg.data, '_blank');
+                            console.warn(`⚠️ لا يوجد بيانات في الكاش للفيديو: ${fileId}`);
+                        }
+                    }, { once: false });
                 }
             }
             div.appendChild(clone);
@@ -1429,7 +1468,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (النظام اليدوي الحقيقي) ====================
+    // ==================== معالجة الملف (معدل نهائياً - window.open + إعادة إنشاء الرابط) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1445,34 +1484,51 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 
-                // ✅ النظام اليدوي الحقيقي - تعيين الرابط مرة واحدة عند العرض
+                // ✅ زر التحميل - إعادة إنشاء الرابط عند كل ضغطة
                 if (downloadBtn) {
                     const fileId = msg._fileId || msg.id;
                     const fileName = msg.fileName || `file_${msg.id}`;
                     
-                    const cached = this._getFile(fileId);
-                    if (cached && cached.data) {
-                        try {
-                            const blob = new Blob([cached.data], { type: cached.mimeType || 'application/octet-stream' });
-                            const url = URL.createObjectURL(blob);
-                            downloadBtn.href = url;
-                            downloadBtn.download = cached.fileName || fileName;
-                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
-                            console.log(`🔗 تم تعيين رابط التحميل للملف: ${fileId}`);
-                        } catch(e) {
-                            downloadBtn.href = msg.data;
-                            downloadBtn.download = fileName;
-                            downloadBtn.title = `تحميل ${fileName}`;
-                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للملف: ${fileId}`);
-                        }
-                    } else {
-                        downloadBtn.href = msg.data;
-                        downloadBtn.download = fileName;
-                        downloadBtn.title = `تحميل ${fileName}`;
-                        console.log(`🔗 تم تعيين رابط التحميل للملف (fallback): ${fileId}`);
-                    }
+                    downloadBtn.href = '#';
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
                     
-                    // ❌ لا يوجد onclick هنا - المستخدم يضغط على الرابط مباشرة
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const cached = ChatSystem._getFile(fileId);
+                        if (cached && cached.data) {
+                            try {
+                                const blob = new Blob([cached.data], { type: cached.mimeType || 'application/octet-stream' });
+                                const url = URL.createObjectURL(blob);
+                                
+                                const win = window.open(url, '_blank');
+                                if (win) {
+                                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                                    console.log(`✅ تم تحميل الملف (window.open): ${fileId}`);
+                                } else {
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = cached.fileName || fileName;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                    console.log(`✅ تم تحميل الملف (fallback): ${fileId}`);
+                                }
+                            } catch(err) {
+                                console.warn(`⚠️ فشل تحميل الملف: ${fileId}`, err);
+                                window.open(msg.data, '_blank');
+                            }
+                        } else {
+                            window.open(msg.data, '_blank');
+                            console.warn(`⚠️ لا يوجد بيانات في الكاش للملف: ${fileId}`);
+                        }
+                    }, { once: false });
                 }
             }
             div.appendChild(clone);
@@ -1481,6 +1537,7 @@ displayMessage(msg) {
         }
     }
     
+    // ✅ إضافة الرسالة إلى الحاوية
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
