@@ -1348,6 +1348,74 @@ compressImage(file) {
     });
 },
 
+// ==================== 13.1 معالجة استلام الملفات (معدل - تخزين ArrayBuffer في ChatSystem) ====================
+handleChunkMessage(msg) {
+    if (!this.incomingChunks[msg.id]) {
+        this.incomingChunks[msg.id] = [];
+        this.incomingFileInfo[msg.id] = {
+            type: msg.type,
+            fileName: msg.fileName,
+            total: msg.total,
+            received: 0
+        };
+        ChatSystem.showProgressBar('جاري استلام الملف...', 0);
+    }
+    
+    const chunkData = new Uint8Array(msg.data);
+    this.incomingChunks[msg.id][msg.chunk] = chunkData;
+    this.incomingFileInfo[msg.id].received++;
+    const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
+    const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
+    ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
+    
+    if (this.incomingFileInfo[msg.id].received === msg.total) {
+        let totalLength = 0;
+        for (let i = 0; i < msg.total; i++) {
+            totalLength += this.incomingChunks[msg.id][i].length;
+        }
+        
+        const fullBuffer = new Uint8Array(totalLength);
+        let offset = 0;
+        for (let i = 0; i < msg.total; i++) {
+            fullBuffer.set(this.incomingChunks[msg.id][i], offset);
+            offset += this.incomingChunks[msg.id][i].length;
+        }
+        
+        let mimeType = 'application/octet-stream';
+        if (msg.type === 'image') mimeType = 'image/jpeg';
+        else if (msg.type === 'video') mimeType = 'video/mp4';
+        else if (msg.type === 'voice') mimeType = 'audio/webm';
+        
+        const blob = new Blob([fullBuffer], { type: mimeType });
+        const objectUrl = URL.createObjectURL(blob);
+        
+        // ✅ تخزين ArrayBuffer في ChatSystem._fileCache
+        if (typeof ChatSystem !== 'undefined' && ChatSystem._storeFile) {
+            ChatSystem._storeFile(msg.id, fullBuffer.buffer, msg.fileName, mimeType, msg.type);
+            console.log(`💾 تم تخزين الملف في الكاش (استلام): ${msg.id}`);
+        }
+        
+        const displayMsg = {
+            id: msg.id,
+            type: msg.type === 'location' ? 'text' : msg.type,
+            data: objectUrl,
+            fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+            sender: 'friend',
+            time: new Date().toISOString(),
+            _blobUrl: objectUrl,
+            _fileId: msg.id  // ✅ ربط الرسالة بالـ ArrayBuffer المخزن
+        };
+        
+        if (ChatSystem.currentChat) {
+            ChatSystem.displayMessage(displayMsg);
+        }
+        ChatSystem.hideProgressBar();
+        
+        delete this.incomingChunks[msg.id];
+        delete this.incomingFileInfo[msg.id];
+    }
+},
+
 // ==================== 14. إنهاء المكالمة (معدل - تستخدم واجهات ثابتة) ====================
     
     endCall() {
