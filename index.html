@@ -703,6 +703,16 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
     exportBtn.textContent = '💾 تصدير';
     exportBtn.style.cssText = `background: #9C27B0; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
     
+    // ✅ إضافة زر تشخيص التحميل
+    const diagnoseBtn = document.createElement('button');
+    diagnoseBtn.textContent = '🔍 تشخيص التحميل';
+    diagnoseBtn.style.cssText = `background: #00BCD4; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
+    // ✅ إضافة زر مسح تشخيص التحميل
+    const clearDiagnoseBtn = document.createElement('button');
+    clearDiagnoseBtn.textContent = '🧹 مسح التشخيص';
+    clearDiagnoseBtn.style.cssText = `background: #555; border: 1px solid #ff6600; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
     controlBar.appendChild(copyBtn);
     controlBar.appendChild(clearBtn);
     controlBar.appendChild(toggleSizeBtn);
@@ -710,6 +720,8 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
     controlBar.appendChild(moveUpBtn);
     controlBar.appendChild(moveDownBtn);
     controlBar.appendChild(exportBtn);
+    controlBar.appendChild(diagnoseBtn);
+    controlBar.appendChild(clearDiagnoseBtn);
     panel.appendChild(controlBar);
     
     const logContainer = document.createElement('div');
@@ -739,6 +751,177 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         logContainer.scrollTop = logContainer.scrollHeight;
         while (logContainer.children.length > 100) logContainer.removeChild(logContainer.children[0]);
     }
+    
+    // ==================== أداة تشخيص التحميل ====================
+    const DownloadDiagnostic = {
+        results: [],
+        
+        diagnose(downloadElement, fileData, fileName) {
+            const result = {
+                timestamp: new Date().toISOString(),
+                elementType: downloadElement.tagName,
+                elementId: downloadElement.id,
+                elementClass: downloadElement.className,
+                hasHref: downloadElement.hasAttribute('href'),
+                hrefValue: downloadElement.getAttribute('href'),
+                hasDownload: downloadElement.hasAttribute('download'),
+                downloadValue: downloadElement.getAttribute('download'),
+                fileDataType: typeof fileData,
+                fileDataIsArrayBuffer: fileData instanceof ArrayBuffer,
+                fileDataIsBlob: fileData instanceof Blob,
+                fileDataIsString: typeof fileData === 'string',
+                fileDataLength: fileData?.byteLength || fileData?.length || 0,
+                fileName: fileName || 'unknown',
+                isObjectUrl: typeof fileData === 'string' && fileData.startsWith('blob:'),
+                isDataUrl: typeof fileData === 'string' && fileData.startsWith('data:'),
+                isHttpUrl: typeof fileData === 'string' && (fileData.startsWith('http://') || fileData.startsWith('https://')),
+                parentElement: downloadElement.parentElement?.tagName || 'none',
+                parentClasses: downloadElement.parentElement?.className || 'none'
+            };
+            
+            this.results.push(result);
+            this.displayResult(result);
+            return result;
+        },
+        
+        displayResult(result) {
+            const logContainer = document.getElementById('diagnosticLogs');
+            if (!logContainer) return;
+            
+            const line = document.createElement('div');
+            line.style.cssText = 'border-bottom: 1px solid #444; padding: 4px 0; font-family: monospace; font-size: 10px;';
+            
+            let status = '✅';
+            let statusColor = '#4CAF50';
+            let issues = [];
+            
+            if (result.elementType !== 'A') {
+                issues.push('❌ العنصر ليس رابط <a>');
+                status = '❌';
+                statusColor = '#f44336';
+            }
+            
+            if (!result.hasHref) {
+                issues.push('❌ لا يوجد href');
+                status = '❌';
+                statusColor = '#f44336';
+            } else if (result.hrefValue === '#') {
+                issues.push('⚠️ href = # (لم يتم تعيينه بعد)');
+                if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
+            } else if (result.hrefValue.startsWith('blob:')) {
+                fetch(result.hrefValue, { method: 'HEAD' })
+                    .then(response => {
+                        if (response.ok) {
+                            const validMsg = document.createElement('div');
+                            validMsg.style.cssText = 'color: #4CAF50; font-size: 9px; padding-left: 20px;';
+                            validMsg.textContent = '✅ Blob URL صالح ويعمل';
+                            logContainer.appendChild(validMsg);
+                        } else {
+                            const invalidMsg = document.createElement('div');
+                            invalidMsg.style.cssText = 'color: #f44336; font-size: 9px; padding-left: 20px;';
+                            invalidMsg.textContent = '❌ Blob URL غير صالح (انتهت صلاحيته)';
+                            logContainer.appendChild(invalidMsg);
+                        }
+                    })
+                    .catch(() => {
+                        const errorMsg = document.createElement('div');
+                        errorMsg.style.cssText = 'color: #f44336; font-size: 9px; padding-left: 20px;';
+                        errorMsg.textContent = '❌ فشل التحقق من Blob URL (قد يكون منتهي الصلاحية)';
+                        logContainer.appendChild(errorMsg);
+                    });
+            } else if (result.hrefValue.startsWith('data:')) {
+                issues.push('ℹ️ data URL (قد يكون كبيراً جداً)');
+            }
+            
+            if (!result.hasDownload) {
+                issues.push('⚠️ لا يوجد download attribute');
+                if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
+            }
+            
+            if (result.fileDataIsArrayBuffer) {
+                issues.push(`✅ البيانات من نوع ArrayBuffer (${(result.fileDataLength / 1024).toFixed(1)} KB)`);
+            } else if (result.fileDataIsBlob) {
+                issues.push(`✅ البيانات من نوع Blob (${(result.fileDataLength / 1024).toFixed(1)} KB)`);
+            } else if (result.isObjectUrl) {
+                issues.push(`⚠️ البيانات هي Blob URL (قد تنتهي صلاحيتها)`);
+                if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
+            } else if (result.fileDataIsString && !result.isObjectUrl && !result.isDataUrl) {
+                issues.push(`⚠️ البيانات من نوع String (قد لا تكون صالحة)`);
+            }
+            
+            const header = document.createElement('div');
+            header.style.cssText = `color: ${statusColor}; font-weight: bold;`;
+            header.textContent = `${status} [${result.timestamp}] تشخيص: ${result.fileName}`;
+            line.appendChild(header);
+            
+            const details = document.createElement('div');
+            details.style.cssText = `color: #aaa; font-size: 9px; padding-left: 20px;`;
+            details.textContent = `🔹 عنصر: ${result.elementType} | href: ${result.hrefValue || 'none'} | download: ${result.downloadValue || 'none'}`;
+            line.appendChild(details);
+            
+            if (issues.length > 0) {
+                const issuesDiv = document.createElement('div');
+                issuesDiv.style.cssText = `color: #FFC107; font-size: 9px; padding-left: 20px;`;
+                issuesDiv.textContent = `🔸 ${issues.join(' | ')}`;
+                line.appendChild(issuesDiv);
+            }
+            
+            logContainer.appendChild(line);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        },
+        
+        diagnoseAll() {
+            const links = document.querySelectorAll('a[download]');
+            const results = [];
+            links.forEach((el, index) => {
+                const fileData = el.href || el.getAttribute('data-file') || 'unknown';
+                const fileName = el.download || `element_${index}`;
+                const result = this.diagnose(el, fileData, fileName);
+                results.push(result);
+            });
+            return results;
+        },
+        
+        showReport() {
+            const logContainer = document.getElementById('diagnosticLogs');
+            if (!logContainer) return;
+            
+            const total = this.results.length;
+            const issues = this.results.filter(r => r.isObjectUrl || r.hrefValue === '#');
+            const valid = this.results.filter(r => !r.isObjectUrl && r.hrefValue !== '#');
+            
+            const report = document.createElement('div');
+            report.style.cssText = 'border-top: 2px solid #ff6600; padding: 8px 0; margin-top: 8px; color: #fff; font-size: 11px;';
+            report.innerHTML = `
+                📊 تقرير التشخيص: ${total} عنصر تم فحصه<br>
+                ✅ صالح: ${valid.length} | ⚠️ بحاجة إلى إصلاح: ${issues.length}
+            `;
+            logContainer.appendChild(report);
+        }
+    };
+    
+    // ==================== أزرار التشخيص ====================
+    diagnoseBtn.onclick = () => {
+        const separator = document.createElement('div');
+        separator.style.cssText = 'border-top: 2px solid #ff6600; padding: 5px 0; color: #ff6600; text-align: center; margin: 5px 0;';
+        separator.textContent = '═══════ بدء تشخيص التحميل ═══════';
+        logContainer.appendChild(separator);
+        DownloadDiagnostic.diagnoseAll();
+        setTimeout(() => DownloadDiagnostic.showReport(), 1500);
+    };
+    
+    clearDiagnoseBtn.onclick = () => {
+        DownloadDiagnostic.results = [];
+        const items = logContainer.querySelectorAll('div');
+        items.forEach(item => {
+            if (item.textContent.includes('═══════') || 
+                item.textContent.includes('تشخيص:') ||
+                item.textContent.includes('تقرير التشخيص')) {
+                item.remove();
+            }
+        });
+        addLog('🧹 تم مسح نتائج التشخيص', 'warn');
+    };
     
     copyBtn.onclick = () => { const text = allLogs.join('\n'); navigator.clipboard.writeText(text).then(() => addLog('✅ تم نسخ ' + allLogs.length + ' سطر', 'success')).catch(() => addLog('❌ فشل النسخ', 'error')); };
     clearBtn.onclick = () => { logContainer.innerHTML = ''; allLogs = []; addLog('🗑️ تم مسح السجل', 'warn'); };
