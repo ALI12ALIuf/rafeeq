@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+ // ==================== القسم 26: displayMessage (معدل - دعم روابط التحميل المباشرة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1180,7 +1180,6 @@ displayMessage(msg) {
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1188,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1210,7 +1209,6 @@ displayMessage(msg) {
             console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1285,20 +1283,53 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - دعم روابط التحميل المباشرة) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
             const clone = templateImg.content.cloneNode(true);
             const wrapper = clone.querySelector('.message-image-wrapper');
+            const downloadBtn = wrapper?.querySelector('.download-btn');
+            
             if (wrapper) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
                     img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                    img.onclick = () => this.showImagePreview(msg.data, msg.fileName || 'image.jpg');
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
+                }
+                
+                // ✅ زر التحميل - رابط طبيعي (لا برمجي)
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `image_${msg.id}.jpg`;
+                    
+                    // محاولة الحصول على الملف من الكاش
+                    const cached = this._getFile(fileId);
+                    if (cached && cached.data) {
+                        try {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'image/jpeg' });
+                            const url = URL.createObjectURL(blob);
+                            downloadBtn.href = url;
+                            downloadBtn.download = cached.fileName || fileName;
+                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
+                            console.log(`🔗 تم تعيين رابط التحميل للصورة: ${fileId}`);
+                        } catch(e) {
+                            // في حال فشل إنشاء الرابط من الكاش
+                            downloadBtn.href = msg.data;
+                            downloadBtn.download = fileName;
+                            downloadBtn.title = `تحميل ${fileName}`;
+                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للصورة: ${fileId}`);
+                        }
+                    } else {
+                        // Fallback: استخدم الرابط الموجود في الرسالة
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = fileName;
+                        downloadBtn.title = `تحميل ${fileName}`;
+                        console.log(`🔗 تم تعيين رابط التحميل للصورة (fallback): ${fileId}`);
+                    }
                 }
             }
             div.appendChild(clone);
@@ -1328,24 +1359,56 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (معدل - دعم روابط التحميل المباشرة) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
             const clone = templateVideo.content.cloneNode(true);
             const thumbnail = clone.querySelector('.video-thumbnail');
+            const downloadBtn = thumbnail?.querySelector('.download-btn');
+            
             if (thumbnail) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
+                
                 if (source && msg.data) {
                     source.src = msg.data;
                     video.load();
                 }
+                
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
-                    this.showVideoPreview(msg.data);
+                    this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
                 };
+                
+                // ✅ زر التحميل - رابط طبيعي (لا برمجي)
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `video_${msg.id}.mp4`;
+                    
+                    const cached = this._getFile(fileId);
+                    if (cached && cached.data) {
+                        try {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'video/mp4' });
+                            const url = URL.createObjectURL(blob);
+                            downloadBtn.href = url;
+                            downloadBtn.download = cached.fileName || fileName;
+                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
+                            console.log(`🔗 تم تعيين رابط التحميل للفيديو: ${fileId}`);
+                        } catch(e) {
+                            downloadBtn.href = msg.data;
+                            downloadBtn.download = fileName;
+                            downloadBtn.title = `تحميل ${fileName}`;
+                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للفيديو: ${fileId}`);
+                        }
+                    } else {
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = fileName;
+                        downloadBtn.title = `تحميل ${fileName}`;
+                        console.log(`🔗 تم تعيين رابط التحميل للفيديو (fallback): ${fileId}`);
+                    }
+                }
             }
             div.appendChild(clone);
         } else {
@@ -1353,12 +1416,14 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل - دعم روابط التحميل المباشرة) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
             const clone = templateFile.content.cloneNode(true);
             const fileCard = clone.querySelector('.file-card');
+            const downloadBtn = fileCard?.querySelector('.download-file-btn');
+            
             if (fileCard) {
                 fileCard.style.background = '#4CAF50';
                 fileCard.style.border = `1.5px solid ${borderColor}`;
@@ -1366,15 +1431,33 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
-                    };
+                
+                // ✅ زر التحميل - رابط طبيعي (لا برمجي)
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `file_${msg.id}`;
+                    
+                    const cached = this._getFile(fileId);
+                    if (cached && cached.data) {
+                        try {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'application/octet-stream' });
+                            const url = URL.createObjectURL(blob);
+                            downloadBtn.href = url;
+                            downloadBtn.download = cached.fileName || fileName;
+                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
+                            console.log(`🔗 تم تعيين رابط التحميل للملف: ${fileId}`);
+                        } catch(e) {
+                            downloadBtn.href = msg.data;
+                            downloadBtn.download = fileName;
+                            downloadBtn.title = `تحميل ${fileName}`;
+                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للملف: ${fileId}`);
+                        }
+                    } else {
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = fileName;
+                        downloadBtn.title = `تحميل ${fileName}`;
+                        console.log(`🔗 تم تعيين رابط التحميل للملف (fallback): ${fileId}`);
+                    }
                 }
             }
             div.appendChild(clone);
@@ -1387,6 +1470,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+
 
 // ==================== القسم 26.1: showImagePreview ====================
 showImagePreview(imageSrc) {
