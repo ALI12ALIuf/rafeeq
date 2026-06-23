@@ -1,4 +1,4 @@
-// ========== webrtc-call.js - النسخة المعدلة (واجهات ثابتة) ==========
+// ========== webrtc-call.js - النسخة المعدلة (مع دعم تخزين Blob للتحميل) ==========
 // جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات
 
 const CallSystem = {
@@ -1260,6 +1260,7 @@ async sendFileDirect(file, type) {
     }
 },
 
+// ==================== 13.1 معالجة استلام الملفات (معدل - تخزين Blob في ChatSystem) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -1300,6 +1301,17 @@ handleChunkMessage(msg) {
         const blob = new Blob([fullBuffer], { type: mimeType });
         const objectUrl = URL.createObjectURL(blob);
         
+        // ✅ تخزين الـ Blob في ChatSystem._blobStorage للتحميل لاحقاً
+        if (typeof ChatSystem !== 'undefined' && ChatSystem._blobStorage) {
+            ChatSystem._blobStorage.set(msg.id, {
+                blob: blob,
+                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+                type: msg.type,
+                mimeType: mimeType
+            });
+            console.log(`💾 تم تخزين الـ Blob في الكاش: ${msg.id}`);
+        }
+        
         const displayMsg = {
             id: msg.id,
             type: msg.type === 'location' ? 'text' : msg.type,
@@ -1307,7 +1319,8 @@ handleChunkMessage(msg) {
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _blobUrl: objectUrl
+            _blobUrl: objectUrl,
+            _blobId: msg.id  // ✅ ربط الرسالة بالـ Blob المخزن
         };
         
         if (ChatSystem.currentChat) {
