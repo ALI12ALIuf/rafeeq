@@ -633,103 +633,187 @@ window.addEventListener('load', function() {
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
 </script>
 
-<!-- ==================== القسم 10: أداة التشخيص ==================== -->
+<!-- ==================== القسم 10: أداة التشخيص المتقدمة ==================== -->
 <script>
 (function advancedDiagnosticTool() {
-    // ===== إنشاء اللوحة =====
+    // ===== اللوحة الرئيسية =====
     const panel = document.createElement('div');
     panel.id = 'diagnosticTool';
     panel.style.cssText = `
         position: fixed;
-        bottom: 80px;
+        bottom: 20px;
         right: 20px;
-        width: 380px;
-        max-width: 90vw;
+        width: 280px;
+        height: 50px;
         background: rgba(0,0,0,0.92);
         color: #0f0;
-        font-size: 11px;
+        font-size: 10px;
         font-family: monospace;
-        padding: 10px 12px;
-        border-radius: 16px;
+        padding: 6px 10px;
+        border-radius: 25px;
         z-index: 999999;
-        direction: ltr;
-        text-align: left;
         border: 2px solid #ff6600;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.7);
         transition: all 0.3s ease;
-        max-height: 320px;
-        min-height: 60px;
+        cursor: move;
         overflow: hidden;
-        resize: none;
-        backdrop-filter: blur(10px);
-        touch-action: none;
+        display: flex;
+        flex-direction: column;
+        backdrop-filter: blur(5px);
         user-select: none;
-        cursor: grab;
+        touch-action: none;
     `;
-    
-    // ===== شريط التحكم =====
+
+    // ===== حالة اللوحة =====
+    let isMinimized = true;
+    let isDragging = false;
+    let dragOffsetX = 0, dragOffsetY = 0;
+    let originalWidth = '280px';
+    let originalHeight = '50px';
+    let expandedWidth = '380px';
+    let expandedHeight = '300px';
+
+    // ===== شريط التحكم العلوي =====
     const controlBar = document.createElement('div');
     controlBar.style.cssText = `
         display: flex;
-        gap: 6px;
-        margin-bottom: 6px;
-        padding-bottom: 5px;
-        border-bottom: 1px solid #ff6600;
-        flex-wrap: wrap;
-        position: sticky;
-        top: 0;
-        background: rgba(0,0,0,0.92);
-        z-index: 10;
-        cursor: grab;
+        gap: 5px;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        height: 30px;
+        cursor: move;
+        touch-action: none;
     `;
-    
-    // الأزرار المطلوبة فقط
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = '📋 نسخ';
-    copyBtn.style.cssText = `background: #ff6600; border: none; color: white; padding: 3px 8px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
-    
-    const clearBtn = document.createElement('button');
-    clearBtn.textContent = '🗑️ مسح';
-    clearBtn.style.cssText = `background: #333; border: 1px solid #ff6600; color: white; padding: 3px 8px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
-    
+
+    // ===== زر التكبير/التصغير =====
     const toggleBtn = document.createElement('button');
-    toggleBtn.textContent = '⭕';
-    toggleBtn.style.cssText = `background: #2196F3; border: none; color: white; padding: 3px 10px; border-radius: 50%; font-size: 14px; cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;`;
-    
-    // إضافة الأزرار
-    controlBar.appendChild(copyBtn);
-    controlBar.appendChild(clearBtn);
-    controlBar.appendChild(toggleBtn);
+    toggleBtn.textContent = '⬜';
+    toggleBtn.style.cssText = `
+        background: #2196F3;
+        border: none;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        min-width: 30px;
+        height: 24px;
+    `;
+
+    // ===== أزرار التحكم =====
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋';
+    copyBtn.style.cssText = `
+        background: #ff6600;
+        border: none;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        min-width: 30px;
+        height: 24px;
+    `;
+
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = '🗑️';
+    clearBtn.style.cssText = `
+        background: #f44336;
+        border: none;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        min-width: 30px;
+        height: 24px;
+    `;
+
+    const diagnoseBtn = document.createElement('button');
+    diagnoseBtn.textContent = '🔍';
+    diagnoseBtn.style.cssText = `
+        background: #00BCD4;
+        border: none;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        min-width: 30px;
+        height: 24px;
+    `;
+
+    const clearDiagBtn = document.createElement('button');
+    clearDiagBtn.textContent = '🧹';
+    clearDiagBtn.style.cssText = `
+        background: #9C27B0;
+        border: none;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        min-width: 30px;
+        height: 24px;
+    `;
+
+    // ===== إضافة الأزرار إلى شريط التحكم =====
+    const leftGroup = document.createElement('div');
+    leftGroup.style.cssText = 'display: flex; gap: 4px; align-items: center;';
+    leftGroup.appendChild(toggleBtn);
+    leftGroup.appendChild(copyBtn);
+    leftGroup.appendChild(clearBtn);
+
+    const rightGroup = document.createElement('div');
+    rightGroup.style.cssText = 'display: flex; gap: 4px; align-items: center;';
+    rightGroup.appendChild(diagnoseBtn);
+    rightGroup.appendChild(clearDiagBtn);
+
+    controlBar.appendChild(leftGroup);
+    controlBar.appendChild(rightGroup);
     panel.appendChild(controlBar);
-    
+
     // ===== حاوية السجلات =====
     const logContainer = document.createElement('div');
     logContainer.id = 'diagnosticLogs';
     logContainer.style.cssText = `
-        max-height: 220px;
+        flex: 1;
         overflow-y: auto;
         font-size: 10px;
-        padding-right: 4px;
-        cursor: default;
+        padding: 4px 2px;
+        display: none;
+        min-height: 0;
+        border-top: 1px solid #333;
+        margin-top: 4px;
+        padding-top: 4px;
     `;
     panel.appendChild(logContainer);
     document.body.appendChild(panel);
-    
+
+    // ===== متغيرات =====
     let allLogs = [];
-    let isMinimized = false;
-    let originalHeight = '320px';
-    let dragData = null;
-    
+    let diagnoseResults = [];
+
     // ===== دالة إضافة سجل =====
     function addLog(msg, type = 'info') {
         const line = document.createElement('div');
         const time = new Date().toLocaleTimeString();
         line.textContent = `${time} | ${msg}`;
-        if (type === 'error') { line.style.color = '#ff6666'; line.style.borderRight = '3px solid #ff0000'; line.style.paddingRight = '5px'; allLogs.push(`[${time}] ERROR: ${msg}`); }
-        else if (type === 'success') { line.style.color = '#66ff66'; allLogs.push(`[${time}] SUCCESS: ${msg}`); }
-        else if (type === 'warn') { line.style.color = '#ffaa66'; allLogs.push(`[${time}] WARN: ${msg}`); }
-        else { line.style.color = '#cccccc'; allLogs.push(`[${time}] INFO: ${msg}`); }
-        line.style.borderBottom = '1px solid #333';
+        if (type === 'error') { 
+            line.style.color = '#ff6666'; 
+            allLogs.push(`[${time}] ERROR: ${msg}`);
+        } else if (type === 'success') { 
+            line.style.color = '#66ff66'; 
+            allLogs.push(`[${time}] SUCCESS: ${msg}`);
+        } else if (type === 'warn') { 
+            line.style.color = '#ffaa66'; 
+            allLogs.push(`[${time}] WARN: ${msg}`);
+        } else { 
+            line.style.color = '#cccccc'; 
+            allLogs.push(`[${time}] INFO: ${msg}`);
+        }
+        line.style.borderBottom = '1px solid #222';
         line.style.padding = '2px 0';
         line.style.fontFamily = 'monospace';
         line.style.wordBreak = 'break-word';
@@ -737,223 +821,216 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         logContainer.scrollTop = logContainer.scrollHeight;
         while (logContainer.children.length > 80) logContainer.removeChild(logContainer.children[0]);
     }
-    
-    // ===== تشخيص تلقائي للتحميل =====
-    function autoDiagnoseDownload() {
+
+    // ===== دالة التشخيص التلقائي =====
+    function autoDiagnose() {
         const links = document.querySelectorAll('a[download]');
         if (links.length === 0) return;
         
-        let hasIssues = false;
-        links.forEach((link) => {
-            const href = link.getAttribute('href');
-            const download = link.getAttribute('download') || 'ملف';
+        links.forEach((link, index) => {
+            const href = link.getAttribute('href') || 'none';
+            const download = link.getAttribute('download') || 'none';
+            const isValid = href && href !== '#' && href !== 'none';
             
-            if (!href || href === '#' || href === '') {
-                addLog(`⚠️ [تحميل] "${download}" ليس له رابط (href="#")`, 'warn');
-                hasIssues = true;
-            } else if (href.startsWith('blob:')) {
-                // التحقق من صحة Blob URL
-                fetch(href, { method: 'HEAD' })
-                    .then(res => {
-                        if (res.ok) {
-                            addLog(`✅ [تحميل] "${download}" - Blob URL صالح`, 'success');
-                        } else {
-                            addLog(`❌ [تحميل] "${download}" - Blob URL غير صالح (انتهت صلاحيته)`, 'error');
-                        }
-                    })
-                    .catch(() => {
-                        addLog(`❌ [تحميل] "${download}" - فشل التحقق من Blob URL`, 'error');
-                    });
-            } else if (href.startsWith('http://') || href.startsWith('https://')) {
-                addLog(`✅ [تحميل] "${download}" - HTTP URL صالح`, 'success');
-            } else if (href.startsWith('data:')) {
-                addLog(`ℹ️ [تحميل] "${download}" - Data URL (قد يكون كبيراً)`, 'info');
+            let status = isValid ? '✅' : '❌';
+            let color = isValid ? '#4CAF50' : '#f44336';
+            
+            // فحص Blob URL
+            if (href.startsWith('blob:')) {
+                try {
+                    fetch(href, { method: 'HEAD' })
+                        .then(res => {
+                            const msg = res.ok ? '✅ Blob صالح' : '❌ Blob منتهي';
+                            addLog(`${status} ملف #${index}: ${download} | ${msg}`, res.ok ? 'success' : 'error');
+                        })
+                        .catch(() => {
+                            addLog(`❌ ملف #${index}: ${download} | ❌ Blob غير صالح`, 'error');
+                        });
+                } catch(e) {
+                    addLog(`❌ ملف #${index}: ${download} | ❌ خطأ في الفحص`, 'error');
+                }
+            } else if (href === '#' || href === 'none') {
+                addLog(`❌ ملف #${index}: ${download} | ⚠️ href = # (غير معين)`, 'error');
+            } else {
+                addLog(`✅ ملف #${index}: ${download} | ${href.substring(0, 30)}...`, 'success');
             }
         });
-        
-        if (!hasIssues && links.length > 0) {
-            addLog(`✅ [تحميل] جميع روابط التحميل (${links.length}) تبدو صالحة`, 'success');
+    }
+
+    // ===== تشغيل التشخيص التلقائي كل 5 ثواني =====
+    let autoDiagnoseInterval = setInterval(() => {
+        if (logContainer.style.display === 'block') {
+            autoDiagnose();
+        }
+    }, 5000);
+
+    // ===== دالة التبديل بين التصغير والتكبير =====
+    function toggleSize() {
+        if (isMinimized) {
+            // تكبير
+            panel.style.width = expandedWidth;
+            panel.style.height = expandedHeight;
+            panel.style.borderRadius = '12px';
+            panel.style.padding = '8px 12px';
+            logContainer.style.display = 'block';
+            toggleBtn.textContent = '⬛';
+            isMinimized = false;
+            // تشغيل التشخيص التلقائي عند التكبير
+            setTimeout(autoDiagnose, 500);
+        } else {
+            // تصغير
+            panel.style.width = originalWidth;
+            panel.style.height = originalHeight;
+            panel.style.borderRadius = '25px';
+            panel.style.padding = '6px 10px';
+            logContainer.style.display = 'none';
+            toggleBtn.textContent = '⬜';
+            isMinimized = true;
         }
     }
-    
-    // ===== مراقبة التغييرات في DOM لتشخيص تلقائي =====
-    const observer = new MutationObserver(() => {
-        // تشخيص تلقائي بعد إضافة عناصر جديدة
-        setTimeout(autoDiagnoseDownload, 500);
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    // تشخيص أولي بعد ثانية
-    setTimeout(autoDiagnoseDownload, 1500);
-    
-    // ===== تشخيص عند كل رسالة جديدة =====
-    const origDisplayMessage = ChatSystem?.displayMessage;
-    if (origDisplayMessage) {
-        ChatSystem.displayMessage = function(msg) {
-            origDisplayMessage.call(this, msg);
-            setTimeout(autoDiagnoseDownload, 300);
-        };
-    }
-    
-    // ===== سحب اللوحة =====
-    function startDrag(e) {
-        e.preventDefault();
+
+    // ===== أزرار التحكم =====
+    toggleBtn.onclick = toggleSize;
+
+    copyBtn.onclick = () => {
+        const text = allLogs.join('\n');
+        navigator.clipboard.writeText(text)
+            .then(() => addLog('✅ تم نسخ ' + allLogs.length + ' سطر', 'success'))
+            .catch(() => addLog('❌ فشل النسخ', 'error'));
+    };
+
+    clearBtn.onclick = () => {
+        logContainer.innerHTML = '';
+        allLogs = [];
+        diagnoseResults = [];
+        addLog('🗑️ تم مسح السجل', 'warn');
+    };
+
+    diagnoseBtn.onclick = () => {
+        if (logContainer.style.display !== 'block') {
+            toggleSize();
+        }
+        setTimeout(() => {
+            const separator = document.createElement('div');
+            separator.style.cssText = 'border-top: 2px solid #ff6600; padding: 3px 0; color: #ff6600; text-align: center; margin: 3px 0;';
+            separator.textContent = '════ بدء الفحص ════';
+            logContainer.appendChild(separator);
+            autoDiagnose();
+        }, 300);
+    };
+
+    clearDiagBtn.onclick = () => {
+        const items = logContainer.querySelectorAll('div');
+        const toRemove = [];
+        items.forEach(item => {
+            if (item.textContent.includes('ملف #') ||
+                item.textContent.includes('بدء الفحص') ||
+                item.textContent.includes('Blob')) {
+                toRemove.push(item);
+            }
+        });
+        toRemove.forEach(item => item.remove());
+        addLog('🧹 تم مسح نتائج الفحص', 'warn');
+    };
+
+    // ===== السحب (Drag) =====
+    let startX, startY, origX, origY;
+
+    function onStart(e) {
         const touch = e.touches ? e.touches[0] : e;
-        dragData = {
-            x: touch.clientX - panel.offsetLeft,
-            y: touch.clientY - panel.offsetTop
-        };
-        panel.style.cursor = 'grabbing';
+        isDragging = true;
+        const rect = panel.getBoundingClientRect();
+        startX = touch.clientX;
+        startY = touch.clientY;
+        origX = rect.left;
+        origY = rect.top;
         panel.style.transition = 'none';
-    }
-    
-    function moveDrag(e) {
-        if (!dragData) return;
         e.preventDefault();
+    }
+
+    function onMove(e) {
+        if (!isDragging) return;
         const touch = e.touches ? e.touches[0] : e;
-        let newX = touch.clientX - dragData.x;
-        let newY = touch.clientY - dragData.y;
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+        let newX = origX + dx;
+        let newY = origY + dy;
         
-        // حدود الشاشة
-        newX = Math.max(10, Math.min(window.innerWidth - panel.offsetWidth - 10, newX));
-        newY = Math.max(10, Math.min(window.innerHeight - panel.offsetHeight - 10, newY));
+        // منع الخروج من الشاشة
+        const rect = panel.getBoundingClientRect();
+        const maxX = window.innerWidth - rect.width - 10;
+        const maxY = window.innerHeight - rect.height - 10;
+        newX = Math.max(10, Math.min(newX, maxX));
+        newY = Math.max(10, Math.min(newY, maxY));
         
         panel.style.left = newX + 'px';
         panel.style.top = newY + 'px';
-        panel.style.bottom = 'auto';
         panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+        e.preventDefault();
     }
-    
-    function endDrag() {
-        dragData = null;
-        panel.style.cursor = 'grab';
+
+    function onEnd() {
+        isDragging = false;
         panel.style.transition = 'all 0.3s ease';
     }
-    
-    // أحداث السحب
-    panel.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button')) return;
-        startDrag(e);
-    });
-    document.addEventListener('mousemove', moveDrag);
-    document.addEventListener('mouseup', endDrag);
-    
-    panel.addEventListener('touchstart', (e) => {
-        if (e.target.closest('button')) return;
-        startDrag(e);
-    }, { passive: false });
-    document.addEventListener('touchmove', moveDrag, { passive: false });
-    document.addEventListener('touchend', endDrag);
-    
-    // ===== زر التصغير/التكبير (دائري) =====
-    let isCircle = false;
-    toggleBtn.onclick = () => {
-        if (isCircle) {
-            // تكبير (رجوع للشكل الطبيعي)
-            panel.style.width = '380px';
-            panel.style.maxWidth = '90vw';
-            panel.style.maxHeight = '320px';
-            panel.style.minHeight = '60px';
-            panel.style.borderRadius = '16px';
-            panel.style.padding = '10px 12px';
-            logContainer.style.display = 'block';
-            controlBar.style.display = 'flex';
-            toggleBtn.textContent = '⭕';
-            toggleBtn.style.background = '#2196F3';
-            isCircle = false;
-        } else {
-            // تصغير (دائري)
-            const rect = panel.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            
-            panel.style.width = '50px';
-            panel.style.maxWidth = '50px';
-            panel.style.maxHeight = '50px';
-            panel.style.minHeight = '50px';
-            panel.style.borderRadius = '50%';
-            panel.style.padding = '5px';
-            panel.style.overflow = 'hidden';
-            logContainer.style.display = 'none';
-            controlBar.style.display = 'none';
-            toggleBtn.textContent = '⭕';
-            toggleBtn.style.background = '#4CAF50';
-            
-            // إبقاء الزر في المنتصف
-            setTimeout(() => {
-                const newRect = panel.getBoundingClientRect();
-                panel.style.left = (centerX - 25) + 'px';
-                panel.style.top = (centerY - 25) + 'px';
-                panel.style.bottom = 'auto';
-                panel.style.right = 'auto';
-            }, 50);
-            
-            isCircle = true;
-        }
-    };
-    
-    // ===== أزرار التحكم =====
-    copyBtn.onclick = () => { 
-        const text = allLogs.join('\n'); 
-        navigator.clipboard.writeText(text)
-            .then(() => addLog('✅ تم نسخ ' + allLogs.length + ' سطر', 'success'))
-            .catch(() => addLog('❌ فشل النسخ', 'error')); 
-    };
-    
-    clearBtn.onclick = () => { 
-        logContainer.innerHTML = ''; 
-        allLogs = []; 
-        addLog('🗑️ تم مسح السجل', 'warn'); 
-    };
-    
+
+    // ===== أحداث السحب =====
+    panel.addEventListener('mousedown', onStart);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onEnd);
+    panel.addEventListener('touchstart', onStart, { passive: false });
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd, { passive: false });
+
     // ===== تجاوز دوال Console =====
     const originalLog = console.log, originalError = console.error, originalWarn = console.warn;
-    console.log = function(...args) { 
-        originalLog(...args); 
-        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a).slice(0, 200) : String(a)).join(' '); 
-        addLog(msg, 'info'); 
+    console.log = function(...args) {
+        originalLog(...args);
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a).slice(0, 200) : String(a)).join(' ');
+        addLog(msg, 'info');
     };
-    console.error = function(...args) { 
-        originalError(...args); 
-        const msg = args.map(a => String(a)).join(' '); 
-        addLog(msg, 'error'); 
+    console.error = function(...args) {
+        originalError(...args);
+        const msg = args.map(a => String(a)).join(' ');
+        addLog(msg, 'error');
     };
-    console.warn = function(...args) { 
-        originalWarn(...args); 
-        const msg = args.map(a => String(a)).join(' '); 
-        addLog(msg, 'warn'); 
+    console.warn = function(...args) {
+        originalWarn(...args);
+        const msg = args.map(a => String(a)).join(' ');
+        addLog(msg, 'warn');
     };
-    
+
     // ===== أحداث الخطأ =====
     window.addEventListener('error', (e) => addLog(`🔥 خطأ: ${e.message}`, 'error'));
     window.addEventListener('unhandledrejection', (e) => addLog(`🔥 Promise خطأ: ${e.reason}`, 'error'));
-    
+
     // ===== فحص أولي =====
     setTimeout(() => {
-        addLog('═══════════════════════', 'warn');
-        addLog('📁 فحص الكائنات:', 'warn');
-        if (typeof CallSystem !== 'undefined') { 
-            addLog('✅ CallSystem موجود', 'success'); 
-        } else { 
-            addLog('❌ CallSystem غير موجود', 'error'); 
+        addLog('═══════════════════════════════', 'warn');
+        addLog('📁 فحص الكائنات المهمة:', 'warn');
+        if (typeof CallSystem !== 'undefined') {
+            addLog('✅ CallSystem موجود', 'success');
+            addLog(`   📌 pc: ${CallSystem.pc ? 'موجود' : 'غير موجود'}`, 'info');
+            addLog(`   📌 dc: ${CallSystem.dc ? 'موجود' : 'غير موجود'}`, 'info');
+        } else {
+            addLog('❌ CallSystem غير موجود', 'error');
         }
-        if (typeof ChatSystem !== 'undefined') { 
-            addLog('✅ ChatSystem موجود', 'success'); 
-            addLog(`   📌 featuresEnabled: ${ChatSystem.featuresEnabled}`, 'info'); 
-            addLog(`   📌 currentChat: ${ChatSystem.currentChat || 'لا يوجد'}`, 'info'); 
-        } else { 
-            addLog('❌ ChatSystem غير موجود', 'error'); 
+        if (typeof ChatSystem !== 'undefined') {
+            addLog('✅ ChatSystem موجود', 'success');
+            addLog(`   📌 featuresEnabled: ${ChatSystem.featuresEnabled}`, 'info');
+            addLog(`   📌 currentChat: ${ChatSystem.currentChat || 'لا يوجد'}`, 'info');
+        } else {
+            addLog('❌ ChatSystem غير موجود', 'error');
         }
-        if (typeof SecureChatSystem !== 'undefined') { 
-            addLog('✅ SecureChatSystem موجود', 'success'); 
-        } else { 
-            addLog('❌ SecureChatSystem غير موجود', 'error'); 
+        if (typeof SecureChatSystem !== 'undefined') {
+            addLog('✅ SecureChatSystem موجود', 'success');
+        } else {
+            addLog('❌ SecureChatSystem غير موجود', 'error');
         }
-        addLog('═══════════════════════', 'warn');
-        addLog('🔍 تشخيص التحميل التلقائي يعمل', 'success');
+        addLog('═══════════════════════════════', 'warn');
+        addLog('🔍 التشخيص التلقائي يعمل (كل 5 ثواني)', 'success');
     }, 500);
-    
-    addLog('🔍 أداة التشخيص جاهزة (اسحب للتحريك)', 'success');
 })();
 </script>
     
