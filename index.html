@@ -633,9 +633,10 @@ window.addEventListener('load', function() {
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
 </script>
 
-<!-- ==================== القسم 10: أداة التشخيص ==================== -->
+<!-- ==================== القسم 10: أداة التشخيص المتقدمة ==================== -->
 <script>
 (function advancedDiagnosticTool() {
+    // ===== إنشاء اللوحة =====
     const panel = document.createElement('div');
     panel.id = 'diagnosticTool';
     panel.style.cssText = `
@@ -659,8 +660,41 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         overflow: auto;
         max-height: 300px;
         min-height: 100px;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
     `;
     
+    // ===== زر دائري صغير (للتصغير) =====
+    const floatingBtn = document.createElement('div');
+    floatingBtn.id = 'diagnosticFloatingBtn';
+    floatingBtn.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ff6600, #cc4400);
+        color: white;
+        font-size: 20px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 999998;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(255,102,0,0.4);
+        border: 2px solid #ff8800;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: transform 0.2s ease;
+    `;
+    floatingBtn.textContent = '🛠️';
+    floatingBtn.title = 'اضغط لعرض لوحة التشخيص';
+    document.body.appendChild(floatingBtn);
+    
+    // ===== شريط التحكم =====
     const controlBar = document.createElement('div');
     controlBar.style.cssText = `
         display: flex;
@@ -675,40 +709,31 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         z-index: 10;
     `;
     
+    // ===== الأزرار =====
     const copyBtn = document.createElement('button');
     copyBtn.textContent = '📋 نسخ الكل';
     copyBtn.style.cssText = `background: #ff6600; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
     
     const clearBtn = document.createElement('button');
-    clearBtn.textContent = '🗑️ مسح';
+    clearBtn.textContent = '🗑️ مسح الكل';
     clearBtn.style.cssText = `background: #333; border: 1px solid #ff6600; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
     
     const toggleSizeBtn = document.createElement('button');
-    toggleSizeBtn.textContent = '📐 تصغير';
+    toggleSizeBtn.textContent = '⭕ تصغير';
     toggleSizeBtn.style.cssText = `background: #2196F3; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
     
     const hideBtn = document.createElement('button');
     hideBtn.textContent = '👁️ إخفاء';
     hideBtn.style.cssText = `background: #f00; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
     
-    const moveUpBtn = document.createElement('button');
-    moveUpBtn.textContent = '⬆️ لأعلى';
-    moveUpBtn.style.cssText = `background: #4CAF50; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
-    
-    const moveDownBtn = document.createElement('button');
-    moveDownBtn.textContent = '⬇️ لأسفل';
-    moveDownBtn.style.cssText = `background: #4CAF50; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
-    
     const exportBtn = document.createElement('button');
     exportBtn.textContent = '💾 تصدير';
     exportBtn.style.cssText = `background: #9C27B0; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
     
-    // ✅ إضافة زر تشخيص التحميل
     const diagnoseBtn = document.createElement('button');
     diagnoseBtn.textContent = '🔍 تشخيص التحميل';
     diagnoseBtn.style.cssText = `background: #00BCD4; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
     
-    // ✅ إضافة زر مسح تشخيص التحميل
     const clearDiagnoseBtn = document.createElement('button');
     clearDiagnoseBtn.textContent = '🧹 مسح التشخيص';
     clearDiagnoseBtn.style.cssText = `background: #555; border: 1px solid #ff6600; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
@@ -717,8 +742,6 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
     controlBar.appendChild(clearBtn);
     controlBar.appendChild(toggleSizeBtn);
     controlBar.appendChild(hideBtn);
-    controlBar.appendChild(moveUpBtn);
-    controlBar.appendChild(moveDownBtn);
     controlBar.appendChild(exportBtn);
     controlBar.appendChild(diagnoseBtn);
     controlBar.appendChild(clearDiagnoseBtn);
@@ -732,9 +755,148 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
     
     let allLogs = [];
     let isMinimized = false;
-    let originalHeight = '300px';
     let isHidden = false;
+    let originalHeight = '300px';
+    let diagnoseResults = [];
     
+    // ===== متغيرات السحب =====
+    let isDragging = false;
+    let dragStartX = 0, dragStartY = 0;
+    let panelStartX = 0, panelStartY = 0;
+    
+    // ===== دوال السحب =====
+    function startDrag(e) {
+        const touch = e.touches ? e.touches[0] : e;
+        isDragging = true;
+        const rect = panel.getBoundingClientRect();
+        panelStartX = rect.left;
+        panelStartY = rect.top;
+        dragStartX = touch.clientX;
+        dragStartY = touch.clientY;
+        panel.style.transition = 'none';
+        panel.style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+    
+    function moveDrag(e) {
+        if (!isDragging) return;
+        const touch = e.touches ? e.touches[0] : e;
+        const dx = touch.clientX - dragStartX;
+        const dy = touch.clientY - dragStartY;
+        let newX = panelStartX + dx;
+        let newY = panelStartY + dy;
+        
+        // منع الخروج من الشاشة
+        const panelWidth = panel.offsetWidth || 300;
+        const panelHeight = panel.offsetHeight || 200;
+        newX = Math.max(0, Math.min(window.innerWidth - panelWidth, newX));
+        newY = Math.max(0, Math.min(window.innerHeight - panelHeight, newY));
+        
+        panel.style.left = newX + 'px';
+        panel.style.right = 'auto';
+        panel.style.top = newY + 'px';
+        panel.style.bottom = 'auto';
+        e.preventDefault();
+    }
+    
+    function endDrag(e) {
+        if (isDragging) {
+            isDragging = false;
+            panel.style.transition = 'all 0.3s ease';
+            panel.style.cursor = 'default';
+            e.preventDefault();
+        }
+    }
+    
+    // ===== أحداث السحب (لمس + فأرة) =====
+    panel.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.diagnostic-controls') || e.target.closest('button')) return;
+        startDrag(e);
+    });
+    panel.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.diagnostic-controls') || e.target.closest('button')) return;
+        startDrag(e);
+    }, { passive: false });
+    
+    document.addEventListener('mousemove', moveDrag);
+    document.addEventListener('touchmove', moveDrag, { passive: false });
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+    
+    // ===== سحب الزر الدائري =====
+    let isFloatingDragging = false;
+    let floatStartX = 0, floatStartY = 0;
+    let floatPanelStartX = 0, floatPanelStartY = 0;
+    
+    floatingBtn.addEventListener('mousedown', (e) => {
+        isFloatingDragging = true;
+        floatStartX = e.clientX;
+        floatStartY = e.clientY;
+        const rect = floatingBtn.getBoundingClientRect();
+        floatPanelStartX = rect.left;
+        floatPanelStartY = rect.top;
+        floatingBtn.style.transition = 'none';
+        e.preventDefault();
+    });
+    
+    floatingBtn.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        isFloatingDragging = true;
+        floatStartX = touch.clientX;
+        floatStartY = touch.clientY;
+        const rect = floatingBtn.getBoundingClientRect();
+        floatPanelStartX = rect.left;
+        floatPanelStartY = rect.top;
+        floatingBtn.style.transition = 'none';
+        e.preventDefault();
+    }, { passive: false });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isFloatingDragging) return;
+        const dx = e.clientX - floatStartX;
+        const dy = e.clientY - floatStartY;
+        let newX = floatPanelStartX + dx;
+        let newY = floatPanelStartY + dy;
+        newX = Math.max(0, Math.min(window.innerWidth - 50, newX));
+        newY = Math.max(0, Math.min(window.innerHeight - 50, newY));
+        floatingBtn.style.left = newX + 'px';
+        floatingBtn.style.right = 'auto';
+        floatingBtn.style.top = newY + 'px';
+        floatingBtn.style.bottom = 'auto';
+        e.preventDefault();
+    });
+    
+    document.addEventListener('touchmove', (e) => {
+        if (!isFloatingDragging) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - floatStartX;
+        const dy = touch.clientY - floatStartY;
+        let newX = floatPanelStartX + dx;
+        let newY = floatPanelStartY + dy;
+        newX = Math.max(0, Math.min(window.innerWidth - 50, newX));
+        newY = Math.max(0, Math.min(window.innerHeight - 50, newY));
+        floatingBtn.style.left = newX + 'px';
+        floatingBtn.style.right = 'auto';
+        floatingBtn.style.top = newY + 'px';
+        floatingBtn.style.bottom = 'auto';
+        e.preventDefault();
+    }, { passive: false });
+    
+    document.addEventListener('mouseup', () => {
+        if (isFloatingDragging) {
+            isFloatingDragging = false;
+            floatingBtn.style.transition = 'transform 0.2s ease';
+        }
+    });
+    
+    document.addEventListener('touchend', () => {
+        if (isFloatingDragging) {
+            isFloatingDragging = false;
+            floatingBtn.style.transition = 'transform 0.2s ease';
+        }
+    });
+    
+    // ===== دالة إضافة سجل =====
     function addLog(msg, type = 'info') {
         const line = document.createElement('div');
         const time = new Date().toLocaleTimeString();
@@ -752,204 +914,259 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         while (logContainer.children.length > 100) logContainer.removeChild(logContainer.children[0]);
     }
     
-    // ==================== أداة تشخيص التحميل ====================
-    const DownloadDiagnostic = {
-        results: [],
-        
-        diagnose(downloadElement, fileData, fileName) {
-            const result = {
-                timestamp: new Date().toISOString(),
-                elementType: downloadElement.tagName,
-                elementId: downloadElement.id,
-                elementClass: downloadElement.className,
-                hasHref: downloadElement.hasAttribute('href'),
-                hrefValue: downloadElement.getAttribute('href'),
-                hasDownload: downloadElement.hasAttribute('download'),
-                downloadValue: downloadElement.getAttribute('download'),
-                fileDataType: typeof fileData,
-                fileDataIsArrayBuffer: fileData instanceof ArrayBuffer,
-                fileDataIsBlob: fileData instanceof Blob,
-                fileDataIsString: typeof fileData === 'string',
-                fileDataLength: fileData?.byteLength || fileData?.length || 0,
-                fileName: fileName || 'unknown',
-                isObjectUrl: typeof fileData === 'string' && fileData.startsWith('blob:'),
-                isDataUrl: typeof fileData === 'string' && fileData.startsWith('data:'),
-                isHttpUrl: typeof fileData === 'string' && (fileData.startsWith('http://') || fileData.startsWith('https://')),
-                parentElement: downloadElement.parentElement?.tagName || 'none',
-                parentClasses: downloadElement.parentElement?.className || 'none'
-            };
-            
-            this.results.push(result);
-            this.displayResult(result);
-            return result;
-        },
-        
-        displayResult(result) {
-            const logContainer = document.getElementById('diagnosticLogs');
-            if (!logContainer) return;
-            
-            const line = document.createElement('div');
-            line.style.cssText = 'border-bottom: 1px solid #444; padding: 4px 0; font-family: monospace; font-size: 10px;';
-            
-            let status = '✅';
-            let statusColor = '#4CAF50';
-            let issues = [];
-            
-            if (result.elementType !== 'A') {
-                issues.push('❌ العنصر ليس رابط <a>');
-                status = '❌';
-                statusColor = '#f44336';
+    // ===== أداة تشخيص التحميل =====
+    function diagnoseDownloadElement(element, index) {
+        const result = {
+            index: index,
+            tagName: element.tagName,
+            id: element.id || 'none',
+            className: element.className || 'none',
+            hasHref: element.hasAttribute('href'),
+            href: element.getAttribute('href') || 'none',
+            hasDownload: element.hasAttribute('download'),
+            download: element.getAttribute('download') || 'none',
+            parentTag: element.parentElement?.tagName || 'none',
+            isBlobUrl: element.href?.startsWith('blob:') || false,
+            isDataUrl: element.href?.startsWith('data:') || false,
+            isHttpUrl: element.href?.startsWith('http://') || element.href?.startsWith('https://') || false,
+            isValid: false
+        };
+        if (result.hasHref && result.href !== '#' && result.href !== 'none') {
+            if (result.isBlobUrl || result.isHttpUrl) {
+                result.isValid = true;
             }
-            
-            if (!result.hasHref) {
-                issues.push('❌ لا يوجد href');
-                status = '❌';
-                statusColor = '#f44336';
-            } else if (result.hrefValue === '#') {
-                issues.push('⚠️ href = # (لم يتم تعيينه بعد)');
-                if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
-            } else if (result.hrefValue.startsWith('blob:')) {
-                fetch(result.hrefValue, { method: 'HEAD' })
-                    .then(response => {
-                        if (response.ok) {
-                            const validMsg = document.createElement('div');
-                            validMsg.style.cssText = 'color: #4CAF50; font-size: 9px; padding-left: 20px;';
-                            validMsg.textContent = '✅ Blob URL صالح ويعمل';
-                            logContainer.appendChild(validMsg);
-                        } else {
-                            const invalidMsg = document.createElement('div');
-                            invalidMsg.style.cssText = 'color: #f44336; font-size: 9px; padding-left: 20px;';
-                            invalidMsg.textContent = '❌ Blob URL غير صالح (انتهت صلاحيته)';
-                            logContainer.appendChild(invalidMsg);
-                        }
-                    })
-                    .catch(() => {
-                        const errorMsg = document.createElement('div');
-                        errorMsg.style.cssText = 'color: #f44336; font-size: 9px; padding-left: 20px;';
-                        errorMsg.textContent = '❌ فشل التحقق من Blob URL (قد يكون منتهي الصلاحية)';
-                        logContainer.appendChild(errorMsg);
-                    });
-            } else if (result.hrefValue.startsWith('data:')) {
-                issues.push('ℹ️ data URL (قد يكون كبيراً جداً)');
-            }
-            
-            if (!result.hasDownload) {
-                issues.push('⚠️ لا يوجد download attribute');
-                if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
-            }
-            
-            if (result.fileDataIsArrayBuffer) {
-                issues.push(`✅ البيانات من نوع ArrayBuffer (${(result.fileDataLength / 1024).toFixed(1)} KB)`);
-            } else if (result.fileDataIsBlob) {
-                issues.push(`✅ البيانات من نوع Blob (${(result.fileDataLength / 1024).toFixed(1)} KB)`);
-            } else if (result.isObjectUrl) {
-                issues.push(`⚠️ البيانات هي Blob URL (قد تنتهي صلاحيتها)`);
-                if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
-            } else if (result.fileDataIsString && !result.isObjectUrl && !result.isDataUrl) {
-                issues.push(`⚠️ البيانات من نوع String (قد لا تكون صالحة)`);
-            }
-            
-            const header = document.createElement('div');
-            header.style.cssText = `color: ${statusColor}; font-weight: bold;`;
-            header.textContent = `${status} [${result.timestamp}] تشخيص: ${result.fileName}`;
-            line.appendChild(header);
-            
-            const details = document.createElement('div');
-            details.style.cssText = `color: #aaa; font-size: 9px; padding-left: 20px;`;
-            details.textContent = `🔹 عنصر: ${result.elementType} | href: ${result.hrefValue || 'none'} | download: ${result.downloadValue || 'none'}`;
-            line.appendChild(details);
-            
-            if (issues.length > 0) {
-                const issuesDiv = document.createElement('div');
-                issuesDiv.style.cssText = `color: #FFC107; font-size: 9px; padding-left: 20px;`;
-                issuesDiv.textContent = `🔸 ${issues.join(' | ')}`;
-                line.appendChild(issuesDiv);
-            }
-            
-            logContainer.appendChild(line);
-            logContainer.scrollTop = logContainer.scrollHeight;
-        },
-        
-        diagnoseAll() {
-            const links = document.querySelectorAll('a[download]');
-            const results = [];
-            links.forEach((el, index) => {
-                const fileData = el.href || el.getAttribute('data-file') || 'unknown';
-                const fileName = el.download || `element_${index}`;
-                const result = this.diagnose(el, fileData, fileName);
-                results.push(result);
-            });
-            return results;
-        },
-        
-        showReport() {
-            const logContainer = document.getElementById('diagnosticLogs');
-            if (!logContainer) return;
-            
-            const total = this.results.length;
-            const issues = this.results.filter(r => r.isObjectUrl || r.hrefValue === '#');
-            const valid = this.results.filter(r => !r.isObjectUrl && r.hrefValue !== '#');
-            
-            const report = document.createElement('div');
-            report.style.cssText = 'border-top: 2px solid #ff6600; padding: 8px 0; margin-top: 8px; color: #fff; font-size: 11px;';
-            report.innerHTML = `
-                📊 تقرير التشخيص: ${total} عنصر تم فحصه<br>
-                ✅ صالح: ${valid.length} | ⚠️ بحاجة إلى إصلاح: ${issues.length}
-            `;
-            logContainer.appendChild(report);
         }
-    };
+        return result;
+    }
     
-    // ==================== أزرار التشخيص ====================
-    diagnoseBtn.onclick = () => {
+    function runDiagnose() {
         const separator = document.createElement('div');
         separator.style.cssText = 'border-top: 2px solid #ff6600; padding: 5px 0; color: #ff6600; text-align: center; margin: 5px 0;';
         separator.textContent = '═══════ بدء تشخيص التحميل ═══════';
         logContainer.appendChild(separator);
-        DownloadDiagnostic.diagnoseAll();
-        setTimeout(() => DownloadDiagnostic.showReport(), 1500);
-    };
+        
+        const links = document.querySelectorAll('a[download]');
+        diagnoseResults = [];
+        
+        if (links.length === 0) {
+            const msg = document.createElement('div');
+            msg.style.cssText = 'color: #FFC107; padding: 5px 0;';
+            msg.textContent = '⚠️ لا توجد روابط تحميل (a[download]) في الصفحة';
+            logContainer.appendChild(msg);
+            return;
+        }
+        
+        links.forEach((link, index) => {
+            const result = diagnoseDownloadElement(link, index);
+            diagnoseResults.push(result);
+            
+            const line = document.createElement('div');
+            line.style.cssText = 'border-bottom: 1px solid #444; padding: 4px 0;';
+            const status = result.isValid ? '✅' : '❌';
+            const color = result.isValid ? '#4CAF50' : '#f44336';
+            
+            const header = document.createElement('div');
+            header.style.cssText = `color: ${color}; font-weight: bold;`;
+            header.textContent = `${status} [${new Date().toISOString()}] عنصر #${index}: ${result.download || 'بدون اسم'}`;
+            line.appendChild(header);
+            
+            const details = document.createElement('div');
+            details.style.cssText = 'color: #aaa; font-size: 9px; padding-left: 20px;';
+            details.textContent = `🔹 عنصر: ${result.tagName} | href: ${result.href} | download: ${result.download}`;
+            line.appendChild(details);
+            
+            const issues = document.createElement('div');
+            issues.style.cssText = 'color: #FFC107; font-size: 9px; padding-left: 20px;';
+            let issueText = '';
+            if (!result.hasHref || result.href === '#' || result.href === 'none') {
+                issueText = '⚠️ href = # (لم يتم تعيينه بعد)';
+            } else if (result.isBlobUrl) {
+                issueText = '⚠️ Blob URL (قد تنتهي صلاحيته)';
+                try {
+                    fetch(result.href, { method: 'HEAD' })
+                        .then(res => {
+                            const statusMsg = document.createElement('div');
+                            statusMsg.style.cssText = `color: ${res.ok ? '#4CAF50' : '#f44336'}; font-size: 9px; padding-left: 20px;`;
+                            statusMsg.textContent = res.ok ? '✅ Blob URL صالح' : '❌ Blob URL غير صالح (انتهت صلاحيته)';
+                            logContainer.appendChild(statusMsg);
+                        })
+                        .catch(() => {
+                            const errorMsg = document.createElement('div');
+                            errorMsg.style.cssText = 'color: #f44336; font-size: 9px; padding-left: 20px;';
+                            errorMsg.textContent = '❌ فشل التحقق من Blob URL';
+                            logContainer.appendChild(errorMsg);
+                        });
+                } catch(e) {}
+            } else if (result.isDataUrl) {
+                issueText = 'ℹ️ Data URL (قد يكون كبيراً جداً)';
+            } else if (result.isHttpUrl) {
+                issueText = '✅ HTTP URL (صالح)';
+            }
+            if (issueText) {
+                issues.textContent = `🔸 ${issueText}`;
+                line.appendChild(issues);
+            }
+            logContainer.appendChild(line);
+        });
+        
+        const total = diagnoseResults.length;
+        const valid = diagnoseResults.filter(r => r.isValid).length;
+        const invalid = total - valid;
+        
+        const report = document.createElement('div');
+        report.style.cssText = 'border-top: 2px solid #ff6600; padding: 8px 0; margin-top: 8px; color: #fff; font-size: 11px;';
+        report.innerHTML = `
+            📊 تقرير التشخيص: ${total} عنصر تم فحصه<br>
+            ✅ صالح: ${valid} | ❌ غير صالح: ${invalid}
+        `;
+        logContainer.appendChild(report);
+    }
     
-    clearDiagnoseBtn.onclick = () => {
-        DownloadDiagnostic.results = [];
+    function clearDiagnose() {
+        diagnoseResults = [];
         const items = logContainer.querySelectorAll('div');
+        const toRemove = [];
         items.forEach(item => {
-            if (item.textContent.includes('═══════') || 
-                item.textContent.includes('تشخيص:') ||
-                item.textContent.includes('تقرير التشخيص')) {
-                item.remove();
+            if (item.textContent.includes('═══════ بدء تشخيص التحميل ═══════') ||
+                item.textContent.includes('عنصر #') ||
+                item.textContent.includes('تقرير التشخيص') ||
+                item.textContent.includes('Blob URL')) {
+                toRemove.push(item);
             }
         });
-        addLog('🧹 تم مسح نتائج التشخيص', 'warn');
+        toRemove.forEach(item => item.remove());
+        addLog('🧹 تم مسح نتائج تشخيص التحميل', 'warn');
+    }
+    
+    // ===== ربط الأزرار =====
+    copyBtn.onclick = () => { 
+        const text = allLogs.join('\n'); 
+        navigator.clipboard.writeText(text)
+            .then(() => addLog('✅ تم نسخ ' + allLogs.length + ' سطر', 'success'))
+            .catch(() => addLog('❌ فشل النسخ', 'error')); 
     };
     
-    copyBtn.onclick = () => { const text = allLogs.join('\n'); navigator.clipboard.writeText(text).then(() => addLog('✅ تم نسخ ' + allLogs.length + ' سطر', 'success')).catch(() => addLog('❌ فشل النسخ', 'error')); };
-    clearBtn.onclick = () => { logContainer.innerHTML = ''; allLogs = []; addLog('🗑️ تم مسح السجل', 'warn'); };
-    toggleSizeBtn.onclick = () => { if (isMinimized) { panel.style.maxHeight = originalHeight; panel.style.minHeight = '100px'; toggleSizeBtn.textContent = '📐 تصغير'; isMinimized = false; } else { originalHeight = panel.style.maxHeight; panel.style.maxHeight = '40px'; panel.style.minHeight = '40px'; toggleSizeBtn.textContent = '📐 تكبير'; isMinimized = true; } };
-    hideBtn.onclick = () => { if (isHidden) { panel.style.display = 'block'; hideBtn.textContent = '👁️ إخفاء'; isHidden = false; } else { panel.style.display = 'none'; hideBtn.textContent = '👁️ إظهار'; isHidden = true; } };
-    let position = 10;
-    moveUpBtn.onclick = () => { position = Math.max(0, position - 20); panel.style.bottom = position + 'px'; addLog(`⬆️ تم نقل اللوحة للأعلى (${position}px)`, 'info'); };
-    moveDownBtn.onclick = () => { position = Math.min(window.innerHeight - 100, position + 20); panel.style.bottom = position + 'px'; addLog(`⬇️ تم نقل اللوحة للأسفل (${position}px)`, 'info'); };
-    exportBtn.onclick = () => { const text = allLogs.join('\n'); const blob = new Blob([text], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `diagnostic_${new Date().toISOString().slice(0,19)}.txt`; a.click(); URL.revokeObjectURL(url); addLog('💾 تم تصدير السجل', 'success'); };
+    clearBtn.onclick = () => { 
+        logContainer.innerHTML = ''; 
+        allLogs = []; 
+        diagnoseResults = [];
+        addLog('🗑️ تم مسح السجل بالكامل', 'warn'); 
+    };
     
+    toggleSizeBtn.onclick = () => { 
+        if (isMinimized) { 
+            panel.style.maxHeight = originalHeight; 
+            panel.style.minHeight = '100px'; 
+            panel.style.display = 'block';
+            floatingBtn.style.display = 'none';
+            toggleSizeBtn.textContent = '⭕ تصغير'; 
+            isMinimized = false; 
+        } else { 
+            originalHeight = panel.style.maxHeight; 
+            panel.style.maxHeight = '50px'; 
+            panel.style.minHeight = '50px'; 
+            panel.style.overflow = 'hidden';
+            floatingBtn.style.display = 'flex';
+            toggleSizeBtn.textContent = '⭕ تكبير'; 
+            isMinimized = true; 
+        } 
+    };
+    
+    hideBtn.onclick = () => { 
+        if (isHidden) { 
+            panel.style.display = 'block'; 
+            floatingBtn.style.display = isMinimized ? 'flex' : 'none';
+            hideBtn.textContent = '👁️ إخفاء'; 
+            isHidden = false; 
+        } else { 
+            panel.style.display = 'none'; 
+            floatingBtn.style.display = 'flex';
+            hideBtn.textContent = '👁️ إظهار'; 
+            isHidden = true; 
+        } 
+    };
+    
+    // ===== زر دائري: يعيد إظهار اللوحة =====
+    floatingBtn.onclick = () => {
+        panel.style.display = 'block';
+        floatingBtn.style.display = 'none';
+        isHidden = false;
+        hideBtn.textContent = '👁️ إخفاء';
+        if (isMinimized) {
+            panel.style.maxHeight = '50px';
+            panel.style.minHeight = '50px';
+            panel.style.overflow = 'hidden';
+        } else {
+            panel.style.maxHeight = originalHeight;
+            panel.style.minHeight = '100px';
+        }
+        addLog('🔄 تم إظهار لوحة التشخيص', 'info');
+    };
+    
+    exportBtn.onclick = () => { 
+        const text = allLogs.join('\n'); 
+        const blob = new Blob([text], { type: 'text/plain' }); 
+        const url = URL.createObjectURL(blob); 
+        const a = document.createElement('a'); 
+        a.href = url; 
+        a.download = `diagnostic_${new Date().toISOString().slice(0,19)}.txt`; 
+        a.click(); 
+        URL.revokeObjectURL(url); 
+        addLog('💾 تم تصدير السجل', 'success'); 
+    };
+    
+    diagnoseBtn.onclick = runDiagnose;
+    clearDiagnoseBtn.onclick = clearDiagnose;
+    
+    // ===== تجاوز دوال Console =====
     const originalLog = console.log, originalError = console.error, originalWarn = console.warn;
-    console.log = function(...args) { originalLog(...args); const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a).slice(0, 200) : String(a)).join(' '); addLog(msg, 'info'); };
-    console.error = function(...args) { originalError(...args); const msg = args.map(a => String(a)).join(' '); addLog(msg, 'error'); };
-    console.warn = function(...args) { originalWarn(...args); const msg = args.map(a => String(a)).join(' '); addLog(msg, 'warn'); };
+    console.log = function(...args) { 
+        originalLog(...args); 
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a).slice(0, 200) : String(a)).join(' '); 
+        addLog(msg, 'info'); 
+    };
+    console.error = function(...args) { 
+        originalError(...args); 
+        const msg = args.map(a => String(a)).join(' '); 
+        addLog(msg, 'error'); 
+    };
+    console.warn = function(...args) { 
+        originalWarn(...args); 
+        const msg = args.map(a => String(a)).join(' '); 
+        addLog(msg, 'warn'); 
+    };
     
+    // ===== أحداث الخطأ العامة =====
     window.addEventListener('error', (e) => addLog(`🔥 خطأ: ${e.message}`, 'error'));
     window.addEventListener('unhandledrejection', (e) => addLog(`🔥 Promise خطأ: ${e.reason}`, 'error'));
     
+    // ===== فحص أولي =====
     setTimeout(() => {
         addLog('═══════════════════════════════', 'warn');
         addLog('📁 فحص الكائنات المهمة:', 'warn');
-        if (typeof CallSystem !== 'undefined') { addLog('✅ CallSystem موجود', 'success'); addLog(`   📌 pc: ${CallSystem.pc ? 'موجود' : 'غير موجود'}`, 'info'); addLog(`   📌 dc: ${CallSystem.dc ? 'موجود' : 'غير موجود'}`, 'info'); } else { addLog('❌ CallSystem غير موجود', 'error'); }
-        if (typeof ChatSystem !== 'undefined') { addLog('✅ ChatSystem موجود', 'success'); addLog(`   📌 featuresEnabled: ${ChatSystem.featuresEnabled}`, 'info'); addLog(`   📌 currentChat: ${ChatSystem.currentChat || 'لا يوجد'}`, 'info'); } else { addLog('❌ ChatSystem غير موجود', 'error'); }
-        if (typeof SecureChatSystem !== 'undefined') { addLog('✅ SecureChatSystem موجود', 'success'); } else { addLog('❌ SecureChatSystem غير موجود', 'error'); }
+        if (typeof CallSystem !== 'undefined') { 
+            addLog('✅ CallSystem موجود', 'success'); 
+            addLog(`   📌 pc: ${CallSystem.pc ? 'موجود' : 'غير موجود'}`, 'info'); 
+            addLog(`   📌 dc: ${CallSystem.dc ? 'موجود' : 'غير موجود'}`, 'info'); 
+        } else { 
+            addLog('❌ CallSystem غير موجود', 'error'); 
+        }
+        if (typeof ChatSystem !== 'undefined') { 
+            addLog('✅ ChatSystem موجود', 'success'); 
+            addLog(`   📌 featuresEnabled: ${ChatSystem.featuresEnabled}`, 'info'); 
+            addLog(`   📌 currentChat: ${ChatSystem.currentChat || 'لا يوجد'}`, 'info'); 
+        } else { 
+            addLog('❌ ChatSystem غير موجود', 'error'); 
+        }
+        if (typeof SecureChatSystem !== 'undefined') { 
+            addLog('✅ SecureChatSystem موجود', 'success'); 
+        } else { 
+            addLog('❌ SecureChatSystem غير موجود', 'error'); 
+        }
         addLog('═══════════════════════════════', 'warn');
     }, 500);
     
-    addLog('🔍 أداة التشخيص المتقدمة تعمل', 'success');
+    addLog('🔍 أداة التشخيص المتقدمة تعمل (مع سحب باللمس + زر دائري)', 'success');
 })();
 </script>
     
