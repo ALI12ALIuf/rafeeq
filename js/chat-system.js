@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1353,7 +1353,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل - استخدام <a> بدلاً من <button>) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1366,15 +1366,12 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
-                    };
+                // ✅ تعديل زر التحميل إلى رابط <a>
+                const downloadLink = fileCard.querySelector('.download-file-btn');
+                if (downloadLink && msg.data) {
+                    downloadLink.href = msg.data;
+                    downloadLink.download = msg.fileName || 'ملف';
+                    // لا حاجة لـ onclick، المتصفح سيتعامل مع الرابط مباشرة
                 }
             }
             div.appendChild(clone);
@@ -1388,14 +1385,21 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview ====================
+// ==================== القسم 26.1: showImagePreview (معدل - إضافة رابط التحميل) ====================
 showImagePreview(imageSrc) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
+    const link = document.getElementById('downloadImageLink');
     if (!modal || !img) return;
     
     img.src = imageSrc;
     modal.style.display = 'flex';
+    
+    // ✅ تعيين رابط التحميل
+    if (link) {
+        link.href = imageSrc;
+        link.download = `image_${Date.now()}.jpg`;
+    }
     
     this.setupImageZoom(modal, img);
 },
@@ -1490,15 +1494,22 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview ====================
+// ==================== القسم 26.2: showVideoPreview (معدل - إضافة رابط التحميل) ====================
 showVideoPreview(videoSrc) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
+    const link = document.getElementById('downloadVideoLink');
     if (!modal || !video) return;
     
     video.src = videoSrc;
     modal.style.display = 'flex';
     video.play().catch(() => {});
+    
+    // ✅ تعيين رابط التحميل
+    if (link) {
+        link.href = videoSrc;
+        link.download = `video_${Date.now()}.mp4`;
+    }
 },
 
 // ==================== القسم 26.3: دوال إغلاق المعاينات ====================
