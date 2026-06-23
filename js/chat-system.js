@@ -1167,322 +1167,323 @@ const ChatSystem = {
         };
     },
 
-    // ==================== القسم 26: displayMessage (معدل - دعم روابط التحميل المباشرة) ====================
-    displayMessage(msg) {
-        const c = document.getElementById('messagesContainer'); 
-        if (!c) return;
-        
-        const formatDateTime = (dateObj) => {
-            const year = dateObj.getFullYear();
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            let hours = dateObj.getHours();
-            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            const formattedHours = String(hours).padStart(2, '0');
-            return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
-        };
-        
-        const dateTime = formatDateTime(new Date(msg.time));
-        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
-        
-        // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
-        const template = document.getElementById('messageWrapperTemplate');
-        let div;
-        if (template) {
-            div = template.content.cloneNode(true).firstElementChild;
+    // ==================== القسم 26: displayMessage (النظام اليدوي الحقيقي) ====================
+displayMessage(msg) {
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return;
+    
+    const formatDateTime = (dateObj) => {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        let hours = dateObj.getHours();
+        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        const formattedHours = String(hours).padStart(2, '0');
+        return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
+    };
+    
+    const dateTime = formatDateTime(new Date(msg.time));
+    const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+    
+    const template = document.getElementById('messageWrapperTemplate');
+    let div;
+    if (template) {
+        div = template.content.cloneNode(true).firstElementChild;
+    } else {
+        console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
+        div = document.createElement('div');
+        div.className = 'message';
+    }
+    
+    div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
+    div.id = `msg-${msg.id}`;
+    
+    // ==================== معالجة الرسائل النصية ====================
+    if (msg.type === 'text') {
+        const textTemplate = document.getElementById('textMessageTemplate');
+        if (textTemplate) {
+            const clone = textTemplate.content.cloneNode(true);
+            const contentDiv = clone.querySelector('.message-content');
+            const textSpan = contentDiv?.querySelector('span');
+            
+            if (contentDiv) {
+                contentDiv.style.border = `1.5px solid ${borderColor}`;
+            }
+            
+            if (textSpan) {
+                textSpan.innerHTML = this.escapeHtml(msg.text);
+            }
+            
+            div.appendChild(clone);
         } else {
-            console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
-            div = document.createElement('div');
-            div.className = 'message';
+            console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
-        div.id = `msg-${msg.id}`;
+        const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
+        const currentMessageCount = existingTextMessages.length;
         
-        // ==================== معالجة الرسائل النصية ====================
-        if (msg.type === 'text') {
-            const textTemplate = document.getElementById('textMessageTemplate');
-            if (textTemplate) {
-                const clone = textTemplate.content.cloneNode(true);
-                const contentDiv = clone.querySelector('.message-content');
-                const textSpan = contentDiv?.querySelector('span');
-                
-                if (contentDiv) {
-                    contentDiv.style.border = `1.5px solid ${borderColor}`;
-                }
-                
-                if (textSpan) {
-                    textSpan.innerHTML = this.escapeHtml(msg.text);
-                }
-                
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب textMessageTemplate غير موجود');
-            }
-            
-            const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
-            const currentMessageCount = existingTextMessages.length;
-            
-            if (currentMessageCount % 10 === 0) {
-                const timeSeparator = document.createElement('div');
-                timeSeparator.className = 'time-separator';
-                timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
-                timeSeparator.textContent = dateTime;
-                c.appendChild(timeSeparator);
-            }
+        if (currentMessageCount % 10 === 0) {
+            const timeSeparator = document.createElement('div');
+            timeSeparator.className = 'time-separator';
+            timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
+            timeSeparator.textContent = dateTime;
+            c.appendChild(timeSeparator);
+        }
+    }
+    
+    // ==================== معالجة الموقع ====================
+    else if (msg.type === 'location') {
+        let locationData = msg.data;
+        let locationUrl = '';
+        
+        if (typeof locationData === 'object' && locationData.url) {
+            locationUrl = locationData.url;
+        } else if (typeof locationData === 'string') {
+            const match = locationData.match(/https?:\/\/[^\s]+/);
+            locationUrl = match ? match[0] : locationData;
+        } else {
+            locationUrl = '#';
         }
         
-        // ==================== معالجة الموقع ====================
-        else if (msg.type === 'location') {
-            let locationData = msg.data;
-            let locationUrl = '';
-            
-            if (typeof locationData === 'object' && locationData.url) {
-                locationUrl = locationData.url;
-            } else if (typeof locationData === 'string') {
-                const match = locationData.match(/https?:\/\/[^\s]+/);
-                locationUrl = match ? match[0] : locationData;
-            } else {
-                locationUrl = '#';
-            }
-            
-            const maxClicks = locationData.maxClicks;
-            let clicksRemaining = locationData.clicksRemaining;
-            
-            const templateLoc = document.getElementById('locationMessageTemplate');
-            if (templateLoc) {
-                const clone = templateLoc.content.cloneNode(true);
-                const locationDiv = clone.querySelector('.location-card');
-                if (locationDiv) {
-                    locationDiv.style.background = '#4CAF50';
-                    
-                    if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                        locationDiv.style.background = '#888';
-                        locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
-                        locationDiv.style.border = 'none';
-                    } else {
-                        locationDiv.style.border = `1.5px solid ${borderColor}`;
-                        locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
-                        locationDiv.onclick = (e) => {
-                            e.stopPropagation();
-                            if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
-                            window.open(locationUrl, '_blank');
-                            if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
-                                clicksRemaining--;
-                                msg.data.clicksRemaining = clicksRemaining;
-                                if (clicksRemaining <= 0) {
-                                    locationDiv.style.background = '#888';
-                                    locationDiv.style.cursor = 'default';
-                                    locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
-                                    locationDiv.onclick = () => {};
-                                }
-                                if (ChatSystem.currentChat) {
-                                    const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
-                                    const msgIndex = messages.findIndex(m => m.id === msg.id);
-                                    if (msgIndex !== -1) {
-                                        messages[msgIndex].data.clicksRemaining = clicksRemaining;
-                                        ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
-                                    }
-                                }
-                            }
-                        };
-                    }
-                }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب locationMessageTemplate غير موجود');
-            }
-        }
+        const maxClicks = locationData.maxClicks;
+        let clicksRemaining = locationData.clicksRemaining;
         
-        // ==================== معالجة الصورة (معدل - دعم روابط التحميل المباشرة) ====================
-        else if (msg.type === 'image') {
-            const templateImg = document.getElementById('imageMessageTemplate');
-            if (templateImg) {
-                const clone = templateImg.content.cloneNode(true);
-                const wrapper = clone.querySelector('.message-image-wrapper');
-                const downloadBtn = wrapper?.querySelector('.download-btn');
+        const templateLoc = document.getElementById('locationMessageTemplate');
+        if (templateLoc) {
+            const clone = templateLoc.content.cloneNode(true);
+            const locationDiv = clone.querySelector('.location-card');
+            if (locationDiv) {
+                locationDiv.style.background = '#4CAF50';
                 
-                if (wrapper) {
-                    wrapper.style.border = `2px solid ${borderColor}`;
-                    const img = wrapper.querySelector('.message-image-content');
-                    if (img) {
-                        img.src = msg.data;
-                        img.onclick = () => this.showImagePreview(msg.data, msg.fileName || 'image.jpg');
-                        img.oncontextmenu = (e) => e.preventDefault();
-                        img.ondragstart = (e) => e.preventDefault();
-                    }
-                    
-                    // ✅ زر التحميل - رابط طبيعي (لا برمجي)
-                    if (downloadBtn) {
-                        const fileId = msg._fileId || msg.id;
-                        const fileName = msg.fileName || `image_${msg.id}.jpg`;
-                        
-                        // محاولة الحصول على الملف من الكاش
-                        const cached = this._getFile(fileId);
-                        if (cached && cached.data) {
-                            try {
-                                const blob = new Blob([cached.data], { type: cached.mimeType || 'image/jpeg' });
-                                const url = URL.createObjectURL(blob);
-                                downloadBtn.href = url;
-                                downloadBtn.download = cached.fileName || fileName;
-                                downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
-                                console.log(`🔗 تم تعيين رابط التحميل للصورة: ${fileId}`);
-                            } catch(e) {
-                                // في حال فشل إنشاء الرابط من الكاش
-                                downloadBtn.href = msg.data;
-                                downloadBtn.download = fileName;
-                                downloadBtn.title = `تحميل ${fileName}`;
-                                console.warn(`⚠️ فشل إنشاء رابط من الكاش للصورة: ${fileId}`);
-                            }
-                        } else {
-                            // Fallback: استخدم الرابط الموجود في الرسالة
-                            downloadBtn.href = msg.data;
-                            downloadBtn.download = fileName;
-                            downloadBtn.title = `تحميل ${fileName}`;
-                            console.log(`🔗 تم تعيين رابط التحميل للصورة (fallback): ${fileId}`);
-                        }
-                    }
-                }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب imageMessageTemplate غير موجود');
-            }
-        }
-        
-        // ==================== معالجة البصمة الصوتية ====================
-        else if (msg.type === 'voice') {
-            const templateVoice = document.getElementById('voiceMessageTemplate');
-            if (templateVoice) {
-                const clone = templateVoice.content.cloneNode(true);
-                const voiceMsg = clone.querySelector('.voice-message');
-                if (voiceMsg) {
-                    voiceMsg.style.background = '#4CAF50';
-                    voiceMsg.style.border = `1.5px solid ${borderColor}`;
-                    const audioEl = voiceMsg.querySelector('.voice-audio-element');
-                    if (audioEl && msg.data) {
-                        audioEl.src = msg.data;
-                        this.setupVoiceControls(clone, audioEl);
-                    }
-                }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
-            }
-        }
-        
-        // ==================== معالجة الفيديو (معدل - دعم روابط التحميل المباشرة) ====================
-        else if (msg.type === 'video') {
-            const templateVideo = document.getElementById('videoMessageTemplate');
-            if (templateVideo) {
-                const clone = templateVideo.content.cloneNode(true);
-                const thumbnail = clone.querySelector('.video-thumbnail');
-                const downloadBtn = thumbnail?.querySelector('.download-btn');
-                
-                if (thumbnail) {
-                    thumbnail.style.border = `2px solid ${borderColor}`;
-                    const video = thumbnail.querySelector('.video-thumbnail-content');
-                    const source = video?.querySelector('source');
-                    
-                    if (source && msg.data) {
-                        source.src = msg.data;
-                        video.load();
-                    }
-                    
-                    thumbnail.onclick = (e) => {
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                    locationDiv.style.background = '#888';
+                    locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                    locationDiv.style.border = 'none';
+                } else {
+                    locationDiv.style.border = `1.5px solid ${borderColor}`;
+                    locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
+                    locationDiv.onclick = (e) => {
                         e.stopPropagation();
-                        this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
+                        if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
+                        window.open(locationUrl, '_blank');
+                        if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                            clicksRemaining--;
+                            msg.data.clicksRemaining = clicksRemaining;
+                            if (clicksRemaining <= 0) {
+                                locationDiv.style.background = '#888';
+                                locationDiv.style.cursor = 'default';
+                                locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                                locationDiv.onclick = () => {};
+                            }
+                            if (ChatSystem.currentChat) {
+                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                                const msgIndex = messages.findIndex(m => m.id === msg.id);
+                                if (msgIndex !== -1) {
+                                    messages[msgIndex].data.clicksRemaining = clicksRemaining;
+                                    ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                                }
+                            }
+                        }
                     };
-                    
-                    // ✅ زر التحميل - رابط طبيعي (لا برمجي)
-                    if (downloadBtn) {
-                        const fileId = msg._fileId || msg.id;
-                        const fileName = msg.fileName || `video_${msg.id}.mp4`;
-                        
-                        const cached = this._getFile(fileId);
-                        if (cached && cached.data) {
-                            try {
-                                const blob = new Blob([cached.data], { type: cached.mimeType || 'video/mp4' });
-                                const url = URL.createObjectURL(blob);
-                                downloadBtn.href = url;
-                                downloadBtn.download = cached.fileName || fileName;
-                                downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
-                                console.log(`🔗 تم تعيين رابط التحميل للفيديو: ${fileId}`);
-                            } catch(e) {
-                                downloadBtn.href = msg.data;
-                                downloadBtn.download = fileName;
-                                downloadBtn.title = `تحميل ${fileName}`;
-                                console.warn(`⚠️ فشل إنشاء رابط من الكاش للفيديو: ${fileId}`);
-                            }
-                        } else {
-                            downloadBtn.href = msg.data;
-                            downloadBtn.download = fileName;
-                            downloadBtn.title = `تحميل ${fileName}`;
-                            console.log(`🔗 تم تعيين رابط التحميل للفيديو (fallback): ${fileId}`);
-                        }
-                    }
                 }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب videoMessageTemplate غير موجود');
             }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب locationMessageTemplate غير موجود');
         }
-        
-        // ==================== معالجة الملف (معدل - دعم روابط التحميل المباشرة) ====================
-        else if (msg.type === 'file') {
-            const templateFile = document.getElementById('fileMessageTemplate');
-            if (templateFile) {
-                const clone = templateFile.content.cloneNode(true);
-                const fileCard = clone.querySelector('.file-card');
-                const downloadBtn = fileCard?.querySelector('.download-file-btn');
+    }
+    
+    // ==================== معالجة الصورة (النظام اليدوي الحقيقي) ====================
+    else if (msg.type === 'image') {
+        const templateImg = document.getElementById('imageMessageTemplate');
+        if (templateImg) {
+            const clone = templateImg.content.cloneNode(true);
+            const wrapper = clone.querySelector('.message-image-wrapper');
+            const downloadBtn = wrapper?.querySelector('.download-btn');
+            
+            if (wrapper) {
+                wrapper.style.border = `2px solid ${borderColor}`;
+                const img = wrapper.querySelector('.message-image-content');
+                if (img) {
+                    img.src = msg.data;
+                    img.onclick = () => this.showImagePreview(msg.data, msg.fileName || 'image.jpg');
+                    img.oncontextmenu = (e) => e.preventDefault();
+                    img.ondragstart = (e) => e.preventDefault();
+                }
                 
-                if (fileCard) {
-                    fileCard.style.background = '#4CAF50';
-                    fileCard.style.border = `1.5px solid ${borderColor}`;
-                    const fileNameEl = fileCard.querySelector('.file-name');
-                    if (fileNameEl) {
-                        fileNameEl.textContent = msg.fileName || 'ملف';
-                    }
+                // ✅ النظام اليدوي الحقيقي - تعيين الرابط مرة واحدة عند العرض
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `image_${msg.id}.jpg`;
                     
-                    // ✅ زر التحميل - رابط طبيعي (لا برمجي)
-                    if (downloadBtn) {
-                        const fileId = msg._fileId || msg.id;
-                        const fileName = msg.fileName || `file_${msg.id}`;
-                        
-                        const cached = this._getFile(fileId);
-                        if (cached && cached.data) {
-                            try {
-                                const blob = new Blob([cached.data], { type: cached.mimeType || 'application/octet-stream' });
-                                const url = URL.createObjectURL(blob);
-                                downloadBtn.href = url;
-                                downloadBtn.download = cached.fileName || fileName;
-                                downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
-                                console.log(`🔗 تم تعيين رابط التحميل للملف: ${fileId}`);
-                            } catch(e) {
-                                downloadBtn.href = msg.data;
-                                downloadBtn.download = fileName;
-                                downloadBtn.title = `تحميل ${fileName}`;
-                                console.warn(`⚠️ فشل إنشاء رابط من الكاش للملف: ${fileId}`);
-                            }
-                        } else {
+                    const cached = this._getFile(fileId);
+                    if (cached && cached.data) {
+                        try {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'image/jpeg' });
+                            const url = URL.createObjectURL(blob);
+                            downloadBtn.href = url;
+                            downloadBtn.download = cached.fileName || fileName;
+                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
+                            console.log(`🔗 تم تعيين رابط التحميل للصورة: ${fileId}`);
+                        } catch(e) {
                             downloadBtn.href = msg.data;
                             downloadBtn.download = fileName;
                             downloadBtn.title = `تحميل ${fileName}`;
-                            console.log(`🔗 تم تعيين رابط التحميل للملف (fallback): ${fileId}`);
+                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للصورة: ${fileId}`);
                         }
+                    } else {
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = fileName;
+                        downloadBtn.title = `تحميل ${fileName}`;
+                        console.log(`🔗 تم تعيين رابط التحميل للصورة (fallback): ${fileId}`);
                     }
+                    
+                    // ❌ لا يوجد onclick هنا - المستخدم يضغط على الرابط مباشرة
                 }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب fileMessageTemplate غير موجود');
             }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب imageMessageTemplate غير موجود');
         }
-        
-        // ✅ إضافة الرسالة إلى الحاوية
-        c.appendChild(div); 
-        c.scrollTop = c.scrollHeight;
-    },
+    }
+    
+    // ==================== معالجة البصمة الصوتية ====================
+    else if (msg.type === 'voice') {
+        const templateVoice = document.getElementById('voiceMessageTemplate');
+        if (templateVoice) {
+            const clone = templateVoice.content.cloneNode(true);
+            const voiceMsg = clone.querySelector('.voice-message');
+            if (voiceMsg) {
+                voiceMsg.style.background = '#4CAF50';
+                voiceMsg.style.border = `1.5px solid ${borderColor}`;
+                const audioEl = voiceMsg.querySelector('.voice-audio-element');
+                if (audioEl && msg.data) {
+                    audioEl.src = msg.data;
+                    this.setupVoiceControls(clone, audioEl);
+                }
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
+        }
+    }
+    
+    // ==================== معالجة الفيديو (النظام اليدوي الحقيقي) ====================
+    else if (msg.type === 'video') {
+        const templateVideo = document.getElementById('videoMessageTemplate');
+        if (templateVideo) {
+            const clone = templateVideo.content.cloneNode(true);
+            const thumbnail = clone.querySelector('.video-thumbnail');
+            const downloadBtn = thumbnail?.querySelector('.download-btn');
+            
+            if (thumbnail) {
+                thumbnail.style.border = `2px solid ${borderColor}`;
+                const video = thumbnail.querySelector('.video-thumbnail-content');
+                const source = video?.querySelector('source');
+                
+                if (source && msg.data) {
+                    source.src = msg.data;
+                    video.load();
+                }
+                
+                thumbnail.onclick = (e) => {
+                    e.stopPropagation();
+                    this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
+                };
+                
+                // ✅ النظام اليدوي الحقيقي - تعيين الرابط مرة واحدة عند العرض
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `video_${msg.id}.mp4`;
+                    
+                    const cached = this._getFile(fileId);
+                    if (cached && cached.data) {
+                        try {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'video/mp4' });
+                            const url = URL.createObjectURL(blob);
+                            downloadBtn.href = url;
+                            downloadBtn.download = cached.fileName || fileName;
+                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
+                            console.log(`🔗 تم تعيين رابط التحميل للفيديو: ${fileId}`);
+                        } catch(e) {
+                            downloadBtn.href = msg.data;
+                            downloadBtn.download = fileName;
+                            downloadBtn.title = `تحميل ${fileName}`;
+                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للفيديو: ${fileId}`);
+                        }
+                    } else {
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = fileName;
+                        downloadBtn.title = `تحميل ${fileName}`;
+                        console.log(`🔗 تم تعيين رابط التحميل للفيديو (fallback): ${fileId}`);
+                    }
+                    
+                    // ❌ لا يوجد onclick هنا - المستخدم يضغط على الرابط مباشرة
+                }
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب videoMessageTemplate غير موجود');
+        }
+    }
+    
+    // ==================== معالجة الملف (النظام اليدوي الحقيقي) ====================
+    else if (msg.type === 'file') {
+        const templateFile = document.getElementById('fileMessageTemplate');
+        if (templateFile) {
+            const clone = templateFile.content.cloneNode(true);
+            const fileCard = clone.querySelector('.file-card');
+            const downloadBtn = fileCard?.querySelector('.download-file-btn');
+            
+            if (fileCard) {
+                fileCard.style.background = '#4CAF50';
+                fileCard.style.border = `1.5px solid ${borderColor}`;
+                const fileNameEl = fileCard.querySelector('.file-name');
+                if (fileNameEl) {
+                    fileNameEl.textContent = msg.fileName || 'ملف';
+                }
+                
+                // ✅ النظام اليدوي الحقيقي - تعيين الرابط مرة واحدة عند العرض
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `file_${msg.id}`;
+                    
+                    const cached = this._getFile(fileId);
+                    if (cached && cached.data) {
+                        try {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'application/octet-stream' });
+                            const url = URL.createObjectURL(blob);
+                            downloadBtn.href = url;
+                            downloadBtn.download = cached.fileName || fileName;
+                            downloadBtn.title = `تحميل ${cached.fileName || fileName}`;
+                            console.log(`🔗 تم تعيين رابط التحميل للملف: ${fileId}`);
+                        } catch(e) {
+                            downloadBtn.href = msg.data;
+                            downloadBtn.download = fileName;
+                            downloadBtn.title = `تحميل ${fileName}`;
+                            console.warn(`⚠️ فشل إنشاء رابط من الكاش للملف: ${fileId}`);
+                        }
+                    } else {
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = fileName;
+                        downloadBtn.title = `تحميل ${fileName}`;
+                        console.log(`🔗 تم تعيين رابط التحميل للملف (fallback): ${fileId}`);
+                    }
+                    
+                    // ❌ لا يوجد onclick هنا - المستخدم يضغط على الرابط مباشرة
+                }
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب fileMessageTemplate غير موجود');
+        }
+    }
+    
+    c.appendChild(div); 
+    c.scrollTop = c.scrollHeight;
+},
 
     // ==================== القسم 26.1: showImagePreview ====================
     showImagePreview(imageSrc, fileName) {
