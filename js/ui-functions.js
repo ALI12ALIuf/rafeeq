@@ -655,34 +655,24 @@ window.getEmojiForUser = u => {
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
+    const link = document.getElementById('downloadImageLink');
     if (modal) modal.style.display = 'none';
     if (img) { img.src = ''; img.style.transform = 'none'; }
+    if (link) { link.href = '#'; link.download = ''; }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
+    const link = document.getElementById('downloadVideoLink');
     if (modal) modal.style.display = 'none';
     if (video) { video.pause(); video.src = ''; }
+    if (link) { link.href = '#'; link.download = ''; }
 };
 
-window.downloadPreviewImage = function() {
-    const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
-};
-
-window.downloadPreviewVideo = function() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-};
+// ❌ تم حذف الدوال التالية (لم تعد هناك حاجة لها)
+// window.downloadPreviewImage = function() { ... }
+// window.downloadPreviewVideo = function() { ... }
 
 // ==================== القسم 15: دوال مساعدة ====================
 function formatNumber(num) { 
