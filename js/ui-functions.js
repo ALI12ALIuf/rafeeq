@@ -763,232 +763,482 @@ window.addEventListener('unhandledrejection', (event) => {
 
 
 
-// ==================== أداة تشخيص التحميل ====================
-const DownloadDiagnostic = {
+// ==================== أداة تشخيص التحميل المتخصصة ====================
+const DownloadDiagnosticPro = {
     // تخزين نتائج التشخيص
     results: [],
-    
-    // تخزين النص الكامل للتشخيص
     fullReportText: '',
+    isRunning: false,
     
-    // تشخيص عنصر التحميل
-    diagnose(downloadElement, fileData, fileName) {
-        const result = {
-            timestamp: new Date().toISOString(),
-            elementType: downloadElement.tagName,
-            elementId: downloadElement.id,
-            elementClass: downloadElement.className,
-            hasHref: downloadElement.hasAttribute('href'),
-            hrefValue: downloadElement.getAttribute('href'),
-            hasDownload: downloadElement.hasAttribute('download'),
-            downloadValue: downloadElement.getAttribute('download'),
-            fileDataType: typeof fileData,
-            fileDataIsArrayBuffer: fileData instanceof ArrayBuffer,
-            fileDataIsBlob: fileData instanceof Blob,
-            fileDataIsString: typeof fileData === 'string',
-            fileDataLength: fileData?.byteLength || fileData?.length || 0,
-            fileName: fileName || 'unknown',
-            isObjectUrl: typeof fileData === 'string' && fileData.startsWith('blob:'),
-            isDataUrl: typeof fileData === 'string' && fileData.startsWith('data:'),
-            isHttpUrl: typeof fileData === 'string' && (fileData.startsWith('http://') || fileData.startsWith('https://')),
-            parentElement: downloadElement.parentElement?.tagName || 'none',
-            parentClasses: downloadElement.parentElement?.className || 'none'
-        };
-        
-        this.results.push(result);
-        this.displayResult(result);
-        
-        return result;
+    // تهيئة الأداة
+    init() {
+        this.createPanel();
+        this.setupEventListeners();
+        console.log('🔍 أداة تشخيص التحميل المتخصصة جاهزة');
     },
     
-    // عرض نتيجة التشخيص في لوحة التحكم
-    displayResult(result) {
-        const logContainer = document.getElementById('diagnosticLogs');
-        if (!logContainer) return;
+    // إنشاء لوحة التشخيص المنفصلة
+    createPanel() {
+        // التحقق من وجود اللوحة مسبقاً
+        if (document.getElementById('downloadDiagnosticPanel')) return;
         
-        const line = document.createElement('div');
-        line.style.cssText = 'border-bottom: 1px solid #444; padding: 4px 0; font-family: monospace; font-size: 10px;';
+        const panel = document.createElement('div');
+        panel.id = 'downloadDiagnosticPanel';
+        panel.style.cssText = `
+            position: fixed;
+            bottom: 80px;
+            right: 10px;
+            width: 420px;
+            max-width: 90vw;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #ff6600;
+            border-radius: 12px;
+            padding: 10px;
+            z-index: 999998;
+            font-family: monospace;
+            font-size: 11px;
+            color: #fff;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+            transition: all 0.3s ease;
+            max-height: 500px;
+            display: none;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        `;
         
-        // تحديد المشكلة بناءً على النتائج
-        let status = '✅';
-        let statusColor = '#4CAF50';
-        let issues = [];
-        
-        // 1. التحقق من نوع العنصر
-        if (result.elementType !== 'A') {
-            issues.push('❌ العنصر ليس رابط <a>');
-            status = '❌';
-            statusColor = '#f44336';
-        }
-        
-        // 2. التحقق من وجود href
-        if (!result.hasHref) {
-            issues.push('❌ لا يوجد href');
-            status = '❌';
-            statusColor = '#f44336';
-        } else if (result.hrefValue === '#') {
-            issues.push('⚠️ href = # (لم يتم تعيينه بعد)');
-            if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
-        } else if (result.hrefValue.startsWith('blob:')) {
-            // 3. التحقق من صحة blob URL
-            fetch(result.hrefValue, { method: 'HEAD' })
-                .then(response => {
-                    if (response.ok) {
-                        const validMsg = document.createElement('div');
-                        validMsg.style.cssText = 'color: #4CAF50; font-size: 9px; padding-left: 20px;';
-                        validMsg.textContent = '✅ Blob URL صالح ويعمل';
-                        logContainer.appendChild(validMsg);
-                    } else {
-                        const invalidMsg = document.createElement('div');
-                        invalidMsg.style.cssText = 'color: #f44336; font-size: 9px; padding-left: 20px;';
-                        invalidMsg.textContent = '❌ Blob URL غير صالح (انتهت صلاحيته)';
-                        logContainer.appendChild(invalidMsg);
-                    }
-                })
-                .catch(() => {
-                    const errorMsg = document.createElement('div');
-                    errorMsg.style.cssText = 'color: #f44336; font-size: 9px; padding-left: 20px;';
-                    errorMsg.textContent = '❌ فشل التحقق من Blob URL (قد يكون منتهي الصلاحية)';
-                    logContainer.appendChild(errorMsg);
-                });
-        } else if (result.hrefValue.startsWith('data:')) {
-            issues.push('ℹ️ data URL (قد يكون كبيراً جداً)');
-        }
-        
-        // 4. التحقق من وجود download
-        if (!result.hasDownload) {
-            issues.push('⚠️ لا يوجد download attribute');
-            if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
-        }
-        
-        // 5. التحقق من نوع البيانات
-        if (result.fileDataIsArrayBuffer) {
-            issues.push(`✅ البيانات من نوع ArrayBuffer (${(result.fileDataLength / 1024).toFixed(1)} KB)`);
-        } else if (result.fileDataIsBlob) {
-            issues.push(`✅ البيانات من نوع Blob (${(result.fileDataLength / 1024).toFixed(1)} KB)`);
-        } else if (result.isObjectUrl) {
-            issues.push(`⚠️ البيانات هي Blob URL (قد تنتهي صلاحيتها)`);
-            if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
-        } else if (result.fileDataIsString && !result.isObjectUrl && !result.isDataUrl) {
-            issues.push(`⚠️ البيانات من نوع String (قد لا تكون صالحة)`);
-            if (status === '✅') { status = '⚠️'; statusColor = '#FFC107'; }
-        }
-        
-        // عرض النتيجة الرئيسية
+        // الهيدر
         const header = document.createElement('div');
-        header.style.cssText = `color: ${statusColor}; font-weight: bold;`;
-        header.textContent = `${status} [${result.timestamp}] تشخيص: ${result.fileName}`;
-        line.appendChild(header);
+        header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ff6600;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        `;
+        header.innerHTML = `
+            <span style="color: #ff6600; font-weight: bold; font-size: 13px;">🔍 تشخيص التحميل</span>
+            <div style="display: flex; gap: 5px;">
+                <button id="diagToggleBtn" style="background: #555; border: none; color: white; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">⏸️ إيقاف</button>
+                <button id="diagCloseBtn" style="background: #f44336; border: none; color: white; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">✕</button>
+            </div>
+        `;
+        panel.appendChild(header);
         
-        // عرض التفاصيل
-        const details = document.createElement('div');
-        details.style.cssText = `color: #aaa; font-size: 9px; padding-left: 20px;`;
-        details.textContent = `🔹 عنصر: ${result.elementType} | href: ${result.hrefValue || 'none'} | download: ${result.downloadValue || 'none'}`;
-        line.appendChild(details);
+        // منطقة الأزرار
+        const buttons = document.createElement('div');
+        buttons.style.cssText = `
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        `;
+        buttons.innerHTML = `
+            <button id="diagStartBtn" style="background: #4CAF50; border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">▶️ بدء التشخيص</button>
+            <button id="diagCopyBtn" style="background: #2196F3; border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">📋 نسخ التقرير</button>
+            <button id="diagClearBtn" style="background: #555; border: 1px solid #ff6600; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">🧹 مسح</button>
+            <button id="diagAnalyzeBtn" style="background: #9C27B0; border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">🔬 تحليل عميق</button>
+        `;
+        panel.appendChild(buttons);
         
-        // عرض المشاكل
-        if (issues.length > 0) {
-            const issuesDiv = document.createElement('div');
-            issuesDiv.style.cssText = `color: #FFC107; font-size: 9px; padding-left: 20px;`;
-            issuesDiv.textContent = `🔸 ${issues.join(' | ')}`;
-            line.appendChild(issuesDiv);
-        }
+        // منطقة النتائج
+        const resultsContainer = document.createElement('div');
+        resultsContainer.id = 'diagResultsContainer';
+        resultsContainer.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            max-height: 300px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            padding: 4px;
+            font-size: 10px;
+            line-height: 1.5;
+            min-height: 100px;
+        `;
+        resultsContainer.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">⏳ انتظر بدء التشخيص...</div>';
+        panel.appendChild(resultsContainer);
         
-        logContainer.appendChild(line);
-        logContainer.scrollTop = logContainer.scrollHeight;
+        // حالة التشخيص
+        const status = document.createElement('div');
+        status.id = 'diagStatus';
+        status.style.cssText = `
+            margin-top: 6px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            color: #aaa;
+            background: rgba(255,255,255,0.05);
+            flex-shrink: 0;
+            text-align: center;
+        `;
+        status.textContent = '🟢 جاهز للتشخيص';
+        panel.appendChild(status);
         
-        // ✅ تخزين النص الكامل للتشخيص
-        this.fullReportText += `${status} [${result.timestamp}] تشخيص: ${result.fileName}\n`;
-        this.fullReportText += `   🔹 عنصر: ${result.elementType} | href: ${result.hrefValue || 'none'} | download: ${result.downloadValue || 'none'}\n`;
-        if (issues.length > 0) {
-            this.fullReportText += `   🔸 ${issues.join(' | ')}\n`;
-        }
-        this.fullReportText += '\n';
+        document.body.appendChild(panel);
+        
+        // إعداد المستمعات
+        this.setupPanelListeners(panel);
     },
     
-    // تشخيص جميع عناصر التحميل في الصفحة
-    diagnoseAll() {
-        // ✅ إعادة تعيين النص
-        this.fullReportText = '';
-        
-        const logContainer = document.getElementById('diagnosticLogs');
-        if (logContainer) {
-            const separator = document.createElement('div');
-            separator.style.cssText = 'border-top: 2px solid #ff6600; padding: 5px 0; color: #ff6600; text-align: center; margin: 5px 0;';
-            separator.textContent = '═══════ بدء تشخيص التحميل ═══════';
-            logContainer.appendChild(separator);
-            this.fullReportText += '═══════ بدء تشخيص التحميل ═══════\n';
-        }
-        
-        const links = document.querySelectorAll('a[download], button[onclick*="download"]');
-        const results = [];
-        links.forEach((el, index) => {
-            const result = this.diagnose(el, el.href || el.getAttribute('data-file'), `element_${index}`);
-            results.push(result);
+    setupPanelListeners(panel) {
+        // زر بدء التشخيص
+        document.getElementById('diagStartBtn')?.addEventListener('click', () => {
+            this.startDiagnostic();
         });
         
-        setTimeout(() => {
-            this.showReport();
-            // ✅ تحديث نص التقرير
-            const total = this.results.length;
-            const issues = this.results.filter(r => r.isObjectUrl || r.hrefValue === '#');
-            const valid = this.results.filter(r => !r.isObjectUrl && r.hrefValue !== '#');
-            this.fullReportText += `\n📊 تقرير التشخيص: ${total} عنصر تم فحصه\n`;
-            this.fullReportText += `✅ صالح: ${valid.length} | ⚠️ بحاجة إلى إصلاح: ${issues.length}\n`;
-        }, 1000);
+        // زر نسخ التقرير
+        document.getElementById('diagCopyBtn')?.addEventListener('click', () => {
+            this.copyFullReport();
+        });
         
-        return results;
+        // زر مسح
+        document.getElementById('diagClearBtn')?.addEventListener('click', () => {
+            this.clearResults();
+        });
+        
+        // زر تحليل عميق
+        document.getElementById('diagAnalyzeBtn')?.addEventListener('click', () => {
+            this.deepAnalyze();
+        });
+        
+        // زر إيقاف/تشغيل اللوحة
+        document.getElementById('diagToggleBtn')?.addEventListener('click', (e) => {
+            const panel = document.getElementById('downloadDiagnosticPanel');
+            if (panel) {
+                const isMinimized = panel.style.maxHeight === '40px';
+                if (isMinimized) {
+                    panel.style.maxHeight = '500px';
+                    panel.style.minHeight = 'auto';
+                    e.target.textContent = '⏸️ إيقاف';
+                } else {
+                    panel.style.maxHeight = '40px';
+                    panel.style.minHeight = '40px';
+                    e.target.textContent = '▶️ تشغيل';
+                }
+            }
+        });
+        
+        // زر إغلاق
+        document.getElementById('diagCloseBtn')?.addEventListener('click', () => {
+            const panel = document.getElementById('downloadDiagnosticPanel');
+            if (panel) panel.style.display = 'none';
+        });
     },
     
-    // عرض التقرير النهائي
-    showReport() {
-        const logContainer = document.getElementById('diagnosticLogs');
-        if (!logContainer) return;
-        
-        const total = this.results.length;
-        const issues = this.results.filter(r => r.isObjectUrl || r.hrefValue === '#');
-        const valid = this.results.filter(r => !r.isObjectUrl && r.hrefValue !== '#');
-        
-        const report = document.createElement('div');
-        report.style.cssText = 'border-top: 2px solid #ff6600; padding: 8px 0; margin-top: 8px; color: #fff; font-size: 11px;';
-        report.innerHTML = `
-            📊 تقرير التشخيص: ${total} عنصر تم فحصه<br>
-            ✅ صالح: ${valid.length} | ⚠️ بحاجة إلى إصلاح: ${issues.length}
-        `;
-        logContainer.appendChild(report);
-    },
-    
-    // ✅ دالة نسخ النص الكامل للتشخيص
-    copyFullReport() {
-        if (!this.fullReportText) {
-            alert('لا يوجد نص لتشخيصه. قم بتشغيل التشخيص أولاً.');
+    // بدء التشخيص
+    startDiagnostic() {
+        if (this.isRunning) {
+            this.addResult('⏹️', 'تم إيقاف التشخيص', '#ff6600');
+            this.isRunning = false;
+            document.getElementById('diagStatus').textContent = '🟡 متوقف';
             return;
         }
         
-        const reportText = this.fullReportText;
+        this.isRunning = true;
+        this.results = [];
+        this.fullReportText = '';
+        document.getElementById('diagStatus').textContent = '🟢 جاري التشخيص...';
+        document.getElementById('diagStartBtn').textContent = '⏹️ إيقاف';
         
-        // استخدام Clipboard API
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(reportText)
-                .then(() => {
-                    const msg = document.createElement('div');
-                    msg.style.cssText = 'color: #4CAF50; font-size: 12px; padding: 5px; text-align: center; border: 1px solid #4CAF50; border-radius: 5px; margin: 5px 0;';
-                    msg.textContent = '✅ تم نسخ النص بالكامل (' + reportText.split('\n').length + ' سطر)';
-                    const logContainer = document.getElementById('diagnosticLogs');
-                    if (logContainer) {
-                        logContainer.appendChild(msg);
-                        logContainer.scrollTop = logContainer.scrollHeight;
+        const container = document.getElementById('diagResultsContainer');
+        if (container) container.innerHTML = '';
+        
+        this.addResult('🔍', 'بدء تشخيص التحميل المتخصص', '#ff6600');
+        this.addResult('📋', 'سيتم مراقبة جميع عمليات التحميل', '#ff6600');
+        
+        // بدء مراقبة التحميلات
+        this.monitorDownloads();
+        
+        // تحليل جميع عناصر التحميل الموجودة
+        this.analyzeAllDownloadElements();
+        
+        // بدء مراقبة النقرات
+        this.monitorClicks();
+    },
+    
+    // مراقبة التحميلات
+    monitorDownloads() {
+        // مراقبة جميع روابط التحميل
+        const links = document.querySelectorAll('a[download]');
+        links.forEach((link, index) => {
+            link.addEventListener('click', (e) => {
+                this.logDownloadAttempt(link, e);
+            });
+        });
+        
+        // مراقبة التغييرات في DOM
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1) {
+                        const links = node.querySelectorAll('a[download]');
+                        links.forEach((link) => {
+                            link.addEventListener('click', (e) => {
+                                this.logDownloadAttempt(link, e);
+                            });
+                        });
                     }
-                })
-                .catch(() => {
-                    this.fallbackCopy(reportText);
                 });
+            });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    },
+    
+    // تسجيل محاولة التحميل
+    logDownloadAttempt(link, event) {
+        const href = link.getAttribute('href');
+        const download = link.getAttribute('download');
+        const id = link.id || 'no-id';
+        
+        this.addResult('📥', `محاولة تحميل: ${download || 'ملف'}`, '#4CAF50');
+        this.addResult('🔗', `الرابط: ${href ? href.substring(0, 80) : 'غير موجود'}${href && href.length > 80 ? '...' : ''}`, '#aaa');
+        
+        // تحليل الرابط
+        if (!href || href === '#') {
+            this.addResult('❌', 'الرابط غير معين (href="#")', '#f44336');
+            this.addResult('💡', 'الحل: تأكد من تعيين href عند عرض الرسالة', '#FFC107');
+        } else if (href.startsWith('blob:')) {
+            this.addResult('⚠️', 'الرابط من نوع Blob URL (قد ينتهي صلاحيته)', '#FFC107');
+            // اختبار صلاحية الرابط
+            this.testBlobUrl(href);
+        } else if (href.startsWith('data:')) {
+            this.addResult('ℹ️', 'الرابط من نوع Data URL (قد يكون كبيراً)', '#aaa');
+        } else if (href.startsWith('http')) {
+            this.addResult('✅', 'الرابط من نوع HTTP (يعمل دائماً)', '#4CAF50');
+        }
+        
+        // تحليل خاصية download
+        if (!download) {
+            this.addResult('⚠️', 'لا توجد خاصية download', '#FFC107');
         } else {
-            this.fallbackCopy(reportText);
+            this.addResult('✅', `خاصية download: ${download}`, '#4CAF50');
+        }
+        
+        // تحليل نوع البيانات المخزنة
+        this.analyzeStoredData(link);
+        
+        this.addResult('', '─'.repeat(40), '#555');
+    },
+    
+    // اختبار صلاحية Blob URL
+    testBlobUrl(url) {
+        this.addResult('🔄', 'جاري اختبار صلاحية الرابط...', '#aaa');
+        fetch(url, { method: 'HEAD' })
+            .then(response => {
+                if (response.ok) {
+                    this.addResult('✅', 'Blob URL صالح ويعمل', '#4CAF50');
+                } else {
+                    this.addResult('❌', 'Blob URL غير صالح (انتهت صلاحيته)', '#f44336');
+                    this.addResult('💡', 'الحل: استخدم ArrayBuffer بدلاً من Blob URL', '#FFC107');
+                }
+            })
+            .catch(() => {
+                this.addResult('❌', 'فشل التحقق من Blob URL (منتهي الصلاحية)', '#f44336');
+                this.addResult('💡', 'الحل: استخدم ArrayBuffer بدلاً من Blob URL', '#FFC107');
+            });
+    },
+    
+    // تحليل البيانات المخزنة
+    analyzeStoredData(link) {
+        // محاولة العثور على الرسالة المرتبطة
+        const messages = document.querySelectorAll('.message');
+        let found = false;
+        messages.forEach((msg) => {
+            const img = msg.querySelector('img');
+            const video = msg.querySelector('video');
+            const audio = msg.querySelector('audio');
+            const fileBtn = msg.querySelector('.download-file-btn');
+            
+            if (fileBtn === link || (img && img.src === link.href) || (video && video.src === link.href)) {
+                found = true;
+                // تحليل نوع البيانات
+                const dataAttr = msg.getAttribute('data-file-type') || 'unknown';
+                this.addResult('📊', `نوع البيانات: ${dataAttr}`, '#aaa');
+            }
+        });
+        
+        if (!found) {
+            this.addResult('ℹ️', 'لم يتم العثور على الرسالة المرتبطة', '#888');
         }
     },
     
-    // ✅ طريقة بديلة للنسخ (للتوافق مع المتصفحات القديمة)
+    // تحليل جميع عناصر التحميل
+    analyzeAllDownloadElements() {
+        const links = document.querySelectorAll('a[download]');
+        this.addResult('📊', `تم العثور على ${links.length} عنصر تحميل`, '#ff6600');
+        
+        links.forEach((link, index) => {
+            const href = link.getAttribute('href');
+            const download = link.getAttribute('download');
+            const isBlob = href && href.startsWith('blob:');
+            const isData = href && href.startsWith('data:');
+            const isHttp = href && href.startsWith('http');
+            const isEmpty = !href || href === '#';
+            
+            let status = '✅';
+            let color = '#4CAF50';
+            let note = '';
+            
+            if (isEmpty) {
+                status = '⚠️';
+                color = '#FFC107';
+                note = '(غير معين)';
+            } else if (isBlob) {
+                status = '⚠️';
+                color = '#FFC107';
+                note = '(Blob URL - قد ينتهي)';
+            } else if (isData) {
+                status = 'ℹ️';
+                color = '#aaa';
+                note = '(Data URL)';
+            } else if (isHttp) {
+                status = '✅';
+                color = '#4CAF50';
+                note = '(HTTP - يعمل دائماً)';
+            }
+            
+            this.addResult(status, `عنصر ${index + 1}: ${download || 'ملف'} ${note}`, color);
+        });
+    },
+    
+    // مراقبة النقرات
+    monitorClicks() {
+        document.addEventListener('click', (e) => {
+            const target = e.target.closest('a[download]');
+            if (target) {
+                // تم التعامل معه في logDownloadAttempt
+            }
+            
+            // مراقبة أزرار التحميل الأخرى
+            const button = e.target.closest('[onclick*="download"]');
+            if (button) {
+                this.addResult('🔄', 'تم النقر على زر تحميل (غير <a>)', '#FFC107');
+                this.addResult('💡', 'يُنصح باستخدام <a> مع download بدلاً من الأزرار', '#FFC107');
+            }
+        }, true);
+    },
+    
+    // تحليل عميق
+    deepAnalyze() {
+        this.addResult('🔬', 'بدء التحليل العميق...', '#9C27B0');
+        
+        // 1. تحليل localStorage
+        this.analyzeLocalStorage();
+        
+        // 2. تحليل الذاكرة
+        this.analyzeMemory();
+        
+        // 3. تحليل الروابط
+        this.analyzeAllDownloadElements();
+        
+        this.addResult('✅', 'اكتمل التحليل العميق', '#4CAF50');
+    },
+    
+    // تحليل localStorage
+    analyzeLocalStorage() {
+        this.addResult('📁', 'تحليل localStorage...', '#aaa');
+        let found = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('chat_')) {
+                found++;
+                try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    if (Array.isArray(data)) {
+                        const fileMessages = data.filter(m => m.type === 'image' || m.type === 'video' || m.type === 'file');
+                        if (fileMessages.length > 0) {
+                            this.addResult('📨', `محادثة ${key}: ${fileMessages.length} ملفات`, '#aaa');
+                            fileMessages.forEach((msg, idx) => {
+                                const isBlob = typeof msg.data === 'string' && msg.data.startsWith('blob:');
+                                const isArrayBuffer = msg.data instanceof ArrayBuffer;
+                                const isString = typeof msg.data === 'string' && !isBlob;
+                                if (isBlob) {
+                                    this.addResult('⚠️', `  رسالة ${idx + 1}: Blob URL (ينتهي)`, '#FFC107');
+                                } else if (isArrayBuffer) {
+                                    this.addResult('✅', `  رسالة ${idx + 1}: ArrayBuffer (دائم)`, '#4CAF50');
+                                } else if (isString) {
+                                    this.addResult('⚠️', `  رسالة ${idx + 1}: String (غير معروف)`, '#FFC107');
+                                }
+                            });
+                        }
+                    }
+                } catch (e) {
+                    this.addResult('❌', `خطأ في قراءة ${key}`, '#f44336');
+                }
+            }
+        }
+        this.addResult('📊', `تم تحليل ${found} محادثة`, '#aaa');
+    },
+    
+    // تحليل الذاكرة
+    analyzeMemory() {
+        this.addResult('🧠', 'تحليل الذاكرة...', '#aaa');
+        if (window.performance && window.performance.memory) {
+            const mem = window.performance.memory;
+            this.addResult('📊', `الذاكرة المستخدمة: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB`, '#aaa');
+            this.addResult('📊', `الحد الأقصى: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(1)} MB`, '#aaa');
+        } else {
+            this.addResult('ℹ️', 'معلومات الذاكرة غير متوفرة', '#888');
+        }
+    },
+    
+    // إضافة نتيجة
+    addResult(icon, text, color = '#fff') {
+        const container = document.getElementById('diagResultsContainer');
+        if (!container) return;
+        
+        const line = document.createElement('div');
+        line.style.cssText = `
+            padding: 2px 4px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: ${color};
+            word-break: break-word;
+        `;
+        line.textContent = `${icon} ${text}`;
+        container.appendChild(line);
+        container.scrollTop = container.scrollHeight;
+        
+        // تخزين النص للتقرير
+        this.fullReportText += `${icon} ${text}\n`;
+        
+        // تحديث الحالة
+        const status = document.getElementById('diagStatus');
+        if (status) {
+            const count = container.querySelectorAll('div').length;
+            status.textContent = `📊 ${count} سجل | ${this.isRunning ? '🟢 جاري...' : '🟡 متوقف'}`;
+        }
+    },
+    
+    // نسخ التقرير
+    copyFullReport() {
+        if (!this.fullReportText) {
+            alert('لا يوجد تقرير للنسخ. قم بتشغيل التشخيص أولاً.');
+            return;
+        }
+        
+        const text = `═══════════════════════════════════════\n` +
+                    `🔍 تقرير تشخيص التحميل المتخصص\n` +
+                    `📅 ${new Date().toLocaleString()}\n` +
+                    `═══════════════════════════════════════\n\n` +
+                    this.fullReportText +
+                    `\n═══════════════════════════════════════\n` +
+                    `📊 نهاية التقرير\n`;
+        
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    this.addResult('✅', `تم نسخ التقرير (${text.split('\n').length} سطر)`, '#4CAF50');
+                })
+                .catch(() => {
+                    this.fallbackCopy(text);
+                });
+        } else {
+            this.fallbackCopy(text);
+        }
+    },
+    
     fallbackCopy(text) {
         const textarea = document.createElement('textarea');
         textarea.value = text;
@@ -997,73 +1247,69 @@ const DownloadDiagnostic = {
         textarea.select();
         try {
             document.execCommand('copy');
-            const msg = document.createElement('div');
-            msg.style.cssText = 'color: #4CAF50; font-size: 12px; padding: 5px; text-align: center; border: 1px solid #4CAF50; border-radius: 5px; margin: 5px 0;';
-            msg.textContent = '✅ تم نسخ النص بالكامل (' + text.split('\n').length + ' سطر)';
-            const logContainer = document.getElementById('diagnosticLogs');
-            if (logContainer) {
-                logContainer.appendChild(msg);
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
+            this.addResult('✅', 'تم نسخ التقرير (طريقة بديلة)', '#4CAF50');
         } catch (e) {
             alert('فشل النسخ. يمكنك تحديد النص ونسخه يدوياً.');
         }
         document.body.removeChild(textarea);
+    },
+    
+    // مسح النتائج
+    clearResults() {
+        const container = document.getElementById('diagResultsContainer');
+        if (container) {
+            container.innerHTML = '';
+        }
+        this.results = [];
+        this.fullReportText = '';
+        const status = document.getElementById('diagStatus');
+        if (status) status.textContent = '🟢 تم المسح';
+        this.addResult('🧹', 'تم مسح جميع النتائج', '#ff6600');
+    },
+    
+    // عرض اللوحة
+    show() {
+        const panel = document.getElementById('downloadDiagnosticPanel');
+        if (panel) {
+            panel.style.display = 'flex';
+        }
+    },
+    
+    // إخفاء اللوحة
+    hide() {
+        const panel = document.getElementById('downloadDiagnosticPanel');
+        if (panel) {
+            panel.style.display = 'none';
+        }
     }
 };
 
-// ✅ إضافة أزرار التشخيص
-function addDiagnosticButtons() {
-    const controlBar = document.querySelector('#diagnosticTool .diagnostic-controls') || 
-                       document.querySelector('#diagnosticTool > div:first-child');
-    if (!controlBar) return;
-    
-    // زر تشخيص التحميل
-    const diagnoseBtn = document.createElement('button');
-    diagnoseBtn.textContent = '🔍 تشخيص التحميل';
-    diagnoseBtn.style.cssText = 'background: #9C27B0; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer; margin-left: 5px;';
-    diagnoseBtn.onclick = () => {
-        DownloadDiagnostic.diagnoseAll();
-    };
-    controlBar.appendChild(diagnoseBtn);
-    
-    // ✅ زر نسخ النص الكامل (جديد)
-    const copyReportBtn = document.createElement('button');
-    copyReportBtn.textContent = '📋 نسخ التقرير';
-    copyReportBtn.style.cssText = 'background: #2196F3; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer; margin-left: 5px;';
-    copyReportBtn.onclick = () => {
-        DownloadDiagnostic.copyFullReport();
-    };
-    controlBar.appendChild(copyReportBtn);
-    
-    // زر مسح التشخيص
-    const clearDiagnoseBtn = document.createElement('button');
-    clearDiagnoseBtn.textContent = '🧹 مسح التشخيص';
-    clearDiagnoseBtn.style.cssText = 'background: #555; border: 1px solid #ff6600; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer; margin-left: 5px;';
-    clearDiagnoseBtn.onclick = () => {
-        DownloadDiagnostic.results = [];
-        DownloadDiagnostic.fullReportText = '';
-        const logContainer = document.getElementById('diagnosticLogs');
-        if (logContainer) {
-            const items = logContainer.querySelectorAll('div');
-            items.forEach(item => {
-                if (item.textContent.includes('═══════') || 
-                    item.textContent.includes('تشخيص:') ||
-                    item.textContent.includes('تقرير التشخيص') ||
-                    item.textContent.includes('تم نسخ النص')) {
-                    item.remove();
-                }
-            });
-        }
-    };
-    controlBar.appendChild(clearDiagnoseBtn);
-}
-
-// تشغيل عند تحميل الصفحة
+// ==================== تشغيل الأداة ====================
+// تهيئة الأداة عند تحميل الصفحة
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', addDiagnosticButtons);
+    document.addEventListener('DOMContentLoaded', () => {
+        DownloadDiagnosticPro.init();
+    });
 } else {
-    addDiagnosticButtons();
+    DownloadDiagnosticPro.init();
 }
 
+// ==================== إضافة اختصار لوحة المفاتيح ====================
+document.addEventListener('keydown', (e) => {
+    // Ctrl+Shift+D = فتح/إغلاق أداة التشخيص
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        const panel = document.getElementById('downloadDiagnosticPanel');
+        if (panel) {
+            if (panel.style.display === 'none' || panel.style.display === '') {
+                DownloadDiagnosticPro.show();
+            } else {
+                DownloadDiagnosticPro.hide();
+            }
+        }
+    }
+});
+
+console.log('🔍 أداة تشخيص التحميل المتخصصة جاهزة!');
+console.log('📌 استخدم Ctrl+Shift+D لفتح/إغلاق اللوحة');
 
