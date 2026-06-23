@@ -1168,283 +1168,324 @@ const ChatSystem = {
         };
     },
 
-    // ==================== القسم 26: displayMessage (معدل - دعم تخزين Blob للتحميل) ====================
-    displayMessage(msg) {
-        const c = document.getElementById('messagesContainer'); 
-        if (!c) return;
-        
-        const formatDateTime = (dateObj) => {
-            const year = dateObj.getFullYear();
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            let hours = dateObj.getHours();
-            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            const formattedHours = String(hours).padStart(2, '0');
-            return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
-        };
-        
-        const dateTime = formatDateTime(new Date(msg.time));
-        const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
-        
-        // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
-        const template = document.getElementById('messageWrapperTemplate');
-        let div;
-        if (template) {
-            div = template.content.cloneNode(true).firstElementChild;
+    // ==================== القسم 26: displayMessage (معدل - تحديث الرابط عند كل ضغطة) ====================
+displayMessage(msg) {
+    const c = document.getElementById('messagesContainer'); 
+    if (!c) return;
+    
+    const formatDateTime = (dateObj) => {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        let hours = dateObj.getHours();
+        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        const formattedHours = String(hours).padStart(2, '0');
+        return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
+    };
+    
+    const dateTime = formatDateTime(new Date(msg.time));
+    const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
+    
+    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
+    const template = document.getElementById('messageWrapperTemplate');
+    let div;
+    if (template) {
+        div = template.content.cloneNode(true).firstElementChild;
+    } else {
+        console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
+        div = document.createElement('div');
+        div.className = 'message';
+    }
+    
+    div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
+    div.id = `msg-${msg.id}`;
+    
+    // ==================== معالجة الرسائل النصية ====================
+    if (msg.type === 'text') {
+        const textTemplate = document.getElementById('textMessageTemplate');
+        if (textTemplate) {
+            const clone = textTemplate.content.cloneNode(true);
+            const contentDiv = clone.querySelector('.message-content');
+            const textSpan = contentDiv?.querySelector('span');
+            
+            if (contentDiv) {
+                contentDiv.style.border = `1.5px solid ${borderColor}`;
+            }
+            
+            if (textSpan) {
+                textSpan.innerHTML = this.escapeHtml(msg.text);
+            }
+            
+            div.appendChild(clone);
         } else {
-            console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
-            div = document.createElement('div');
-            div.className = 'message';
+            console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
-        div.id = `msg-${msg.id}`;
+        const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
+        const currentMessageCount = existingTextMessages.length;
         
-        // ==================== معالجة الرسائل النصية ====================
-        if (msg.type === 'text') {
-            const textTemplate = document.getElementById('textMessageTemplate');
-            if (textTemplate) {
-                const clone = textTemplate.content.cloneNode(true);
-                const contentDiv = clone.querySelector('.message-content');
-                const textSpan = contentDiv?.querySelector('span');
-                
-                if (contentDiv) {
-                    contentDiv.style.border = `1.5px solid ${borderColor}`;
-                }
-                
-                if (textSpan) {
-                    textSpan.innerHTML = this.escapeHtml(msg.text);
-                }
-                
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب textMessageTemplate غير موجود');
-            }
-            
-            const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
-            const currentMessageCount = existingTextMessages.length;
-            
-            if (currentMessageCount % 10 === 0) {
-                const timeSeparator = document.createElement('div');
-                timeSeparator.className = 'time-separator';
-                timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
-                timeSeparator.textContent = dateTime;
-                c.appendChild(timeSeparator);
-            }
+        if (currentMessageCount % 10 === 0) {
+            const timeSeparator = document.createElement('div');
+            timeSeparator.className = 'time-separator';
+            timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
+            timeSeparator.textContent = dateTime;
+            c.appendChild(timeSeparator);
+        }
+    }
+    
+    // ==================== معالجة الموقع ====================
+    else if (msg.type === 'location') {
+        let locationData = msg.data;
+        let locationUrl = '';
+        
+        if (typeof locationData === 'object' && locationData.url) {
+            locationUrl = locationData.url;
+        } else if (typeof locationData === 'string') {
+            const match = locationData.match(/https?:\/\/[^\s]+/);
+            locationUrl = match ? match[0] : locationData;
+        } else {
+            locationUrl = '#';
         }
         
-        // ==================== معالجة الموقع ====================
-        else if (msg.type === 'location') {
-            let locationData = msg.data;
-            let locationUrl = '';
-            
-            if (typeof locationData === 'object' && locationData.url) {
-                locationUrl = locationData.url;
-            } else if (typeof locationData === 'string') {
-                const match = locationData.match(/https?:\/\/[^\s]+/);
-                locationUrl = match ? match[0] : locationData;
-            } else {
-                locationUrl = '#';
-            }
-            
-            const maxClicks = locationData.maxClicks;
-            let clicksRemaining = locationData.clicksRemaining;
-            
-            const templateLoc = document.getElementById('locationMessageTemplate');
-            if (templateLoc) {
-                const clone = templateLoc.content.cloneNode(true);
-                const locationDiv = clone.querySelector('.location-card');
-                if (locationDiv) {
-                    locationDiv.style.background = '#4CAF50';
-                    
-                    if (clicksRemaining !== undefined && clicksRemaining <= 0) {
-                        locationDiv.style.background = '#888';
-                        locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
-                        locationDiv.style.border = 'none';
-                    } else {
-                        locationDiv.style.border = `1.5px solid ${borderColor}`;
-                        locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
-                        locationDiv.onclick = (e) => {
-                            e.stopPropagation();
-                            if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
-                            window.open(locationUrl, '_blank');
-                            if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
-                                clicksRemaining--;
-                                msg.data.clicksRemaining = clicksRemaining;
-                                if (clicksRemaining <= 0) {
-                                    locationDiv.style.background = '#888';
-                                    locationDiv.style.cursor = 'default';
-                                    locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
-                                    locationDiv.onclick = () => {};
-                                }
-                                if (ChatSystem.currentChat) {
-                                    const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
-                                    const msgIndex = messages.findIndex(m => m.id === msg.id);
-                                    if (msgIndex !== -1) {
-                                        messages[msgIndex].data.clicksRemaining = clicksRemaining;
-                                        ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
-                                    }
+        const maxClicks = locationData.maxClicks;
+        let clicksRemaining = locationData.clicksRemaining;
+        
+        const templateLoc = document.getElementById('locationMessageTemplate');
+        if (templateLoc) {
+            const clone = templateLoc.content.cloneNode(true);
+            const locationDiv = clone.querySelector('.location-card');
+            if (locationDiv) {
+                locationDiv.style.background = '#4CAF50';
+                
+                if (clicksRemaining !== undefined && clicksRemaining <= 0) {
+                    locationDiv.style.background = '#888';
+                    locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                    locationDiv.style.border = 'none';
+                } else {
+                    locationDiv.style.border = `1.5px solid ${borderColor}`;
+                    locationDiv.innerHTML = `<i class="fas fa-map-marker-alt" style="font-size: 1.2rem; color: white;"></i>`;
+                    locationDiv.onclick = (e) => {
+                        e.stopPropagation();
+                        if (clicksRemaining !== undefined && clicksRemaining <= 0) return;
+                        window.open(locationUrl, '_blank');
+                        if (msg.sender !== 'me' && clicksRemaining !== undefined && maxClicks < 999999) {
+                            clicksRemaining--;
+                            msg.data.clicksRemaining = clicksRemaining;
+                            if (clicksRemaining <= 0) {
+                                locationDiv.style.background = '#888';
+                                locationDiv.style.cursor = 'default';
+                                locationDiv.innerHTML = `<i class="fas fa-lock" style="font-size: 1.2rem; color: white;"></i>`;
+                                locationDiv.onclick = () => {};
+                            }
+                            if (ChatSystem.currentChat) {
+                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                                const msgIndex = messages.findIndex(m => m.id === msg.id);
+                                if (msgIndex !== -1) {
+                                    messages[msgIndex].data.clicksRemaining = clicksRemaining;
+                                    ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
                                 }
                             }
-                        };
-                    }
+                        }
+                    };
                 }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب locationMessageTemplate غير موجود');
             }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب locationMessageTemplate غير موجود');
         }
-        
-        // ==================== معالجة الصورة (معدل - دعم تخزين Blob) ====================
-        else if (msg.type === 'image') {
-            const templateImg = document.getElementById('imageMessageTemplate');
-            if (templateImg) {
-                const clone = templateImg.content.cloneNode(true);
-                const wrapper = clone.querySelector('.message-image-wrapper');
-                if (wrapper) {
-                    wrapper.style.border = `2px solid ${borderColor}`;
-                    const img = wrapper.querySelector('.message-image-content');
-                    const downloadBtn = wrapper.querySelector('.download-btn');
+    }
+    
+    // ==================== معالجة الصورة (معدل - تحديث الرابط عند الضغط) ====================
+    else if (msg.type === 'image') {
+        const templateImg = document.getElementById('imageMessageTemplate');
+        if (templateImg) {
+            const clone = templateImg.content.cloneNode(true);
+            const wrapper = clone.querySelector('.message-image-wrapper');
+            if (wrapper) {
+                wrapper.style.border = `2px solid ${borderColor}`;
+                const img = wrapper.querySelector('.message-image-content');
+                const downloadBtn = wrapper.querySelector('.download-btn');
+                
+                if (img) {
+                    img.src = msg.data;
+                    img.onclick = () => this.showImagePreview(msg.data, msg.fileName || 'image.jpg');
+                    img.oncontextmenu = (e) => e.preventDefault();
+                    img.ondragstart = (e) => e.preventDefault();
+                }
+                
+                // ✅ زر التحميل - تحديث الرابط عند كل ضغطة
+                if (downloadBtn) {
+                    const blobId = msg._blobId || msg.id;
                     
-                    if (img) {
-                        img.src = msg.data;
-                        img.onclick = () => this.showImagePreview(msg.data, msg.fileName || 'image.jpg');
-                        img.oncontextmenu = (e) => e.preventDefault();
-                        img.ondragstart = (e) => e.preventDefault();
+                    // تعيين الرابط الأولي
+                    const initialUrl = this._getDownloadUrl(blobId);
+                    if (initialUrl) {
+                        downloadBtn.href = initialUrl;
+                        downloadBtn.download = msg.fileName || `image_${msg.id}.jpg`;
+                        downloadBtn.title = `تحميل ${msg.fileName || 'صورة'}`;
+                    } else {
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = msg.fileName || `image_${msg.id}.jpg`;
+                        downloadBtn.title = `تحميل ${msg.fileName || 'صورة'}`;
                     }
                     
-                    // ✅ زر التحميل - يستخدم الرابط من الـ Blob المخزن
-                    if (downloadBtn) {
-                        const blobId = msg._blobId || msg.id;
-                        const downloadUrl = this._getDownloadUrl(blobId);
-                        
-                        if (downloadUrl) {
-                            downloadBtn.href = downloadUrl;
-                            downloadBtn.download = msg.fileName || `image_${msg.id}.jpg`;
-                            downloadBtn.title = `تحميل ${msg.fileName || 'صورة'}`;
+                    // ✅ عند الضغط، نعيد إنشاء الرابط من الـ Blob المخزن
+                    downloadBtn.addEventListener('click', function(e) {
+                        const newUrl = ChatSystem._getDownloadUrl(blobId);
+                        if (newUrl) {
+                            this.href = newUrl;
+                            this.download = msg.fileName || `image_${msg.id}.jpg`;
+                            console.log(`🔄 تم تحديث رابط التحميل للصورة: ${blobId}`);
                         } else {
                             // Fallback: استخدم الرابط الموجود
-                            downloadBtn.href = msg.data;
-                            downloadBtn.download = msg.fileName || `image_${msg.id}.jpg`;
-                            downloadBtn.title = `تحميل ${msg.fileName || 'صورة'}`;
+                            this.href = msg.data;
+                            this.download = msg.fileName || `image_${msg.id}.jpg`;
+                            console.warn(`⚠️ لا يوجد Blob في الكاش للصورة: ${blobId}, استخدام الرابط الموجود`);
                         }
-                    }
+                    }, { once: false });
                 }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب imageMessageTemplate غير موجود');
             }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب imageMessageTemplate غير موجود');
         }
-        
-        // ==================== معالجة البصمة الصوتية ====================
-        else if (msg.type === 'voice') {
-            const templateVoice = document.getElementById('voiceMessageTemplate');
-            if (templateVoice) {
-                const clone = templateVoice.content.cloneNode(true);
-                const voiceMsg = clone.querySelector('.voice-message');
-                if (voiceMsg) {
-                    voiceMsg.style.background = '#4CAF50';
-                    voiceMsg.style.border = `1.5px solid ${borderColor}`;
-                    const audioEl = voiceMsg.querySelector('.voice-audio-element');
-                    if (audioEl && msg.data) {
-                        audioEl.src = msg.data;
-                        this.setupVoiceControls(clone, audioEl);
-                    }
+    }
+    
+    // ==================== معالجة البصمة الصوتية ====================
+    else if (msg.type === 'voice') {
+        const templateVoice = document.getElementById('voiceMessageTemplate');
+        if (templateVoice) {
+            const clone = templateVoice.content.cloneNode(true);
+            const voiceMsg = clone.querySelector('.voice-message');
+            if (voiceMsg) {
+                voiceMsg.style.background = '#4CAF50';
+                voiceMsg.style.border = `1.5px solid ${borderColor}`;
+                const audioEl = voiceMsg.querySelector('.voice-audio-element');
+                if (audioEl && msg.data) {
+                    audioEl.src = msg.data;
+                    this.setupVoiceControls(clone, audioEl);
                 }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
             }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
         }
-        
-        // ==================== معالجة الفيديو (معدل - دعم تخزين Blob) ====================
-        else if (msg.type === 'video') {
-            const templateVideo = document.getElementById('videoMessageTemplate');
-            if (templateVideo) {
-                const clone = templateVideo.content.cloneNode(true);
-                const thumbnail = clone.querySelector('.video-thumbnail');
-                if (thumbnail) {
-                    thumbnail.style.border = `2px solid ${borderColor}`;
-                    const video = thumbnail.querySelector('.video-thumbnail-content');
-                    const source = video?.querySelector('source');
-                    const downloadBtn = thumbnail.querySelector('.download-btn');
+    }
+    
+    // ==================== معالجة الفيديو (معدل - تحديث الرابط عند الضغط) ====================
+    else if (msg.type === 'video') {
+        const templateVideo = document.getElementById('videoMessageTemplate');
+        if (templateVideo) {
+            const clone = templateVideo.content.cloneNode(true);
+            const thumbnail = clone.querySelector('.video-thumbnail');
+            if (thumbnail) {
+                thumbnail.style.border = `2px solid ${borderColor}`;
+                const video = thumbnail.querySelector('.video-thumbnail-content');
+                const source = video?.querySelector('source');
+                const downloadBtn = thumbnail.querySelector('.download-btn');
+                
+                if (source && msg.data) {
+                    source.src = msg.data;
+                    video.load();
+                }
+                
+                thumbnail.onclick = (e) => {
+                    e.stopPropagation();
+                    this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
+                };
+                
+                // ✅ زر التحميل - تحديث الرابط عند كل ضغطة
+                if (downloadBtn) {
+                    const blobId = msg._blobId || msg.id;
                     
-                    if (source && msg.data) {
-                        source.src = msg.data;
-                        video.load();
+                    const initialUrl = this._getDownloadUrl(blobId);
+                    if (initialUrl) {
+                        downloadBtn.href = initialUrl;
+                        downloadBtn.download = msg.fileName || `video_${msg.id}.mp4`;
+                        downloadBtn.title = `تحميل ${msg.fileName || 'فيديو'}`;
+                    } else {
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = msg.fileName || `video_${msg.id}.mp4`;
+                        downloadBtn.title = `تحميل ${msg.fileName || 'فيديو'}`;
                     }
                     
-                    thumbnail.onclick = (e) => {
-                        e.stopPropagation();
-                        this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
-                    };
-                    
-                    // ✅ زر التحميل - يستخدم الرابط من الـ Blob المخزن
-                    if (downloadBtn) {
-                        const blobId = msg._blobId || msg.id;
-                        const downloadUrl = this._getDownloadUrl(blobId);
-                        
-                        if (downloadUrl) {
-                            downloadBtn.href = downloadUrl;
-                            downloadBtn.download = msg.fileName || `video_${msg.id}.mp4`;
-                            downloadBtn.title = `تحميل ${msg.fileName || 'فيديو'}`;
+                    downloadBtn.addEventListener('click', function(e) {
+                        const newUrl = ChatSystem._getDownloadUrl(blobId);
+                        if (newUrl) {
+                            this.href = newUrl;
+                            this.download = msg.fileName || `video_${msg.id}.mp4`;
+                            console.log(`🔄 تم تحديث رابط التحميل للفيديو: ${blobId}`);
                         } else {
-                            downloadBtn.href = msg.data;
-                            downloadBtn.download = msg.fileName || `video_${msg.id}.mp4`;
-                            downloadBtn.title = `تحميل ${msg.fileName || 'فيديو'}`;
+                            this.href = msg.data;
+                            this.download = msg.fileName || `video_${msg.id}.mp4`;
+                            console.warn(`⚠️ لا يوجد Blob في الكاش للفيديو: ${blobId}, استخدام الرابط الموجود`);
                         }
-                    }
+                    }, { once: false });
                 }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب videoMessageTemplate غير موجود');
             }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب videoMessageTemplate غير موجود');
         }
-        
-        // ==================== معالجة الملف (معدل - دعم تخزين Blob) ====================
-        else if (msg.type === 'file') {
-            const templateFile = document.getElementById('fileMessageTemplate');
-            if (templateFile) {
-                const clone = templateFile.content.cloneNode(true);
-                const fileCard = clone.querySelector('.file-card');
-                if (fileCard) {
-                    fileCard.style.background = '#4CAF50';
-                    fileCard.style.border = `1.5px solid ${borderColor}`;
-                    const fileNameEl = fileCard.querySelector('.file-name');
-                    const downloadBtn = fileCard.querySelector('.download-file-btn');
+    }
+    
+    // ==================== معالجة الملف (معدل - تحديث الرابط عند الضغط) ====================
+    else if (msg.type === 'file') {
+        const templateFile = document.getElementById('fileMessageTemplate');
+        if (templateFile) {
+            const clone = templateFile.content.cloneNode(true);
+            const fileCard = clone.querySelector('.file-card');
+            if (fileCard) {
+                fileCard.style.background = '#4CAF50';
+                fileCard.style.border = `1.5px solid ${borderColor}`;
+                const fileNameEl = fileCard.querySelector('.file-name');
+                const downloadBtn = fileCard.querySelector('.download-file-btn');
+                
+                if (fileNameEl) {
+                    fileNameEl.textContent = msg.fileName || 'ملف';
+                }
+                
+                // ✅ زر التحميل - تحديث الرابط عند كل ضغطة
+                if (downloadBtn) {
+                    const blobId = msg._blobId || msg.id;
                     
-                    if (fileNameEl) {
-                        fileNameEl.textContent = msg.fileName || 'ملف';
+                    const initialUrl = this._getDownloadUrl(blobId);
+                    if (initialUrl) {
+                        downloadBtn.href = initialUrl;
+                        downloadBtn.download = msg.fileName || `file_${msg.id}`;
+                        downloadBtn.title = `تحميل ${msg.fileName || 'ملف'}`;
+                    } else {
+                        downloadBtn.href = msg.data;
+                        downloadBtn.download = msg.fileName || `file_${msg.id}`;
+                        downloadBtn.title = `تحميل ${msg.fileName || 'ملف'}`;
                     }
                     
-                    // ✅ زر التحميل - يستخدم الرابط من الـ Blob المخزن
-                    if (downloadBtn) {
-                        const blobId = msg._blobId || msg.id;
-                        const downloadUrl = this._getDownloadUrl(blobId);
-                        
-                        if (downloadUrl) {
-                            downloadBtn.href = downloadUrl;
-                            downloadBtn.download = msg.fileName || `file_${msg.id}`;
-                            downloadBtn.title = `تحميل ${msg.fileName || 'ملف'}`;
+                    downloadBtn.addEventListener('click', function(e) {
+                        const newUrl = ChatSystem._getDownloadUrl(blobId);
+                        if (newUrl) {
+                            this.href = newUrl;
+                            this.download = msg.fileName || `file_${msg.id}`;
+                            console.log(`🔄 تم تحديث رابط التحميل للملف: ${blobId}`);
                         } else {
-                            downloadBtn.href = msg.data;
-                            downloadBtn.download = msg.fileName || `file_${msg.id}`;
-                            downloadBtn.title = `تحميل ${msg.fileName || 'ملف'}`;
+                            this.href = msg.data;
+                            this.download = msg.fileName || `file_${msg.id}`;
+                            console.warn(`⚠️ لا يوجد Blob في الكاش للملف: ${blobId}, استخدام الرابط الموجود`);
                         }
-                    }
+                    }, { once: false });
                 }
-                div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب fileMessageTemplate غير موجود');
             }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب fileMessageTemplate غير موجود');
         }
-        
-        // ✅ إضافة الرسالة إلى الحاوية
-        c.appendChild(div); 
-        c.scrollTop = c.scrollHeight;
-    },
+    }
+    
+    // ✅ إضافة الرسالة إلى الحاوية
+    c.appendChild(div); 
+    c.scrollTop = c.scrollHeight;
+},
 
     // ==================== القسم 26.1: showImagePreview ====================
     showImagePreview(imageSrc, fileName) {
