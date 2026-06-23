@@ -1154,7 +1154,9 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+
+
+    // ==================== القسم 26: displayMessage (معدل بالكامل - دعم ArrayBuffer) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1180,7 +1182,6 @@ displayMessage(msg) {
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1190,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== 26.1: معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1223,7 +1224,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الموقع ====================
+    // ==================== 26.2: معالجة الموقع ====================
     else if (msg.type === 'location') {
         let locationData = msg.data;
         let locationUrl = '';
@@ -1285,7 +1286,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== 26.3: معالجة الصورة (معدل - دعم ArrayBuffer) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1295,8 +1296,16 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                    // ✅ إنشاء URL جديد من البيانات المخزنة
+                    let imageUrl = msg.data;
+                    if (msg.data instanceof ArrayBuffer) {
+                        const blob = new Blob([msg.data], { type: 'image/jpeg' });
+                        imageUrl = URL.createObjectURL(blob);
+                        msg._currentUrl = imageUrl;
+                    }
+                    img.src = imageUrl;
+                    // ✅ تمرير الكائن msg بدلاً من الرابط فقط
+                    img.onclick = () => this.showImagePreview(msg);
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
                 }
@@ -1307,7 +1316,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة البصمة الصوتية ====================
+    // ==================== 26.4: معالجة البصمة الصوتية ====================
     else if (msg.type === 'voice') {
         const templateVoice = document.getElementById('voiceMessageTemplate');
         if (templateVoice) {
@@ -1318,7 +1327,13 @@ displayMessage(msg) {
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
                 if (audioEl && msg.data) {
-                    audioEl.src = msg.data;
+                    // ✅ إنشاء URL جديد من البيانات المخزنة
+                    let audioUrl = msg.data;
+                    if (msg.data instanceof ArrayBuffer) {
+                        const blob = new Blob([msg.data], { type: 'audio/webm' });
+                        audioUrl = URL.createObjectURL(blob);
+                    }
+                    audioEl.src = audioUrl;
                     this.setupVoiceControls(clone, audioEl);
                 }
             }
@@ -1328,7 +1343,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== 26.5: معالجة الفيديو (معدل - دعم ArrayBuffer) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1339,12 +1354,20 @@ displayMessage(msg) {
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
                 if (source && msg.data) {
-                    source.src = msg.data;
+                    // ✅ إنشاء URL جديد من البيانات المخزنة
+                    let videoUrl = msg.data;
+                    if (msg.data instanceof ArrayBuffer) {
+                        const blob = new Blob([msg.data], { type: 'video/mp4' });
+                        videoUrl = URL.createObjectURL(blob);
+                        msg._currentUrl = videoUrl;
+                    }
+                    source.src = videoUrl;
                     video.load();
                 }
+                // ✅ تمرير الكائن msg بدلاً من الرابط فقط
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
-                    this.showVideoPreview(msg.data);
+                    this.showVideoPreview(msg);
                 };
             }
             div.appendChild(clone);
@@ -1353,7 +1376,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== 26.6: معالجة الملف (معدل - دعم ArrayBuffer) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1366,12 +1389,18 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
+                const downloadLink = fileCard.querySelector('.download-file-btn');
+                if (downloadLink && msg.data) {
+                    // ✅ إنشاء URL جديد عند التحميل
+                    downloadLink.onclick = (e) => {
+                        e.preventDefault();
+                        let fileUrl = msg.data;
+                        if (msg.data instanceof ArrayBuffer) {
+                            const blob = new Blob([msg.data]);
+                            fileUrl = URL.createObjectURL(blob);
+                        }
                         const link = document.createElement('a');
-                        link.href = msg.data;
+                        link.href = fileUrl;
                         link.download = msg.fileName || 'ملف';
                         link.click();
                     };
@@ -1388,19 +1417,32 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview ====================
-showImagePreview(imageSrc) {
+// ==================== القسم 26.7: showImagePreview (معدل - دعم ArrayBuffer) ====================
+showImagePreview(msg) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
+    const link = document.getElementById('downloadImageLink');
     if (!modal || !img) return;
     
-    img.src = imageSrc;
+    // ✅ إنشاء URL جديد من البيانات المخزنة
+    let imageUrl = msg.data;
+    if (msg.data instanceof ArrayBuffer) {
+        const blob = new Blob([msg.data], { type: 'image/jpeg' });
+        imageUrl = URL.createObjectURL(blob);
+    }
+    
+    img.src = imageUrl;
     modal.style.display = 'flex';
+    
+    if (link) {
+        link.href = imageUrl;
+        link.download = `image_${Date.now()}.jpg`;
+    }
     
     this.setupImageZoom(modal, img);
 },
 
-// ==================== القسم 26.1.1: setupImageZoom ====================
+// ==================== القسم 26.8: setupImageZoom ====================
 setupImageZoom(modal, img) {
     if (img._zoomCleanup) {
         img._zoomCleanup();
@@ -1490,49 +1532,52 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview ====================
-showVideoPreview(videoSrc) {
+// ==================== القسم 26.9: showVideoPreview (معدل - دعم ArrayBuffer) ====================
+showVideoPreview(msg) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
+    const link = document.getElementById('downloadVideoLink');
     if (!modal || !video) return;
     
-    video.src = videoSrc;
+    // ✅ إنشاء URL جديد من البيانات المخزنة
+    let videoUrl = msg.data;
+    if (msg.data instanceof ArrayBuffer) {
+        const blob = new Blob([msg.data], { type: 'video/mp4' });
+        videoUrl = URL.createObjectURL(blob);
+    }
+    
+    video.src = videoUrl;
     modal.style.display = 'flex';
     video.play().catch(() => {});
+    
+    if (link) {
+        link.href = videoUrl;
+        link.download = `video_${Date.now()}.mp4`;
+    }
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات ====================
+// ==================== القسم 26.10: دوال إغلاق المعاينات ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
+    const link = document.getElementById('downloadImageLink');
     if (modal) modal.style.display = 'none';
     if (img) { img.src = ''; img.style.transform = 'none'; }
+    if (link) { link.href = '#'; link.download = ''; }
 },
 
 closeVideoPreview() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
+    const link = document.getElementById('downloadVideoLink');
     if (modal) modal.style.display = 'none';
     if (video) { video.pause(); video.src = ''; }
+    if (link) { link.href = '#'; link.download = ''; }
 },
 
-downloadPreviewImage() {
-    const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
-},
-
-downloadPreviewVideo() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-},  
+// ❌ تم حذف الدوال التالية (لم تعد هناك حاجة لها)
+// downloadPreviewImage()
+// downloadPreviewVideo()
     
 
     // ==================== القسم 27: sendMessage ====================
