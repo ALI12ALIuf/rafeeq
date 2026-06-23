@@ -1168,7 +1168,7 @@ const ChatSystem = {
         };
     },
 
-    // ==================== القسم 26: displayMessage (معدل - تحديث الرابط عند كل ضغطة) ====================
+    // ==================== القسم 26: displayMessage (معدل نهائياً - تحميل يدوي عند الضغط) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1188,7 +1188,7 @@ displayMessage(msg) {
     const dateTime = formatDateTime(new Date(msg.time));
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
+    // ✅ إنشاء العنصر الرئيسي
     const template = document.getElementById('messageWrapperTemplate');
     let div;
     if (template) {
@@ -1297,7 +1297,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (معدل - تحديث الرابط عند الضغط) ====================
+    // ==================== معالجة الصورة (معدل نهائياً - تحميل يدوي) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1315,11 +1315,11 @@ displayMessage(msg) {
                     img.ondragstart = (e) => e.preventDefault();
                 }
                 
-                // ✅ زر التحميل - تحديث الرابط عند كل ضغطة
+                // ✅ زر التحميل - تحميل يدوي عند الضغط
                 if (downloadBtn) {
                     const blobId = msg._blobId || msg.id;
                     
-                    // تعيين الرابط الأولي
+                    // تعيين الرابط الأولي (للحصول على تأثير hover)
                     const initialUrl = this._getDownloadUrl(blobId);
                     if (initialUrl) {
                         downloadBtn.href = initialUrl;
@@ -1331,17 +1331,32 @@ displayMessage(msg) {
                         downloadBtn.title = `تحميل ${msg.fileName || 'صورة'}`;
                     }
                     
-                    // ✅ عند الضغط، نعيد إنشاء الرابط من الـ Blob المخزن
-                    downloadBtn.addEventListener('click', function(e) {
-                        const newUrl = ChatSystem._getDownloadUrl(blobId);
-                        if (newUrl) {
-                            this.href = newUrl;
-                            this.download = msg.fileName || `image_${msg.id}.jpg`;
-                            console.log(`🔄 تم تحديث رابط التحميل للصورة: ${blobId}`);
+                    // ✅ إزالة أي مستمعات سابقة وإنشاء مستمع جديد
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault(); // منع السلوك الافتراضي
+                        e.stopPropagation();
+                        
+                        const blobId = msg._blobId || msg.id;
+                        const downloadUrl = ChatSystem._getDownloadUrl(blobId);
+                        
+                        if (downloadUrl) {
+                            const link = document.createElement('a');
+                            link.href = downloadUrl;
+                            link.download = msg.fileName || `image_${msg.id}.jpg`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            console.log(`✅ تم تحميل الصورة: ${blobId}`);
                         } else {
-                            // Fallback: استخدم الرابط الموجود
-                            this.href = msg.data;
-                            this.download = msg.fileName || `image_${msg.id}.jpg`;
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = msg.fileName || `image_${msg.id}.jpg`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
                             console.warn(`⚠️ لا يوجد Blob في الكاش للصورة: ${blobId}, استخدام الرابط الموجود`);
                         }
                     }, { once: false });
@@ -1374,7 +1389,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (معدل - تحديث الرابط عند الضغط) ====================
+    // ==================== معالجة الفيديو (معدل نهائياً - تحميل يدوي) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1396,7 +1411,7 @@ displayMessage(msg) {
                     this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
                 };
                 
-                // ✅ زر التحميل - تحديث الرابط عند كل ضغطة
+                // ✅ زر التحميل - تحميل يدوي عند الضغط
                 if (downloadBtn) {
                     const blobId = msg._blobId || msg.id;
                     
@@ -1411,15 +1426,31 @@ displayMessage(msg) {
                         downloadBtn.title = `تحميل ${msg.fileName || 'فيديو'}`;
                     }
                     
-                    downloadBtn.addEventListener('click', function(e) {
-                        const newUrl = ChatSystem._getDownloadUrl(blobId);
-                        if (newUrl) {
-                            this.href = newUrl;
-                            this.download = msg.fileName || `video_${msg.id}.mp4`;
-                            console.log(`🔄 تم تحديث رابط التحميل للفيديو: ${blobId}`);
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const blobId = msg._blobId || msg.id;
+                        const downloadUrl = ChatSystem._getDownloadUrl(blobId);
+                        
+                        if (downloadUrl) {
+                            const link = document.createElement('a');
+                            link.href = downloadUrl;
+                            link.download = msg.fileName || `video_${msg.id}.mp4`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            console.log(`✅ تم تحميل الفيديو: ${blobId}`);
                         } else {
-                            this.href = msg.data;
-                            this.download = msg.fileName || `video_${msg.id}.mp4`;
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = msg.fileName || `video_${msg.id}.mp4`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
                             console.warn(`⚠️ لا يوجد Blob في الكاش للفيديو: ${blobId}, استخدام الرابط الموجود`);
                         }
                     }, { once: false });
@@ -1431,7 +1462,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (معدل - تحديث الرابط عند الضغط) ====================
+    // ==================== معالجة الملف (معدل نهائياً - تحميل يدوي) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1447,7 +1478,7 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 
-                // ✅ زر التحميل - تحديث الرابط عند كل ضغطة
+                // ✅ زر التحميل - تحميل يدوي عند الضغط
                 if (downloadBtn) {
                     const blobId = msg._blobId || msg.id;
                     
@@ -1462,15 +1493,31 @@ displayMessage(msg) {
                         downloadBtn.title = `تحميل ${msg.fileName || 'ملف'}`;
                     }
                     
-                    downloadBtn.addEventListener('click', function(e) {
-                        const newUrl = ChatSystem._getDownloadUrl(blobId);
-                        if (newUrl) {
-                            this.href = newUrl;
-                            this.download = msg.fileName || `file_${msg.id}`;
-                            console.log(`🔄 تم تحديث رابط التحميل للملف: ${blobId}`);
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const blobId = msg._blobId || msg.id;
+                        const downloadUrl = ChatSystem._getDownloadUrl(blobId);
+                        
+                        if (downloadUrl) {
+                            const link = document.createElement('a');
+                            link.href = downloadUrl;
+                            link.download = msg.fileName || `file_${msg.id}`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            console.log(`✅ تم تحميل الملف: ${blobId}`);
                         } else {
-                            this.href = msg.data;
-                            this.download = msg.fileName || `file_${msg.id}`;
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = msg.fileName || `file_${msg.id}`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
                             console.warn(`⚠️ لا يوجد Blob في الكاش للملف: ${blobId}, استخدام الرابط الموجود`);
                         }
                     }, { once: false });
