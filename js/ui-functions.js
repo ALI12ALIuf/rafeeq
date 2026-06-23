@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة المعدلة (مع دوال إغلاق المعاينات) ==========
+// ========== ui-functions.js - النسخة المعدلة (مع دوال إغلاق المعاينات المحسنة) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -651,38 +651,67 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (معدل - بدون تحرير الرابط) ====================
+
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    if (img) { img.style.transform = 'none'; }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    if (video) { video.pause(); }
 };
 
-window.downloadPreviewImage = function() {
+// ✅ دالة عرض معاينة الصورة (معدلة - تدعم fileName)
+window.showImagePreview = function(imageSrc, fileName = 'image.jpg') {
+    const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
+    const downloadLink = document.getElementById('previewDownloadLink');
+    
+    if (!modal || !img) return;
+    
+    img.src = imageSrc;
+    
+    if (downloadLink) {
+        downloadLink.href = imageSrc;
+        downloadLink.download = fileName;
+        downloadLink.title = `تحميل ${fileName}`;
+    }
+    
+    modal.style.display = 'flex';
+    
+    if (typeof window.setupImageZoom === 'function') {
+        window.setupImageZoom(modal, img);
+    }
 };
 
-window.downloadPreviewVideo = function() {
+// ✅ دالة عرض معاينة الفيديو (معدلة - تدعم fileName)
+window.showVideoPreview = function(videoSrc, fileName = 'video.mp4') {
+    const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
+    const downloadLink = document.getElementById('previewVideoDownloadLink');
+    
+    if (!modal || !video) return;
+    
+    video.src = videoSrc;
+    
+    if (downloadLink) {
+        downloadLink.href = videoSrc;
+        downloadLink.download = fileName;
+        downloadLink.title = `تحميل ${fileName}`;
+    }
+    
+    modal.style.display = 'flex';
+    video.play().catch(() => {});
 };
+
+// ❌ تم إزالة downloadPreviewImage() و downloadPreviewVideo()
+// لم تعد هناك حاجة لهما لأن التحميل يتم عبر الرابط المباشر <a>
 
 // ==================== القسم 15: دوال مساعدة ====================
 function formatNumber(num) { 
