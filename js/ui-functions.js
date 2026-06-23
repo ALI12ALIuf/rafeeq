@@ -762,9 +762,8 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 
-
-
-// ==================== أداة تشخيص التحميل المتخصصة (شاشة منفصلة قابلة للسحب) ====================
+<script>
+// ==================== أداة تشخيص التحميل المتخصصة ====================
 const DownloadDiagnosticPro = {
     results: [],
     fullReportText: '',
@@ -774,23 +773,19 @@ const DownloadDiagnosticPro = {
     dragOffsetX: 0,
     dragOffsetY: 0,
     
-    // ✅ الدالة المفقودة
     setupEventListeners() {
         console.log('🔧 تم إعداد مستمعات الأحداث');
     },
     
-    // تهيئة الأداة
     init() {
         this.createFloatingScreen();
         this.setupEventListeners();
-        console.log('🔍 أداة تشخيص التحميل المتخصصة جاهزة (شاشة قابلة للسحب)');
+        console.log('🔍 أداة تشخيص التحميل المتخصصة جاهزة');
     },
     
-    // إنشاء شاشة عائمة قابلة للسحب
     createFloatingScreen() {
         if (document.getElementById('downloadDiagnosticOverlay')) return;
         
-        // الخلفية
         const overlay = document.createElement('div');
         overlay.id = 'downloadDiagnosticOverlay';
         overlay.style.cssText = `
@@ -799,7 +794,7 @@ const DownloadDiagnosticPro = {
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.0);
+            background: rgba(0,0,0,0.0);
             z-index: 999999;
             display: none;
             align-items: center;
@@ -808,7 +803,6 @@ const DownloadDiagnosticPro = {
             pointer-events: none;
         `;
         
-        // الشاشة العائمة
         const screen = document.createElement('div');
         screen.id = 'diagFloatingScreen';
         screen.style.cssText = `
@@ -826,11 +820,9 @@ const DownloadDiagnosticPro = {
             position: relative;
             pointer-events: all;
             cursor: grab;
-            transition: none;
             touch-action: none;
         `;
         
-        // رأس الشاشة (قابل للسحب)
         const header = document.createElement('div');
         header.id = 'diagDragHandle';
         header.style.cssText = `
@@ -845,144 +837,91 @@ const DownloadDiagnosticPro = {
             user-select: none;
         `;
         header.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 20px;">🔍</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:20px;">🔍</span>
                 <div>
-                    <div style="color: #ff6600; font-size: 16px; font-weight: bold;">تشخيص التحميل</div>
-                    <div style="color: #666; font-size: 10px;">اسحب للتحريك | Ctrl+Shift+D</div>
+                    <div style="color:#ff6600;font-size:16px;font-weight:bold;">تشخيص التحميل</div>
+                    <div style="color:#666;font-size:10px;">اسحب للتحريك | Ctrl+Shift+D</div>
                 </div>
             </div>
-            <div style="display: flex; gap: 6px;">
-                <button id="diagMinimizeBtn" style="background: #555; border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">⏬</button>
-                <button id="diagCloseFullBtn" style="background: #f44336; border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;">✕</button>
+            <div style="display:flex;gap:6px;">
+                <button id="diagMinimizeBtn" style="background:#555;border:none;color:white;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;">⏬</button>
+                <button id="diagCloseFullBtn" style="background:#f44336;border:none;color:white;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;">✕</button>
             </div>
         `;
         screen.appendChild(header);
         
-        // شريط الحالة
         const statusBar = document.createElement('div');
-        statusBar.style.cssText = `
-            display: flex;
-            gap: 12px;
-            padding: 6px 0;
-            flex-shrink: 0;
-            font-size: 11px;
-            color: #aaa;
-            border-bottom: 1px solid #222;
-        `;
-        statusBar.innerHTML = `
-            <span id="diagFullStatus">🟢 جاهز</span>
-            <span id="diagFullCount">📊 0</span>
-            <span id="diagFullTime">⏱️ 00:00</span>
-        `;
+        statusBar.style.cssText = `display:flex;gap:12px;padding:6px 0;flex-shrink:0;font-size:11px;color:#aaa;border-bottom:1px solid #222;`;
+        statusBar.innerHTML = `<span id="diagFullStatus">🟢 جاهز</span><span id="diagFullCount">📊 0</span><span id="diagFullTime">⏱️ 00:00</span>`;
         screen.appendChild(statusBar);
         
-        // منطقة الأزرار
         const buttons = document.createElement('div');
-        buttons.style.cssText = `
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            padding: 8px 0;
-            flex-shrink: 0;
-            border-bottom: 1px solid #222;
-        `;
+        buttons.style.cssText = `display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;flex-shrink:0;border-bottom:1px solid #222;`;
         buttons.innerHTML = `
-            <button id="diagFullStartBtn" style="background: #4CAF50; border: none; color: white; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">▶️ بدء</button>
-            <button id="diagFullStopBtn" style="background: #f44336; border: none; color: white; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; display: none;">⏹️ إيقاف</button>
-            <button id="diagFullCopyBtn" style="background: #2196F3; border: none; color: white; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px;">📋 نسخ</button>
-            <button id="diagFullClearBtn" style="background: #555; border: 1px solid #ff6600; color: white; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px;">🧹 مسح</button>
-            <button id="diagFullAnalyzeBtn" style="background: #9C27B0; border: none; color: white; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px;">🔬 تحليل</button>
-            <button id="diagFullTestBtn" style="background: #FF9800; border: none; color: white; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px;">🧪 اختبار</button>
+            <button id="diagFullStartBtn" style="background:#4CAF50;border:none;color:white;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;">▶️ بدء</button>
+            <button id="diagFullStopBtn" style="background:#f44336;border:none;color:white;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;display:none;">⏹️ إيقاف</button>
+            <button id="diagFullCopyBtn" style="background:#2196F3;border:none;color:white;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;">📋 نسخ</button>
+            <button id="diagFullClearBtn" style="background:#555;border:1px solid #ff6600;color:white;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;">🧹 مسح</button>
+            <button id="diagFullAnalyzeBtn" style="background:#9C27B0;border:none;color:white;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;">🔬 تحليل</button>
+            <button id="diagFullTestBtn" style="background:#FF9800;border:none;color:white;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;">🧪 اختبار</button>
         `;
         screen.appendChild(buttons);
         
-        // منطقة النتائج (قابلة للتمرير والنسخ)
         const resultsContainer = document.createElement('div');
         resultsContainer.id = 'diagFullResults';
         resultsContainer.style.cssText = `
-            flex: 1;
-            overflow-y: auto;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 8px;
-            padding: 8px;
-            margin: 6px 0;
-            font-size: 11px;
-            line-height: 1.5;
-            border: 1px solid #222;
-            min-height: 150px;
-            user-select: text;
-            cursor: text;
+            flex:1;
+            overflow-y:auto;
+            background:rgba(0,0,0,0.5);
+            border-radius:8px;
+            padding:8px;
+            margin:6px 0;
+            font-size:11px;
+            line-height:1.5;
+            border:1px solid #222;
+            min-height:150px;
+            user-select:text;
+            cursor:text;
         `;
         resultsContainer.innerHTML = `
-            <div style="color: #666; text-align: center; padding: 30px 15px; font-size: 13px;">
-                <div style="font-size: 40px; margin-bottom: 10px;">🔍</div>
+            <div style="color:#666;text-align:center;padding:30px 15px;font-size:13px;">
+                <div style="font-size:40px;margin-bottom:10px;">🔍</div>
                 <div>انتظر بدء التشخيص...</div>
-                <div style="font-size: 10px; margin-top: 6px; color: #444;">اضغط "▶️ بدء" ثم اضغط على أي زر تحميل</div>
+                <div style="font-size:10px;margin-top:6px;color:#444;">اضغط "▶️ بدء" ثم اضغط على أي زر تحميل</div>
             </div>
         `;
         screen.appendChild(resultsContainer);
         
-        // شريط المعلومات السفلي
         const footer = document.createElement('div');
-        footer.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            padding-top: 6px;
-            border-top: 1px solid #222;
-            flex-shrink: 0;
-            font-size: 9px;
-            color: #444;
-        `;
-        footer.innerHTML = `
-            <span>💡 Ctrl+Shift+D</span>
-            <span id="diagFooterTime">🔄 ${new Date().toLocaleString()}</span>
-        `;
+        footer.style.cssText = `display:flex;justify-content:space-between;padding-top:6px;border-top:1px solid #222;flex-shrink:0;font-size:9px;color:#444;`;
+        footer.innerHTML = `<span>💡 Ctrl+Shift+D</span><span>🔄 ${new Date().toLocaleString()}</span>`;
         screen.appendChild(footer);
         
         overlay.appendChild(screen);
         document.body.appendChild(overlay);
         
-        // إضافة أنماط
+        // أنماط إضافية
         const style = document.createElement('style');
         style.textContent = `
-            @keyframes fadeIn {
-                from { opacity: 0; transform: scale(0.95); }
-                to { opacity: 1; transform: scale(1); }
-            }
             #diagFullResults::-webkit-scrollbar { width: 5px; }
             #diagFullResults::-webkit-scrollbar-track { background: #111; }
             #diagFullResults::-webkit-scrollbar-thumb { background: #ff6600; border-radius: 3px; }
-            .diag-log-entry {
-                padding: 2px 5px;
-                border-bottom: 1px solid rgba(255,255,255,0.03);
-                border-radius: 2px;
-                font-size: 11px;
-                word-break: break-word;
-                user-select: text;
-            }
-            .diag-log-entry:hover {
-                background: rgba(255,255,255,0.05);
-            }
-            #diagFloatingScreen:active {
-                cursor: grabbing;
-            }
+            .diag-log-entry { padding: 2px 5px; border-bottom: 1px solid rgba(255,255,255,0.03); border-radius: 2px; font-size: 11px; word-break: break-word; user-select: text; }
+            .diag-log-entry:hover { background: rgba(255,255,255,0.05); }
         `;
         document.head.appendChild(style);
         
-        // إعداد السحب
         this.setupDragging();
         this.setupScreenListeners();
     },
     
-    // إعداد السحب بالماوس واللمس
     setupDragging() {
         const screen = document.getElementById('diagFloatingScreen');
         const handle = document.getElementById('diagDragHandle');
         if (!screen || !handle) return;
         
-        let startX, startY, origX, origY;
-        let isDragging = false;
+        let startX, startY, origX, origY, isDragging = false;
         
         const onStart = (e) => {
             e.preventDefault();
@@ -1010,97 +949,48 @@ const DownloadDiagnosticPro = {
             screen.style.margin = '0';
         };
         
-        const onEnd = () => {
-            isDragging = false;
-            screen.style.cursor = 'grab';
-        };
+        const onEnd = () => { isDragging = false; screen.style.cursor = 'grab'; };
         
-        // أحداث الماوس
         handle.addEventListener('mousedown', onStart);
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onEnd);
-        
-        // أحداث اللمس
         handle.addEventListener('touchstart', onStart, { passive: false });
         document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('touchend', onEnd);
     },
     
     setupScreenListeners() {
-        // زر بدء التشخيص
-        document.getElementById('diagFullStartBtn')?.addEventListener('click', () => {
-            this.startDiagnostic();
-        });
+        document.getElementById('diagFullStartBtn')?.addEventListener('click', () => this.startDiagnostic());
+        document.getElementById('diagFullStopBtn')?.addEventListener('click', () => this.stopDiagnostic());
+        document.getElementById('diagFullCopyBtn')?.addEventListener('click', () => this.copyFullReport());
+        document.getElementById('diagFullClearBtn')?.addEventListener('click', () => this.clearResults());
+        document.getElementById('diagFullAnalyzeBtn')?.addEventListener('click', () => this.deepAnalyze());
+        document.getElementById('diagFullTestBtn')?.addEventListener('click', () => this.testDownload());
+        document.getElementById('diagMinimizeBtn')?.addEventListener('click', () => this.minimize());
+        document.getElementById('diagCloseFullBtn')?.addEventListener('click', () => this.hide());
         
-        // زر إيقاف التشخيص
-        document.getElementById('diagFullStopBtn')?.addEventListener('click', () => {
-            this.stopDiagnostic();
-        });
-        
-        // زر نسخ التقرير
-        document.getElementById('diagFullCopyBtn')?.addEventListener('click', () => {
-            this.copyFullReport();
-        });
-        
-        // زر مسح
-        document.getElementById('diagFullClearBtn')?.addEventListener('click', () => {
-            this.clearResults();
-        });
-        
-        // زر تحليل عميق
-        document.getElementById('diagFullAnalyzeBtn')?.addEventListener('click', () => {
-            this.deepAnalyze();
-        });
-        
-        // زر اختبار التحميل
-        document.getElementById('diagFullTestBtn')?.addEventListener('click', () => {
-            this.testDownload();
-        });
-        
-        // زر تصغير
-        document.getElementById('diagMinimizeBtn')?.addEventListener('click', () => {
-            this.minimize();
-        });
-        
-        // زر إغلاق
-        document.getElementById('diagCloseFullBtn')?.addEventListener('click', () => {
-            this.hide();
-        });
-        
-        // إغلاق بالضغط على Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 const overlay = document.getElementById('downloadDiagnosticOverlay');
-                if (overlay && overlay.style.display === 'flex') {
-                    this.hide();
-                }
+                if (overlay && overlay.style.display === 'flex') this.hide();
             }
         });
     },
     
-    // بدء التشخيص
     startDiagnostic() {
-        if (this.isRunning) {
-            this.stopDiagnostic();
-            return;
-        }
-        
+        if (this.isRunning) { this.stopDiagnostic(); return; }
         this.isRunning = true;
         this.results = [];
         this.fullReportText = '';
         this.startTime = Date.now();
-        
         document.getElementById('diagFullStartBtn').textContent = '⏹️ إيقاف';
         document.getElementById('diagFullStartBtn').style.background = '#f44336';
         document.getElementById('diagFullStopBtn').style.display = 'inline-block';
         document.getElementById('diagFullStatus').textContent = '🟢 جاري...';
-        
         const container = document.getElementById('diagFullResults');
         if (container) container.innerHTML = '';
-        
         this.addResult('🔍', '═══════ بدء التشخيص ═══════', '#ff6600');
         this.addResult('📋', `⏱️ ${new Date().toLocaleString()}`, '#888');
-        
         this.analyzeAllDownloadElements();
         this.monitorDownloads();
         this.updateTimer();
@@ -1113,10 +1003,7 @@ const DownloadDiagnosticPro = {
         document.getElementById('diagFullStopBtn').style.display = 'none';
         document.getElementById('diagFullStatus').textContent = '🟡 متوقف';
         this.addResult('⏹️', 'تم إيقاف التشخيص', '#ff6600');
-        if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
-        }
+        if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
     },
     
     updateTimer() {
@@ -1130,24 +1017,17 @@ const DownloadDiagnosticPro = {
         }, 1000);
     },
     
-    // مراقبة التحميلات
     monitorDownloads() {
         const links = document.querySelectorAll('a[download]');
         links.forEach((link) => {
-            link.addEventListener('click', (e) => {
-                this.logDownloadAttempt(link, e);
-            });
+            link.addEventListener('click', (e) => { this.logDownloadAttempt(link, e); });
         });
-        
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) {
-                        const links = node.querySelectorAll('a[download]');
-                        links.forEach((link) => {
-                            link.addEventListener('click', (e) => {
-                                this.logDownloadAttempt(link, e);
-                            });
+                        node.querySelectorAll('a[download]').forEach((link) => {
+                            link.addEventListener('click', (e) => { this.logDownloadAttempt(link, e); });
                         });
                     }
                 });
@@ -1157,15 +1037,12 @@ const DownloadDiagnosticPro = {
         this._observer = observer;
     },
     
-    // تسجيل محاولة التحميل
     logDownloadAttempt(link, event) {
         const href = link.getAttribute('href');
         const download = link.getAttribute('download');
-        
         this.addResult('', '─'.repeat(40), '#444');
         this.addResult('📥', `🔄 تحميل: ${download || 'ملف'}`, '#4CAF50');
         this.addResult('🔗', `الرابط: ${href ? href.substring(0, 60) : 'غير موجود'}${href && href.length > 60 ? '...' : ''}`, '#aaa');
-        
         if (!href || href === '#') {
             this.addResult('❌', 'الرابط غير معين (href="#")', '#f44336');
             this.addResult('💡', 'الحل: تعيين href عند عرض الرسالة', '#FFC107');
@@ -1175,44 +1052,31 @@ const DownloadDiagnosticPro = {
         } else if (href.startsWith('http')) {
             this.addResult('✅', '✅ HTTP (يعمل دائماً)', '#4CAF50');
         }
-        
-        if (!download) {
-            this.addResult('⚠️', '⚠️ لا توجد خاصية download', '#FFC107');
-        }
-        
+        if (!download) { this.addResult('⚠️', '⚠️ لا توجد خاصية download', '#FFC107'); }
         const count = document.querySelectorAll('#diagFullResults .diag-log-entry').length;
         document.getElementById('diagFullCount').textContent = `📊 ${count}`;
     },
     
-    // تحليل جميع عناصر التحميل
     analyzeAllDownloadElements() {
         const links = document.querySelectorAll('a[download]');
         this.addResult('📊', `${links.length} عنصر تحميل`, '#ff6600');
-        
         links.forEach((link, index) => {
             const href = link.getAttribute('href');
             const download = link.getAttribute('download');
             const isBlob = href && href.startsWith('blob:');
             const isEmpty = !href || href === '#';
-            
-            let status = isEmpty ? '⚠️' : (isBlob ? '⚠️' : '✅');
-            let color = isEmpty ? '#FFC107' : (isBlob ? '#FFC107' : '#4CAF50');
-            let note = isEmpty ? '(غير معين)' : (isBlob ? '(Blob)' : '(HTTP)');
-            
+            const status = isEmpty ? '⚠️' : (isBlob ? '⚠️' : '✅');
+            const color = isEmpty ? '#FFC107' : (isBlob ? '#FFC107' : '#4CAF50');
+            const note = isEmpty ? '(غير معين)' : (isBlob ? '(Blob)' : '(HTTP)');
             this.addResult(status, `#${index+1}: ${download || 'ملف'} ${note}`, color);
         });
     },
     
-    // اختبار صلاحية Blob URL
     testBlobUrl(url) {
         fetch(url, { method: 'HEAD' })
             .then(response => {
-                if (response.ok) {
-                    this.addResult('✅', 'Blob URL صالح', '#4CAF50');
-                } else {
-                    this.addResult('❌', 'Blob URL منتهي الصلاحية', '#f44336');
-                    this.addResult('💡', 'الحل: استخدام ArrayBuffer بدلاً من Blob URL', '#FFC107');
-                }
+                if (response.ok) { this.addResult('✅', 'Blob URL صالح', '#4CAF50'); }
+                else { this.addResult('❌', 'Blob URL منتهي الصلاحية', '#f44336'); this.addResult('💡', 'الحل: استخدام ArrayBuffer بدلاً من Blob URL', '#FFC107'); }
             })
             .catch(() => {
                 this.addResult('❌', 'Blob URL غير صالح (منتهي)', '#f44336');
@@ -1220,7 +1084,6 @@ const DownloadDiagnosticPro = {
             });
     },
     
-    // تحليل عميق
     deepAnalyze() {
         this.addResult('🔬', '═══════ تحليل عميق ═══════', '#9C27B0');
         this.analyzeLocalStorage();
@@ -1230,19 +1093,16 @@ const DownloadDiagnosticPro = {
         this.addResult('✅', '═══════ اكتمل ═══════', '#4CAF50');
     },
     
-    // تحليل localStorage
     analyzeLocalStorage() {
         this.addResult('📁', '─── localStorage ───', '#ff6600');
         let blobCount = 0, arrayBufferCount = 0;
-        
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith('chat_')) {
                 try {
                     const data = JSON.parse(localStorage.getItem(key));
                     if (Array.isArray(data)) {
-                        const fileMessages = data.filter(m => m.type === 'image' || m.type === 'video' || m.type === 'file');
-                        fileMessages.forEach((msg) => {
+                        data.filter(m => m.type === 'image' || m.type === 'video' || m.type === 'file').forEach((msg) => {
                             const isBlob = typeof msg.data === 'string' && msg.data.startsWith('blob:');
                             const isArrayBuffer = msg.data instanceof ArrayBuffer;
                             if (isBlob) blobCount++;
@@ -1252,17 +1112,11 @@ const DownloadDiagnosticPro = {
                 } catch (e) {}
             }
         }
-        
         this.addResult('📊', `Blob URL: ${blobCount} | ArrayBuffer: ${arrayBufferCount}`, '#aaa');
-        if (blobCount > 0) {
-            this.addResult('💡', `🔴 ${blobCount} ملف كـ Blob URL (يحتاج إصلاح)`, '#f44336');
-        }
-        if (arrayBufferCount > 0) {
-            this.addResult('✅', `🟢 ${arrayBufferCount} ملف كـ ArrayBuffer (صحيح)`, '#4CAF50');
-        }
+        if (blobCount > 0) { this.addResult('💡', `🔴 ${blobCount} ملف كـ Blob URL (يحتاج إصلاح)`, '#f44336'); }
+        if (arrayBufferCount > 0) { this.addResult('✅', `🟢 ${arrayBufferCount} ملف كـ ArrayBuffer (صحيح)`, '#4CAF50'); }
     },
     
-    // تحليل الذاكرة
     analyzeMemory() {
         this.addResult('🧠', '─── الذاكرة ───', '#ff6600');
         if (window.performance && window.performance.memory) {
@@ -1275,29 +1129,23 @@ const DownloadDiagnosticPro = {
         }
     },
     
-    // تحليل المتصفح
     analyzeBrowser() {
         this.addResult('🌐', '─── المتصفح ───', '#ff6600');
         this.addResult('📊', navigator.userAgent.split(' ').slice(0, 3).join(' '), '#aaa');
         this.addResult('📊', `دعم ArrayBuffer: ${!!window.ArrayBuffer}`, '#aaa');
     },
     
-    // اختبار تحميل تجريبي
     testDownload() {
         this.addResult('🧪', '─── اختبار تحميل ───', '#FF9800');
-        
         const testData = new Uint8Array([72, 101, 108, 108, 111, 33]);
         const blob = new Blob([testData], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
-        
         this.addResult('📄', 'ملف تجريبي: "Hello!"', '#aaa');
-        
         const link = document.createElement('a');
         link.href = url;
         link.download = 'test.txt';
         link.style.display = 'none';
         document.body.appendChild(link);
-        
         try {
             link.click();
             this.addResult('✅', 'تم تحميل الملف التجريبي بنجاح!', '#4CAF50');
@@ -1305,108 +1153,61 @@ const DownloadDiagnosticPro = {
         } catch (e) {
             this.addResult('❌', `فشل: ${e.message}`, '#f44336');
         }
-        
-        setTimeout(() => {
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }, 1000);
+        setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(url); }, 1000);
     },
     
-    // إضافة نتيجة
     addResult(icon, text, color = '#fff') {
         const container = document.getElementById('diagFullResults');
         if (!container) return;
-        
         const placeholder = container.querySelector('div[style*="text-align: center"]');
-        if (placeholder && container.children.length === 1) {
-            container.innerHTML = '';
-        }
-        
+        if (placeholder && container.children.length === 1) { container.innerHTML = ''; }
         const line = document.createElement('div');
         line.className = 'diag-log-entry';
-        line.style.cssText = `
-            padding: 2px 5px;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-            color: ${color};
-            word-break: break-word;
-            font-size: 11px;
-            user-select: text;
-        `;
+        line.style.cssText = `padding:2px 5px;border-bottom:1px solid rgba(255,255,255,0.03);color:${color};word-break:break-word;font-size:11px;user-select:text;`;
         line.textContent = `${icon} ${text}`;
         container.appendChild(line);
         container.scrollTop = container.scrollHeight;
-        
         this.fullReportText += `${icon} ${text}\n`;
-        
         const count = container.querySelectorAll('.diag-log-entry').length;
         document.getElementById('diagFullCount').textContent = `📊 ${count}`;
     },
     
-    // نسخ التقرير
     copyFullReport() {
-        if (!this.fullReportText) {
-            alert('لا يوجد تقرير للنسخ. قم بتشغيل التشخيص أولاً.');
-            return;
-        }
-        
-        const text = `═══════════════════════════════════════\n` +
-                    `🔍 تقرير تشخيص التحميل\n` +
-                    `📅 ${new Date().toLocaleString()}\n` +
-                    `═══════════════════════════════════════\n\n` +
-                    this.fullReportText +
-                    `\n═══════════════════════════════════════\n` +
-                    `📊 نهاية التقرير\n`;
-        
+        if (!this.fullReportText) { alert('لا يوجد تقرير للنسخ. قم بتشغيل التشخيص أولاً.'); return; }
+        const text = `═══════════════════════════════════════\n🔍 تقرير تشخيص التحميل\n📅 ${new Date().toLocaleString()}\n═══════════════════════════════════════\n\n${this.fullReportText}\n═══════════════════════════════════════\n📊 نهاية التقرير\n`;
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text)
-                .then(() => {
-                    this.addResult('✅', `✅ تم نسخ التقرير (${text.split('\n').length} سطر)`, '#4CAF50');
-                })
-                .catch(() => {
-                    this.fallbackCopy(text);
-                });
-        } else {
-            this.fallbackCopy(text);
-        }
+            navigator.clipboard.writeText(text).then(() => {
+                this.addResult('✅', `✅ تم نسخ التقرير (${text.split('\n').length} سطر)`, '#4CAF50');
+            }).catch(() => { this.fallbackCopy(text); });
+        } else { this.fallbackCopy(text); }
     },
     
     fallbackCopy(text) {
         const textarea = document.createElement('textarea');
         textarea.value = text;
-        textarea.style.cssText = 'position: fixed; opacity: 0; left: -9999px; top: -9999px;';
+        textarea.style.cssText = 'position:fixed;opacity:0;left:-9999px;top:-9999px;';
         document.body.appendChild(textarea);
         textarea.select();
         try {
             document.execCommand('copy');
             this.addResult('✅', '✅ تم نسخ التقرير', '#4CAF50');
-        } catch (e) {
-            alert('فشل النسخ. يمكنك تحديد النص ونسخه يدوياً.');
-        }
+        } catch (e) { alert('فشل النسخ. يمكنك تحديد النص ونسخه يدوياً.'); }
         document.body.removeChild(textarea);
     },
     
-    // مسح النتائج
     clearResults() {
         const container = document.getElementById('diagFullResults');
         if (container) {
-            container.innerHTML = `
-                <div style="color: #666; text-align: center; padding: 30px 15px; font-size: 13px;">
-                    <div style="font-size: 40px; margin-bottom: 10px;">🧹</div>
-                    <div>تم مسح النتائج</div>
-                    <div style="font-size: 10px; margin-top: 6px; color: #444;">اضغط "▶️ بدء" لبدء مراقبة جديدة</div>
-                </div>
-            `;
+            container.innerHTML = `<div style="color:#666;text-align:center;padding:30px 15px;font-size:13px;"><div style="font-size:40px;margin-bottom:10px;">🧹</div><div>تم مسح النتائج</div><div style="font-size:10px;margin-top:6px;color:#444;">اضغط "▶️ بدء" لبدء مراقبة جديدة</div></div>`;
         }
         this.results = [];
         this.fullReportText = '';
         document.getElementById('diagFullCount').textContent = '📊 0';
     },
     
-    // تصغير/تكبير الشاشة
     minimize() {
         const screen = document.getElementById('diagFloatingScreen');
         if (!screen) return;
-        
         if (this.isMinimized) {
             screen.style.height = '75vh';
             screen.style.maxHeight = '600px';
@@ -1426,12 +1227,10 @@ const DownloadDiagnosticPro = {
         }
     },
     
-    // عرض الشاشة
     show() {
         const overlay = document.getElementById('downloadDiagnosticOverlay');
         if (overlay) {
             overlay.style.display = 'flex';
-            // إعادة تعيين الموضع إلى المركز
             const screen = document.getElementById('diagFloatingScreen');
             if (screen) {
                 screen.style.position = 'relative';
@@ -1443,23 +1242,18 @@ const DownloadDiagnosticPro = {
         }
     },
     
-    // إخفاء الشاشة
     hide() {
         const overlay = document.getElementById('downloadDiagnosticOverlay');
         if (overlay) {
             overlay.style.display = 'none';
         }
-        if (this.isRunning) {
-            this.stopDiagnostic();
-        }
+        if (this.isRunning) { this.stopDiagnostic(); }
     }
 };
 
 // ==================== تشغيل الأداة ====================
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        DownloadDiagnosticPro.init();
-    });
+    document.addEventListener('DOMContentLoaded', () => { DownloadDiagnosticPro.init(); });
 } else {
     DownloadDiagnosticPro.init();
 }
@@ -1481,5 +1275,6 @@ document.addEventListener('keydown', (e) => {
 
 console.log('🔍 أداة تشخيص التحميل جاهزة! (قابلة للسحب واللمس)');
 console.log('📌 Ctrl+Shift+D للفتح/الإغلاق');
+</script>
 
 
