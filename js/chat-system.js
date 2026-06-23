@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة المعدلة (قوالب ثابتة + setupVoiceControls) ==========
+// ========== chat-system.js - النسخة المعدلة (مع نظام تخزين ArrayBuffer للتحميل) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 const ChatSystem = {
@@ -13,6 +13,29 @@ const ChatSystem = {
     // ✅ قالب عنصر المحادثة (ثابت)
     chatItemTemplate: null,
     
+    // ✅ نظام تخزين الملفات كـ ArrayBuffer (للتحميل)
+    _fileCache: new Map(), // key: fileId, value: { data: ArrayBuffer, fileName, mimeType, type }
+    
+    // ==================== دوال تخزين الملفات ====================
+    _getFile(fileId) {
+        return this._fileCache.get(fileId);
+    },
+    
+    _storeFile(fileId, arrayBuffer, fileName, mimeType, type) {
+        this._fileCache.set(fileId, {
+            data: arrayBuffer,
+            fileName: fileName,
+            mimeType: mimeType,
+            type: type
+        });
+        console.log(`💾 تم تخزين الملف في الكاش: ${fileId}`);
+    },
+    
+    _clearFileCache() {
+        this._fileCache.clear();
+        console.log('🧹 تم تنظيف كاش الملفات');
+    },
+
     // ==================== القسم 2.5: دالة تحديث زر التفعيل ====================
 updateFeatureToggleUI() {
     const toggleInput = document.getElementById('featureToggleInput');
@@ -1154,7 +1177,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل - دعم ArrayBuffer للتحميل) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1174,13 +1197,12 @@ displayMessage(msg) {
     const dateTime = formatDateTime(new Date(msg.time));
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
+    // ✅ إنشاء العنصر الرئيسي
     const template = document.getElementById('messageWrapperTemplate');
     let div;
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1211,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1210,7 +1232,6 @@ displayMessage(msg) {
             console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1285,7 +1306,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - دعم ArrayBuffer) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1294,11 +1315,56 @@ displayMessage(msg) {
             if (wrapper) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
+                const downloadBtn = wrapper.querySelector('.download-btn');
+                
                 if (img) {
                     img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                    img.onclick = () => this.showImagePreview(msg.data, msg.fileName || 'image.jpg');
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
+                }
+                
+                // ✅ زر التحميل - يستخدم ArrayBuffer المخزن
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `image_${msg.id}.jpg`;
+                    
+                    // تعيين الرابط الأولي
+                    downloadBtn.href = msg.data;
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
+                    
+                    // ✅ إزالة المستمعات القديمة وإضافة مستمع جديد
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const cached = ChatSystem._getFile(fileId);
+                        if (cached && cached.data) {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'image/jpeg' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = cached.fileName || fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            setTimeout(() => URL.revokeObjectURL(url), 5000);
+                            console.log(`✅ تم تحميل الصورة من الكاش: ${fileId}`);
+                        } else {
+                            // Fallback: استخدم الرابط الموجود
+                            console.warn(`⚠️ لا يوجد بيانات في الكاش للصورة: ${fileId}, استخدام الرابط الموجود`);
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    }, { once: false });
                 }
             }
             div.appendChild(clone);
@@ -1328,7 +1394,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (معدل - دعم ArrayBuffer) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1338,14 +1404,57 @@ displayMessage(msg) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
+                const downloadBtn = thumbnail.querySelector('.download-btn');
+                
                 if (source && msg.data) {
                     source.src = msg.data;
                     video.load();
                 }
+                
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
-                    this.showVideoPreview(msg.data);
+                    this.showVideoPreview(msg.data, msg.fileName || 'video.mp4');
                 };
+                
+                // ✅ زر التحميل - يستخدم ArrayBuffer المخزن
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `video_${msg.id}.mp4`;
+                    
+                    downloadBtn.href = msg.data;
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
+                    
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const cached = ChatSystem._getFile(fileId);
+                        if (cached && cached.data) {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'video/mp4' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = cached.fileName || fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            setTimeout(() => URL.revokeObjectURL(url), 5000);
+                            console.log(`✅ تم تحميل الفيديو من الكاش: ${fileId}`);
+                        } else {
+                            console.warn(`⚠️ لا يوجد بيانات في الكاش للفيديو: ${fileId}, استخدام الرابط الموجود`);
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    }, { once: false });
+                }
             }
             div.appendChild(clone);
         } else {
@@ -1353,7 +1462,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل - دعم ArrayBuffer) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1363,18 +1472,50 @@ displayMessage(msg) {
                 fileCard.style.background = '#4CAF50';
                 fileCard.style.border = `1.5px solid ${borderColor}`;
                 const fileNameEl = fileCard.querySelector('.file-name');
+                const downloadBtn = fileCard.querySelector('.download-file-btn');
+                
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
+                
+                // ✅ زر التحميل - يستخدم ArrayBuffer المخزن
+                if (downloadBtn) {
+                    const fileId = msg._fileId || msg.id;
+                    const fileName = msg.fileName || `file_${msg.id}`;
+                    
+                    downloadBtn.href = msg.data;
+                    downloadBtn.download = fileName;
+                    downloadBtn.title = `تحميل ${fileName}`;
+                    
+                    const newBtn = downloadBtn.cloneNode(true);
+                    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+                    
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
                         e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
-                    };
+                        
+                        const cached = ChatSystem._getFile(fileId);
+                        if (cached && cached.data) {
+                            const blob = new Blob([cached.data], { type: cached.mimeType || 'application/octet-stream' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = cached.fileName || fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            setTimeout(() => URL.revokeObjectURL(url), 5000);
+                            console.log(`✅ تم تحميل الملف من الكاش: ${fileId}`);
+                        } else {
+                            console.warn(`⚠️ لا يوجد بيانات في الكاش للملف: ${fileId}, استخدام الرابط الموجود`);
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    }, { once: false });
                 }
             }
             div.appendChild(clone);
@@ -1389,12 +1530,21 @@ displayMessage(msg) {
 },
 
 // ==================== القسم 26.1: showImagePreview ====================
-showImagePreview(imageSrc) {
+showImagePreview(imageSrc, fileName) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
+    const downloadLink = document.getElementById('previewDownloadLink');
+    
     if (!modal || !img) return;
     
     img.src = imageSrc;
+    
+    if (downloadLink) {
+        downloadLink.href = imageSrc;
+        downloadLink.download = fileName || 'image.jpg';
+        downloadLink.title = `تحميل ${fileName || 'صورة'}`;
+    }
+    
     modal.style.display = 'flex';
     
     this.setupImageZoom(modal, img);
@@ -1491,12 +1641,21 @@ setupImageZoom(modal, img) {
 },
 
 // ==================== القسم 26.2: showVideoPreview ====================
-showVideoPreview(videoSrc) {
+showVideoPreview(videoSrc, fileName) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
+    const downloadLink = document.getElementById('previewVideoDownloadLink');
+    
     if (!modal || !video) return;
     
     video.src = videoSrc;
+    
+    if (downloadLink) {
+        downloadLink.href = videoSrc;
+        downloadLink.download = fileName || 'video.mp4';
+        downloadLink.title = `تحميل ${fileName || 'فيديو'}`;
+    }
+    
     modal.style.display = 'flex';
     video.play().catch(() => {});
 },
@@ -1506,32 +1665,14 @@ closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    if (img) { img.style.transform = 'none'; }
 },
 
 closeVideoPreview() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
-},
-
-downloadPreviewImage() {
-    const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
-},
-
-downloadPreviewVideo() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
+    if (video) { video.pause(); }
 },  
     
 
@@ -1621,7 +1762,7 @@ async sendMessage(text) {
         }
     },
     
-    // ==================== القسم 30: sendImage ====================
+    // ==================== القسم 30: sendImage (معدل - تخزين ArrayBuffer) ====================
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1642,12 +1783,31 @@ async sendMessage(text) {
             if (success) {
                 const msgId = Date.now().toString();
                 const tempUrl = URL.createObjectURL(file);
-                this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                
+                // ✅ تخزين ArrayBuffer في الكاش
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    this._storeFile(msgId, arrayBuffer, file.name, file.type || 'image/jpeg', 'image');
+                } catch(e) {
+                    console.warn('⚠️ فشل تخزين ArrayBuffer للصورة:', e);
+                }
+                
+                this.displayMessage({ 
+                    id: msgId, 
+                    type: 'image', 
+                    data: tempUrl, 
+                    fileName: file.name, 
+                    sender: 'me', 
+                    time: new Date().toISOString(), 
+                    status: 'sent', 
+                    _blobUrl: tempUrl,
+                    _fileId: msgId 
+                });
             } else alert('فشل إرسال الصورة');
         }
     },
 
-// ==================== القسم 31: sendVideoFile ====================
+// ==================== القسم 31: sendVideoFile (معدل - تخزين ArrayBuffer) ====================
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1678,14 +1838,32 @@ async sendMessage(text) {
                     const msgId = Date.now().toString();
                     const tempUrl = URL.createObjectURL(file);
                     
-                    this.displayMessage({ id: msgId, type: 'video', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                    // ✅ تخزين ArrayBuffer في الكاش
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        this._storeFile(msgId, arrayBuffer, file.name, file.type || 'video/mp4', 'video');
+                    } catch(e) {
+                        console.warn('⚠️ فشل تخزين ArrayBuffer للفيديو:', e);
+                    }
+                    
+                    this.displayMessage({ 
+                        id: msgId, 
+                        type: 'video', 
+                        data: tempUrl, 
+                        fileName: file.name, 
+                        sender: 'me', 
+                        time: new Date().toISOString(), 
+                        status: 'sent', 
+                        _blobUrl: tempUrl,
+                        _fileId: msgId 
+                    });
                     
                 } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
     },
 
-// ==================== القسم 32: sendFile ====================
+// ==================== القسم 32: sendFile (معدل - تخزين ArrayBuffer) ====================
     async sendFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1706,12 +1884,31 @@ async sendMessage(text) {
             if (success) {
                 const msgId = Date.now().toString();
                 const tempUrl = URL.createObjectURL(file);
-                this.displayMessage({ id: msgId, type: 'file', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                
+                // ✅ تخزين ArrayBuffer في الكاش
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    this._storeFile(msgId, arrayBuffer, file.name, file.type || 'application/octet-stream', 'file');
+                } catch(e) {
+                    console.warn('⚠️ فشل تخزين ArrayBuffer للملف:', e);
+                }
+                
+                this.displayMessage({ 
+                    id: msgId, 
+                    type: 'file', 
+                    data: tempUrl, 
+                    fileName: file.name, 
+                    sender: 'me', 
+                    time: new Date().toISOString(), 
+                    status: 'sent', 
+                    _blobUrl: tempUrl,
+                    _fileId: msgId 
+                });
             } else alert('فشل إرسال الملف');
         }
     },
 
-// ==================== القسم 33: sendVoiceNote ====================
+// ==================== القسم 33: sendVoiceNote (معدل - تخزين ArrayBuffer) ====================
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1732,7 +1929,26 @@ async sendMessage(text) {
             if (success) {
                 const msgId = Date.now().toString();
                 const tempUrl = URL.createObjectURL(audioBlob);
-                this.displayMessage({ id: msgId, type: 'voice', data: tempUrl, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                
+                // ✅ تخزين ArrayBuffer في الكاش
+                try {
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    this._storeFile(msgId, arrayBuffer, `voice_${msgId}.webm`, 'audio/webm', 'voice');
+                } catch(e) {
+                    console.warn('⚠️ فشل تخزين ArrayBuffer للبصمة:', e);
+                }
+                
+                this.displayMessage({ 
+                    id: msgId, 
+                    type: 'voice', 
+                    data: tempUrl, 
+                    fileName: `voice_${msgId}.webm`, 
+                    sender: 'me', 
+                    time: new Date().toISOString(), 
+                    status: 'sent', 
+                    _blobUrl: tempUrl,
+                    _fileId: msgId 
+                });
             } else alert('فشل إرسال البصمة الصوتية');
         }
     },
@@ -2036,6 +2252,9 @@ closeChat() {
         });
     }
     
+    // ✅ تنظيف كاش الملفات
+    this._clearFileCache();
+    
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
@@ -2094,6 +2313,9 @@ closeChat() {
             console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
         }
         
+        // ✅ تنظيف كاش الملفات
+        this._clearFileCache();
+        
         document.querySelectorAll('img, video, audio').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
                 URL.revokeObjectURL(el.src);
@@ -2140,6 +2362,11 @@ ChatSystem.init();
 // ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
+    
+    // ✅ تنظيف كاش الملفات
+    if (typeof ChatSystem !== 'undefined') {
+        ChatSystem._clearFileCache();
+    }
     
     if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
         CallSystem.cleanupDynamicElements();
