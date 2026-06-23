@@ -1260,6 +1260,7 @@ async sendFileDirect(file, type) {
     }
 },
 
+// ==================== 13.1 معالجة استلام الملفات (معدل - تخزين ArrayBuffer في ChatSystem) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -1300,6 +1301,11 @@ handleChunkMessage(msg) {
         const blob = new Blob([fullBuffer], { type: mimeType });
         const objectUrl = URL.createObjectURL(blob);
         
+        // ✅ تخزين ArrayBuffer في ChatSystem._fileCache
+        if (typeof ChatSystem !== 'undefined' && ChatSystem._storeFile) {
+            ChatSystem._storeFile(msg.id, fullBuffer.buffer, msg.fileName, mimeType, msg.type);
+        }
+        
         const displayMsg = {
             id: msg.id,
             type: msg.type === 'location' ? 'text' : msg.type,
@@ -1307,7 +1313,8 @@ handleChunkMessage(msg) {
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _blobUrl: objectUrl
+            _blobUrl: objectUrl,
+            _fileId: msg.id  // ✅ ربط الرسالة بالـ ArrayBuffer المخزن
         };
         
         if (ChatSystem.currentChat) {
