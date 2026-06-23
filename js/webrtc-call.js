@@ -705,6 +705,7 @@ async createDataChannelOnly(calleeId) {
 
     // ==================== 9. Data Channel وإدارة الاتصال ====================
 
+// ==================== 9.1: إعداد Data Channel ====================
 setupDataChannel(channel) {
     if (!channel) return;
     console.log('📡 إعداد Data Channel');
@@ -713,6 +714,7 @@ setupDataChannel(channel) {
         try {
             const msg = JSON.parse(e.data);
             
+            // 9.1.1: معالجة الرسائل النصية المباشرة
             if (msg.type === 'direct_text') {
                 console.log('📨 استلام رسالة نصية مباشرة:', msg.text);
                 const displayMsg = { 
@@ -729,6 +731,7 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // 9.1.2: معالجة إشارات WebRTC
             if (msg.type === 'webrtc_signal') {
                 console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
                 if (msg.data.sdp && msg.data.sdp.type === 'offer') {
@@ -739,6 +742,7 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // 9.1.3: معالجة إشارة طرد المستخدم
             if (msg.type === 'force_close_conversation') {
                 console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -761,6 +765,7 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // 9.1.4: معالجة إشارة إلغاء الميزات
             if (msg.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -784,18 +789,22 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // 9.1.5: معالجة ping
             if (msg.type === 'ping') return;
             
+            // 9.1.6: معالجة حالة المكالمة
             if (msg.type === 'call_status') {
                 this.handleCallStatus(msg);
                 return;
             }
             
+            // 9.1.7: معالجة أجزاء الملفات (Chunks)
             if (msg.chunk !== undefined) {
                 this.handleChunkMessage(msg);
                 return;
             }
             
+            // 9.1.8: معالجة الرسائل الأخرى
             const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
             if (ChatSystem.currentChat) {
                 ChatSystem.displayMessage(displayMsg);
@@ -805,6 +814,7 @@ setupDataChannel(channel) {
         }
     };
     
+    // 9.1.9: معالجة فتح القناة
     channel.onopen = () => {
         console.log('✅ Data Channel مفتوح');
         this.sendCallStatus('connected');
@@ -826,6 +836,7 @@ setupDataChannel(channel) {
         }
     };
     
+    // 9.1.10: معالجة إغلاق القناة
     channel.onclose = () => {
         console.log('❌ Data Channel مغلق');
         this.sendCallStatus('disconnected');
@@ -854,6 +865,7 @@ setupDataChannel(channel) {
         }
     };
     
+    // 9.1.11: معالجة أخطاء القناة
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         
@@ -873,8 +885,89 @@ setupDataChannel(channel) {
     };
 },
 
-// ==================== 9.2 معالجة حالة المكالمة ====================
+// ==================== 9.2: معالجة أجزاء الملفات (Chunks) - المعدل ====================
+handleChunkMessage(msg) {
+    if (!this.incomingChunks[msg.id]) {
+        this.incomingChunks[msg.id] = [];
+        this.incomingFileInfo[msg.id] = {
+            type: msg.type,
+            fileName: msg.fileName,
+            total: msg.total,
+            received: 0
+        };
+        ChatSystem.showProgressBar('جاري استلام الملف...', 0);
+    }
+    
+    const chunkData = new Uint8Array(msg.data);
+    this.incomingChunks[msg.id][msg.chunk] = chunkData;
+    this.incomingFileInfo[msg.id].received++;
+    const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
+    const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
+    ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
+    
+    if (this.incomingFileInfo[msg.id].received === msg.total) {
+        let totalLength = 0;
+        for (let i = 0; i < msg.total; i++) {
+            if (this.incomingChunks[msg.id][i]) {
+                totalLength += this.incomingChunks[msg.id][i].length;
+            }
+        }
+        
+        const fullBuffer = new Uint8Array(totalLength);
+        let offset = 0;
+        for (let i = 0; i < msg.total; i++) {
+            if (this.incomingChunks[msg.id][i]) {
+                fullBuffer.set(this.incomingChunks[msg.id][i], offset);
+                offset += this.incomingChunks[msg.id][i].length;
+            }
+        }
+        
+        let mimeType = 'application/octet-stream';
+        if (msg.type === 'image') mimeType = 'image/jpeg';
+        else if (msg.type === 'video') mimeType = 'video/mp4';
+        else if (msg.type === 'voice') mimeType = 'audio/webm';
+        
+        // ✅ إنشاء Blob من البيانات
+        const blob = new Blob([fullBuffer], { type: mimeType });
+        
+        // ✅ تحويل Blob إلى ArrayBuffer (التخزين الدائم)
+        const reader = new FileReader();
+        reader.onload = function() {
+            const arrayBuffer = reader.result;
+            
+            // ✅ تخزين ArrayBuffer بدلاً من Blob URL
+            const displayMsg = {
+                id: msg.id,
+                type: msg.type,
+                data: arrayBuffer,  // ✅ تخزين البيانات الفعلية
+                fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+                sender: 'friend',
+                time: new Date().toISOString(),
+                _fileData: arrayBuffer  // ✅ نسخة احتياطية
+            };
+            
+            // عرض الرسالة في الواجهة
+            if (ChatSystem.currentChat) {
+                ChatSystem.displayMessage(displayMsg);
+            }
+            
+            // إخفاء شريط التقدم
+            ChatSystem.hideProgressBar();
+            
+            // ✅ تنظيف الذاكرة بعد التأكد من اكتمال المعالجة
+            setTimeout(() => {
+                delete this.incomingChunks[msg.id];
+                delete this.incomingFileInfo[msg.id];
+                console.log(`🧹 تم تفريغ ذاكرة العنصر المكتمل: ${msg.id}`);
+            }, 100);
+        };
+        
+        // ✅ قراءة blob كـ ArrayBuffer
+        reader.readAsArrayBuffer(blob);
+    }
+},
 
+// ==================== 9.3: معالجة حالة المكالمة ====================
 handleCallStatus(msg) {
     if (msg.status === 'connected') {
         console.log('📞 الطرف الآخر متصل');
@@ -886,16 +979,14 @@ handleCallStatus(msg) {
     }
 },
 
-// ==================== 9.3 إرسال حالة المكالمة ====================
-
+// ==================== 9.4: إرسال حالة المكالمة ====================
 sendCallStatus(status) {
     if (this.dc && this.dc.readyState === 'open') {
         this.dc.send(JSON.stringify({ type: 'call_status', status: status, timestamp: Date.now() }));
     }
 },
 
-// ==================== 9.4 معالجة إشارات WebRTC ====================
-
+// ==================== 9.5: معالجة إشارات WebRTC ====================
 async handleSignaling(data) {
     try {
         if (data.type === 'reject') {
@@ -952,8 +1043,7 @@ async handleSignaling(data) {
     }
 },
 
-// ==================== 9.5 إرسال الإشارات ====================
-
+// ==================== 9.6: إرسال الإشارات ====================
 async sendSignal(calleeId, data) {
     if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation) {
         console.log('📡 تجاهل إرسال إشارة WebRTC - الميزات غير مفعلة');
