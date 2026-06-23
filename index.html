@@ -716,6 +716,8 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
     let isDragging = false;
     let dragOffsetX = 0;
     let dragOffsetY = 0;
+    let dragStartTime = 0;
+    let isClick = false;
     
     // ===== متغيرات لتشخيص التحميل التلقائي =====
     let diagnoseResults = [];
@@ -745,12 +747,10 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         const links = document.querySelectorAll('a[download]');
         if (links.length === 0) return;
         
-        // التحقق من عدم التكرار
         const now = Date.now();
         if (now - lastDiagnoseTime < 2000) return;
         lastDiagnoseTime = now;
         
-        // إضافة فاصل
         const separator = document.createElement('div');
         separator.style.cssText = 'border-top: 2px solid #ff6600; padding: 5px 0; color: #ff6600; text-align: center; margin: 5px 0;';
         separator.textContent = '═══════ تشخيص التحميل التلقائي ═══════';
@@ -793,7 +793,6 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
             logContainer.appendChild(line);
         });
         
-        // تقرير سريع
         const report = document.createElement('div');
         report.style.cssText = 'border-top: 2px solid #ff6600; padding: 8px 0; margin-top: 8px; color: #fff; font-size: 11px;';
         report.innerHTML = `📊 ✅ صالح: ${validCount} | ❌ غير صالح: ${invalidCount}`;
@@ -805,43 +804,93 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
     // ===== بدء التشخيص التلقائي =====
     function startAutoDiagnose() {
         if (diagnoseInterval) clearInterval(diagnoseInterval);
-        // تشخيص فوري بعد ثانية
         setTimeout(diagnoseDownloadLinks, 1000);
-        // ثم كل 5 ثواني
         diagnoseInterval = setInterval(diagnoseDownloadLinks, 5000);
     }
     
     // ===== مراقبة التغييرات في DOM =====
     const observer = new MutationObserver(() => {
-        // تشخيص بعد إضافة عناصر جديدة
         setTimeout(diagnoseDownloadLinks, 500);
     });
     observer.observe(document.body, { childList: true, subtree: true });
     
-    // ===== تشغيل التشخيص التلقائي =====
     startAutoDiagnose();
     
-    // ===== التحريك (Drag & Drop) =====
-    function startDrag(e) {
-        if (isMinimized) {
-            // في الوضع الدائري، نسمح بالتحريك فقط
-            isDragging = true;
-            const touch = e.touches ? e.touches[0] : e;
-            const rect = panel.getBoundingClientRect();
-            dragOffsetX = touch.clientX - rect.left;
-            dragOffsetY = touch.clientY - rect.top;
-            panel.style.cursor = 'grabbing';
-            e.preventDefault();
+    // ===== دالة التكبير (من الدائرة إلى المستطيل) =====
+    function expandPanel() {
+        if (!isMinimized) return;
+        
+        panel.style.width = 'auto';
+        panel.style.height = 'auto';
+        panel.style.borderRadius = '10px';
+        panel.style.maxHeight = originalHeight || '300px';
+        panel.style.minHeight = '100px';
+        panel.style.padding = '8px';
+        panel.style.fontSize = '11px';
+        panel.style.overflow = 'auto';
+        panel.style.cursor = 'move';
+        controlBar.style.display = 'flex';
+        logContainer.style.display = 'block';
+        circleIndicator.style.display = 'none';
+        toggleSizeBtn.textContent = '⭕ تصغير';
+        isMinimized = false;
+        
+        // إعادة تعيين الموضع
+        const rect = panel.getBoundingClientRect();
+        if (rect.left < 0 || rect.top < 0 || rect.right > window.innerWidth || rect.bottom > window.innerHeight) {
+            panel.style.left = '10px';
+            panel.style.top = 'auto';
+            panel.style.bottom = '10px';
+            panel.style.right = '10px';
         }
+    }
+    
+    // ===== دالة التصغير (من المستطيل إلى دائرة) =====
+    function minimizePanel() {
+        if (isMinimized) return;
+        
+        originalHeight = panel.style.maxHeight || '300px';
+        panel.style.width = '60px';
+        panel.style.height = '60px';
+        panel.style.borderRadius = '50%';
+        panel.style.maxHeight = '60px';
+        panel.style.minHeight = '60px';
+        panel.style.padding = '0';
+        panel.style.fontSize = '0';
+        panel.style.overflow = 'hidden';
+        panel.style.cursor = 'move';
+        controlBar.style.display = 'none';
+        logContainer.style.display = 'none';
+        circleIndicator.style.display = 'block';
+        toggleSizeBtn.textContent = '⭕ تكبير';
+        isMinimized = true;
+    }
+    
+    // ===== التحريك (Drag & Drop) مع تمييز بين السحب والضغط =====
+    function startDrag(e) {
+        isDragging = false;
+        isClick = true;
+        dragStartTime = Date.now();
+        
+        const touch = e.touches ? e.touches[0] : e;
+        const rect = panel.getBoundingClientRect();
+        dragOffsetX = touch.clientX - rect.left;
+        dragOffsetY = touch.clientY - rect.top;
+        
+        // نبدأ السحب فوراً
+        isDragging = true;
+        panel.style.cursor = 'grabbing';
+        if (e.preventDefault) e.preventDefault();
     }
     
     function moveDrag(e) {
         if (!isDragging) return;
+        isClick = false;
+        
         const touch = e.touches ? e.touches[0] : e;
         let x = touch.clientX - dragOffsetX;
         let y = touch.clientY - dragOffsetY;
         
-        // منع الخروج من الشاشة
         const maxX = window.innerWidth - panel.offsetWidth;
         const maxY = window.innerHeight - panel.offsetHeight;
         x = Math.max(0, Math.min(x, maxX));
@@ -851,21 +900,50 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         panel.style.top = y + 'px';
         panel.style.bottom = 'auto';
         panel.style.right = 'auto';
-        e.preventDefault();
+        if (e.preventDefault) e.preventDefault();
     }
     
-    function endDrag() {
+    function endDrag(e) {
         isDragging = false;
-        panel.style.cursor = 'move';
+        panel.style.cursor = isMinimized ? 'move' : 'move';
+        
+        // إذا كان ضغط بسيط (نقرة) وليس سحب، ننفذ التكبير/التصغير
+        if (isClick && Date.now() - dragStartTime < 300) {
+            if (isMinimized) {
+                expandPanel();
+            } else {
+                minimizePanel();
+            }
+        }
+        isClick = false;
     }
     
-    // إضافة مستمعات التحريك
+    // ===== إضافة مستمعات التحريك =====
     panel.addEventListener('mousedown', startDrag);
     panel.addEventListener('touchstart', startDrag, { passive: false });
     document.addEventListener('mousemove', moveDrag);
     document.addEventListener('touchmove', moveDrag, { passive: false });
     document.addEventListener('mouseup', endDrag);
     document.addEventListener('touchend', endDrag);
+    
+    // ===== إضافة مؤشر الدائرة =====
+    const circleIndicator = document.createElement('div');
+    circleIndicator.id = 'circleIndicator';
+    circleIndicator.style.cssText = `
+        display: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #0f0;
+        font-size: 24px;
+        font-weight: bold;
+        pointer-events: none;
+        text-shadow: 0 0 10px #0f0;
+        cursor: pointer;
+    `;
+    circleIndicator.textContent = '📊';
+    panel.appendChild(circleIndicator);
     
     // ===== أزرار التحكم =====
     copyBtn.onclick = () => { 
@@ -897,108 +975,11 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         addLog('🧹 تم مسح نتائج تشخيص التحميل', 'warn');
     };
     
-    toggleSizeBtn.onclick = () => { 
-        if (isMinimized) { 
-            // تكبير: من دائرة إلى مستطيل
-            panel.style.borderRadius = '10px';
-            panel.style.width = 'auto';
-            panel.style.height = 'auto';
-            panel.style.maxHeight = originalHeight;
-            panel.style.minHeight = '100px';
-            panel.style.padding = '8px';
-            panel.style.fontSize = '11px';
-            panel.style.overflow = 'auto';
-            controlBar.style.display = 'flex';
-            logContainer.style.display = 'block';
-            toggleSizeBtn.textContent = '⭕ تصغير';
-            isMinimized = false;
-            
-            // إعادة تعيين الموضع إذا كان خارج الشاشة
-            const rect = panel.getBoundingClientRect();
-            if (rect.left < 0 || rect.top < 0 || rect.right > window.innerWidth || rect.bottom > window.innerHeight) {
-                panel.style.left = '10px';
-                panel.style.top = 'auto';
-                panel.style.bottom = '10px';
-                panel.style.right = '10px';
-            }
-        } else { 
-            // تصغير: من مستطيل إلى دائرة
-            originalHeight = panel.style.maxHeight;
-            panel.style.width = '60px';
-            panel.style.height = '60px';
-            panel.style.borderRadius = '50%';
-            panel.style.maxHeight = '60px';
-            panel.style.minHeight = '60px';
-            panel.style.padding = '0';
-            panel.style.fontSize = '0';
-            panel.style.overflow = 'hidden';
-            controlBar.style.display = 'none';
-            logContainer.style.display = 'none';
-            toggleSizeBtn.textContent = '⭕ تكبير';
-            isMinimized = true;
-            
-            // وضع الدائرة في مكان مناسب
-            const rect = panel.getBoundingClientRect();
-            if (rect.left < 0 || rect.top < 0 || rect.right > window.innerWidth || rect.bottom > window.innerHeight) {
-                panel.style.left = '10px';
-                panel.style.top = 'auto';
-                panel.style.bottom = '10px';
-                panel.style.right = 'auto';
-            }
-        } 
-    };
-    
-    // ===== إضافة إشارة صغيرة في وضع الدائرة =====
-    const circleIndicator = document.createElement('div');
-    circleIndicator.id = 'circleIndicator';
-    circleIndicator.style.cssText = `
-        display: none;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: #0f0;
-        font-size: 20px;
-        font-weight: bold;
-        pointer-events: none;
-    `;
-    circleIndicator.textContent = '📊';
-    panel.appendChild(circleIndicator);
-    
-    // ===== تحديث إظهار المؤشر عند التصغير =====
-    const originalToggle = toggleSizeBtn.onclick;
-    toggleSizeBtn.onclick = function() {
+    toggleSizeBtn.onclick = () => {
         if (isMinimized) {
-            // تكبير
-            panel.style.width = 'auto';
-            panel.style.height = 'auto';
-            panel.style.borderRadius = '10px';
-            panel.style.maxHeight = originalHeight;
-            panel.style.minHeight = '100px';
-            panel.style.padding = '8px';
-            panel.style.fontSize = '11px';
-            panel.style.overflow = 'auto';
-            controlBar.style.display = 'flex';
-            logContainer.style.display = 'block';
-            circleIndicator.style.display = 'none';
-            toggleSizeBtn.textContent = '⭕ تصغير';
-            isMinimized = false;
+            expandPanel();
         } else {
-            // تصغير
-            originalHeight = panel.style.maxHeight || '300px';
-            panel.style.width = '60px';
-            panel.style.height = '60px';
-            panel.style.borderRadius = '50%';
-            panel.style.maxHeight = '60px';
-            panel.style.minHeight = '60px';
-            panel.style.padding = '0';
-            panel.style.fontSize = '0';
-            panel.style.overflow = 'hidden';
-            controlBar.style.display = 'none';
-            logContainer.style.display = 'none';
-            circleIndicator.style.display = 'block';
-            toggleSizeBtn.textContent = '⭕ تكبير';
-            isMinimized = true;
+            minimizePanel();
         }
     };
     
