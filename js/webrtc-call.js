@@ -1275,6 +1275,7 @@ blobToBase64(blob) {
     });
 },
 
+// ==================== handleChunkMessage (معدل - مع _fullBase64) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = '';
@@ -1311,6 +1312,7 @@ handleChunkMessage(msg) {
         
         const dataUrl = dataPrefix + fullBase64;
         
+        // ✅ تخزين البيانات الكاملة مع _fullBase64
         const displayMsg = {
             id: msg.id,
             type: msg.type,
@@ -1318,11 +1320,22 @@ handleChunkMessage(msg) {
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _isBase64: true
+            _isBase64: true,
+            _fullBase64: fullBase64  // ✅ تخزين البيانات الخام لإعادة البناء عند الحاجة
         };
         
         if (ChatSystem.currentChat) {
+            // ✅ حفظ في ذاكرة المحادثة
+            if (!ChatSystem.messages[ChatSystem.currentChat]) {
+                ChatSystem.messages[ChatSystem.currentChat] = [];
+            }
+            ChatSystem.messages[ChatSystem.currentChat].push(displayMsg);
+            
+            // ✅ عرض في المحادثة
             ChatSystem.displayMessage(displayMsg);
+            
+            // ✅ حفظ في localStorage
+            ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
         }
         ChatSystem.hideProgressBar();
         
