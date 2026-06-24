@@ -742,7 +742,7 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // ✅ 9.1.3: معالجة استقبال المفتاح العام (جديد)
+            // ✅ 9.1.3: معالجة استقبال المفتاح العام
             if (msg.type === 'public_key_update') {
                 console.log('📥 استلام مفتاح عام جديد من:', ChatSystem.currentChat);
                 if (msg.publicKey && ChatSystem.currentChat) {
@@ -755,6 +755,15 @@ setupDataChannel(channel) {
                     }).catch(e => {
                         console.warn('⚠️ فشل تحديث المفتاح العام:', e);
                     });
+                }
+                return;
+            }
+            
+            // ✅ 9.1.3.1: معالجة طلب تحديث المفتاح (جديد)
+            if (msg.type === 'request_public_key') {
+                console.log('📥 استلام طلب تحديث المفتاح من:', ChatSystem.currentChat);
+                if (ChatSystem.currentChat) {
+                    ChatSystem.sendPublicKeyToFriend(ChatSystem.currentChat);
                 }
                 return;
             }
