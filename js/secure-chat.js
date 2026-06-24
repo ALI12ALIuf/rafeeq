@@ -319,33 +319,96 @@ startReceiving() {
 },
 
 
-   // ==================== القسم 7: معالجة الرسائل المستلمة ====================
-    async processReceivedMessage(msg) {
-        try {
-            const myPrivateKey = await this.getMyPrivateKey(); 
-            const senderPublicKey = await this.getReceiverPublicKey(msg.from);
-            if (!myPrivateKey || !senderPublicKey) return;
-            const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
-            
-            // القسم 7.1: رسائل نصية
-            if (msg.package.type === 'text') { 
-                const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
-                ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } 
-            // القسم 7.2: إشارات WebRTC
-            else if (msg.package.type === 'webrtc') { 
-                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
-                        featuresEnabled: ChatSystem.featuresEnabled,
-                        friendInConversation: ChatSystem.friendInConversation,
-                        currentChat: ChatSystem.currentChat,
-                        sender: msg.from
-                    });
+// ==================== القسم 7: معالجة الرسائل المستلمة (معدل - مع إعادة المحاولة التلقائية) ====================
+async processReceivedMessage(msg) {
+    try {
+        let decryptedData = null;
+        let sharedKey = null;
+        let retryCount = 0;
+        const maxRetries = 2;
+        let lastError = null;
+        
+        // ✅ محاولة فك التشفير مع إعادة المحاولة التلقائية
+        while (retryCount <= maxRetries) {
+            try {
+                const myPrivateKey = await this.getMyPrivateKey();
+                const senderPublicKey = await this.getReceiverPublicKey(msg.from);
+                
+                if (!myPrivateKey || !senderPublicKey) {
+                    console.log('❌ مفاتيح غير صالحة للمستخدم:', msg.from);
                     return;
                 }
                 
+                sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
+                
+                // ✅ فك تشفير البيانات
+                if (msg.package.data) {
+                    decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                }
+                
+                // ✅ إذا وصلنا هنا، فك التشفير نجح
+                break;
+                
+            } catch (e) {
+                lastError = e;
+                retryCount++;
+                console.log(`🔄 محاولة فك التشفير ${retryCount}/${maxRetries} فشلت:`, e.message);
+                
+                if (retryCount <= maxRetries) {
+                    // ✅ طلب المفتاح العام الجديد من الطرف الآخر
+                    console.log('📤 طلب مفتاح عام جديد من:', msg.from);
+                    await this.requestPublicKeyUpdate(msg.from);
+                    
+                    // انتظار وصول المفتاح الجديد
+                    await new Promise(r => setTimeout(r, 1500));
+                    
+                    // مسح الكاش المؤقت للمفتاح المشترك
+                    this.sharedKeyCache.clear();
+                }
+            }
+        }
+        
+        // ✅ إذا فشلت جميع المحاولات
+        if (!decryptedData && lastError) {
+            console.error('❌ فشل فك التشفير بعد المحاولات:', lastError.message);
+            return;
+        }
+        
+        // ============================================================
+        // القسم 7.1: رسائل نصية
+        // ============================================================
+        if (msg.package.type === 'text') {
+            try {
+                const decryptedText = await this.decryptData(msg.package.data, sharedKey);
+                ChatSystem.saveMessage(msg.from, {
+                    id: msg.package.id,
+                    type: 'text',
+                    text: decryptedText,
+                    sender: 'friend',
+                    time: new Date().toISOString()
+                });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                ChatSystem.updateLastMessage(msg.from, decryptedText);
+            } catch (e) {
+                console.error('❌ فشل فك تشفير النص:', e);
+            }
+        }
+        
+        // ============================================================
+        // القسم 7.2: إشارات WebRTC
+        // ============================================================
+        else if (msg.package.type === 'webrtc') {
+            if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
+                console.log('📞 تجاهل إشارة WebRTC - سبب:', {
+                    featuresEnabled: ChatSystem.featuresEnabled,
+                    friendInConversation: ChatSystem.friendInConversation,
+                    currentChat: ChatSystem.currentChat,
+                    sender: msg.from
+                });
+                return;
+            }
+            
+            try {
                 const signalData = await this.decryptData(msg.package.data, sharedKey);
                 const parsedData = JSON.parse(signalData);
                 
@@ -359,23 +422,31 @@ startReceiving() {
                     } else {
                         console.error('❌ CallSystem.showIncomingCall غير موجود');
                     }
-                } 
-                else {
+                } else {
                     if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
                         CallSystem.handleSignaling(parsedData);
                     }
                 }
+            } catch (e) {
+                console.error('❌ فشل معالجة إشارة WebRTC:', e);
             }
-            // القسم 7.3: طلب تفعيل الميزات (معدل - يدعم الدفعات)
-            else if (msg.package.type === 'feature_request') {
-                console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
-                    ChatSystem.handleFeatureRequest(msg.from, msg.package.data);
-                }
+        }
+        
+        // ============================================================
+        // القسم 7.3: طلب تفعيل الميزات
+        // ============================================================
+        else if (msg.package.type === 'feature_request') {
+            console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
+            if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
+                ChatSystem.handleFeatureRequest(msg.from, msg.package.data);
             }
-            // القسم 7.4: رد على طلب التفعيل (معدل - يدعم الدفعات answer_batch)
-            else if (msg.package.type === 'feature_response') {
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+        }
+        
+        // ============================================================
+        // القسم 7.4: رد على طلب التفعيل
+        // ============================================================
+        else if (msg.package.type === 'feature_response') {
+            try {
                 const responseData = JSON.parse(decryptedData);
                 console.log('🔓 استلام رد على طلب التفعيل من:', msg.from, '| الحالة:', responseData.action);
                 
@@ -383,7 +454,6 @@ startReceiving() {
                 if (responseData.action === 'answer_batch' && responseData.sdp) {
                     console.log(`📦 استلام دفعة الرد (Answer + ${responseData.iceCandidates?.length || 0} ICE candidates) من:`, msg.from);
                     
-                    // ✅ إعادة تعيين حالة الطلب وإيقاف الـ blinking (لحل مشكلة انتهاء المهلة عند المرسل)
                     if (typeof ChatSystem !== 'undefined') {
                         ChatSystem.featureRequestPending = false;
                         ChatSystem.featureRequestReceived = false;
@@ -403,10 +473,8 @@ startReceiving() {
                         console.log('✅ تم تحديث حالة المرسل بعد استلام answer_batch');
                     }
                     
-                    // معالجة الـ Answer وإضافة ICE candidates المجمعة
                     if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
                         try {
-                            // تعيين الـ Remote Description (Answer)
                             const answerSdp = new RTCSessionDescription({
                                 type: responseData.sdp.type,
                                 sdp: responseData.sdp.sdp
@@ -414,7 +482,6 @@ startReceiving() {
                             await CallSystem.pc.setRemoteDescription(answerSdp);
                             console.log('✅ تم تعيين Answer SDP');
                             
-                            // إضافة جميع ICE candidates المجمعة
                             for (const ice of (responseData.iceCandidates || [])) {
                                 try {
                                     await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
@@ -429,11 +496,10 @@ startReceiving() {
                         }
                     }
                 }
-                // ✅ معالجة answer العادي (للتوافق مع الإصدارات القديمة)
+                // ✅ معالجة answer العادي
                 else if (responseData.action === 'answer' && responseData.sdp) {
                     console.log('📞 استلام Answer منفرد (دعم خلفي)');
                     
-                    // ✅ إعادة تعيين حالة الطلب أيضاً
                     if (typeof ChatSystem !== 'undefined') {
                         ChatSystem.featureRequestPending = false;
                         ChatSystem.featureRequestReceived = false;
@@ -465,7 +531,7 @@ startReceiving() {
                         }
                     }
                 }
-                // ✅ معالجة ice منفرد (للتوافق مع الإصدارات القديمة)
+                // ✅ معالجة ice منفرد
                 else if (responseData.action === 'ice' && responseData.candidate) {
                     console.log('📞 استلام ICE candidate منفرد (دعم خلفي)');
                     if (typeof CallSystem !== 'undefined' && CallSystem.pc) {
@@ -477,7 +543,7 @@ startReceiving() {
                         }
                     }
                 }
-                // ✅ معالجة accepted العادي
+                // ✅ معالجة accepted
                 else if (responseData.action === 'accepted') {
                     console.log('✅ تم قبول طلب التفعيل من:', msg.from);
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
@@ -497,51 +563,113 @@ startReceiving() {
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
                         ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                     }
-                }
-                else {
-                    // للتوافق مع الإصدارات القديمة جداً
+                } else {
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
                         ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                     }
                 }
+            } catch (e) {
+                console.error('❌ فشل معالجة رد التفعيل:', e);
             }
-            // القسم 7.5: إشارة إلغاء الميزات (مصحح)
-            else if (msg.package.type === 'force_disable_features') {
-                console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
+        }
+        
+        // ============================================================
+        // القسم 7.5: إشارة إلغاء الميزات
+        // ============================================================
+        else if (msg.package.type === 'force_disable_features') {
+            console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
+            
+            if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
+                console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
                 
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
-                    
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
-                    }
-                    
-                    ChatSystem.updateAllButtons();
+                ChatSystem.featuresEnabled = false;
+                ChatSystem.featureRequestPending = false;
+                ChatSystem.featureRequestReceived = false;
+                
+                const toggleInput = document.getElementById('featureToggleInput');
+                if (toggleInput) toggleInput.checked = false;
+                
+                const kickBtn = document.getElementById('kickBtn');
+                if (kickBtn) {
+                    kickBtn.classList.remove('active');
+                    kickBtn.style.opacity = '0.5';
+                    kickBtn.style.pointerEvents = 'none';
                 }
+                
+                ChatSystem.updateAllButtons();
             }
-            // القسم 7.6: مشاركة الموقع
-            else if (msg.package.type === 'location') {
+        }
+        
+        // ============================================================
+        // القسم 7.6: مشاركة الموقع
+        // ============================================================
+        else if (msg.package.type === 'location') {
+            try {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'location', data: locationData, sender: 'friend', time: new Date().toISOString() });
+                ChatSystem.saveMessage(msg.from, {
+                    id: msg.package.id,
+                    type: 'location',
+                    data: locationData,
+                    sender: 'friend',
+                    time: new Date().toISOString()
+                });
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+            } catch (e) {
+                console.error('❌ فشل معالجة الموقع:', e);
             }
-            
-            if (typeof loadChats === 'function') loadChats();
-        } catch (error) {
-            console.error('❌ خطأ في معالجة الرسالة:', error);
         }
-    },
+        
+        // ============================================================
+        // القسم 7.7: تحديث المفتاح العام (جديد)
+        // ============================================================
+        else if (msg.package.type === 'public_key_update') {
+            console.log('📥 استلام تحديث مفتاح عام من:', msg.from);
+            try {
+                const publicKey = msg.package.data;
+                if (publicKey && msg.from) {
+                    await window.db.collection('users').doc(msg.from).update({
+                        publicKey: publicKey,
+                        publicKeyUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    this.sharedKeyCache.clear();
+                    console.log('✅ تم تحديث المفتاح العام في Firebase للمستخدم:', msg.from);
+                }
+            } catch (e) {
+                console.warn('⚠️ فشل تحديث المفتاح العام:', e);
+            }
+        }
+        
+        // ============================================================
+        // القسم 7.8: طلب تحديث المفتاح العام (جديد)
+        // ============================================================
+        else if (msg.package.type === 'request_public_key') {
+            console.log('📥 استلام طلب تحديث مفتاح من:', msg.from);
+            if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
+                ChatSystem.sendPublicKeyToFriend(msg.from);
+            }
+        }
+        
+        if (typeof loadChats === 'function') loadChats();
+        
+    } catch (error) {
+        console.error('❌ خطأ في معالجة الرسالة:', error);
+    }
+},
+
+// ==================== القسم 7.9: طلب تحديث المفتاح العام (جديد) ====================
+async requestPublicKeyUpdate(friendId) {
+    try {
+        await this.sendToServer(friendId, {
+            type: 'request_public_key',
+            from: window.auth.currentUser.uid,
+            timestamp: Date.now()
+        });
+        console.log('📤 تم إرسال طلب تحديث المفتاح إلى:', friendId);
+    } catch (e) {
+        console.warn('⚠️ فشل إرسال طلب تحديث المفتاح:', e);
+    }
+},
     
     // ==================== القسم 8: تنظيف الرسائل المنتهية الصلاحية (جميع المستخدمين) ====================
 async cleanExpiredMessages() {
