@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
-// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل نهائي - يدعم _fullBase64) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1174,7 +1174,7 @@ displayMessage(msg) {
     const dateTime = formatDateTime(new Date(msg.time));
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
+    // ✅ إنشاء العنصر الرئيسي
     const template = document.getElementById('messageWrapperTemplate');
     let div;
     if (template) {
@@ -1209,7 +1209,6 @@ displayMessage(msg) {
             console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1294,8 +1293,20 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    // ✅ تخزين البيانات في Closure
-                    const imageData = msg.data;
+                    // ✅ إعادة بناء البيانات من _fullBase64 إذا كانت data فارغة
+                    let imageData = msg.data;
+                    if (!imageData || !imageData.startsWith('data:')) {
+                        if (msg._fullBase64) {
+                            imageData = 'data:image/jpeg;base64,' + msg._fullBase64;
+                        } else {
+                            console.warn('⚠️ لا توجد بيانات للصورة:', msg.id);
+                            div.appendChild(clone);
+                            c.appendChild(div);
+                            c.scrollTop = c.scrollHeight;
+                            return;
+                        }
+                    }
+                    
                     img.src = imageData;
                     
                     img.onclick = () => {
@@ -1323,9 +1334,21 @@ displayMessage(msg) {
                 voiceMsg.style.background = '#4CAF50';
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
-                if (audioEl && msg.data) {
-                    // ✅ تخزين البيانات في Closure
-                    const audioData = msg.data;
+                if (audioEl) {
+                    // ✅ إعادة بناء البيانات من _fullBase64 إذا كانت data فارغة
+                    let audioData = msg.data;
+                    if (!audioData || !audioData.startsWith('data:')) {
+                        if (msg._fullBase64) {
+                            audioData = 'data:audio/webm;base64,' + msg._fullBase64;
+                        } else {
+                            console.warn('⚠️ لا توجد بيانات للبصمة:', msg.id);
+                            div.appendChild(clone);
+                            c.appendChild(div);
+                            c.scrollTop = c.scrollHeight;
+                            return;
+                        }
+                    }
+                    
                     audioEl.src = audioData;
                     this.setupVoiceControls(clone, audioEl);
                 }
@@ -1346,9 +1369,21 @@ displayMessage(msg) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
-                if (source && msg.data) {
-                    // ✅ تخزين البيانات في Closure
-                    const videoData = msg.data;
+                if (source) {
+                    // ✅ إعادة بناء البيانات من _fullBase64 إذا كانت data فارغة
+                    let videoData = msg.data;
+                    if (!videoData || !videoData.startsWith('data:')) {
+                        if (msg._fullBase64) {
+                            videoData = 'data:video/mp4;base64,' + msg._fullBase64;
+                        } else {
+                            console.warn('⚠️ لا توجد بيانات للفيديو:', msg.id);
+                            div.appendChild(clone);
+                            c.appendChild(div);
+                            c.scrollTop = c.scrollHeight;
+                            return;
+                        }
+                    }
+                    
                     source.src = videoData;
                     video.load();
                     
@@ -1380,9 +1415,22 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
-                    // ✅ تخزين البيانات في Closure (نسخة مستقلة لكل زر)
-                    const fileData = msg.data;
+                if (downloadBtn) {
+                    // ✅ إعادة بناء البيانات من _fullBase64 إذا كانت data فارغة
+                    let fileData = msg.data;
+                    if (!fileData || !fileData.startsWith('data:')) {
+                        if (msg._fullBase64) {
+                            fileData = 'data:application/octet-stream;base64,' + msg._fullBase64;
+                        } else {
+                            console.warn('⚠️ لا توجد بيانات للملف:', msg.id);
+                            downloadBtn.style.display = 'none';
+                            div.appendChild(clone);
+                            c.appendChild(div);
+                            c.scrollTop = c.scrollHeight;
+                            return;
+                        }
+                    }
+                    
                     const fileName = msg.fileName || 'ملف';
                     
                     downloadBtn.onclick = function(e) {
