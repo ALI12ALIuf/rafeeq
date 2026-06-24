@@ -633,7 +633,7 @@ window.addEventListener('load', function() {
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
 </script>
 
-<!-- ==================== القسم 10: أداة التشخيص ==================== -->
+<!-- ==================== القسم 10: أداة التشخيص (معدلة - Base64) ==================== -->
 <script>
 (function advancedDiagnosticTool() {
     const panel = document.createElement('div');
@@ -699,6 +699,7 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
     moveDownBtn.textContent = '⬇️ لأسفل';
     moveDownBtn.style.cssText = `background: #4CAF50; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
     
+    // ✅ زر التصدير المعدل - باستخدام Base64 بدلاً من Blob URL
     const exportBtn = document.createElement('button');
     exportBtn.textContent = '💾 تصدير';
     exportBtn.style.cssText = `background: #9C27B0; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
@@ -747,7 +748,18 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
     let position = 10;
     moveUpBtn.onclick = () => { position = Math.max(0, position - 20); panel.style.bottom = position + 'px'; addLog(`⬆️ تم نقل اللوحة للأعلى (${position}px)`, 'info'); };
     moveDownBtn.onclick = () => { position = Math.min(window.innerHeight - 100, position + 20); panel.style.bottom = position + 'px'; addLog(`⬇️ تم نقل اللوحة للأسفل (${position}px)`, 'info'); };
-    exportBtn.onclick = () => { const text = allLogs.join('\n'); const blob = new Blob([text], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `diagnostic_${new Date().toISOString().slice(0,19)}.txt`; a.click(); URL.revokeObjectURL(url); addLog('💾 تم تصدير السجل', 'success'); };
+    
+    // ✅ دالة تصدير السجل - باستخدام Base64 بدلاً من Blob URL
+    exportBtn.onclick = () => { 
+        const text = allLogs.join('\n');
+        const base64 = btoa(unescape(encodeURIComponent(text)));
+        const dataUrl = `data:text/plain;base64,${base64}`;
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `diagnostic_${new Date().toISOString().slice(0,19)}.txt`;
+        a.click();
+        addLog('💾 تم تصدير السجل (Base64)', 'success');
+    };
     
     const originalLog = console.log, originalError = console.error, originalWarn = console.warn;
     console.log = function(...args) { originalLog(...args); const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a).slice(0, 200) : String(a)).join(' '); addLog(msg, 'info'); };
@@ -766,7 +778,7 @@ window.performSearch = function() { if (typeof findUserById === 'function') find
         addLog('═══════════════════════════════', 'warn');
     }, 500);
     
-    addLog('🔍 أداة التشخيص المتقدمة تعمل', 'success');
+    addLog('🔍 أداة التشخيص المتقدمة تعمل (Base64)', 'success');
 })();
 </script>
     
