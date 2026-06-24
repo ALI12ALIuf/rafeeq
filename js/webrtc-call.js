@@ -885,7 +885,7 @@ setupDataChannel(channel) {
     };
 },
 
-// ==================== 9.2: معالجة أجزاء الملفات (Chunks) - المعدل ====================
+// ==================== 9.2: معالجة أجزاء الملفات (Chunks) - المعدل بالكامل ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -930,20 +930,20 @@ handleChunkMessage(msg) {
         // ✅ إنشاء Blob من البيانات
         const blob = new Blob([fullBuffer], { type: mimeType });
         
-        // ✅ تحويل Blob إلى ArrayBuffer (التخزين الدائم)
+        // ✅ تحويل Blob إلى ArrayBuffer (التخزين الدائم في الذاكرة)
         const reader = new FileReader();
         reader.onload = function() {
             const arrayBuffer = reader.result;
             
-            // ✅ تخزين ArrayBuffer بدلاً من Blob URL
+            // ✅ تخزين ArrayBuffer (وليس Blob URL)
             const displayMsg = {
                 id: msg.id,
                 type: msg.type,
-                data: arrayBuffer,  // ✅ تخزين البيانات الفعلية
+                data: arrayBuffer,  // ✅ البيانات الفعلية
                 fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
                 sender: 'friend',
                 time: new Date().toISOString(),
-                _fileData: arrayBuffer  // ✅ نسخة احتياطية
+                _fileData: arrayBuffer
             };
             
             // عرض الرسالة في الواجهة
