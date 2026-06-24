@@ -1,9 +1,9 @@
-// ========== webrtc-call.js - النسخة النهائية (Base64 100%) ==========
+// ========== webrtc-call.js - النسخة النهائية (بدون تنزيل) ==========
 // جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات (Base64)
 
 const CallSystem = {
-    pc: null, dc: null,           // ✅ خاصة بالميزات (دردشة، ملفات، موقع)
-    pcCall: null, dcCall: null,   // ✅ خاصة بالمكالمات (صوت، فيديو)
+    pc: null, dc: null,
+    pcCall: null, dcCall: null,
     localStream: null, isInCall: false, callType: null, currentCallId: null,
     incomingChunks: {}, incomingFileInfo: {},
     callTimerInterval: null, keepAliveInterval: null, keepAliveIntervalCall: null,
@@ -533,12 +533,10 @@ async createDataChannelOnly(calleeId) {
         const rightThumb = document.getElementById('rightThumb');
         const swipeButton = document.getElementById('swipeButton');
         
-        // تحديث أيقونة القبول حسب نوع المكالمة
         const callType = callData.type === 'video' ? 'video' : 'audio';
         const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
         leftThumb.innerHTML = `<i class="fas ${acceptIcon}"></i>`;
         
-        // جلب اسم المستخدم
         const fetchUserName = async () => {
             try {
                 const userDoc = await window.db.collection('users').doc(callerId).get();
@@ -565,14 +563,10 @@ async createDataChannelOnly(calleeId) {
             name.textContent = contactName;
             avatar.textContent = contactAvatar;
             
-            // إظهار الشاشة
             overlay.style.display = 'flex';
-            
-            // إعداد السحب
             this.setupIncomingCallSwipe(callerId, callData);
         });
         
-        // مؤقت 30 ثانية
         if (this._incomingCallTimeout) clearTimeout(this._incomingCallTimeout);
         this._incomingCallTimeout = setTimeout(() => {
             overlay.style.display = 'none';
@@ -674,7 +668,6 @@ async createDataChannelOnly(calleeId) {
             }
         };
         
-        // إزالة المستمعات القديمة
         leftThumb._cleanup && leftThumb._cleanup();
         rightThumb._cleanup && rightThumb._cleanup();
         
@@ -698,7 +691,6 @@ async createDataChannelOnly(calleeId) {
         document.addEventListener('touchmove', moveHandler, { passive: false });
         document.addEventListener('touchend', endHandler);
         
-        // حفظ دالة التنظيف
         leftThumb._cleanup = () => { document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', endHandler); document.removeEventListener('touchmove', moveHandler); document.removeEventListener('touchend', endHandler); };
         rightThumb._cleanup = leftThumb._cleanup;
     },
@@ -991,7 +983,6 @@ async sendSignal(calleeId, data) {
     // ==================== 10. واجهة المستخدم (معدلة - تستخدم واجهات ثابتة) ====================
 
 showCallUI(type) {
-    // إخفاء جميع واجهات المكالمات أولاً
     const audioUI = document.getElementById('audioCallUI');
     const videoUI = document.getElementById('videoCallUI');
     if (audioUI) audioUI.style.display = 'none';
@@ -1009,13 +1000,11 @@ showCallUI(type) {
         }
         audioUI.style.display = 'block';
         
-        // تحديث الاسم والصورة
         const nameEl = document.getElementById('callName');
         const avatarEl = document.getElementById('callAvatar');
         if (nameEl) nameEl.textContent = contactName;
         if (avatarEl) avatarEl.textContent = contactAvatar;
         
-        // إعداد المستمعات - إزالة القديمة وإضافة الجديدة
         const endBtn = document.getElementById('endCallBtn');
         if (endBtn) {
             const newEndBtn = endBtn.cloneNode(true);
@@ -1048,7 +1037,6 @@ showCallUI(type) {
                     newMuteBtn.style.color = this.isAudioMuted ? '#f44336' : '#2196F3';
                 }
             });
-            // تحديث الحالة الأولية
             const icon = newMuteBtn.querySelector('i');
             if (icon) {
                 icon.className = this.isAudioMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
@@ -1065,13 +1053,11 @@ showCallUI(type) {
         }
         videoUI.style.display = 'block';
         
-        // ربط الفيديو المحلي
         const lv = document.getElementById('localVideo');
         if (lv && this.localStream) {
             lv.srcObject = this.localStream;
         }
         
-        // إعداد المستمعات - إزالة القديمة وإضافة الجديدة
         const endBtn = document.getElementById('endCallBtnVideo');
         if (endBtn) {
             const newEndBtn = endBtn.cloneNode(true);
@@ -1098,7 +1084,6 @@ showCallUI(type) {
                     newMuteAudioBtn.style.color = this.isAudioMuted ? '#f44336' : '#2196F3';
                 }
             });
-            // تحديث الحالة الأولية
             const icon = newMuteAudioBtn.querySelector('i');
             if (icon) {
                 icon.className = this.isAudioMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
@@ -1118,7 +1103,6 @@ showCallUI(type) {
                     newMuteVideoBtn.style.color = this.isVideoMuted ? '#f44336' : '#2196F3';
                 }
             });
-            // تحديث الحالة الأولية
             if (this.isVideoMuted) {
                 const icon = newMuteVideoBtn.querySelector('i');
                 if (icon) {
@@ -1206,7 +1190,7 @@ showCallUI(type) {
         }
     },
     
-    // ==================== 13. إرسال الملفات (Base64 كامل) ====================
+    // ==================== 13. إرسال الملفات (Base64 كامل - بدون تنزيل) ====================
 
 async sendFileDirect(file, type) {
     if (!this.dc || this.dc.readyState !== 'open') {
@@ -1220,9 +1204,8 @@ async sendFileDirect(file, type) {
             blobToSend = await this.compressImage(file);
         }
         
-        // تحويل الملف إلى Base64
         const base64String = await this.blobToBase64(blobToSend);
-        const chunkSize = 16000; // عدد الأحرف في كل جزء
+        const chunkSize = 16000;
         const totalChunks = Math.ceil(base64String.length / chunkSize);
         const fileId = Date.now().toString();
         
@@ -1261,12 +1244,10 @@ async sendFileDirect(file, type) {
     }
 },
 
-// دالة مساعدة لتحويل Blob/File إلى Base64
 blobToBase64(blob) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
-            // إزالة الجزء "data:image/jpeg;base64," من البداية
             const base64 = reader.result.split(',')[1] || reader.result;
             resolve(base64);
         };
@@ -1275,7 +1256,6 @@ blobToBase64(blob) {
     });
 },
 
-// ==================== handleChunkMessage (معدل - مع _fullBase64) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = '';
@@ -1288,7 +1268,6 @@ handleChunkMessage(msg) {
         ChatSystem.showProgressBar('جاري استلام الملف...', 0);
     }
     
-    // تجميع أجزاء Base64
     this.incomingChunks[msg.id] += msg.data;
     this.incomingFileInfo[msg.id].received++;
     const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
@@ -1298,7 +1277,6 @@ handleChunkMessage(msg) {
     if (this.incomingFileInfo[msg.id].received === msg.total) {
         const fullBase64 = this.incomingChunks[msg.id];
         
-        // تحديد نوع MIME
         let dataPrefix = '';
         if (msg.type === 'image') {
             dataPrefix = 'data:image/jpeg;base64,';
@@ -1312,7 +1290,6 @@ handleChunkMessage(msg) {
         
         const dataUrl = dataPrefix + fullBase64;
         
-        // ✅ تخزين البيانات الكاملة مع _fullBase64
         const displayMsg = {
             id: msg.id,
             type: msg.type,
@@ -1320,22 +1297,11 @@ handleChunkMessage(msg) {
             fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
             sender: 'friend',
             time: new Date().toISOString(),
-            _isBase64: true,
-            _fullBase64: fullBase64  // ✅ تخزين البيانات الخام لإعادة البناء عند الحاجة
+            _isBase64: true
         };
         
         if (ChatSystem.currentChat) {
-            // ✅ حفظ في ذاكرة المحادثة
-            if (!ChatSystem.messages[ChatSystem.currentChat]) {
-                ChatSystem.messages[ChatSystem.currentChat] = [];
-            }
-            ChatSystem.messages[ChatSystem.currentChat].push(displayMsg);
-            
-            // ✅ عرض في المحادثة
             ChatSystem.displayMessage(displayMsg);
-            
-            // ✅ حفظ في localStorage
-            ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
         }
         ChatSystem.hideProgressBar();
         
@@ -1344,7 +1310,6 @@ handleChunkMessage(msg) {
     }
 },
 
-// ✅ دالة ضغط الصورة - تعيد Base64 مباشرة
 compressImage(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1365,9 +1330,7 @@ compressImage(file) {
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-                // ✅ إرجاع Base64 بدلاً من Blob
                 const base64 = canvas.toDataURL('image/jpeg', 0.7);
-                // تحويل data:image/jpeg;base64, إلى Blob للإرسال
                 fetch(base64)
                     .then(res => res.blob())
                     .then(blob => resolve(blob))
@@ -1432,7 +1395,6 @@ compressImage(file) {
             this.pcCall = null;
         }
         
-        // إخفاء جميع واجهات المكالمات
         document.getElementById('audioCallUI').style.display = 'none';
         document.getElementById('videoCallUI').style.display = 'none';
         
@@ -1465,7 +1427,6 @@ compressImage(file) {
     cleanupDynamicElements() {
         console.log('🧹 بدء تنظيف العناصر الديناميكية...');
         
-        // إخفاء العناصر الثابتة
         const elements = ['incomingCall', 'audioCallUI', 'videoCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
         elements.forEach(id => {
             const el = document.getElementById(id);
@@ -1486,7 +1447,6 @@ compressImage(file) {
                     if (rightThumb) { rightThumb.style.right = '8px'; rightThumb.style.transition = 'none'; }
                 }
                 if (id === 'audioCallUI' || id === 'videoCallUI') {
-                    // إعادة تعيين الفيديو البعيد
                     const rv = document.getElementById('remoteVideo');
                     if (rv) rv.srcObject = null;
                     const lv = document.getElementById('localVideo');
@@ -1495,7 +1455,6 @@ compressImage(file) {
             }
         });
         
-        // تنظيف المؤقتات
         if (this._callBatchTimer) {
             clearTimeout(this._callBatchTimer);
             this._callBatchTimer = null;
@@ -1534,4 +1493,4 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-console.log('✅ WebRTC Call System جاهز - مع دعم Base64 100%');
+console.log('✅ WebRTC Call System جاهز - مع دعم Base64 (بدون تنزيل)');
