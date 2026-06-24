@@ -742,7 +742,24 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // 9.1.3: معالجة إشارة طرد المستخدم
+            // ✅ 9.1.3: معالجة استقبال المفتاح العام (جديد)
+            if (msg.type === 'public_key_update') {
+                console.log('📥 استلام مفتاح عام جديد من:', ChatSystem.currentChat);
+                if (msg.publicKey && ChatSystem.currentChat) {
+                    window.db.collection('users').doc(ChatSystem.currentChat).update({
+                        publicKey: msg.publicKey,
+                        publicKeyUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }).then(() => {
+                        console.log('✅ تم تحديث المفتاح العام في Firebase');
+                        SecureChatSystem.sharedKeyCache.clear();
+                    }).catch(e => {
+                        console.warn('⚠️ فشل تحديث المفتاح العام:', e);
+                    });
+                }
+                return;
+            }
+            
+            // 9.1.4: معالجة إشارة طرد المستخدم
             if (msg.type === 'force_close_conversation') {
                 console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -765,7 +782,7 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // 9.1.4: معالجة إشارة إلغاء الميزات
+            // 9.1.5: معالجة إشارة إلغاء الميزات
             if (msg.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -789,22 +806,22 @@ setupDataChannel(channel) {
                 return;
             }
             
-            // 9.1.5: معالجة ping
+            // 9.1.6: معالجة ping
             if (msg.type === 'ping') return;
             
-            // 9.1.6: معالجة حالة المكالمة
+            // 9.1.7: معالجة حالة المكالمة
             if (msg.type === 'call_status') {
                 this.handleCallStatus(msg);
                 return;
             }
             
-            // 9.1.7: معالجة أجزاء الملفات (Chunks)
+            // 9.1.8: معالجة أجزاء الملفات (Chunks)
             if (msg.chunk !== undefined) {
                 this.handleChunkMessage(msg);
                 return;
             }
             
-            // 9.1.8: معالجة الرسائل الأخرى
+            // 9.1.9: معالجة الرسائل الأخرى
             const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
             if (ChatSystem.currentChat) {
                 ChatSystem.displayMessage(displayMsg);
@@ -814,7 +831,7 @@ setupDataChannel(channel) {
         }
     };
     
-    // 9.1.9: معالجة فتح القناة
+    // 9.1.10: معالجة فتح القناة
     channel.onopen = () => {
         console.log('✅ Data Channel مفتوح');
         this.sendCallStatus('connected');
@@ -836,7 +853,7 @@ setupDataChannel(channel) {
         }
     };
     
-    // 9.1.10: معالجة إغلاق القناة
+    // 9.1.11: معالجة إغلاق القناة
     channel.onclose = () => {
         console.log('❌ Data Channel مغلق');
         this.sendCallStatus('disconnected');
@@ -865,7 +882,7 @@ setupDataChannel(channel) {
         }
     };
     
-    // 9.1.11: معالجة أخطاء القناة
+    // 9.1.12: معالجة أخطاء القناة
     channel.onerror = (e) => {
         console.error('❌ خطأ في Data Channel:', e);
         
