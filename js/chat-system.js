@@ -1156,7 +1156,7 @@ setupVoiceControls(clone, audioEl) {
 
 
 
-    // ==================== القسم 26: displayMessage (معدل بالكامل - دعم ArrayBuffer) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - دعم Base64) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1176,7 +1176,6 @@ displayMessage(msg) {
     const dateTime = formatDateTime(new Date(msg.time));
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
     const template = document.getElementById('messageWrapperTemplate');
     let div;
     if (template) {
@@ -1211,7 +1210,6 @@ displayMessage(msg) {
             console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1286,7 +1284,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== 26.3: معالجة الصورة (معدل - دعم ArrayBuffer) ====================
+    // ==================== 26.3: معالجة الصورة (معدل - دعم Base64) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1296,15 +1294,18 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    // ✅ إنشاء URL جديد من البيانات المخزنة
+                    // ✅ دعم Base64 مباشرة
                     let imageUrl = msg.data;
-                    if (msg.data instanceof ArrayBuffer) {
+                    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
+                        // Base64
+                        const mimeType = msg._mimeType || 'image/jpeg';
+                        imageUrl = `data:${mimeType};base64,${msg.data}`;
+                    } else if (msg.data instanceof ArrayBuffer) {
+                        // دعم خلفي لـ ArrayBuffer
                         const blob = new Blob([msg.data], { type: 'image/jpeg' });
                         imageUrl = URL.createObjectURL(blob);
-                        msg._currentUrl = imageUrl;
                     }
                     img.src = imageUrl;
-                    // ✅ تمرير الكائن msg بدلاً من الرابط فقط
                     img.onclick = () => this.showImagePreview(msg);
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
@@ -1327,9 +1328,11 @@ displayMessage(msg) {
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
                 if (audioEl && msg.data) {
-                    // ✅ إنشاء URL جديد من البيانات المخزنة
                     let audioUrl = msg.data;
-                    if (msg.data instanceof ArrayBuffer) {
+                    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
+                        const mimeType = msg._mimeType || 'audio/webm';
+                        audioUrl = `data:${mimeType};base64,${msg.data}`;
+                    } else if (msg.data instanceof ArrayBuffer) {
                         const blob = new Blob([msg.data], { type: 'audio/webm' });
                         audioUrl = URL.createObjectURL(blob);
                     }
@@ -1343,7 +1346,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== 26.5: معالجة الفيديو (معدل - دعم ArrayBuffer) ====================
+    // ==================== 26.5: معالجة الفيديو (معدل - دعم Base64) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1354,17 +1357,17 @@ displayMessage(msg) {
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
                 if (source && msg.data) {
-                    // ✅ إنشاء URL جديد من البيانات المخزنة
                     let videoUrl = msg.data;
-                    if (msg.data instanceof ArrayBuffer) {
+                    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
+                        const mimeType = msg._mimeType || 'video/mp4';
+                        videoUrl = `data:${mimeType};base64,${msg.data}`;
+                    } else if (msg.data instanceof ArrayBuffer) {
                         const blob = new Blob([msg.data], { type: 'video/mp4' });
                         videoUrl = URL.createObjectURL(blob);
-                        msg._currentUrl = videoUrl;
                     }
                     source.src = videoUrl;
                     video.load();
                 }
-                // ✅ تمرير الكائن msg بدلاً من الرابط فقط
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
                     this.showVideoPreview(msg);
@@ -1376,7 +1379,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== 26.6: معالجة الملف (معدل - دعم ArrayBuffer) ====================
+    // ==================== 26.6: معالجة الملف (معدل - دعم Base64) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1391,11 +1394,18 @@ displayMessage(msg) {
                 }
                 const downloadLink = fileCard.querySelector('.download-file-btn');
                 if (downloadLink && msg.data) {
-                    // ✅ إنشاء URL جديد عند التحميل
                     downloadLink.onclick = (e) => {
                         e.preventDefault();
                         let fileUrl = msg.data;
-                        if (msg.data instanceof ArrayBuffer) {
+                        if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
+                            // Base64 - تحميل مباشر
+                            const link = document.createElement('a');
+                            const mimeType = msg._mimeType || 'application/octet-stream';
+                            link.href = `data:${mimeType};base64,${msg.data}`;
+                            link.download = msg.fileName || 'ملف';
+                            link.click();
+                            return;
+                        } else if (msg.data instanceof ArrayBuffer) {
                             const blob = new Blob([msg.data]);
                             fileUrl = URL.createObjectURL(blob);
                         }
@@ -1412,21 +1422,22 @@ displayMessage(msg) {
         }
     }
     
-    // ✅ إضافة الرسالة إلى الحاوية
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.7: showImagePreview (معدل - دعم ArrayBuffer) ====================
+// ==================== القسم 26.7: showImagePreview (معدل - دعم Base64) ====================
 showImagePreview(msg) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     const link = document.getElementById('downloadImageLink');
     if (!modal || !img) return;
     
-    // ✅ إنشاء URL جديد من البيانات المخزنة
     let imageUrl = msg.data;
-    if (msg.data instanceof ArrayBuffer) {
+    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
+        const mimeType = msg._mimeType || 'image/jpeg';
+        imageUrl = `data:${mimeType};base64,${msg.data}`;
+    } else if (msg.data instanceof ArrayBuffer) {
         const blob = new Blob([msg.data], { type: 'image/jpeg' });
         imageUrl = URL.createObjectURL(blob);
     }
@@ -1532,16 +1543,18 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.9: showVideoPreview (معدل - دعم ArrayBuffer) ====================
+// ==================== القسم 26.9: showVideoPreview (معدل - دعم Base64) ====================
 showVideoPreview(msg) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     const link = document.getElementById('downloadVideoLink');
     if (!modal || !video) return;
     
-    // ✅ إنشاء URL جديد من البيانات المخزنة
     let videoUrl = msg.data;
-    if (msg.data instanceof ArrayBuffer) {
+    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
+        const mimeType = msg._mimeType || 'video/mp4';
+        videoUrl = `data:${mimeType};base64,${msg.data}`;
+    } else if (msg.data instanceof ArrayBuffer) {
         const blob = new Blob([msg.data], { type: 'video/mp4' });
         videoUrl = URL.createObjectURL(blob);
     }
@@ -1996,49 +2009,53 @@ setupLocationSwipe(locationData) {
 }, 
     
     
-    // ==================== القسم 35: saveMessage ====================
-    saveMessage(friendId, message) { 
-        if (message.type !== 'text') {
-            console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
-            return;
-        }
-        
-        const key = `chat_${friendId}`; 
-        let messages = []; 
-        try { 
-            messages = JSON.parse(localStorage.getItem(key)) || []; 
-        } catch (e) { 
-            messages = []; 
-        }
-        
-        messages.push(message); 
-        
-        if (messages.length > 100) {
-            const excessCount = messages.length - 100;
-            const removeCount = excessCount + 50;
-            messages = messages.slice(removeCount);
-            console.log(`🧹 تم حذف ${removeCount} رسالة قديمة (الحد الأقصى 100 رسالة)`);
-        }
-        
+    // ==================== القسم 35: saveMessage (معدل - يدعم Base64) ====================
+saveMessage(friendId, message) { 
+    // ✅ إزالة الشرط - حفظ جميع أنواع الرسائل (نصوص + ملفات)
+    // if (message.type !== 'text') { return; }  // ❌ تم حذفه
+    
+    const key = `chat_${friendId}`; 
+    let messages = []; 
+    try { 
+        messages = JSON.parse(localStorage.getItem(key)) || []; 
+    } catch (e) { 
+        messages = []; 
+    }
+    
+    messages.push(message); 
+    
+    // ✅ تحديد حد أقصى 50 رسالة (بسبب حجم Base64)
+    const MAX_MESSAGES = 50;
+    if (messages.length > MAX_MESSAGES) {
+        const excessCount = messages.length - MAX_MESSAGES;
+        const removeCount = excessCount + 10;
+        messages = messages.slice(removeCount);
+        console.log(`🧹 تم حذف ${removeCount} رسالة قديمة (الحد الأقصى ${MAX_MESSAGES} رسالة)`);
+    }
+    
+    try { 
+        localStorage.setItem(key, JSON.stringify(messages)); 
+    } catch (e) {
+        // ✅ إذا كانت المساحة غير كافية (بسبب Base64 الكبير)
+        const removeCount = Math.min(20, messages.length);
+        messages = messages.slice(removeCount);
         try { 
             localStorage.setItem(key, JSON.stringify(messages)); 
-        } catch (e) {
-            const removeCount = Math.min(50, messages.length);
-            messages = messages.slice(removeCount);
+            console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة قديمة`);
+        } catch (e2) { 
+            // ✅ الحل الأخير: الاحتفاظ بآخر 20 رسالة فقط
+            messages = messages.slice(-20);
             try { 
                 localStorage.setItem(key, JSON.stringify(messages)); 
-                console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة قديمة`);
-            } catch (e2) { 
-                messages = messages.slice(-50);
-                try { 
-                    localStorage.setItem(key, JSON.stringify(messages)); 
-                    console.log(`🧹 مساحة غير كافية - تم الاحتفاظ بآخر 50 رسالة فقط`);
-                } catch (e3) {}
+                console.log(`🧹 مساحة غير كافية - تم الاحتفاظ بآخر 20 رسالة فقط`);
+            } catch (e3) {
+                console.warn('⚠️ لا يمكن حفظ المزيد من الملفات في localStorage');
             }
         }
-        
-        this.messages[friendId] = messages; 
-    },
+    }
+    
+    this.messages[friendId] = messages; 
+},
     
 
    // ==================== القسم 36: updateLastMessage ====================
