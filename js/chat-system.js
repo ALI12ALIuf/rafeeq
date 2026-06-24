@@ -1,5 +1,5 @@
-// ========== chat-system.js - النسخة المعدلة (قوالب ثابتة + setupVoiceControls) ==========
-// نظام الدردشة E2EE + نظام الحضور Presence
+// ========== chat-system.js - النسخة النهائية (Base64 100%) ==========
+// نظام الدردشة E2EE + نظام الحضور Presence + Base64
 
 const ChatSystem = {
     currentChat: null, messages: {},
@@ -1285,7 +1285,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (Base64) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1295,6 +1295,7 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
+                    // ✅ استخدام Base64 مباشرة
                     img.src = msg.data;
                     img.onclick = () => this.showImagePreview(msg.data);
                     img.oncontextmenu = (e) => e.preventDefault();
@@ -1307,7 +1308,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة البصمة الصوتية ====================
+    // ==================== معالجة البصمة الصوتية (Base64) ====================
     else if (msg.type === 'voice') {
         const templateVoice = document.getElementById('voiceMessageTemplate');
         if (templateVoice) {
@@ -1318,6 +1319,7 @@ displayMessage(msg) {
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
                 if (audioEl && msg.data) {
+                    // ✅ استخدام Base64 مباشرة
                     audioEl.src = msg.data;
                     this.setupVoiceControls(clone, audioEl);
                 }
@@ -1328,7 +1330,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (Base64) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1339,6 +1341,7 @@ displayMessage(msg) {
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
                 if (source && msg.data) {
+                    // ✅ استخدام Base64 مباشرة
                     source.src = msg.data;
                     video.load();
                 }
@@ -1353,7 +1356,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (Base64) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1388,7 +1391,7 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview ====================
+// ==================== القسم 26.1: showImagePreview (Base64) ====================
 showImagePreview(imageSrc) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1490,7 +1493,7 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview ====================
+// ==================== القسم 26.2: showVideoPreview (Base64) ====================
 showVideoPreview(videoSrc) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
@@ -1621,7 +1624,7 @@ async sendMessage(text) {
         }
     },
     
-    // ==================== القسم 30: sendImage ====================
+    // ==================== القسم 30: sendImage (Base64) ====================
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1641,13 +1644,15 @@ async sendMessage(text) {
             const success = await this.sendFileWithRetry(file, 'image');
             if (success) {
                 const msgId = Date.now().toString();
-                const tempUrl = URL.createObjectURL(file);
-                this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                // ✅ تحويل الملف إلى Base64 للعرض
+                const base64Data = await this.fileToBase64(file);
+                const dataUrl = `data:image/jpeg;base64,${base64Data}`;
+                this.displayMessage({ id: msgId, type: 'image', data: dataUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _isBase64: true });
             } else alert('فشل إرسال الصورة');
         }
     },
 
-// ==================== القسم 31: sendVideoFile ====================
+// ==================== القسم 31: sendVideoFile (Base64) ====================
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1676,16 +1681,16 @@ async sendMessage(text) {
             if (success) {
                 try {
                     const msgId = Date.now().toString();
-                    const tempUrl = URL.createObjectURL(file);
-                    
-                    this.displayMessage({ id: msgId, type: 'video', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-                    
+                    // ✅ تحويل الملف إلى Base64 للعرض
+                    const base64Data = await this.fileToBase64(file);
+                    const dataUrl = `data:video/mp4;base64,${base64Data}`;
+                    this.displayMessage({ id: msgId, type: 'video', data: dataUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _isBase64: true });
                 } catch (error) { alert('فشل معالجة الفيديو'); }
             } else alert('فشل إرسال الفيديو');
         }
     },
 
-// ==================== القسم 32: sendFile ====================
+// ==================== القسم 32: sendFile (Base64) ====================
     async sendFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1705,13 +1710,15 @@ async sendMessage(text) {
             const success = await this.sendFileWithRetry(file, 'file');
             if (success) {
                 const msgId = Date.now().toString();
-                const tempUrl = URL.createObjectURL(file);
-                this.displayMessage({ id: msgId, type: 'file', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                // ✅ تحويل الملف إلى Base64 للعرض
+                const base64Data = await this.fileToBase64(file);
+                const dataUrl = `data:application/octet-stream;base64,${base64Data}`;
+                this.displayMessage({ id: msgId, type: 'file', data: dataUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _isBase64: true });
             } else alert('فشل إرسال الملف');
         }
     },
 
-// ==================== القسم 33: sendVoiceNote ====================
+// ==================== القسم 33: sendVoiceNote (Base64) ====================
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1731,12 +1738,39 @@ async sendMessage(text) {
             const success = await this.sendFileWithRetry(audioBlob, 'voice');
             if (success) {
                 const msgId = Date.now().toString();
-                const tempUrl = URL.createObjectURL(audioBlob);
-                this.displayMessage({ id: msgId, type: 'voice', data: tempUrl, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+                // ✅ تحويل البلوب إلى Base64 للعرض
+                const base64Data = await this.blobToBase64(audioBlob);
+                const dataUrl = `data:audio/webm;base64,${base64Data}`;
+                this.displayMessage({ id: msgId, type: 'voice', data: dataUrl, sender: 'me', time: new Date().toISOString(), status: 'sent', _isBase64: true });
             } else alert('فشل إرسال البصمة الصوتية');
         }
     },
 
+// ✅ دالة مساعدة لتحويل File إلى Base64
+fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64 = reader.result.split(',')[1] || reader.result;
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+},
+
+// ✅ دالة مساعدة لتحويل Blob إلى Base64
+blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64 = reader.result.split(',')[1] || reader.result;
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+},
 
     
     // ==================== القسم 34: shareLocationDirect ====================
@@ -1951,9 +1985,10 @@ setupLocationSwipe(locationData) {
 }, 
     
     
-    // ==================== القسم 35: saveMessage ====================
+    // ==================== القسم 35: saveMessage (معدل - يدعم Base64) ====================
     saveMessage(friendId, message) { 
-        if (message.type !== 'text') {
+        // ✅ نحتفظ بالوسائط إذا كانت تحتوي على _isBase64
+        if (message.type !== 'text' && !message._isBase64) {
             console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
             return;
         }
@@ -2008,7 +2043,7 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-   // ==================== القسم 37: closeChat ====================
+   // ==================== القسم 37: closeChat (معدل - Base64) ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
@@ -2023,14 +2058,15 @@ closeChat() {
         
         const key = `chat_${chatId}`;
         const messages = this.messages[chatId] || [];
-        const filteredMessages = messages.filter(msg => msg.type === 'text');
+        // ✅ نحتفظ بالنصوص والوسائط (Base64)
+        const filteredMessages = messages.filter(msg => msg.type === 'text' || msg._isBase64);
         this.messages[chatId] = filteredMessages;
         localStorage.setItem(key, JSON.stringify(filteredMessages));
-        console.log('✅ تم تنظيف الملفات والوسائط من localStorage');
+        console.log('✅ تم تنظيف الملفات والوسائط من localStorage (تم الاحتفاظ بـ Base64)');
         
+        // ✅ إزالة عناصر DOM (بدون Blob URL)
         document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
+            if (el.src && (el.src.startsWith('data:') || el.src.startsWith('blob:'))) {
                 el.src = '';
             }
         });
@@ -2077,7 +2113,7 @@ closeChat() {
 },
 
     
-    // ==================== القسم 40: تنظيف بيانات المحادثة ====================
+    // ==================== القسم 40: تنظيف بيانات المحادثة (معدل - Base64) ====================
     cleanConversationData(chatId, cleanAll = false) {
         console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
         
@@ -2088,15 +2124,16 @@ closeChat() {
             console.log('✅ تم مسح localStorage بالكامل');
         } else {
             const messages = this.messages[chatId] || [];
-            const textMessages = messages.filter(msg => msg.type === 'text').slice(-100);
+            // ✅ نحتفظ بالنصوص والوسائط (Base64)
+            const textMessages = messages.filter(msg => msg.type === 'text' || msg._isBase64).slice(-100);
             this.messages[chatId] = textMessages;
             localStorage.setItem(key, JSON.stringify(textMessages));
-            console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
+            console.log('✅ تم الاحتفاظ بآخر 100 رسالة (نصوص + Base64)');
         }
         
+        // ✅ إزالة عناصر DOM (بدون Blob URL)
         document.querySelectorAll('img, video, audio').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
+            if (el.src && (el.src.startsWith('data:') || el.src.startsWith('blob:'))) {
                 el.src = '';
             }
         });
@@ -2137,7 +2174,7 @@ closeChat() {
 // ==================== القسم 39: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة ====================
+// ==================== القسم 41: التنظيف الشامل عند تحميل الصفحة (معدل - Base64) ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
@@ -2145,9 +2182,9 @@ function performGlobalCleanup() {
         CallSystem.cleanupDynamicElements();
     }
     
+    // ✅ إزالة عناصر DOM (بدون Blob URL)
     document.querySelectorAll('img, video, audio').forEach(el => {
-        if (el.src && el.src.startsWith('blob:')) {
-            URL.revokeObjectURL(el.src);
+        if (el.src && (el.src.startsWith('data:') || el.src.startsWith('blob:'))) {
             el.src = '';
         }
     });
