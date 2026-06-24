@@ -19,17 +19,50 @@ const SecureChatSystem = {
         
         try {
             console.log('🔐 بدء تهيئة نظام التشفير...');
+            
+            // ✅ التحقق من صحة المفاتيح (جديد)
+            await this.ensureValidKeys();
+            
             await this.setupKeys();
             this.startReceiving();
-            this.startExpiredMessagesCleanup(); // ✅ تنظيف الرسائل المنتهية
-            this.startSignalCleanup(); // ✅ تنظيف الإشارات المنتهية
-            // PresenceSystem.setOnline(); // ❌ تمت إزالتها (غير مستخدمة)
+            this.startExpiredMessagesCleanup();
+            this.startSignalCleanup();
             console.log('✅ تم تهيئة نظام التشفير بنجاح');
             return true;
         } catch (error) {
             console.error('❌ فشل تهيئة نظام التشفير:', error);
             return false;
         }
+    },
+    
+    // ==================== القسم 1.5: التحقق من صحة المفاتيح (جديد) ====================
+    async ensureValidKeys() {
+        const uid = window.auth.currentUser.uid;
+        
+        // 1. التحقق من وجود المفتاح الخاص في localStorage
+        const privateKey = localStorage.getItem(`enc_private_key_${uid}`);
+        if (!privateKey) {
+            console.log('🔑 المفتاح الخاص مفقود، إعادة إنشاء المفاتيح...');
+            await this.setupKeys();
+            return true;
+        }
+        
+        // 2. التحقق من وجود المفتاح العام في Firebase
+        try {
+            const doc = await window.db.collection('users').doc(uid).get();
+            if (!doc.exists || !doc.data()?.publicKey) {
+                console.log('🔑 المفتاح العام مفقود، إعادة إنشاء المفاتيح...');
+                await this.setupKeys();
+                return true;
+            }
+        } catch (e) {
+            console.warn('⚠️ فشل التحقق من المفتاح العام، إعادة إنشاء المفاتيح...');
+            await this.setupKeys();
+            return true;
+        }
+        
+        console.log('✅ المفاتيح صالحة');
+        return true;
     },
     
     // ==================== القسم 2: setupKeys ====================
