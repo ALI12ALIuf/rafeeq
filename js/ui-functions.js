@@ -761,12 +761,6 @@ window.addEventListener('unhandledrejection', (event) => {
     console.error('❌ خطأ غير معالج:', event.reason); 
 });
 
-
-
-
-
-
-
 // ==================== أداة تشخيص التحميل المتخصصة (للنسخة الأصلية) ====================
 const DownloadDiagnosticPro = {
     results: [],
@@ -1080,6 +1074,7 @@ const DownloadDiagnosticPro = {
         this._observer = observer;
     },
     
+    // ✅ دالة تشخيص متقدمة لتحليل زر التحميل عند الضغط
     logDownloadAttempt(link, event) {
         this.clickCount++;
         const href = link.getAttribute('href');
@@ -1108,7 +1103,7 @@ const DownloadDiagnosticPro = {
             this.addResult('✅', '✅ رابط من نوع <a> (موصى به)', '#4CAF50', 'diag-success');
         }
         
-        // تحليل الرابط
+        // ✅ تحليل الرابط بالتفصيل
         if (!href || href === '#') {
             this.addResult('❌', '❌ الرابط غير معين (href="#")', '#f44336', 'diag-error');
             this.detectedIssues.push('href غير معين');
@@ -1118,7 +1113,15 @@ const DownloadDiagnosticPro = {
             this.testBlobUrl(href);
             this.detectedIssues.push('استخدام Blob URL (ينتهي صلاحيته)');
         } else if (href.startsWith('data:')) {
-            this.addResult('ℹ️', 'Data URL (قد يكون كبيراً)', '#aaa', '');
+            this.addResult('✅', '✅ Data URL (يعمل دائماً)', '#4CAF50', 'diag-success');
+            // ✅ تحليل حجم Data URL
+            const size = href.length;
+            const sizeKB = (size / 1024).toFixed(1);
+            if (size > 1024 * 100) { // أكبر من 100KB
+                this.addResult('⚠️', `⚠️ حجم Data URL كبير: ${sizeKB} KB (قد يسبب بطئاً)`, '#FFC107', 'diag-warning');
+            } else {
+                this.addResult('ℹ️', `حجم Data URL: ${sizeKB} KB`, '#aaa', '');
+            }
         } else if (href.startsWith('http')) {
             this.addResult('✅', '✅ HTTP URL (يعمل دائماً)', '#4CAF50', 'diag-success');
         }
@@ -1131,7 +1134,7 @@ const DownloadDiagnosticPro = {
             this.addResult('✅', `✅ download: "${download}"`, '#4CAF50', 'diag-success');
         }
         
-        // التحقق من onclick (للأزرار)
+        // ✅ التحقق من onclick (للأزرار)
         const onclick = link.getAttribute('onclick');
         if (onclick && onclick.includes('download')) {
             this.addResult('🔹', `onclick: "${onclick.substring(0, 50)}${onclick.length > 50 ? '...' : ''}"`, '#aaa', '');
@@ -1141,38 +1144,38 @@ const DownloadDiagnosticPro = {
             }
         }
         
-        // تحليل موقع العنصر في DOM
+        // ✅ تحليل موقع العنصر في DOM
         const parent = link.parentElement;
         if (parent) {
             const parentClass = parent.className || '';
             const parentTag = parent.tagName;
             this.addResult('🔹', `الموضع: <${parentTag}> class="${parentClass}"`, '#666', '');
             
-            // التحقق من وجود القالب
             if (parent.closest('template')) {
                 this.addResult('ℹ️', 'العنصر داخل قالب (template)', '#888', '');
             }
         }
         
-        // تحليل نوع البيانات المخزنة
+        // ✅ تحليل نوع البيانات المخزنة في الرسالة
         this.analyzeStoredData(link);
         
-        // تحديث العدد الإجمالي
+        // ✅ تحديث العدد الإجمالي
         const count = document.querySelectorAll('#diagFullResults .diag-log-entry').length;
         document.getElementById('diagFullCount').textContent = `📊 ${count}`;
         document.getElementById('diagFullIssues').textContent = `⚠️ ${this.detectedIssues.length}`;
         
-        // عرض ملخص المشاكل
+        // ✅ عرض ملخص المشاكل
         if (this.detectedIssues.length > 0) {
             this.addResult('📋', `المشاكل المكتشفة: ${this.detectedIssues.length}`, '#FFC107', '');
         }
     },
     
+    // ✅ تحليل البيانات المخزنة في الرسالة
     analyzeStoredData(link) {
-        // البحث عن الرسالة المرتبطة
         const messages = document.querySelectorAll('.message');
         let found = false;
         let dataType = 'غير معروف';
+        let details = '';
         
         messages.forEach((msg) => {
             const img = msg.querySelector('img');
@@ -1182,33 +1185,71 @@ const DownloadDiagnosticPro = {
             
             if (fileBtn === link || (img && img.src === link.href) || (video && video.src === link.href)) {
                 found = true;
-                // تحديد نوع البيانات
+                
+                // الحصول على بيانات الرسالة من ChatSystem
+                const msgId = msg.id.replace('msg-', '');
+                let msgData = null;
+                if (ChatSystem.currentChat && ChatSystem.messages[ChatSystem.currentChat]) {
+                    const foundMsg = ChatSystem.messages[ChatSystem.currentChat].find(m => m.id === msgId);
+                    if (foundMsg) {
+                        msgData = foundMsg;
+                    }
+                }
+                
                 if (img && img.src === link.href) {
                     dataType = 'صورة (img)';
-                    // التحقق من صحة الرابط
-                    if (img.src.startsWith('blob:')) {
-                        this.addResult('📊', `نوع البيانات: ${dataType} - Blob URL`, '#FFC107', 'diag-warning');
-                    } else {
-                        this.addResult('📊', `نوع البيانات: ${dataType} - ${img.src.substring(0, 30)}...`, '#aaa', '');
-                    }
+                    details = `src: ${img.src.substring(0, 50)}...`;
                 } else if (video && video.src === link.href) {
                     dataType = 'فيديو (video)';
-                    if (video.src.startsWith('blob:')) {
-                        this.addResult('📊', `نوع البيانات: ${dataType} - Blob URL`, '#FFC107', 'diag-warning');
-                    } else {
-                        this.addResult('📊', `نوع البيانات: ${dataType} - ${video.src.substring(0, 30)}...`, '#aaa', '');
-                    }
+                    details = `src: ${video.src.substring(0, 50)}...`;
                 } else if (audio && audio.src === link.href) {
                     dataType = 'صوت (audio)';
-                    this.addResult('📊', `نوع البيانات: ${dataType}`, '#aaa', '');
+                    details = `src: ${audio.src.substring(0, 50)}...`;
                 } else if (fileBtn === link) {
                     dataType = 'ملف (file)';
-                    this.addResult('📊', `نوع البيانات: ${dataType}`, '#aaa', '');
+                    const fileName = msg.querySelector('.file-name')?.textContent || 'غير معروف';
+                    details = `fileName: ${fileName}`;
+                }
+                
+                // ✅ تحليل نوع البيانات المخزنة
+                if (msgData) {
+                    if (msgData.data) {
+                        if (typeof msgData.data === 'string') {
+                            if (msgData.data.startsWith('data:')) {
+                                details += ` | ✅ Data URL (Base64)`;
+                            } else if (msgData.data.startsWith('blob:')) {
+                                details += ` | ❌ Blob URL (ينتهي)`;
+                            } else if (msgData.data.length > 100) {
+                                details += ` | ✅ Base64 (${msgData.data.length} حرف)`;
+                            } else {
+                                details += ` | ⚠️ String (${msgData.data.length} حرف)`;
+                            }
+                        } else if (msgData.data instanceof ArrayBuffer) {
+                            details += ` | ✅ ArrayBuffer (${msgData.data.byteLength} بايت)`;
+                        } else {
+                            details += ` | ⚠️ نوع غير معروف: ${typeof msgData.data}`;
+                        }
+                    } else {
+                        details += ` | ❌ لا توجد بيانات (msg.data غير موجود)`;
+                    }
+                    
+                    if (msgData._mimeType) {
+                        details += ` | MIME: ${msgData._mimeType}`;
+                    }
+                    
+                    if (msgData._base64) {
+                        details += ` | ✅ _base64 موجود (${msgData._base64.length} حرف)`;
+                    }
+                } else {
+                    details += ` | ❌ لم يتم العثور على البيانات في ChatSystem`;
                 }
             }
         });
         
-        if (!found) {
+        if (found) {
+            this.addResult('📊', `نوع البيانات: ${dataType}`, '#aaa', '');
+            this.addResult('📊', `تفاصيل: ${details}`, '#888', '');
+        } else {
             this.addResult('ℹ️', 'لم يتم العثور على رسالة مرتبطة', '#888', '');
         }
         
@@ -1269,6 +1310,7 @@ const DownloadDiagnosticPro = {
         let anchorCount = 0;
         let blobCount = 0;
         let emptyHrefCount = 0;
+        let dataUrlCount = 0;
         
         links.forEach((link, index) => {
             const href = link.getAttribute('href');
@@ -1278,9 +1320,11 @@ const DownloadDiagnosticPro = {
             if (tagName === 'BUTTON') buttonCount++;
             if (tagName === 'A') anchorCount++;
             if (href && href.startsWith('blob:')) blobCount++;
+            if (href && href.startsWith('data:')) dataUrlCount++;
             if (!href || href === '#') emptyHrefCount++;
             
             const isBlob = href && href.startsWith('blob:');
+            const isData = href && href.startsWith('data:');
             const isEmpty = !href || href === '#';
             const isButton = tagName === 'BUTTON';
             
@@ -1300,6 +1344,10 @@ const DownloadDiagnosticPro = {
                 status = '⚠️';
                 color = '#FFC107';
                 note = '(Blob URL - قد ينتهي)';
+            } else if (isData) {
+                status = '✅';
+                color = '#4CAF50';
+                note = '(Data URL - دائم)';
             }
             
             this.addResult(status, `#${index+1}: ${download || 'ملف'} ${note}`, color, status === '❌' ? 'diag-error' : (status === '⚠️' ? 'diag-warning' : 'diag-success'));
@@ -1309,7 +1357,7 @@ const DownloadDiagnosticPro = {
         this.addResult('', '─'.repeat(40), '#444', '');
         this.addResult('📊', `الإحصائيات:`, '#ff6600', '');
         this.addResult('📊', `روابط <a>: ${anchorCount} | أزرار <button>: ${buttonCount}`, '#aaa', '');
-        this.addResult('📊', `Blob URLs: ${blobCount} | روابط فارغة: ${emptyHrefCount}`, '#aaa', '');
+        this.addResult('📊', `Blob URLs: ${blobCount} | Data URLs: ${dataUrlCount} | روابط فارغة: ${emptyHrefCount}`, '#aaa', '');
         
         if (buttonCount > 0) {
             this.addResult('⚠️', `🔴 ${buttonCount} زر تحميل (يُنصح باستخدام <a>)`, '#f44336', 'diag-error');
@@ -1322,6 +1370,9 @@ const DownloadDiagnosticPro = {
         if (emptyHrefCount > 0) {
             this.addResult('⚠️', `🔴 ${emptyHrefCount} رابط غير معين`, '#f44336', 'diag-error');
             this.detectedIssues.push(`${emptyHrefCount} رابط غير معين`);
+        }
+        if (dataUrlCount > 0) {
+            this.addResult('✅', `🟢 ${dataUrlCount} Data URL (يعمل دائماً)`, '#4CAF50', 'diag-success');
         }
     },
     
@@ -1345,10 +1396,8 @@ const DownloadDiagnosticPro = {
     inspectElements() {
         this.addResult('🔎', '═══════ فحص العناصر ═══════', '#00BCD4', '');
         
-        // فحص جميع عناصر التحميل
         this.analyzeAllDownloadElements();
         
-        // فحص القوالب
         const templates = document.querySelectorAll('template');
         this.addResult('📋', `القوالب (templates): ${templates.length}`, '#aaa', '');
         templates.forEach((t, i) => {
@@ -1356,7 +1405,6 @@ const DownloadDiagnosticPro = {
             this.addResult('🔹', `قالب ${i+1}: id="${id}"`, '#666', '');
         });
         
-        // فحص localStorage
         this.addResult('📁', '─── localStorage ───', '#00BCD4', '');
         let chatCount = 0;
         let fileCount = 0;
@@ -1375,7 +1423,6 @@ const DownloadDiagnosticPro = {
         }
         this.addResult('📊', `محادثات: ${chatCount} | ملفات: ${fileCount}`, '#aaa', '');
         
-        // فحص الذاكرة
         this.addResult('🧠', '─── الذاكرة ───', '#00BCD4', '');
         if (window.performance && window.performance.memory) {
             const mem = window.performance.memory;
@@ -1393,22 +1440,68 @@ const DownloadDiagnosticPro = {
     deepAnalyze() {
         this.addResult('🔬', '═══════ تحليل عميق ═══════', '#9C27B0', '');
         
-        // 1. تحليل localStorage
         this.analyzeLocalStorage();
-        
-        // 2. تحليل الذاكرة
         this.analyzeMemory();
-        
-        // 3. تحليل الروابط
         this.analyzeAllDownloadElements();
-        
-        // 4. تحليل المتصفح
         this.analyzeBrowser();
-        
-        // 5. تحليل الأخطاء المحتملة
         this.analyzePotentialIssues();
+        this.analyzeMessageData(); // ✅ تحليل بيانات الرسائل
         
         this.addResult('✅', '═══════ اكتمل التحليل العميق ═══════', '#4CAF50', '');
+    },
+    
+    // ✅ تحليل بيانات الرسائل المخزنة
+    analyzeMessageData() {
+        this.addResult('📨', '─── تحليل بيانات الرسائل ───', '#ff6600', '');
+        
+        let totalMessages = 0;
+        let hasData = 0;
+        let hasBase64 = 0;
+        let hasBlob = 0;
+        let hasArrayBuffer = 0;
+        let hasString = 0;
+        
+        if (ChatSystem.currentChat && ChatSystem.messages[ChatSystem.currentChat]) {
+            const messages = ChatSystem.messages[ChatSystem.currentChat];
+            totalMessages = messages.length;
+            
+            messages.forEach((msg) => {
+                if (msg.data) {
+                    hasData++;
+                    if (typeof msg.data === 'string') {
+                        if (msg.data.startsWith('data:')) {
+                            hasBase64++;
+                        } else if (msg.data.startsWith('blob:')) {
+                            hasBlob++;
+                        } else if (msg.data.length > 100) {
+                            hasBase64++;
+                        } else {
+                            hasString++;
+                        }
+                    } else if (msg.data instanceof ArrayBuffer) {
+                        hasArrayBuffer++;
+                    }
+                }
+            });
+        }
+        
+        this.addResult('📊', `إجمالي الرسائل: ${totalMessages}`, '#aaa', '');
+        this.addResult('📊', `بها بيانات: ${hasData}`, '#aaa', '');
+        this.addResult('📊', `Base64: ${hasBase64} | Blob URL: ${hasBlob} | ArrayBuffer: ${hasArrayBuffer} | String: ${hasString}`, '#aaa', '');
+        
+        if (hasBlob > 0) {
+            this.addResult('❌', `🔴 ${hasBlob} رسالة تحتوي على Blob URL (يحتاج إصلاح)`, '#f44336', 'diag-error');
+            this.detectedIssues.push(`${hasBlob} رسائل تحتوي على Blob URL`);
+        }
+        if (hasBase64 > 0) {
+            this.addResult('✅', `🟢 ${hasBase64} رسالة تحتوي على Base64 (صحيح)`, '#4CAF50', 'diag-success');
+        }
+        if (hasArrayBuffer > 0) {
+            this.addResult('✅', `🟢 ${hasArrayBuffer} رسالة تحتوي على ArrayBuffer (دائم)`, '#4CAF50', 'diag-success');
+        }
+        if (hasString > 0) {
+            this.addResult('⚠️', `🟡 ${hasString} رسالة تحتوي على String (قد يكون غير صحيح)`, '#FFC107', 'diag-warning');
+        }
     },
     
     analyzeLocalStorage() {
@@ -1481,7 +1574,6 @@ const DownloadDiagnosticPro = {
         this.addResult('📊', `دعم ArrayBuffer: ${!!window.ArrayBuffer}`, '#aaa', '');
         this.addResult('📊', `دعم URL.createObjectURL: ${!!window.URL?.createObjectURL}`, '#aaa', '');
         
-        // التحقق من إصدار المتصفح
         const isChrome = ua.includes('Chrome');
         const isFirefox = ua.includes('Firefox');
         const isSafari = ua.includes('Safari') && !ua.includes('Chrome');
@@ -1491,14 +1583,6 @@ const DownloadDiagnosticPro = {
     analyzePotentialIssues() {
         this.addResult('⚠️', '─── المشاكل المحتملة ───', '#ff6600', '');
         
-        const issues = [
-            { check: 'localStorage.getItem("chat_")', desc: 'الملفات مخزنة كـ Blob URL' },
-            { check: 'document.querySelectorAll("button[onclick*=\'download\']")', desc: 'استخدام أزرار بدلاً من روابط' },
-            { check: 'document.querySelectorAll("a[href*=\'blob:\']")', desc: 'استخدام Blob URL قد ينتهي' },
-            { check: 'typeof msg.data === "string" && msg.data.startsWith("blob:")', desc: 'تخزين Blob URL في localStorage' }
-        ];
-        
-        // التحقق من وجود Blob URLs في localStorage
         let hasBlobInStorage = false;
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -1528,13 +1612,11 @@ const DownloadDiagnosticPro = {
             this.addResult('✅', '🟢 لا توجد Blob URLs في localStorage', '#4CAF50', 'diag-success');
         }
         
-        // التحقق من استخدام الأزرار
         const buttons = document.querySelectorAll('button[onclick*="download"]');
         if (buttons.length > 0) {
             this.addResult('⚠️', `⚠️ ${buttons.length} زر تحميل (يُنصح باستخدام <a>)`, '#FFC107', 'diag-warning');
         }
         
-        // التحقق من وجود دالة downloadPreview
         if (typeof window.downloadPreviewImage === 'function' || typeof window.downloadPreviewVideo === 'function') {
             this.addResult('⚠️', '⚠️ دوال downloadPreview موجودة (قد تسبب مشاكل)', '#FFC107', 'diag-warning');
             this.detectedIssues.push('استخدام دوال downloadPreview');
@@ -1743,6 +1825,3 @@ document.addEventListener('keydown', (e) => {
 console.log('🔍 أداة تشخيص التحميل جاهزة! (للنسخة الأصلية)');
 console.log('📌 Ctrl+Shift+D للفتح/الإغلاق');
 console.log('📌 اضغط "▶️ بدء" ثم اضغط على زر التحميل');
-
-
-
