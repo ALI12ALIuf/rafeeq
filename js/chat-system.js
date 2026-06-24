@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1180,7 +1180,6 @@ displayMessage(msg) {
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1188,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1295,9 +1294,15 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    // ✅ استخدام Base64 مباشرة
-                    img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                    // ✅ تخزين البيانات في Closure
+                    const imageData = msg.data;
+                    img.src = imageData;
+                    
+                    img.onclick = () => {
+                        if (imageData && imageData.startsWith('data:')) {
+                            this.showImagePreview(imageData);
+                        }
+                    };
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
                 }
@@ -1319,8 +1324,9 @@ displayMessage(msg) {
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
                 if (audioEl && msg.data) {
-                    // ✅ استخدام Base64 مباشرة
-                    audioEl.src = msg.data;
+                    // ✅ تخزين البيانات في Closure
+                    const audioData = msg.data;
+                    audioEl.src = audioData;
                     this.setupVoiceControls(clone, audioEl);
                 }
             }
@@ -1341,14 +1347,18 @@ displayMessage(msg) {
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
                 if (source && msg.data) {
-                    // ✅ استخدام Base64 مباشرة
-                    source.src = msg.data;
+                    // ✅ تخزين البيانات في Closure
+                    const videoData = msg.data;
+                    source.src = videoData;
                     video.load();
+                    
+                    thumbnail.onclick = (e) => {
+                        e.stopPropagation();
+                        if (videoData && videoData.startsWith('data:')) {
+                            this.showVideoPreview(videoData);
+                        }
+                    };
                 }
-                thumbnail.onclick = (e) => {
-                    e.stopPropagation();
-                    this.showVideoPreview(msg.data);
-                };
             }
             div.appendChild(clone);
         } else {
@@ -1371,12 +1381,25 @@ displayMessage(msg) {
                 }
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
+                    // ✅ تخزين البيانات في Closure (نسخة مستقلة لكل زر)
+                    const fileData = msg.data;
+                    const fileName = msg.fileName || 'ملف';
+                    
+                    downloadBtn.onclick = function(e) {
                         e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
+                        e.preventDefault();
+                        
+                        if (fileData && fileData.startsWith('data:')) {
+                            const link = document.createElement('a');
+                            link.href = fileData;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            console.log(`✅ تم تحميل الملف: ${fileName}`);
+                        } else {
+                            alert('⚠️ بيانات الملف غير متوفرة للتحميل');
+                        }
                     };
                 }
             }
