@@ -1315,6 +1315,10 @@ displayMessage(msg) {
         } else {
             console.warn('⚠️ قالب imageMessageTemplate غير موجود');
         }
+        // ✅ حفظ الرسالة في الذاكرة
+        if (ChatSystem.currentChat) {
+            ChatSystem.saveMessage(ChatSystem.currentChat, msg);
+        }
     }
     
     // ==================== 26.4: معالجة البصمة الصوتية ====================
@@ -1343,6 +1347,10 @@ displayMessage(msg) {
             div.appendChild(clone);
         } else {
             console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
+        }
+        // ✅ حفظ الرسالة في الذاكرة
+        if (ChatSystem.currentChat) {
+            ChatSystem.saveMessage(ChatSystem.currentChat, msg);
         }
     }
     
@@ -1376,6 +1384,10 @@ displayMessage(msg) {
             div.appendChild(clone);
         } else {
             console.warn('⚠️ قالب videoMessageTemplate غير موجود');
+        }
+        // ✅ حفظ الرسالة في الذاكرة
+        if (ChatSystem.currentChat) {
+            ChatSystem.saveMessage(ChatSystem.currentChat, msg);
         }
     }
     
@@ -1420,13 +1432,17 @@ displayMessage(msg) {
         } else {
             console.warn('⚠️ قالب fileMessageTemplate غير موجود');
         }
+        // ✅ حفظ الرسالة في الذاكرة
+        if (ChatSystem.currentChat) {
+            ChatSystem.saveMessage(ChatSystem.currentChat, msg);
+        }
     }
     
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.7: showImagePreview (معدل - دعم Base64) ====================
+// ==================== 26.7: showImagePreview (معدل - دعم Base64) ====================
 showImagePreview(msg) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1453,7 +1469,7 @@ showImagePreview(msg) {
     this.setupImageZoom(modal, img);
 },
 
-// ==================== القسم 26.8: setupImageZoom ====================
+// ==================== 26.8: setupImageZoom ====================
 setupImageZoom(modal, img) {
     if (img._zoomCleanup) {
         img._zoomCleanup();
@@ -1543,7 +1559,7 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.9: showVideoPreview (معدل - دعم Base64) ====================
+// ==================== 26.9: showVideoPreview (معدل - دعم Base64) ====================
 showVideoPreview(msg) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
@@ -1569,7 +1585,7 @@ showVideoPreview(msg) {
     }
 },
 
-// ==================== القسم 26.10: دوال إغلاق المعاينات ====================
+// ==================== 26.10: دوال إغلاق المعاينات ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
