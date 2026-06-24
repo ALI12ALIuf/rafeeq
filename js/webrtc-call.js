@@ -885,7 +885,7 @@ setupDataChannel(channel) {
     };
 },
 
-// ==================== 9.2: معالجة أجزاء الملفات (Chunks) - المعدل بالكامل ====================
+// ==================== 9.2: معالجة أجزاء الملفات (Chunks) - الحل النهائي ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -930,39 +930,37 @@ handleChunkMessage(msg) {
         // ✅ إنشاء Blob من البيانات
         const blob = new Blob([fullBuffer], { type: mimeType });
         
-        // ✅ تحويل Blob إلى ArrayBuffer (التخزين الدائم في الذاكرة)
+        // ✅ تحويل Blob إلى ArrayBuffer
         const reader = new FileReader();
         reader.onload = function() {
             const arrayBuffer = reader.result;
             
-            // ✅ تخزين ArrayBuffer (وليس Blob URL)
+            // ✅ إنشاء Blob URL جديد فوراً
+            const newBlob = new Blob([arrayBuffer], { type: mimeType });
+            const objectUrl = URL.createObjectURL(newBlob);
+            
             const displayMsg = {
                 id: msg.id,
                 type: msg.type,
-                data: arrayBuffer,  // ✅ البيانات الفعلية
+                data: objectUrl,  // ✅ Blob URL جديد
                 fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
                 sender: 'friend',
                 time: new Date().toISOString(),
-                _fileData: arrayBuffer
+                _blobUrl: objectUrl,
+                _arrayBuffer: arrayBuffer  // ✅ نسخة احتياطية
             };
             
-            // عرض الرسالة في الواجهة
-            if (ChatSystem.currentChat) {
-                ChatSystem.displayMessage(displayMsg);
-            }
+            // عرض الرسالة
+            ChatSystem.displayMessage(displayMsg);
             
-            // إخفاء شريط التقدم
             ChatSystem.hideProgressBar();
             
-            // ✅ تنظيف الذاكرة بعد التأكد من اكتمال المعالجة
             setTimeout(() => {
                 delete this.incomingChunks[msg.id];
                 delete this.incomingFileInfo[msg.id];
-                console.log(`🧹 تم تفريغ ذاكرة العنصر المكتمل: ${msg.id}`);
+                console.log(`🧹 تم تنظيف الذاكرة: ${msg.id}`);
             }, 100);
         };
-        
-        // ✅ قراءة blob كـ ArrayBuffer
         reader.readAsArrayBuffer(blob);
     }
 },
