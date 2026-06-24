@@ -1062,14 +1062,16 @@ openChat(friendId, friendName, friendAvatar) {
 // ==================== القسم 23.1: إرسال المفتاح العام للطرف الآخر ====================
 async sendPublicKeyToFriend(friendId) {
     try {
-        // الحصول على المفتاح العام الخاص بي
-        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
-        if (!myPrivateKey) {
-            console.log('❌ لا يوجد مفتاح خاص لإرساله');
+        // ✅ الحصول على المفتاح العام من Firebase (وليس تصدير الخاص)
+        const uid = window.auth.currentUser.uid;
+        const doc = await window.db.collection('users').doc(uid).get();
+        
+        if (!doc.exists || !doc.data()?.publicKey) {
+            console.log('❌ لا يوجد مفتاح عام لإرساله');
             return;
         }
         
-        const publicKey = await SecureChatSystem.exportPublicKey(myPrivateKey);
+        const publicKey = doc.data().publicKey;
         
         // إرسال المفتاح عبر Data Channel
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
