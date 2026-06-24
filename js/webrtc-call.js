@@ -885,7 +885,7 @@ setupDataChannel(channel) {
     };
 },
 
-// ==================== 9.2: معالجة أجزاء الملفات (Chunks) - المعدل بالكامل ====================
+// ==================== 9.2: معالجة أجزاء الملفات (Chunks) - تخزين Base64 ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
@@ -930,20 +930,28 @@ handleChunkMessage(msg) {
         // ✅ إنشاء Blob من البيانات
         const blob = new Blob([fullBuffer], { type: mimeType });
         
-        // ✅ تحويل Blob إلى ArrayBuffer (التخزين الدائم في الذاكرة)
+        // ✅ تحويل Blob إلى Base64 (تخزين دائم في localStorage)
         const reader = new FileReader();
         reader.onload = function() {
+            // ✅ تحويل ArrayBuffer إلى Base64
             const arrayBuffer = reader.result;
+            const uint8Array = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < uint8Array.length; i++) {
+                binary += String.fromCharCode(uint8Array[i]);
+            }
+            const base64 = btoa(binary);
             
-            // ✅ تخزين ArrayBuffer (وليس Blob URL)
+            // ✅ تخزين Base64 (وليس Blob URL أو ArrayBuffer)
             const displayMsg = {
                 id: msg.id,
                 type: msg.type,
-                data: arrayBuffer,  // ✅ البيانات الفعلية
+                data: base64,  // ✅ Base64 (دائم)
                 fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
                 sender: 'friend',
                 time: new Date().toISOString(),
-                _fileData: arrayBuffer
+                _base64: base64,
+                _mimeType: mimeType
             };
             
             // عرض الرسالة في الواجهة
