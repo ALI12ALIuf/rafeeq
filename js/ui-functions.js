@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة المعدلة (مع دوال إغلاق المعاينات) ==========
+// ========== ui-functions.js - النسخة النهائية (Base64 100%) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -19,7 +19,7 @@ function clearStack() {
     window._pageStack = [];
 }
 
-// ==================== القسم 2: تحميل المحادثات (معدل - استخدام القالب الثابت) ====================
+// ==================== القسم 2: تحميل المحادثات ====================
 let chatsLoaded = false;
 
 async function loadChats(force = false) { 
@@ -172,7 +172,7 @@ window.handleMessageKeyPress = e => {
     } 
 };
 
-// ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
+// ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) - Base64 كامل ====================
 
 let _recordingTimer = null;
 let _recordingSeconds = 0;
@@ -180,7 +180,7 @@ let _recordingChunks = [];
 let _mediaRecorder = null;
 let _recordingBlob = null;
 let _isRecording = false;
-let _audioUrl = null;
+let _audioData = null; // ✅ تخزين Base64 بدلاً من URL
 let _audioElement = null;
 
 const MAX_RECORDING_SECONDS = 300;
@@ -263,8 +263,12 @@ window.startVoiceRecording = function() {
     
     if (!recordingUI || !progressFill || !currentTimeEl) return;
     
-    if (_audioUrl) { URL.revokeObjectURL(_audioUrl); _audioUrl = null; }
-    if (_audioElement) { _audioElement = null; }
+    // ✅ تنظيف أي بيانات سابقة (بدون Blob URL)
+    _audioData = null;
+    if (_audioElement) {
+        _audioElement.pause();
+        _audioElement = null;
+    }
     
     input.style.display = 'none';
     recordingUI.style.display = 'flex';
@@ -301,19 +305,22 @@ window.startVoiceRecording = function() {
                 
                 _recordingBlob = new Blob(_recordingChunks, { type: 'audio/webm' });
                 
-                if (_audioUrl) URL.revokeObjectURL(_audioUrl);
-                _audioUrl = URL.createObjectURL(_recordingBlob);
-                
-                playBtn.style.display = 'flex';
-                playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                sendBtn.style.display = 'flex';
-                btn.style.display = 'none';
-                btn.classList.remove('recording');
-                
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
+                // ✅ تحويل إلى Base64
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    _audioData = e.target.result; // data:audio/webm;base64,...
+                    playBtn.style.display = 'flex';
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    sendBtn.style.display = 'flex';
+                    btn.style.display = 'none';
+                    btn.classList.remove('recording');
+                    
+                    if (_recordingTimer) {
+                        clearInterval(_recordingTimer);
+                        _recordingTimer = null;
+                    }
+                };
+                reader.readAsDataURL(_recordingBlob);
             };
             
             _mediaRecorder.start();
@@ -322,10 +329,6 @@ window.startVoiceRecording = function() {
                 if (_mediaRecorder && _mediaRecorder.state === 'recording') {
                     _mediaRecorder.stop();
                     btn.onclick = window.handleActionButton;
-                    playBtn.style.display = 'flex';
-                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    sendBtn.style.display = 'flex';
-                    btn.style.display = 'none';
                 }
             };
             
@@ -370,7 +373,7 @@ window.startVoiceRecording = function() {
             
             let isPlaying = false;
             playBtn.onclick = () => {
-                if (!_recordingBlob) return;
+                if (!_audioData) return;
                 
                 if (isPlaying) {
                     if (_audioElement) {
@@ -383,7 +386,7 @@ window.startVoiceRecording = function() {
                 }
                 
                 if (!_audioElement) {
-                    _audioElement = new Audio(_audioUrl);
+                    _audioElement = new Audio(_audioData);
                     _audioElement.onended = () => {
                         playBtn.innerHTML = '<i class="fas fa-play"></i>';
                         isPlaying = false;
@@ -422,10 +425,7 @@ window.startVoiceRecording = function() {
                     _audioElement.pause();
                     _audioElement = null;
                 }
-                if (_audioUrl) {
-                    URL.revokeObjectURL(_audioUrl);
-                    _audioUrl = null;
-                }
+                _audioData = null;
                 resetVoiceUI();
             };
             window._voiceCleanup = cleanup;
@@ -467,10 +467,7 @@ function resetVoiceUI() {
         _audioElement.pause();
         _audioElement = null;
     }
-    if (_audioUrl) {
-        URL.revokeObjectURL(_audioUrl);
-        _audioUrl = null;
-    }
+    _audioData = null;
     
     _recordingBlob = null;
     _mediaRecorder = null;
