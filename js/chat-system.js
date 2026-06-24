@@ -2009,7 +2009,7 @@ setupLocationSwipe(locationData) {
 }, 
     
     
-    // ==================== القسم 35: saveMessage (معدل - يدعم Base64) ====================
+    // ==================== القسم 35: saveMessage (معدل - يحفظ جميع البيانات) ====================
 saveMessage(friendId, message) { 
     // ✅ إزالة الشرط - حفظ جميع أنواع الرسائل (نصوص + ملفات)
     // if (message.type !== 'text') { return; }  // ❌ تم حذفه
@@ -2022,6 +2022,22 @@ saveMessage(friendId, message) {
         messages = []; 
     }
     
+    // ✅ حفظ الرسالة في الذاكرة (this.messages) أولاً
+    if (!this.messages[friendId]) {
+        this.messages[friendId] = [];
+    }
+    
+    // ✅ التأكد من عدم وجود رسالة مكررة (نفس الـ id)
+    const exists = this.messages[friendId].some(m => m.id === message.id);
+    if (!exists) {
+        this.messages[friendId].push(message);
+        console.log(`✅ تم حفظ ${message.type} في الذاكرة (this.messages)`);
+    } else {
+        console.log(`⚠️ رسالة مكررة (${message.id}) - تم تخطيها`);
+        return;
+    }
+    
+    // ✅ حفظ في localStorage
     messages.push(message); 
     
     // ✅ تحديد حد أقصى 50 رسالة (بسبب حجم Base64)
@@ -2035,6 +2051,7 @@ saveMessage(friendId, message) {
     
     try { 
         localStorage.setItem(key, JSON.stringify(messages)); 
+        console.log(`✅ تم حفظ ${message.type} في localStorage (${messages.length} رسالة)`);
     } catch (e) {
         // ✅ إذا كانت المساحة غير كافية (بسبب Base64 الكبير)
         const removeCount = Math.min(20, messages.length);
@@ -2054,7 +2071,8 @@ saveMessage(friendId, message) {
         }
     }
     
-    this.messages[friendId] = messages; 
+    // ✅ تحديث this.messages بالبيانات المحفوظة
+    this.messages[friendId] = messages;
 },
     
 
