@@ -1062,46 +1062,74 @@ openChat(friendId, friendName, friendAvatar) {
 // ==================== القسم 23.1: إرسال المفتاح العام للطرف الآخر ====================
 async sendPublicKeyToFriend(friendId) {
     try {
-        // ✅ الحصول على المفتاح العام من Firebase (وليس تصدير الخاص)
+        console.log('📤 بدء إرسال المفتاح العام إلى:', friendId);
+        
+        // ✅ الحصول على المفتاح العام من Firebase
         const uid = window.auth.currentUser.uid;
         const doc = await window.db.collection('users').doc(uid).get();
         
         if (!doc.exists || !doc.data()?.publicKey) {
-            console.log('❌ لا يوجد مفتاح عام لإرساله');
+            console.log('❌ لا يوجد مفتاح عام في Firebase لإرساله');
             return;
         }
         
         const publicKey = doc.data().publicKey;
+        console.log('✅ تم جلب المفتاح العام من Firebase، الطول:', publicKey?.length);
         
-        // إرسال المفتاح عبر Data Channel
+        // ============================================================
+        // 1️⃣ إرسال عبر Data Channel (الطريقة الأساسية)
+        // ============================================================
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({
-                type: 'public_key_update',
-                publicKey: publicKey,
-                timestamp: Date.now()
-            }));
-            console.log('📤 تم إرسال المفتاح العام إلى:', friendId);
+            try {
+                CallSystem.dc.send(JSON.stringify({
+                    type: 'public_key_update',
+                    publicKey: publicKey,
+                    timestamp: Date.now()
+                }));
+                console.log('📤 تم إرسال المفتاح العام عبر Data Channel إلى:', friendId);
+            } catch (e) {
+                console.warn('⚠️ فشل الإرسال عبر Data Channel:', e);
+            }
         } else {
-            console.log('⚠️ Data Channel غير مفتوح، سيتم الإرسال عند فتح القناة');
+            console.log('⚠️ Data Channel غير مفتوح (الحالة:', CallSystem.dc?.readyState || 'غير موجود', ')');
             
             // محاولة الإرسال عند فتح القناة لاحقاً
             const checkChannel = setInterval(() => {
                 if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
                     clearInterval(checkChannel);
-                    CallSystem.dc.send(JSON.stringify({
-                        type: 'public_key_update',
-                        publicKey: publicKey,
-                        timestamp: Date.now()
-                    }));
-                    console.log('📤 تم إرسال المفتاح العام (بعد فتح القناة) إلى:', friendId);
+                    try {
+                        CallSystem.dc.send(JSON.stringify({
+                            type: 'public_key_update',
+                            publicKey: publicKey,
+                            timestamp: Date.now()
+                        }));
+                        console.log('📤 تم إرسال المفتاح العام (بعد فتح القناة) إلى:', friendId);
+                    } catch (e) {
+                        console.warn('⚠️ فشل الإرسال بعد فتح القناة:', e);
+                    }
                 }
             }, 1000);
             
-            // إيقاف المحاولة بعد 10 ثواني
             setTimeout(() => clearInterval(checkChannel), 10000);
         }
+        
+        // ============================================================
+        // 2️⃣ إرسال عبر Firebase (نسخة احتياطية)
+        // ============================================================
+        try {
+            await SecureChatSystem.sendToServer(friendId, {
+                type: 'public_key_update',
+                data: publicKey,
+                timestamp: Date.now()
+            });
+            console.log('📤 تم إرسال المفتاح العام عبر Firebase (احتياطي) إلى:', friendId);
+        } catch (e) {
+            console.warn('⚠️ فشل إرسال المفتاح عبر Firebase:', e);
+        }
+        
     } catch (e) {
         console.warn('❌ فشل إرسال المفتاح العام:', e);
+        console.warn('❌ تفاصيل الخطأ:', e.message);
     }
 },
     
