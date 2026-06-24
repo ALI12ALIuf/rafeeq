@@ -1,4 +1,4 @@
-// ========== secure-chat.js ==========
+// ========== secure-chat.js - النسخة النهائية (Base64 100%) ==========
 // نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
 
 const SecureChatSystem = {
@@ -21,9 +21,8 @@ const SecureChatSystem = {
             console.log('🔐 بدء تهيئة نظام التشفير...');
             await this.setupKeys();
             this.startReceiving();
-            this.startExpiredMessagesCleanup(); // ✅ تنظيف الرسائل المنتهية
-            this.startSignalCleanup(); // ✅ تنظيف الإشارات المنتهية
-            // PresenceSystem.setOnline(); // ❌ تمت إزالتها (غير مستخدمة)
+            this.startExpiredMessagesCleanup();
+            this.startSignalCleanup();
             console.log('✅ تم تهيئة نظام التشفير بنجاح');
             return true;
         } catch (error) {
@@ -145,32 +144,88 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
-    // ==================== القسم 5: معالجة الملفات ====================
+    // ==================== القسم 5: معالجة الملفات (Base64 كامل) ====================
+    
+    // ✅ دالة ضغط الصورة - بدون Blob URL نهائياً
     async compressImage(file) { 
         return new Promise((resolve, reject) => { 
-            const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
-            const url = URL.createObjectURL(file);
-            img.onload = () => { 
-                URL.revokeObjectURL(url);
-                let w = img.width, h = img.height; 
-                if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } 
-                canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); 
-                canvas.toBlob((blob) => { if (blob) resolve(blob); else reject(new Error('فشل ضغط الصورة')); }, 'image/jpeg', 0.8); 
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => { 
+                    const canvas = document.createElement('canvas'); 
+                    const ctx = canvas.getContext('2d');
+                    let w = img.width, h = img.height; 
+                    if (w > 1200 || h > 1200) { 
+                        if (w > h) { h *= 1200 / w; w = 1200; } 
+                        else { w *= 1200 / h; h = 1200; } 
+                    } 
+                    canvas.width = w; 
+                    canvas.height = h; 
+                    ctx.drawImage(img, 0, 0, w, h); 
+                    // ✅ إرجاع Blob من canvas (بدون Blob URL)
+                    canvas.toBlob((blob) => { 
+                        if (blob) resolve(blob); 
+                        else reject(new Error('فشل ضغط الصورة')); 
+                    }, 'image/jpeg', 0.8); 
+                };
+                img.onerror = () => { reject(new Error('فشل تحميل الصورة')); };
+                img.src = e.target.result; // ✅ استخدام data URL بدلاً من Blob URL
             };
-            img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('فشل تحميل الصورة')); };
-            img.src = url;
+            reader.onerror = () => { reject(new Error('فشل قراءة الملف')); };
+            reader.readAsDataURL(file); // ✅ استخدام readAsDataURL
         }); 
     },
     
+    // ✅ دالة جلب مدة الفيديو - بدون Blob URL نهائياً
     getVideoDuration(file) {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
-            const url = URL.createObjectURL(file);
-            const timeout = setTimeout(() => { URL.revokeObjectURL(url); reject(new Error('انتهت مهلة قراءة الفيديو')); }, 10000);
-            video.onloadedmetadata = () => { clearTimeout(timeout); URL.revokeObjectURL(url); resolve(video.duration); };
-            video.onerror = () => { clearTimeout(timeout); URL.revokeObjectURL(url); reject(new Error('فشل تحميل الفيديو')); };
-            video.preload = 'metadata';
-            video.src = url;
+            const reader = new FileReader();
+            let resolved = false;
+            
+            const timeout = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    reject(new Error('انتهت مهلة قراءة الفيديو'));
+                }
+            }, 10000);
+            
+            reader.onload = (e) => {
+                try {
+                    video.onloadedmetadata = () => {
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timeout);
+                            resolve(video.duration);
+                        }
+                    };
+                    video.onerror = () => {
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timeout);
+                            reject(new Error('فشل تحميل الفيديو'));
+                        }
+                    };
+                    // ✅ استخدام data URL بدلاً من Blob URL
+                    video.preload = 'metadata';
+                    video.src = e.target.result;
+                } catch (err) {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        reject(err);
+                    }
+                }
+            };
+            reader.onerror = () => {
+                if (!resolved) {
+                    resolved = true;
+                    clearTimeout(timeout);
+                    reject(new Error('فشل قراءة ملف الفيديو'));
+                }
+            };
+            reader.readAsDataURL(file); // ✅ استخدام readAsDataURL
         });
     },
     
@@ -200,20 +255,16 @@ const SecureChatSystem = {
         });
     },
     
-    // ❌ تم حذف fileToBase64 (غير مستخدمة، الملفات تمر مباشرة عبر Data Channel P2P)
-    
     // ==================== القسم 6: إرسال واستقبال الرسائل ====================
 async sendToServer(receiverId, encryptedPackage) { 
     if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
     
-    // ✅ تحديد مدة الصلاحية حسب نوع الإشارة
-    let expiryHours = 24; // الافتراضي 24 ساعة
+    let expiryHours = 24;
     let expirySeconds = null;
     
-    // ✅ فقط feature_request و feature_response تحتاج مدة قصيرة
     if (encryptedPackage.type === 'feature_request' || 
         encryptedPackage.type === 'feature_response') {
-        expirySeconds = 60; // 60 ثانية لتفعيل الميزات (تتوافق مع blinking)
+        expirySeconds = 60;
     }
     
     let expiresAt;
@@ -271,12 +322,7 @@ startReceiving() {
             // القسم 7.2: إشارات WebRTC
             else if (msg.package.type === 'webrtc') { 
                 if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
-                        featuresEnabled: ChatSystem.featuresEnabled,
-                        friendInConversation: ChatSystem.friendInConversation,
-                        currentChat: ChatSystem.currentChat,
-                        sender: msg.from
-                    });
+                    console.log('📞 تجاهل إشارة WebRTC');
                     return;
                 }
                 
@@ -300,24 +346,22 @@ startReceiving() {
                     }
                 }
             }
-            // القسم 7.3: طلب تفعيل الميزات (معدل - يدعم الدفعات)
+            // القسم 7.3: طلب تفعيل الميزات
             else if (msg.package.type === 'feature_request') {
                 console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
                     ChatSystem.handleFeatureRequest(msg.from, msg.package.data);
                 }
             }
-            // القسم 7.4: رد على طلب التفعيل (معدل - يدعم الدفعات answer_batch)
+            // القسم 7.4: رد على طلب التفعيل
             else if (msg.package.type === 'feature_response') {
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
                 const responseData = JSON.parse(decryptedData);
                 console.log('🔓 استلام رد على طلب التفعيل من:', msg.from, '| الحالة:', responseData.action);
                 
-                // ✅ معالجة الدفعة (answer_batch)
                 if (responseData.action === 'answer_batch' && responseData.sdp) {
                     console.log(`📦 استلام دفعة الرد (Answer + ${responseData.iceCandidates?.length || 0} ICE candidates) من:`, msg.from);
                     
-                    // ✅ إعادة تعيين حالة الطلب وإيقاف الـ blinking (لحل مشكلة انتهاء المهلة عند المرسل)
                     if (typeof ChatSystem !== 'undefined') {
                         ChatSystem.featureRequestPending = false;
                         ChatSystem.featureRequestReceived = false;
@@ -337,10 +381,8 @@ startReceiving() {
                         console.log('✅ تم تحديث حالة المرسل بعد استلام answer_batch');
                     }
                     
-                    // معالجة الـ Answer وإضافة ICE candidates المجمعة
                     if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
                         try {
-                            // تعيين الـ Remote Description (Answer)
                             const answerSdp = new RTCSessionDescription({
                                 type: responseData.sdp.type,
                                 sdp: responseData.sdp.sdp
@@ -348,7 +390,6 @@ startReceiving() {
                             await CallSystem.pc.setRemoteDescription(answerSdp);
                             console.log('✅ تم تعيين Answer SDP');
                             
-                            // إضافة جميع ICE candidates المجمعة
                             for (const ice of (responseData.iceCandidates || [])) {
                                 try {
                                     await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
@@ -363,11 +404,9 @@ startReceiving() {
                         }
                     }
                 }
-                // ✅ معالجة answer العادي (للتوافق مع الإصدارات القديمة)
                 else if (responseData.action === 'answer' && responseData.sdp) {
                     console.log('📞 استلام Answer منفرد (دعم خلفي)');
                     
-                    // ✅ إعادة تعيين حالة الطلب أيضاً
                     if (typeof ChatSystem !== 'undefined') {
                         ChatSystem.featureRequestPending = false;
                         ChatSystem.featureRequestReceived = false;
@@ -399,7 +438,6 @@ startReceiving() {
                         }
                     }
                 }
-                // ✅ معالجة ice منفرد (للتوافق مع الإصدارات القديمة)
                 else if (responseData.action === 'ice' && responseData.candidate) {
                     console.log('📞 استلام ICE candidate منفرد (دعم خلفي)');
                     if (typeof CallSystem !== 'undefined' && CallSystem.pc) {
@@ -411,21 +449,18 @@ startReceiving() {
                         }
                     }
                 }
-                // ✅ معالجة accepted العادي
                 else if (responseData.action === 'accepted') {
                     console.log('✅ تم قبول طلب التفعيل من:', msg.from);
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
                         ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                     }
                 }
-                // ✅ معالجة rejected
                 else if (responseData.action === 'rejected') {
                     console.log('❌ تم رفض طلب التفعيل من:', msg.from);
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
                         ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                     }
                 }
-                // ✅ معالجة disable
                 else if (responseData.action === 'disable') {
                     console.log('🔴 استلام إشارة إيقاف من:', msg.from);
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
@@ -433,18 +468,17 @@ startReceiving() {
                     }
                 }
                 else {
-                    // للتوافق مع الإصدارات القديمة جداً
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
                         ChatSystem.handleFeatureResponse(msg.from, responseData.action);
                     }
                 }
             }
-            // القسم 7.5: إشارة إلغاء الميزات (مصحح)
+            // القسم 7.5: إشارة إلغاء الميزات
             else if (msg.package.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
+                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر');
                     
                     ChatSystem.featuresEnabled = false;
                     ChatSystem.featureRequestPending = false;
@@ -477,10 +511,8 @@ startReceiving() {
         }
     },
     
-    // ==================== القسم 8: تنظيف الرسائل المنتهية الصلاحية (جميع المستخدمين) ====================
+    // ==================== القسم 8: تنظيف الرسائل المنتهية الصلاحية ====================
 async cleanExpiredMessages() {
-    // ✅ لا نتحقق من المستخدم (تنظيف عام لجميع الرسائل المنتهية)
-    
     try {
         const now = new Date();
         const snapshot = await window.db.collection('secure_messages')
@@ -489,19 +521,18 @@ async cleanExpiredMessages() {
         
         for (const doc of snapshot.docs) {
             await doc.ref.delete();
-            console.log('🗑️ تم حذف رسالة منتهية الصلاحية (لجميع المستخدمين)');
+            console.log('🗑️ تم حذف رسالة منتهية الصلاحية');
         }
     } catch (e) {
         console.warn('خطأ في تنظيف الرسائل المنتهية:', e);
     }
 },
 
-// ==================== القسم 9: بدء التنظيف (مرة واحدة في اليوم) ====================
+// ==================== القسم 9: بدء التنظيف ====================
 startExpiredMessagesCleanup() {
-    // ✅ التنظيف مرة واحدة فقط في اليوم (بدلاً من كل 6 ساعات)
     const lastCleanup = localStorage.getItem('lastCleanup_sms');
     const now = Date.now();
-    const oneDay = 24 * 60 * 60 * 1000; // 24 ساعة
+    const oneDay = 24 * 60 * 60 * 1000;
     
     if (!lastCleanup || (now - parseInt(lastCleanup)) > oneDay) {
         this.cleanExpiredMessages();
@@ -512,23 +543,20 @@ startExpiredMessagesCleanup() {
     }
 },
     
-    // ==================== القسم 10: تنظيف إشارات تفعيل الميزات (لجميع المستخدمين) ====================
+    // ==================== القسم 10: تنظيف إشارات تفعيل الميزات ====================
 async cleanOldSignals() {
-    // ✅ لا نتحقق من المستخدم (تنظيف عام لجميع المستخدمين)
     const sixtySecondsAgo = new Date(Date.now() - 60000);
     
     try {
-        // ✅ البحث عن جميع الإشارات المنتهية (بدون شرط 'to')
         const featureSnapshot = await window.db.collection('secure_messages')
             .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(sixtySecondsAgo))
             .get();
         
         for (const doc of featureSnapshot.docs) {
             const data = doc.data();
-            // ✅ حذف إشارات التفعيل فقط (بغض النظر عن المستخدم)
             if (data.package?.type === 'feature_request' || data.package?.type === 'feature_response') {
                 await doc.ref.delete();
-                console.log(`🗑️ تم حذف إشارة تفعيل ميزات قديمة (60 ثانية) للمستخدم: ${data.to || 'غير معروف'}`);
+                console.log(`🗑️ تم حذف إشارة تفعيل ميزات قديمة (60 ثانية)`);
             }
         }
     } catch (e) {
@@ -536,7 +564,7 @@ async cleanOldSignals() {
     }
 },
     
-    // ==================== القسم 11: بدء التنظيف الدوري للإشارات (كل 30 ثانية) ====================
+    // ==================== القسم 11: بدء التنظيف الدوري للإشارات ====================
     startSignalCleanup() {
         this.cleanOldSignals();
         setInterval(() => this.cleanOldSignals(), 30000);
