@@ -35,35 +35,68 @@ const SecureChatSystem = {
         }
     },
     
-    // ==================== القسم 1.5: التحقق من صحة المفاتيح (جديد) ====================
-    async ensureValidKeys() {
-        const uid = window.auth.currentUser.uid;
-        
-        // 1. التحقق من وجود المفتاح الخاص في localStorage
-        const privateKey = localStorage.getItem(`enc_private_key_${uid}`);
-        if (!privateKey) {
-            console.log('🔑 المفتاح الخاص مفقود، إعادة إنشاء المفاتيح...');
-            await this.setupKeys();
-            return true;
-        }
-        
-        // 2. التحقق من وجود المفتاح العام في Firebase
-        try {
-            const doc = await window.db.collection('users').doc(uid).get();
-            if (!doc.exists || !doc.data()?.publicKey) {
-                console.log('🔑 المفتاح العام مفقود، إعادة إنشاء المفاتيح...');
-                await this.setupKeys();
-                return true;
-            }
-        } catch (e) {
-            console.warn('⚠️ فشل التحقق من المفتاح العام، إعادة إنشاء المفاتيح...');
-            await this.setupKeys();
-            return true;
-        }
-        
-        console.log('✅ المفاتيح صالحة');
+    // ==================== القسم 1.5: التحقق من صحة المفاتيح (معدل - مع اختبار التوافق) ====================
+async ensureValidKeys() {
+    const uid = window.auth.currentUser.uid;
+    
+    // 1. التحقق من وجود المفتاح الخاص في localStorage
+    const privateKey = localStorage.getItem(`enc_private_key_${uid}`);
+    if (!privateKey) {
+        console.log('🔑 المفتاح الخاص مفقود، إعادة إنشاء المفاتيح...');
+        await this.setupKeys();
         return true;
-    },
+    }
+    
+    // 2. التحقق من وجود المفتاح العام في Firebase
+    let publicKeyFromFirebase = null;
+    try {
+        const doc = await window.db.collection('users').doc(uid).get();
+        if (!doc.exists || !doc.data()?.publicKey) {
+            console.log('🔑 المفتاح العام مفقود في Firebase، إعادة إنشاء المفاتيح...');
+            await this.setupKeys();
+            return true;
+        }
+        publicKeyFromFirebase = doc.data().publicKey;
+    } catch (e) {
+        console.warn('⚠️ فشل التحقق من المفتاح العام، إعادة إنشاء المفاتيح...');
+        await this.setupKeys();
+        return true;
+    }
+    
+    // 3. ✅ التحقق من تطابق المفتاحين (جديد - لحل مشكلة OperationError)
+    try {
+        // استيراد المفتاح العام من Firebase
+        const publicKey = await this.importPublicKey(publicKeyFromFirebase);
+        
+        // الحصول على المفتاح الخاص
+        const privateKeyObj = await this.getMyPrivateKey();
+        if (!privateKeyObj) {
+            console.log('🔑 المفتاح الخاص غير صالح، إعادة إنشاء المفاتيح...');
+            await this.setupKeys();
+            return true;
+        }
+        
+        // ✅ اختبار التوافق: محاولة اشتقاق مفتاح مشترك
+        try {
+            // نشتق مفتاحاً مشتركاً مع المفتاح العام الخاص بنا (اختبار فقط)
+            const testKey = await this.deriveSharedKey(privateKeyObj, publicKey);
+            console.log('✅ المفاتيح متطابقة وصالحة');
+        } catch (e) {
+            console.log('🔑 المفاتيح غير متطابقة (خطأ في الاشتقاق)، إعادة إنشاء المفاتيح...');
+            console.log('   سبب الخطأ:', e.message);
+            await this.setupKeys();
+            return true;
+        }
+    } catch (e) {
+        console.log('🔑 فشل اختبار المفاتيح، إعادة إنشاء المفاتيح...');
+        console.log('   سبب الخطأ:', e.message);
+        await this.setupKeys();
+        return true;
+    }
+    
+    console.log('✅ المفاتيح صالحة ومتطابقة');
+    return true;
+},
     
     // ==================== القسم 2: setupKeys ====================
     async setupKeys() {
