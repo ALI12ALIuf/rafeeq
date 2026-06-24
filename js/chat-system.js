@@ -1284,8 +1284,20 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== 26.3: معالجة الصورة (معدل - دعم Base64) ====================
+    // ==================== 26.3: معالجة الصورة (معدل - دعم Base64 + استرجاع من localStorage) ====================
     else if (msg.type === 'image') {
+        // ✅ استرجاع Base64 من localStorage إذا كان مفقوداً
+        let imageData = msg.data;
+        if (!imageData || typeof imageData !== 'string' || imageData.length < 100) {
+            const fileKey = `file_${msg.id}`;
+            const stored = localStorage.getItem(fileKey);
+            if (stored) {
+                imageData = stored;
+                msg.data = stored;
+                console.log(`✅ تم استرجاع Base64 من localStorage للصورة: ${fileKey}`);
+            }
+        }
+        
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
             const clone = templateImg.content.cloneNode(true);
@@ -1294,19 +1306,24 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    // ✅ دعم Base64 مباشرة
-                    let imageUrl = msg.data;
-                    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
-                        // Base64
+                    let imageUrl = imageData;
+                    if (typeof imageData === 'string' && imageData.length > 100 && !imageData.startsWith('blob:')) {
                         const mimeType = msg._mimeType || 'image/jpeg';
-                        imageUrl = `data:${mimeType};base64,${msg.data}`;
-                    } else if (msg.data instanceof ArrayBuffer) {
-                        // دعم خلفي لـ ArrayBuffer
-                        const blob = new Blob([msg.data], { type: 'image/jpeg' });
+                        imageUrl = `data:${mimeType};base64,${imageData}`;
+                    } else if (imageData instanceof ArrayBuffer) {
+                        const blob = new Blob([imageData], { type: 'image/jpeg' });
                         imageUrl = URL.createObjectURL(blob);
                     }
                     img.src = imageUrl;
-                    img.onclick = () => this.showImagePreview(msg);
+                    
+                    // ✅ تمرير نسخة من البيانات
+                    const imageDataObj = {
+                        data: imageData,
+                        mimeType: msg._mimeType || 'image/jpeg',
+                        fileName: msg.fileName || 'صورة',
+                        id: msg.id
+                    };
+                    img.onclick = () => this.showImagePreview(imageDataObj);
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
                 }
@@ -1315,7 +1332,6 @@ displayMessage(msg) {
         } else {
             console.warn('⚠️ قالب imageMessageTemplate غير موجود');
         }
-        // ✅ حفظ الرسالة في الذاكرة
         if (ChatSystem.currentChat) {
             ChatSystem.saveMessage(ChatSystem.currentChat, msg);
         }
@@ -1323,6 +1339,18 @@ displayMessage(msg) {
     
     // ==================== 26.4: معالجة البصمة الصوتية ====================
     else if (msg.type === 'voice') {
+        // ✅ استرجاع Base64 من localStorage إذا كان مفقوداً
+        let audioData = msg.data;
+        if (!audioData || typeof audioData !== 'string' || audioData.length < 100) {
+            const fileKey = `file_${msg.id}`;
+            const stored = localStorage.getItem(fileKey);
+            if (stored) {
+                audioData = stored;
+                msg.data = stored;
+                console.log(`✅ تم استرجاع Base64 من localStorage للبصمة: ${fileKey}`);
+            }
+        }
+        
         const templateVoice = document.getElementById('voiceMessageTemplate');
         if (templateVoice) {
             const clone = templateVoice.content.cloneNode(true);
@@ -1331,13 +1359,13 @@ displayMessage(msg) {
                 voiceMsg.style.background = '#4CAF50';
                 voiceMsg.style.border = `1.5px solid ${borderColor}`;
                 const audioEl = voiceMsg.querySelector('.voice-audio-element');
-                if (audioEl && msg.data) {
-                    let audioUrl = msg.data;
-                    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
+                if (audioEl && audioData) {
+                    let audioUrl = audioData;
+                    if (typeof audioData === 'string' && audioData.length > 100 && !audioData.startsWith('blob:')) {
                         const mimeType = msg._mimeType || 'audio/webm';
-                        audioUrl = `data:${mimeType};base64,${msg.data}`;
-                    } else if (msg.data instanceof ArrayBuffer) {
-                        const blob = new Blob([msg.data], { type: 'audio/webm' });
+                        audioUrl = `data:${mimeType};base64,${audioData}`;
+                    } else if (audioData instanceof ArrayBuffer) {
+                        const blob = new Blob([audioData], { type: 'audio/webm' });
                         audioUrl = URL.createObjectURL(blob);
                     }
                     audioEl.src = audioUrl;
@@ -1348,14 +1376,25 @@ displayMessage(msg) {
         } else {
             console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
         }
-        // ✅ حفظ الرسالة في الذاكرة
         if (ChatSystem.currentChat) {
             ChatSystem.saveMessage(ChatSystem.currentChat, msg);
         }
     }
     
-    // ==================== 26.5: معالجة الفيديو (معدل - دعم Base64) ====================
+    // ==================== 26.5: معالجة الفيديو (معدل - دعم Base64 + استرجاع من localStorage) ====================
     else if (msg.type === 'video') {
+        // ✅ استرجاع Base64 من localStorage إذا كان مفقوداً
+        let videoData = msg.data;
+        if (!videoData || typeof videoData !== 'string' || videoData.length < 100) {
+            const fileKey = `file_${msg.id}`;
+            const stored = localStorage.getItem(fileKey);
+            if (stored) {
+                videoData = stored;
+                msg.data = stored;
+                console.log(`✅ تم استرجاع Base64 من localStorage للفيديو: ${fileKey}`);
+            }
+        }
+        
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
             const clone = templateVideo.content.cloneNode(true);
@@ -1364,35 +1403,53 @@ displayMessage(msg) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
-                if (source && msg.data) {
-                    let videoUrl = msg.data;
-                    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
+                if (source && videoData) {
+                    let videoUrl = videoData;
+                    if (typeof videoData === 'string' && videoData.length > 100 && !videoData.startsWith('blob:')) {
                         const mimeType = msg._mimeType || 'video/mp4';
-                        videoUrl = `data:${mimeType};base64,${msg.data}`;
-                    } else if (msg.data instanceof ArrayBuffer) {
-                        const blob = new Blob([msg.data], { type: 'video/mp4' });
+                        videoUrl = `data:${mimeType};base64,${videoData}`;
+                    } else if (videoData instanceof ArrayBuffer) {
+                        const blob = new Blob([videoData], { type: 'video/mp4' });
                         videoUrl = URL.createObjectURL(blob);
                     }
                     source.src = videoUrl;
                     video.load();
                 }
+                // ✅ تمرير نسخة من البيانات
+                const videoDataObj = {
+                    data: videoData,
+                    mimeType: msg._mimeType || 'video/mp4',
+                    fileName: msg.fileName || 'فيديو',
+                    id: msg.id
+                };
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
-                    this.showVideoPreview(msg);
+                    this.showVideoPreview(videoDataObj);
                 };
             }
             div.appendChild(clone);
         } else {
             console.warn('⚠️ قالب videoMessageTemplate غير موجود');
         }
-        // ✅ حفظ الرسالة في الذاكرة
         if (ChatSystem.currentChat) {
             ChatSystem.saveMessage(ChatSystem.currentChat, msg);
         }
     }
     
-    // ==================== 26.6: معالجة الملف (معدل - دعم Base64) ====================
+    // ==================== 26.6: معالجة الملف (معدل - دعم Base64 + استرجاع من localStorage) ====================
     else if (msg.type === 'file') {
+        // ✅ استرجاع Base64 من localStorage إذا كان مفقوداً
+        let fileData = msg.data;
+        if (!fileData || typeof fileData !== 'string' || fileData.length < 100) {
+            const fileKey = `file_${msg.id}`;
+            const stored = localStorage.getItem(fileKey);
+            if (stored) {
+                fileData = stored;
+                msg.data = stored;
+                console.log(`✅ تم استرجاع Base64 من localStorage للملف: ${fileKey}`);
+            }
+        }
+        
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
             const clone = templateFile.content.cloneNode(true);
@@ -1405,20 +1462,20 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 const downloadLink = fileCard.querySelector('.download-file-btn');
-                if (downloadLink && msg.data) {
+                if (downloadLink && fileData) {
+                    // ✅ استخدام fileData مباشرة
                     downloadLink.onclick = (e) => {
                         e.preventDefault();
-                        let fileUrl = msg.data;
-                        if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
-                            // Base64 - تحميل مباشر
+                        let fileUrl = fileData;
+                        if (typeof fileData === 'string' && fileData.length > 100 && !fileData.startsWith('blob:')) {
                             const link = document.createElement('a');
                             const mimeType = msg._mimeType || 'application/octet-stream';
-                            link.href = `data:${mimeType};base64,${msg.data}`;
+                            link.href = `data:${mimeType};base64,${fileData}`;
                             link.download = msg.fileName || 'ملف';
                             link.click();
                             return;
-                        } else if (msg.data instanceof ArrayBuffer) {
-                            const blob = new Blob([msg.data]);
+                        } else if (fileData instanceof ArrayBuffer) {
+                            const blob = new Blob([fileData]);
                             fileUrl = URL.createObjectURL(blob);
                         }
                         const link = document.createElement('a');
@@ -1432,7 +1489,6 @@ displayMessage(msg) {
         } else {
             console.warn('⚠️ قالب fileMessageTemplate غير موجود');
         }
-        // ✅ حفظ الرسالة في الذاكرة
         if (ChatSystem.currentChat) {
             ChatSystem.saveMessage(ChatSystem.currentChat, msg);
         }
@@ -1442,19 +1498,31 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== 26.7: showImagePreview (معدل - دعم Base64) ====================
-showImagePreview(msg) {
+// ==================== 26.7: showImagePreview (معدل - دعم Base64 + استرجاع من localStorage) ====================
+showImagePreview(imageData) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     const link = document.getElementById('downloadImageLink');
     if (!modal || !img) return;
     
-    let imageUrl = msg.data;
-    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
-        const mimeType = msg._mimeType || 'image/jpeg';
-        imageUrl = `data:${mimeType};base64,${msg.data}`;
-    } else if (msg.data instanceof ArrayBuffer) {
-        const blob = new Blob([msg.data], { type: 'image/jpeg' });
+    // ✅ التأكد من وجود البيانات
+    let data = imageData.data;
+    if (!data || typeof data !== 'string' || data.length < 100) {
+        const fileKey = `file_${imageData.id}`;
+        const stored = localStorage.getItem(fileKey);
+        if (stored) {
+            data = stored;
+            imageData.data = stored;
+            console.log(`✅ تم استرجاع Base64 من localStorage في المعاينة: ${fileKey}`);
+        }
+    }
+    
+    let imageUrl = data;
+    if (typeof data === 'string' && data.length > 100 && !data.startsWith('blob:')) {
+        const mimeType = imageData.mimeType || 'image/jpeg';
+        imageUrl = `data:${mimeType};base64,${data}`;
+    } else if (data instanceof ArrayBuffer) {
+        const blob = new Blob([data], { type: 'image/jpeg' });
         imageUrl = URL.createObjectURL(blob);
     }
     
@@ -1559,19 +1627,31 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== 26.9: showVideoPreview (معدل - دعم Base64) ====================
-showVideoPreview(msg) {
+// ==================== 26.9: showVideoPreview (معدل - دعم Base64 + استرجاع من localStorage) ====================
+showVideoPreview(videoData) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     const link = document.getElementById('downloadVideoLink');
     if (!modal || !video) return;
     
-    let videoUrl = msg.data;
-    if (typeof msg.data === 'string' && msg.data.length > 100 && !msg.data.startsWith('blob:')) {
-        const mimeType = msg._mimeType || 'video/mp4';
-        videoUrl = `data:${mimeType};base64,${msg.data}`;
-    } else if (msg.data instanceof ArrayBuffer) {
-        const blob = new Blob([msg.data], { type: 'video/mp4' });
+    // ✅ التأكد من وجود البيانات
+    let data = videoData.data;
+    if (!data || typeof data !== 'string' || data.length < 100) {
+        const fileKey = `file_${videoData.id}`;
+        const stored = localStorage.getItem(fileKey);
+        if (stored) {
+            data = stored;
+            videoData.data = stored;
+            console.log(`✅ تم استرجاع Base64 من localStorage في معاينة الفيديو: ${fileKey}`);
+        }
+    }
+    
+    let videoUrl = data;
+    if (typeof data === 'string' && data.length > 100 && !data.startsWith('blob:')) {
+        const mimeType = videoData.mimeType || 'video/mp4';
+        videoUrl = `data:${mimeType};base64,${data}`;
+    } else if (data instanceof ArrayBuffer) {
+        const blob = new Blob([data], { type: 'video/mp4' });
         videoUrl = URL.createObjectURL(blob);
     }
     
@@ -2025,7 +2105,7 @@ setupLocationSwipe(locationData) {
 }, 
     
     
-    // ==================== القسم 35: saveMessage (معدل - يحفظ جميع البيانات) ====================
+    // ==================== القسم 35: saveMessage (معدل - يحفظ جميع البيانات + Base64 منفصل) ====================
 saveMessage(friendId, message) { 
     // ✅ إزالة الشرط - حفظ جميع أنواع الرسائل (نصوص + ملفات)
     // if (message.type !== 'text') { return; }  // ❌ تم حذفه
@@ -2089,6 +2169,17 @@ saveMessage(friendId, message) {
     
     // ✅ تحديث this.messages بالبيانات المحفوظة
     this.messages[friendId] = messages;
+    
+    // ✅✅✅ حفظ Base64 في localStorage بشكل منفصل (لضمان عدم فقدان البيانات)
+    if (message.type !== 'text' && message.data && typeof message.data === 'string' && message.data.length > 100) {
+        const fileKey = `file_${message.id}`;
+        try {
+            localStorage.setItem(fileKey, message.data);
+            console.log(`✅ تم حفظ Base64 بشكل منفصل في localStorage: ${fileKey} (${message.data.length} حرف)`);
+        } catch (e) {
+            console.warn(`⚠️ فشل حفظ Base64 بشكل منفصل: ${fileKey}`);
+        }
+    }
 },
     
 
