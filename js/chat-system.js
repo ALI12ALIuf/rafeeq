@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
-// ==================== القسم 26: displayMessage (معدل نهائي - يدعم _fullBase64) ====================
+// ==================== القسم 26: displayMessage (معدل نهائي - استخدام dataset) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1283,7 +1283,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (Base64) ====================
+    // ==================== معالجة الصورة (Base64) - باستخدام dataset ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1307,11 +1307,14 @@ displayMessage(msg) {
                         }
                     }
                     
+                    // ✅ تخزين البيانات في dataset
+                    img.dataset.imageData = imageData;
                     img.src = imageData;
                     
-                    img.onclick = () => {
-                        if (imageData && imageData.startsWith('data:')) {
-                            this.showImagePreview(imageData);
+                    img.onclick = function() {
+                        const data = this.dataset.imageData;
+                        if (data && data.startsWith('data:')) {
+                            ChatSystem.showImagePreview(data);
                         }
                     };
                     img.oncontextmenu = (e) => e.preventDefault();
@@ -1324,7 +1327,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة البصمة الصوتية (Base64) ====================
+    // ==================== معالجة البصمة الصوتية (Base64) - باستخدام dataset ====================
     else if (msg.type === 'voice') {
         const templateVoice = document.getElementById('voiceMessageTemplate');
         if (templateVoice) {
@@ -1349,6 +1352,8 @@ displayMessage(msg) {
                         }
                     }
                     
+                    // ✅ تخزين البيانات في dataset
+                    audioEl.dataset.audioData = audioData;
                     audioEl.src = audioData;
                     this.setupVoiceControls(clone, audioEl);
                 }
@@ -1359,7 +1364,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (Base64) ====================
+    // ==================== معالجة الفيديو (Base64) - باستخدام dataset ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1384,13 +1389,16 @@ displayMessage(msg) {
                         }
                     }
                     
+                    // ✅ تخزين البيانات في dataset
+                    thumbnail.dataset.videoData = videoData;
                     source.src = videoData;
                     video.load();
                     
-                    thumbnail.onclick = (e) => {
+                    thumbnail.onclick = function(e) {
                         e.stopPropagation();
-                        if (videoData && videoData.startsWith('data:')) {
-                            this.showVideoPreview(videoData);
+                        const data = this.dataset.videoData;
+                        if (data && data.startsWith('data:')) {
+                            ChatSystem.showVideoPreview(data);
                         }
                     };
                 }
@@ -1401,7 +1409,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (Base64) ====================
+    // ==================== معالجة الملف (Base64) - باستخدام dataset ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1433,18 +1441,27 @@ displayMessage(msg) {
                     
                     const fileName = msg.fileName || 'ملف';
                     
+                    // ✅ تخزين البيانات في dataset (بدلاً من Closure)
+                    downloadBtn.dataset.fileData = fileData;
+                    downloadBtn.dataset.fileName = fileName;
+                    downloadBtn.dataset.fileId = msg.id || Date.now().toString();
+                    
                     downloadBtn.onclick = function(e) {
                         e.stopPropagation();
                         e.preventDefault();
                         
-                        if (fileData && fileData.startsWith('data:')) {
+                        // ✅ استرجاع البيانات من dataset
+                        const data = this.dataset.fileData;
+                        const name = this.dataset.fileName;
+                        
+                        if (data && data.startsWith('data:')) {
                             const link = document.createElement('a');
-                            link.href = fileData;
-                            link.download = fileName;
+                            link.href = data;
+                            link.download = name;
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
-                            console.log(`✅ تم تحميل الملف: ${fileName}`);
+                            console.log(`✅ تم تحميل الملف: ${name}`);
                         } else {
                             alert('⚠️ بيانات الملف غير متوفرة للتحميل');
                         }
