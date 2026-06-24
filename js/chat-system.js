@@ -1038,6 +1038,11 @@ openChat(friendId, friendName, friendAvatar) {
     
     this.updateAllButtons();
     
+    // ✅ إرسال المفتاح العام عند فتح المحادثة (جديد)
+    setTimeout(() => {
+        this.sendPublicKeyToFriend(friendId);
+    }, 500);
+    
     setTimeout(() => {
         if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
             console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
@@ -1052,6 +1057,50 @@ openChat(friendId, friendName, friendAvatar) {
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
     }, 1000);
+},
+
+// ==================== القسم 23.1: إرسال المفتاح العام للطرف الآخر ====================
+async sendPublicKeyToFriend(friendId) {
+    try {
+        // الحصول على المفتاح العام الخاص بي
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        if (!myPrivateKey) {
+            console.log('❌ لا يوجد مفتاح خاص لإرساله');
+            return;
+        }
+        
+        const publicKey = await SecureChatSystem.exportPublicKey(myPrivateKey);
+        
+        // إرسال المفتاح عبر Data Channel
+        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({
+                type: 'public_key_update',
+                publicKey: publicKey,
+                timestamp: Date.now()
+            }));
+            console.log('📤 تم إرسال المفتاح العام إلى:', friendId);
+        } else {
+            console.log('⚠️ Data Channel غير مفتوح، سيتم الإرسال عند فتح القناة');
+            
+            // محاولة الإرسال عند فتح القناة لاحقاً
+            const checkChannel = setInterval(() => {
+                if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                    clearInterval(checkChannel);
+                    CallSystem.dc.send(JSON.stringify({
+                        type: 'public_key_update',
+                        publicKey: publicKey,
+                        timestamp: Date.now()
+                    }));
+                    console.log('📤 تم إرسال المفتاح العام (بعد فتح القناة) إلى:', friendId);
+                }
+            }, 1000);
+            
+            // إيقاف المحاولة بعد 10 ثواني
+            setTimeout(() => clearInterval(checkChannel), 10000);
+        }
+    } catch (e) {
+        console.warn('❌ فشل إرسال المفتاح العام:', e);
+    }
 },
     
     
