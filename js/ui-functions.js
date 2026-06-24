@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (Base64 100%) ==========
+// ========== ui-functions.js - النسخة النهائية (بدون تنزيل) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -180,7 +180,7 @@ let _recordingChunks = [];
 let _mediaRecorder = null;
 let _recordingBlob = null;
 let _isRecording = false;
-let _audioData = null; // ✅ تخزين Base64 بدلاً من URL
+let _audioData = null;
 let _audioElement = null;
 
 const MAX_RECORDING_SECONDS = 300;
@@ -263,7 +263,6 @@ window.startVoiceRecording = function() {
     
     if (!recordingUI || !progressFill || !currentTimeEl) return;
     
-    // ✅ تنظيف أي بيانات سابقة (بدون Blob URL)
     _audioData = null;
     if (_audioElement) {
         _audioElement.pause();
@@ -305,10 +304,9 @@ window.startVoiceRecording = function() {
                 
                 _recordingBlob = new Blob(_recordingChunks, { type: 'audio/webm' });
                 
-                // ✅ تحويل إلى Base64
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    _audioData = e.target.result; // data:audio/webm;base64,...
+                    _audioData = e.target.result;
                     playBtn.style.display = 'flex';
                     playBtn.innerHTML = '<i class="fas fa-play"></i>';
                     sendBtn.style.display = 'flex';
@@ -648,7 +646,7 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (بدون تنزيل) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -661,24 +659,6 @@ window.closeVideoPreview = function() {
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
     if (video) { video.pause(); video.src = ''; }
-};
-
-window.downloadPreviewImage = function() {
-    const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
-};
-
-window.downloadPreviewVideo = function() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
 };
 
 // ==================== القسم 15: دوال مساعدة ====================
