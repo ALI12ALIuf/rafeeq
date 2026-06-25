@@ -6,7 +6,7 @@ const FileManager = {
     _blobs: new Map(),    // ✅ تخزين Blob بشكل منفصل
     _maxFiles: 50,
     
-    // ✅ حفظ Blob (للتحميل)
+    // ✅ حفظ Blob (للتحميل) مع dataUrl للعرض
     saveBlob(id, blob, metadata) {
         if (!blob) {
             console.error('❌ Blob غير صالح:', id);
@@ -26,10 +26,11 @@ const FileManager = {
             fileName: metadata.fileName || 'ملف',
             type: metadata.type || 'file',
             sender: metadata.sender || 'friend',
-            time: new Date().toISOString()
+            time: metadata.time || new Date().toISOString(),
+            dataUrl: metadata.dataUrl || null  // ✅ إضافة dataUrl
         });
         
-        console.log(`💾 تم حفظ Blob: ${id} (${(blob.size / 1024).toFixed(1)} KB)`);
+        console.log(`💾 تم حفظ Blob: ${id} (${(blob.size / 1024).toFixed(1)} KB) مع dataUrl`);
         return true;
     },
     
@@ -57,7 +58,11 @@ const FileManager = {
     // ✅ الحصول على dataUrl (للتوافق مع الإصدارات القديمة)
     getFileDataUrl(id) {
         const file = this._files.get(id);
-        return file ? file.dataUrl : null;
+        if (file && file.dataUrl) {
+            return file.dataUrl;
+        }
+        console.warn(`⚠️ لا توجد dataUrl للملف: ${id}`);
+        return null;
     },
     
     // ✅ التحقق من وجود ملف
@@ -93,4 +98,4 @@ const FileManager = {
 };
 
 window.FileManager = FileManager;
-console.log('✅ FileManager جاهز (يدعم Blob)');
+console.log('✅ FileManager جاهز (يدعم Blob + dataUrl)');
