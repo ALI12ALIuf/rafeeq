@@ -1256,7 +1256,7 @@ blobToBase64(blob) {
     });
 },
 
-// ==================== handleChunkMessage (معدل - يحفظ Blob) ====================
+// ==================== handleChunkMessage (معدل - يحفظ Blob مع dataUrl) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = '';
@@ -1323,16 +1323,17 @@ handleChunkMessage(msg) {
             const byteArray = new Uint8Array(byteNumbers);
             const blob = new Blob([byteArray], { type: mimeType });
             
-            // ✅ حفظ Blob في FileManager
+            // ✅ إنشاء data: URL للعرض فقط
+            const dataUrl = dataPrefix + fullBase64;
+            
+            // ✅ حفظ Blob في FileManager مع dataUrl
             FileManager.saveBlob(fileId, blob, {
                 fileName: fileName,
                 type: msg.type,
                 sender: 'friend',
-                time: new Date().toISOString()
+                time: new Date().toISOString(),
+                dataUrl: dataUrl  // ✅ أضف هذا السطر
             });
-            
-            // ✅ إنشاء data: URL للعرض فقط
-            const dataUrl = dataPrefix + fullBase64;
             
             // ✅ رسالة للعرض (مع fileId و _dataUrl للعرض)
             const displayMsg = {
@@ -1362,7 +1363,7 @@ handleChunkMessage(msg) {
             delete this.incomingChunks[msg.id];
             delete this.incomingFileInfo[msg.id];
             
-            console.log(`✅ تم استلام وعرض الملف: ${fileName} (ID: ${fileId}) - حفظ كـ Blob (${(blob.size / 1024).toFixed(1)} KB)`);
+            console.log(`✅ تم استلام وعرض الملف: ${fileName} (ID: ${fileId}) - حفظ كـ Blob مع dataUrl (${(blob.size / 1024).toFixed(1)} KB)`);
         } catch (error) {
             console.error('❌ فشل تحويل الملف إلى Blob:', error);
             ChatSystem.hideProgressBar();
@@ -1405,7 +1406,7 @@ compressImage(file) {
         reader.onerror = reject;
         reader.readAsDataURL(file);
     });
-}, 
+},
 
 // ==================== 14. إنهاء المكالمة (معدل - تستخدم واجهات ثابتة) ====================
     
