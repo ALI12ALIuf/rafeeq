@@ -447,22 +447,64 @@
     <div class="message"></div>
 </template>
 
-<!-- 5.1: قالب الصورة -->
+<!-- 5.1: قالب الصورة (مع زر تحميل ثابت) -->
 <template id="imageMessageTemplate">
-    <div class="message-image-wrapper">
+    <div class="message-image-wrapper" style="position: relative;">
         <img class="message-image-content" src="" alt="صورة" loading="lazy">
+        <!-- ✅ زر تحميل ثابت -->
+        <button class="download-file-btn" data-fileid="" style="
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        ">
+            <i class="fas fa-download"></i>
+        </button>
     </div>
 </template>
 
-<!-- 5.2: قالب الفيديو -->
+<!-- 5.2: قالب الفيديو (مع زر تحميل ثابت) -->
 <template id="videoMessageTemplate">
-    <div class="message-content video-thumbnail">
+    <div class="message-content video-thumbnail" style="position: relative;">
         <video class="video-thumbnail-content" preload="metadata" playsinline>
             <source src="" type="video/mp4">
         </video>
         <div class="video-play-overlay">
             <i class="fas fa-expand"></i>
         </div>
+        <!-- ✅ زر تحميل ثابت -->
+        <button class="download-file-btn" data-fileid="" style="
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        ">
+            <i class="fas fa-download"></i>
+        </button>
     </div>
 </template>
 
@@ -488,13 +530,31 @@
     </div>
 </template>
 
-<!-- 5.4: قالب الملف (بدون تنزيل) -->
+<!-- 5.4: قالب الملف (مع زر تحميل ثابت) -->
 <template id="fileMessageTemplate">
     <div class="message-content file-card">
         <div class="file-icon">📄</div>
         <div class="file-info">
             <div class="file-name"></div>
         </div>
+        <!-- ✅ زر تحميل ثابت -->
+        <button class="download-file-btn" data-fileid="" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            font-size: 0.9rem;
+        ">
+            <i class="fas fa-download"></i>
+        </button>
     </div>
 </template>
 
@@ -578,6 +638,7 @@
 <!-- ==================== القسم 8: ملفات الجافاسكريبت ==================== -->
 <script src="js/i18n.js?v=2"></script>
 <script src="js/theme.js?v=2"></script>
+<script src="js/file-manager.js?v=1"></script>  <!-- ✅ أضف هذا السطر -->
 <script src="js/secure-chat.js?v=3"></script>
 <script src="js/webrtc-call.js?v=3"></script>
 <script src="js/chat-system.js?v=3"></script>
