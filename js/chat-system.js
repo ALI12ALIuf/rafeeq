@@ -1144,7 +1144,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل - بدون تنزيل) ====================
+// ==================== القسم 26: displayMessage (معدل - مع تنزيل للصور والفيديو والملفات فقط) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1270,6 +1270,7 @@ displayMessage(msg) {
         }
     }
     
+    // ==================== الصور مع زر التنزيل ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1286,11 +1287,39 @@ displayMessage(msg) {
                 }
             }
             div.appendChild(clone);
+            
+            // ✅ إضافة زر التنزيل للصور
+            setTimeout(() => {
+                try {
+                    // استخراج البيانات النقية من Base64
+                    let cleanData = msg.data;
+                    if (cleanData.startsWith('data:image/')) {
+                        cleanData = cleanData.replace(/^data:image\/[^;]+;base64,/, '');
+                    }
+                    
+                    const fileData = {
+                        data: cleanData,
+                        category: 'image'
+                    };
+                    const fileName = msg.fileName || 'صورة_' + Date.now() + '.jpg';
+                    const fileType = 'image/jpeg';
+                    
+                    // استدعاء دالة إضافة زر التنزيل (يجب أن تكون معرفة مسبقاً)
+                    if (typeof addDownloadButton === 'function') {
+                        addDownloadButton(div, fileData, fileName, fileType, msg.id);
+                    } else {
+                        console.warn('⚠️ دالة addDownloadButton غير معرفة');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ فشل إضافة زر التنزيل للصورة:', error);
+                }
+            }, 50);
         } else {
             console.warn('⚠️ قالب imageMessageTemplate غير موجود');
         }
     }
     
+    // ==================== البصمة الصوتية (بدون تنزيل) ====================
     else if (msg.type === 'voice') {
         const templateVoice = document.getElementById('voiceMessageTemplate');
         if (templateVoice) {
@@ -1311,6 +1340,7 @@ displayMessage(msg) {
         }
     }
     
+    // ==================== الفيديو مع زر التنزيل ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1330,11 +1360,38 @@ displayMessage(msg) {
                 };
             }
             div.appendChild(clone);
+            
+            // ✅ إضافة زر التنزيل للفيديو
+            setTimeout(() => {
+                try {
+                    // استخراج البيانات النقية من Base64
+                    let cleanData = msg.data;
+                    if (cleanData.startsWith('data:video/')) {
+                        cleanData = cleanData.replace(/^data:video\/[^;]+;base64,/, '');
+                    }
+                    
+                    const fileData = {
+                        data: cleanData,
+                        category: 'video'
+                    };
+                    const fileName = msg.fileName || 'فيديو_' + Date.now() + '.mp4';
+                    const fileType = 'video/mp4';
+                    
+                    if (typeof addDownloadButton === 'function') {
+                        addDownloadButton(div, fileData, fileName, fileType, msg.id);
+                    } else {
+                        console.warn('⚠️ دالة addDownloadButton غير معرفة');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ فشل إضافة زر التنزيل للفيديو:', error);
+                }
+            }, 50);
         } else {
             console.warn('⚠️ قالب videoMessageTemplate غير موجود');
         }
     }
     
+    // ==================== الملفات مع زر التنزيل ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1347,9 +1404,36 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                // ❌ تم حذف زر التنزيل بالكامل
             }
             div.appendChild(clone);
+            
+            // ✅ إضافة زر التنزيل للملفات
+            setTimeout(() => {
+                try {
+                    // استخراج البيانات النقية من Base64
+                    let cleanData = msg.data;
+                    if (cleanData.startsWith('data:application/octet-stream;base64,')) {
+                        cleanData = cleanData.replace(/^data:application\/octet-stream;base64,/, '');
+                    } else if (cleanData.startsWith('data:')) {
+                        cleanData = cleanData.replace(/^data:[^;]+;base64,/, '');
+                    }
+                    
+                    const fileData = {
+                        data: cleanData,
+                        category: 'file'
+                    };
+                    const fileName = msg.fileName || 'ملف_' + Date.now();
+                    const fileType = 'application/octet-stream';
+                    
+                    if (typeof addDownloadButton === 'function') {
+                        addDownloadButton(div, fileData, fileName, fileType, msg.id);
+                    } else {
+                        console.warn('⚠️ دالة addDownloadButton غير معرفة');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ فشل إضافة زر التنزيل للملف:', error);
+                }
+            }, 50);
         } else {
             console.warn('⚠️ قالب fileMessageTemplate غير موجود');
         }
