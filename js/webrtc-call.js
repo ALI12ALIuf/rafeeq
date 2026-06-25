@@ -1190,7 +1190,7 @@ showCallUI(type) {
         }
     },
     
-    // ==================== 13. إرسال واستقبال الملفات (Base64 - مع FileManager) ====================
+   // ==================== 13. إرسال واستقبال الملفات (Base64 - مع Blob) ====================
 
 async sendFileDirect(file, type) {
     if (!this.dc || this.dc.readyState !== 'open') {
@@ -1256,7 +1256,7 @@ blobToBase64(blob) {
     });
 },
 
-// ==================== handleChunkMessage (معدل - مع FileManager) ====================
+// ==================== handleChunkMessage (معدل - يحفظ Blob) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = '';
@@ -1278,16 +1278,20 @@ handleChunkMessage(msg) {
     if (this.incomingFileInfo[msg.id].received === msg.total) {
         const fullBase64 = this.incomingChunks[msg.id];
         
-        // ✅ بناء data: URL
-        let dataUrl = '';
+        // ✅ تحديد نوع MIME
+        let mimeType = 'application/octet-stream';
+        let dataPrefix = '';
         if (msg.type === 'image') {
-            dataUrl = 'data:image/jpeg;base64,' + fullBase64;
+            mimeType = 'image/jpeg';
+            dataPrefix = 'data:image/jpeg;base64,';
         } else if (msg.type === 'video') {
-            dataUrl = 'data:video/mp4;base64,' + fullBase64;
+            mimeType = 'video/mp4';
+            dataPrefix = 'data:video/mp4;base64,';
         } else if (msg.type === 'file') {
-            dataUrl = 'data:application/octet-stream;base64,' + fullBase64;
+            mimeType = 'application/octet-stream';
+            dataPrefix = 'data:application/octet-stream;base64,';
         } else {
-            // ❌ أنواع غير مدعومة (voice, location, إلخ) - نعرضها بدون تحميل
+            // ❌ أنواع غير مدعومة (voice, location, إلخ)
             const displayMsg = {
                 id: msg.id,
                 type: msg.type,
@@ -1309,50 +1313,62 @@ handleChunkMessage(msg) {
         const fileId = msg.id;
         const fileName = msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف');
         
-        // ✅ حفظ في FileManager (الذاكرة فقط)
-        const saved = FileManager.saveFile(fileId, dataUrl, {
-            fileName: fileName,
-            type: msg.type,
-            sender: 'friend',
-            time: new Date().toISOString()
-        });
-        
-        if (!saved) {
-            console.warn('⚠️ فشل حفظ الملف في FileManager');
+        // ✅ تحويل Base64 إلى Blob مباشرة
+        try {
+            const byteCharacters = atob(fullBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: mimeType });
+            
+            // ✅ حفظ Blob في FileManager
+            FileManager.saveBlob(fileId, blob, {
+                fileName: fileName,
+                type: msg.type,
+                sender: 'friend',
+                time: new Date().toISOString()
+            });
+            
+            // ✅ إنشاء data: URL للعرض فقط
+            const dataUrl = dataPrefix + fullBase64;
+            
+            // ✅ رسالة للعرض (مع fileId و _dataUrl للعرض)
+            const displayMsg = {
+                id: fileId,
+                type: msg.type,
+                fileId: fileId,
+                fileName: fileName,
+                sender: 'friend',
+                time: new Date().toISOString(),
+                _hasFile: true,
+                _isBase64: true,
+                _dataUrl: dataUrl  // ✅ للعرض فقط
+            };
+            
+            if (ChatSystem.currentChat) {
+                // ✅ حفظ في ذاكرة المحادثة
+                if (!ChatSystem.messages[ChatSystem.currentChat]) {
+                    ChatSystem.messages[ChatSystem.currentChat] = [];
+                }
+                ChatSystem.messages[ChatSystem.currentChat].push(displayMsg);
+                
+                // ✅ عرض في المحادثة
+                ChatSystem.displayMessage(displayMsg);
+            }
+            ChatSystem.hideProgressBar();
+            
+            delete this.incomingChunks[msg.id];
+            delete this.incomingFileInfo[msg.id];
+            
+            console.log(`✅ تم استلام وعرض الملف: ${fileName} (ID: ${fileId}) - حفظ كـ Blob (${(blob.size / 1024).toFixed(1)} KB)`);
+        } catch (error) {
+            console.error('❌ فشل تحويل الملف إلى Blob:', error);
             ChatSystem.hideProgressBar();
             delete this.incomingChunks[msg.id];
             delete this.incomingFileInfo[msg.id];
-            return;
         }
-        
-        // ✅ رسالة للعرض (مع fileId فقط - بدون data مباشرة)
-        const displayMsg = {
-            id: fileId,
-            type: msg.type,
-            fileId: fileId,
-            fileName: fileName,
-            sender: 'friend',
-            time: new Date().toISOString(),
-            _hasFile: true,
-            _isBase64: true
-        };
-        
-        if (ChatSystem.currentChat) {
-            // ✅ حفظ في ذاكرة المحادثة
-            if (!ChatSystem.messages[ChatSystem.currentChat]) {
-                ChatSystem.messages[ChatSystem.currentChat] = [];
-            }
-            ChatSystem.messages[ChatSystem.currentChat].push(displayMsg);
-            
-            // ✅ عرض في المحادثة
-            ChatSystem.displayMessage(displayMsg);
-        }
-        ChatSystem.hideProgressBar();
-        
-        delete this.incomingChunks[msg.id];
-        delete this.incomingFileInfo[msg.id];
-        
-        console.log(`✅ تم استلام وعرض الملف: ${fileName} (ID: ${fileId}) - يحفظ في FileManager`);
     }
 },
 
@@ -1389,7 +1405,7 @@ compressImage(file) {
         reader.onerror = reject;
         reader.readAsDataURL(file);
     });
-},
+}, 
 
 // ==================== 14. إنهاء المكالمة (معدل - تستخدم واجهات ثابتة) ====================
     
