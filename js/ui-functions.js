@@ -42,40 +42,52 @@ const MediaDownloader = {
         return btn;
     },
 
-    // تحميل الملف مباشرة من dataUrl
+    // تحميل الملف - دائماً عبر Blob URL (يعمل مع جميع المتصفحات والأحجام)
     triggerDownload(dataUrl, fileName, mimeType) {
-        // حالة 1: dataUrl كامل (data:...)
-        if (dataUrl.startsWith('data:')) {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = fileName;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => document.body.removeChild(a), 3000);
-            return;
-        }
-
-        // حالة 2: raw base64 بدون prefix
         try {
-            const clean = dataUrl.replace(/[\r\n\t ]/g, '').replace(/-/g, '+').replace(/_/g, '/');
-            const pad = clean.length % 4;
-            const padded = pad === 2 ? clean + '==' : pad === 3 ? clean + '=' : clean;
-            const binary = atob(padded);
+            let base64;
+            let mime = mimeType || 'application/octet-stream';
+
+            if (dataUrl.startsWith('data:')) {
+                // استخراج mime والـ base64 من dataUrl
+                const parts = dataUrl.split(',');
+                const header = parts[0]; // مثل: data:image/jpeg;base64
+                base64 = parts[1];
+                const mimeMatch = header.match(/data:([^;]+)/);
+                if (mimeMatch) mime = mimeMatch[1];
+            } else {
+                base64 = dataUrl;
+            }
+
+            // تنظيف base64
+            base64 = base64.replace(/[\r\n\t ]/g, '');
+            const pad = base64.length % 4;
+            if (pad === 2) base64 += '==';
+            else if (pad === 3) base64 += '=';
+
+            // تحويل لـ Blob ثم Blob URL - يعمل مع كل الأحجام وكل المتصفحات
+            const binary = atob(base64);
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            const blob = new Blob([bytes], { type: mimeType });
-            const url = URL.createObjectURL(blob);
+            const blob = new Blob([bytes], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+
             const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
+            a.href = blobUrl;
+            a.download = fileName || 'ملف';
             a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
-            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 10000);
+
+            // تنظيف بعد 30 ثانية (وقت كافي لأي حجم)
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            }, 30000);
+
         } catch(err) {
-            console.error('❌ خطأ في فك base64:', err);
-            alert('فشل تنزيل الملف. يرجى المحاولة مرة أخرى.');
+            console.error('❌ فشل تنزيل:', fileName, err);
+            alert('فشل تنزيل: ' + (fileName || 'الملف'));
         }
     }
 };
