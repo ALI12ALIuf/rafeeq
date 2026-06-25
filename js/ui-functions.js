@@ -750,12 +750,13 @@ window.addEventListener('unhandledrejection', (event) => {
 
 
 
-// ==================== نظام التنزيل للصور والفيديو والملفات فقط ====================
+
+// ==================== نظام التنزيل للصور والفيديو والملفات فقط (بدون IndexedDB) ====================
 
 const DownloadManager = {
     activeDownloads: new Map(),
     
-    // تنزيل ملف
+    // تنزيل ملف - الطريقة المباشرة (بدون تخزين)
     downloadFile(fileData, fileName, fileType, messageId) {
         // التحقق من صحة البيانات
         if (!fileData || fileData.length < 10) {
@@ -763,61 +764,43 @@ const DownloadManager = {
             return false;
         }
         
-        // إنشاء معرف فريد للتنزيل
-        const downloadId = 'dl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
-        
-        // تخزين التنزيل
-        this.activeDownloads.set(downloadId, {
-            id: downloadId,
-            data: fileData,
-            name: fileName,
-            type: fileType,
-            status: 'downloading',
-            progress: 0
-        });
-        
-        // بدء التنزيل
-        this.performDownload(downloadId);
-        return downloadId;
-    },
-    
-    // تنفيذ التنزيل
-    performDownload(downloadId) {
-        const download = this.activeDownloads.get(downloadId);
-        if (!download) return;
-        
         try {
-            // تحويل Base64 إلى Blob
-            const byteCharacters = atob(download.data);
+            // تحويل Base64 إلى Blob مباشرة
+            const byteCharacters = atob(fileData);
             const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
+            for (let i = 0; i < byteNumbers.length; i++) {
                 byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
             const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: download.type || 'application/octet-stream' });
+            const blob = new Blob([byteArray], { type: fileType || 'application/octet-stream' });
             
-            // تحديث التقدم
-            download.progress = 50;
-            this.activeDownloads.set(downloadId, download);
-            this.showProgress(downloadId, 50);
+            // التحقق من حجم الملف
+            const fileSizeMB = blob.size / (1024 * 1024);
+            console.log(`📦 حجم الملف: ${fileSizeMB.toFixed(2)} MB`);
             
-            // تنزيل الملف
-            this.downloadBlob(blob, download.name, downloadId);
+            if (blob.size === 0) {
+                this.showNotification('الملف فارغ أو تالف', 'error');
+                return false;
+            }
+            
+            // تنزيل مباشر باستخدام الرابط
+            this.downloadBlobDirect(blob, fileName || 'ملف');
+            return true;
             
         } catch (error) {
             console.error('❌ فشل التنزيل:', error);
-            download.status = 'failed';
-            this.activeDownloads.set(downloadId, download);
-            this.showNotification('فشل تنزيل الملف', 'error');
-            this.hideProgress(downloadId);
+            this.showNotification('فشل تنزيل الملف: ' + error.message, 'error');
+            return false;
         }
     },
     
-    // تنزيل Blob
-    downloadBlob(blob, filename, downloadId) {
+    // تنزيل Blob مباشرة (بدون IndexedDB)
+    downloadBlobDirect(blob, filename) {
         try {
             // إنشاء رابط مؤقت
             const url = URL.createObjectURL(blob);
+            
+            // إنشاء عنصر الرابط
             const link = document.createElement('a');
             link.href = url;
             link.download = filename;
@@ -831,72 +814,24 @@ const DownloadManager = {
             setTimeout(() => {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
-                
-                const download = this.activeDownloads.get(downloadId);
-                if (download) {
-                    download.status = 'complete';
-                    download.progress = 100;
-                    this.activeDownloads.set(downloadId, download);
-                    this.hideProgress(downloadId);
-                    this.showNotification('تم تنزيل الملف بنجاح ✅', 'success');
-                }
+                this.showNotification('✅ تم تنزيل الملف بنجاح', 'success');
             }, 1000);
             
         } catch (error) {
+            console.error('❌ فشل التنزيل المباشر:', error);
+            
             // طريقة بديلة: فتح في نافذة جديدة
-            console.warn('⚠️ استخدام الطريقة البديلة للتنزيل');
             try {
                 const url = URL.createObjectURL(blob);
-                window.open(url, '_blank');
-                
-                const download = this.activeDownloads.get(downloadId);
-                if (download) {
-                    download.status = 'complete';
-                    download.progress = 100;
-                    this.activeDownloads.set(downloadId, download);
-                    this.hideProgress(downloadId);
-                    this.showNotification('تم فتح الملف، احفظه يدوياً', 'info');
+                const newWindow = window.open(url, '_blank');
+                if (newWindow) {
+                    this.showNotification('تم فتح الملف، اضغط Ctrl+S للحفظ', 'info');
+                } else {
+                    this.showNotification('يرجى السماح بالنوافذ المنبثقة', 'error');
                 }
             } catch (error2) {
-                // الطريقة الأخيرة
-                this.showNotification('اضغط مع الاستمرار واختر "حفظ"', 'info');
-                this.hideProgress(downloadId);
+                this.showNotification('فشل التنزيل، حاول مرة أخرى', 'error');
             }
-        }
-    },
-    
-    // عرض شريط التقدم
-    showProgress(downloadId, percent) {
-        let progressEl = document.getElementById('downloadProgress_' + downloadId);
-        if (!progressEl) {
-            progressEl = document.createElement('div');
-            progressEl.id = 'downloadProgress_' + downloadId;
-            progressEl.className = 'download-progress';
-            progressEl.innerHTML = `
-                <div class="download-info">
-                    <span class="download-name">جاري التنزيل...</span>
-                    <span class="download-percent">0%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 0%;"></div>
-                </div>
-            `;
-            document.body.appendChild(progressEl);
-        }
-        
-        const fill = progressEl.querySelector('.progress-fill');
-        const percentEl = progressEl.querySelector('.download-percent');
-        if (fill) fill.style.width = Math.min(percent, 100) + '%';
-        if (percentEl) percentEl.textContent = Math.round(percent) + '%';
-    },
-    
-    // إخفاء شريط التقدم
-    hideProgress(downloadId) {
-        const progressEl = document.getElementById('downloadProgress_' + downloadId);
-        if (progressEl) {
-            progressEl.style.opacity = '0';
-            progressEl.style.transition = 'opacity 0.3s';
-            setTimeout(() => progressEl.remove(), 300);
         }
     },
     
@@ -908,7 +843,12 @@ const DownloadManager = {
             info: '#2196F3'
         };
         
+        // إزالة الإشعارات القديمة
+        const oldNotifications = document.querySelectorAll('.download-notification');
+        oldNotifications.forEach(el => el.remove());
+        
         const notification = document.createElement('div');
+        notification.className = 'download-notification';
         notification.style.cssText = `
             position: fixed;
             bottom: 80px;
@@ -925,6 +865,7 @@ const DownloadManager = {
             max-width: 90%;
             text-align: center;
             font-size: 0.95rem;
+            border: 2px solid rgba(255,255,255,0.2);
         `;
         notification.textContent = message;
         document.body.appendChild(notification);
@@ -945,7 +886,7 @@ function addDownloadButton(messageElement, fileData, fileName, fileType, message
     const category = fileData.category || 'file';
     
     if (!allowedTypes.includes(category)) {
-        return; // لا نضيف زر للبصمة الصوتية أو الموقع
+        return;
     }
     
     // التحقق من وجود البيانات
@@ -964,6 +905,11 @@ function addDownloadButton(messageElement, fileData, fileName, fileType, message
         e.stopPropagation();
         e.preventDefault();
         
+        // تغيير مظهر الزر أثناء التنزيل
+        downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        downloadBtn.style.opacity = '0.5';
+        downloadBtn.style.pointerEvents = 'none';
+        
         // بدء التنزيل
         DownloadManager.downloadFile(
             fileData.data,
@@ -971,6 +917,13 @@ function addDownloadButton(messageElement, fileData, fileName, fileType, message
             fileType || 'application/octet-stream',
             messageId
         );
+        
+        // إعادة الزر بعد 2 ثانية
+        setTimeout(() => {
+            downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+            downloadBtn.style.opacity = '1';
+            downloadBtn.style.pointerEvents = 'auto';
+        }, 2000);
     };
     
     // أنماط الزر
@@ -996,7 +949,7 @@ function classifyFile(filename, mimeType) {
         return { category: 'video', icon: 'fa-video', color: '#FF5722' };
     }
     
-    // ملفات أخرى (مستندات، أرشيفات، الخ)
+    // ملفات أخرى
     return { category: 'file', icon: 'fa-file', color: '#607D8B' };
 }
 
