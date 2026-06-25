@@ -1126,3 +1126,32 @@ input:checked + .toggle-slider:before {
 .message .location-card .download-btn {
     display: none !important;
 }
+
+
+/* ==================== إشعارات التنزيل ==================== */
+.download-notification {
+    position: fixed !important;
+    bottom: 80px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    padding: 12px 24px !important;
+    border-radius: 12px !important;
+    z-index: 99999 !important;
+    font-family: -apple-system, sans-serif !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+    max-width: 90% !important;
+    text-align: center !important;
+    font-size: 0.95rem !important;
+    animation: slideUp 0.3s ease !important;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateX(-50%) translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
