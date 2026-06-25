@@ -1,19 +1,26 @@
 // ========== download-debugger.js ==========
-// أداة تشخيص متقدمة لمشكلة التحميل (نسخة 2.0)
+// أداة تشخيص متقدمة لمشكلة التحميل (نسخة 3.0 - تحليل كامل)
 
 (function() {
     'use strict';
     
-    // ✅ إنشاء لوحة التشخيص الرئيسية
+    // ==================== إعدادات ====================
+    const CONFIG = {
+        maxLogs: 500,
+        autoScanDelay: 3000,
+        debugMode: true
+    };
+    
+    // ==================== إنشاء لوحة التشخيص ====================
     const panel = document.createElement('div');
     panel.id = 'downloadDebuggerPanel';
     panel.style.cssText = `
         position: fixed;
         top: 10px;
         right: 10px;
-        width: 450px;
-        max-height: 80vh;
-        background: rgba(0, 0, 0, 0.97);
+        width: 500px;
+        max-height: 85vh;
+        background: rgba(0, 0, 0, 0.98);
         color: #00ff00;
         font-family: 'Courier New', monospace;
         font-size: 11px;
@@ -31,7 +38,7 @@
         touch-action: pan-y;
     `;
     
-    // ✅ شريط التحكم العلوي
+    // ==================== شريط التحكم ====================
     const controlBar = document.createElement('div');
     controlBar.style.cssText = `
         display: flex;
@@ -42,12 +49,11 @@
         flex-wrap: wrap;
         position: sticky;
         top: 0;
-        background: rgba(0,0,0,0.97);
+        background: rgba(0,0,0,0.98);
         z-index: 10;
         touch-action: pan-y;
     `;
     
-    // ✅ أزرار التحكم (أكبر حجمًا لللمس)
     const buttons = [
         { text: '📋 نسخ', color: '#ff6600', action: copyLogs },
         { text: '🗑️ مسح', color: '#333', action: clearLogs },
@@ -56,7 +62,8 @@
         { text: '⬆️ لأعلى', color: '#4CAF50', action: moveUp },
         { text: '⬇️ لأسفل', color: '#4CAF50', action: moveDown },
         { text: '🔍 فحص', color: '#FF9800', action: fullScan },
-        { text: '📊 تحليل', color: '#9C27B0', action: deepAnalyze }
+        { text: '📊 تحليل', color: '#9C27B0', action: deepAnalyze },
+        { text: '🐛 تصحيح', color: '#00BCD4', action: debugFix }
     ];
     
     buttons.forEach(btn => {
@@ -76,17 +83,13 @@
             min-height: 32px;
             min-width: 50px;
         `;
-        button.onmouseover = () => { button.style.opacity = '0.8'; };
-        button.onmouseout = () => { button.style.opacity = '1'; };
-        button.ontouchstart = () => { button.style.transform = 'scale(0.95)'; };
-        button.ontouchend = () => { button.style.transform = 'scale(1)'; };
         button.onclick = btn.action;
         controlBar.appendChild(button);
     });
     
     panel.appendChild(controlBar);
     
-    // ✅ حاوية السجلات مع دعم التمرير باللمس
+    // ==================== حاوية السجلات ====================
     const logContainer = document.createElement('div');
     logContainer.id = 'debuggerLogs';
     logContainer.style.cssText = `
@@ -101,16 +104,17 @@
     panel.appendChild(logContainer);
     document.body.appendChild(panel);
     
-    // ✅ متغيرات الحالة
+    // ==================== المتغيرات ====================
     let allLogs = [];
     let isMinimized = false;
     let isHidden = false;
     let position = 10;
     let originalHeight = '80vh';
     let downloadAttempts = [];
+    let eventListeners = [];
     
-    // ✅ دالة إضافة سجل مع تنسيق محسن
-    window.addDebugLog = function(msg, type = 'info', data = null, timestamp = true) {
+    // ==================== دوال التسجيل ====================
+    function addLog(msg, type = 'info', data = null, timestamp = true) {
         const line = document.createElement('div');
         const time = new Date().toLocaleTimeString('ar-EG', { hour12: false });
         let color = '#cccccc';
@@ -124,6 +128,7 @@
             case 'download': color = '#44aaff'; prefix = '📥'; bgColor = 'rgba(68,170,255,0.05)'; break;
             case 'data': color = '#ff66ff'; prefix = '📊'; bgColor = 'rgba(255,102,255,0.05)'; break;
             case 'critical': color = '#ff0066'; prefix = '🔥'; bgColor = 'rgba(255,0,102,0.1)'; break;
+            case 'debug': color = '#00ffaa'; prefix = '🐛'; bgColor = 'rgba(0,255,170,0.05)'; break;
             default: color = '#cccccc'; prefix = 'ℹ️';
         }
         
@@ -147,20 +152,20 @@
         logContainer.scrollTop = logContainer.scrollHeight;
         allLogs.push(logMsg);
         
-        // ✅ الحفاظ على 300 سجل فقط
-        while (logContainer.children.length > 300) {
+        while (logContainer.children.length > CONFIG.maxLogs) {
             logContainer.removeChild(logContainer.children[0]);
         }
         
-        // ✅ نسخ إلى Console
         console.log(`[DEBUG] ${msg}`, data || '');
-    };
+    }
     
-    // ✅ دوال الأزرار
+    window.addDebugLog = addLog;
+    
+    // ==================== دوال الأزرار ====================
     function copyLogs() {
         const text = allLogs.join('\n');
         navigator.clipboard.writeText(text).then(() => {
-            addDebugLog('✅ تم نسخ ' + allLogs.length + ' سطر', 'success');
+            addLog('✅ تم نسخ ' + allLogs.length + ' سطر', 'success');
         }).catch(() => {
             const textarea = document.createElement('textarea');
             textarea.value = text;
@@ -168,7 +173,7 @@
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
-            addDebugLog('✅ تم نسخ ' + allLogs.length + ' سطر (احتياطي)', 'success');
+            addLog('✅ تم نسخ ' + allLogs.length + ' سطر (احتياطي)', 'success');
         });
     }
     
@@ -176,7 +181,7 @@
         logContainer.innerHTML = '';
         allLogs = [];
         downloadAttempts = [];
-        addDebugLog('🗑️ تم مسح السجل', 'warn');
+        addLog('🗑️ تم مسح السجل', 'warn');
     }
     
     function toggleSize() {
@@ -205,80 +210,127 @@
     function moveUp() {
         position = Math.max(0, position - 20);
         panel.style.top = position + 'px';
-        addDebugLog(`⬆️ تم نقل اللوحة للأعلى (${position}px)`, 'info');
+        addLog(`⬆️ تم نقل اللوحة للأعلى (${position}px)`, 'info');
     }
     
     function moveDown() {
         position = Math.min(window.innerHeight - 100, position + 20);
         panel.style.top = position + 'px';
-        addDebugLog(`⬇️ تم نقل اللوحة للأسفل (${position}px)`, 'info');
+        addLog(`⬇️ تم نقل اللوحة للأسفل (${position}px)`, 'info');
     }
     
-    // ✅ فحص شامل
+    // ==================== الفحص الشامل ====================
     function fullScan() {
-        addDebugLog('🔍 بدء الفحص الشامل...', 'warn');
+        addLog('🔍 بدء الفحص الشامل...', 'warn');
         
         // 1. فحص FileManager
         if (typeof FileManager !== 'undefined') {
             const files = FileManager._files || new Map();
-            addDebugLog(`📊 FileManager: ${files.size} ملفات`, 'data');
+            const blobs = FileManager._blobs || new Map();
+            addLog(`📊 FileManager: ${files.size} ملفات, ${blobs.size} Blobs`, 'data');
+            
             for (const [id, file] of files) {
-                addDebugLog(`📄 ملف: ${id}`, 'data', {
+                const blob = blobs.get(id);
+                addLog(`📄 ملف: ${id}`, 'data', {
                     fileName: file.fileName,
                     type: file.type,
-                    dataLength: file.dataUrl?.length || 0,
-                    dataPrefix: file.dataUrl?.substring(0, 50) || 'فارغ',
-                    hasData: !!file.dataUrl
+                    dataUrlLength: file.dataUrl?.length || 0,
+                    dataUrlPrefix: file.dataUrl?.substring(0, 40) || 'فارغ',
+                    hasData: !!file.dataUrl,
+                    blobSize: blob ? (blob.size / 1024).toFixed(1) + ' KB' : 'غير موجود',
+                    blobType: blob ? blob.type : 'غير موجود'
                 });
             }
         } else {
-            addDebugLog('❌ FileManager غير موجود!', 'critical');
+            addLog('❌ FileManager غير موجود!', 'critical');
         }
         
         // 2. فحص أزرار التحميل
-        const downloadBtns = document.querySelectorAll('.download-file-btn, [data-fileid]');
-        addDebugLog(`📊 أزرار التحميل: ${downloadBtns.length}`, 'data');
+        const downloadBtns = document.querySelectorAll('.download-file-btn');
+        const imageElements = document.querySelectorAll('.message-image-content');
+        const videoElements = document.querySelectorAll('.video-thumbnail-content');
         
+        addLog(`📊 أزرار التحميل: ${downloadBtns.length}`, 'data');
+        addLog(`📊 عناصر الصور: ${imageElements.length}`, 'data');
+        addLog(`📊 عناصر الفيديو: ${videoElements.length}`, 'data');
+        
+        // 3. فحص كل زر تحميل
         downloadBtns.forEach((btn, index) => {
-            const fileId = btn.dataset.fileid || btn.getAttribute('data-fileid') || 'غير معروف';
-            const parent = btn.closest('.message');
-            const msgId = parent?.id?.replace('msg-', '') || 'غير معروف';
+            const fileId = btn.dataset.fileid || 'غير معروف';
+            const isVisible = btn.style.display !== 'none';
+            const hasClickListener = !!btn._listeners || !!btn.onclick;
             
-            addDebugLog(`🔘 زر #${index + 1}:`, 'data', {
+            addLog(`🔘 زر تحميل #${index + 1}:`, 'data', {
                 fileId: fileId,
-                msgId: msgId,
-                hasClickListener: !!btn._listeners || !!btn.onclick,
-                isVisible: btn.style.display !== 'none',
-                classList: btn.className,
+                isVisible: isVisible,
+                hasClickListener: hasClickListener,
+                className: btn.className,
                 dataset: btn.dataset
             });
         });
         
-        // 3. فحص ChatSystem
+        // 4. فحص كل صورة
+        imageElements.forEach((img, index) => {
+            const fileId = img.dataset.fileid || 'غير معروف';
+            const src = img.src;
+            const hasSrc = !!src && src.length > 0;
+            const isDataUrl = hasSrc && src.startsWith('data:');
+            
+            addLog(`🖼️ صورة #${index + 1}:`, 'data', {
+                fileId: fileId,
+                hasSrc: hasSrc,
+                isDataUrl: isDataUrl,
+                srcLength: src?.length || 0,
+                srcPrefix: src?.substring(0, 50) || 'فارغ'
+            });
+        });
+        
+        // 5. فحص ChatSystem
         if (typeof ChatSystem !== 'undefined') {
             const messages = ChatSystem.messages || {};
             let totalMessages = 0;
+            let imageMessages = 0;
+            let videoMessages = 0;
             let fileMessages = 0;
+            
             for (const [chatId, msgs] of Object.entries(messages)) {
                 totalMessages += msgs.length;
-                fileMessages += msgs.filter(m => m.type === 'file' || m.type === 'image' || m.type === 'video').length;
+                imageMessages += msgs.filter(m => m.type === 'image').length;
+                videoMessages += msgs.filter(m => m.type === 'video').length;
+                fileMessages += msgs.filter(m => m.type === 'file').length;
             }
-            addDebugLog(`📊 ChatSystem: ${totalMessages} رسالة (${fileMessages} وسائط)`, 'data');
+            
+            addLog(`📊 ChatSystem: ${totalMessages} رسالة`, 'data', {
+                images: imageMessages,
+                videos: videoMessages,
+                files: fileMessages,
+                currentChat: ChatSystem.currentChat || 'لا يوجد'
+            });
         }
         
-        addDebugLog('✅ الفحص الشامل اكتمل', 'success');
+        // 6. فحص localStorage
+        let chatKeys = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('chat_')) chatKeys++;
+        }
+        addLog(`📊 localStorage: ${chatKeys} محادثة محفوظة`, 'data');
+        
+        addLog('✅ الفحص الشامل اكتمل', 'success');
     }
     
-    // ✅ تحليل عميق لعملية التحميل
+    // ==================== التحليل العميق ====================
     function deepAnalyze() {
-        addDebugLog('📊 بدء التحليل العميق...', 'warn');
+        addLog('📊 بدء التحليل العميق...', 'warn');
         
-        // تحليل آخر 10 محاولات تحميل
+        // تحليل محاولات التحميل
         const recent = downloadAttempts.slice(-10);
-        addDebugLog(`📊 آخر ${recent.length} محاولة تحميل:`, 'data');
+        addLog(`📊 آخر ${recent.length} محاولة تحميل:`, 'data');
         
+        let successCount = 0;
         recent.forEach((attempt, index) => {
-            addDebugLog(`📥 محاولة #${index + 1}:`, 'data', {
+            if (attempt.success) successCount++;
+            addLog(`📥 محاولة #${index + 1}:`, 'data', {
                 fileId: attempt.fileId || 'غير معروف',
                 fileName: attempt.fileName || 'غير معروف',
                 timestamp: attempt.timestamp || 'غير معروف',
@@ -289,90 +341,211 @@
             });
         });
         
-        // تحليل حالة FileManager
+        // تحليل FileManager بالتفصيل
         if (typeof FileManager !== 'undefined') {
             const files = FileManager._files || new Map();
+            const blobs = FileManager._blobs || new Map();
             let totalSize = 0;
+            let filesWithData = 0;
+            
             for (const [id, file] of files) {
-                totalSize += file.dataUrl?.length || 0;
+                if (file.dataUrl) {
+                    totalSize += file.dataUrl.length;
+                    filesWithData++;
+                }
             }
-            addDebugLog(`📊 حجم البيانات في FileManager: ${(totalSize / 1024).toFixed(1)} KB`, 'data');
+            
+            addLog(`📊 إحصائيات FileManager:`, 'data', {
+                totalFiles: files.size,
+                filesWithData: filesWithData,
+                filesWithoutData: files.size - filesWithData,
+                totalDataSize: (totalSize / 1024).toFixed(1) + ' KB',
+                totalBlobs: blobs.size,
+                totalBlobSize: (FileManager.getTotalSize ? FileManager.getTotalSize() / 1024 : 0).toFixed(1) + ' KB'
+            });
         }
         
-        addDebugLog('✅ التحليل العميق اكتمل', 'success');
+        addLog('✅ التحليل العميق اكتمل', 'success');
     }
     
-    // ✅ اعتراض وتحليل نقرات التحميل
-    function interceptDownloadClicks() {
-        addDebugLog('🔧 بدء اعتراض أزرار التحميل...', 'warn');
+    // ==================== تصحيح الأخطاء ====================
+    function debugFix() {
+        addLog('🐛 بدء التصحيح التلقائي...', 'warn');
         
-        document.addEventListener('click', function(e) {
+        // 1. التحقق من أزرار التحميل
+        const downloadBtns = document.querySelectorAll('.download-file-btn');
+        let fixedCount = 0;
+        
+        downloadBtns.forEach(btn => {
+            const fileId = btn.dataset.fileid;
+            if (!fileId) return;
+            
+            // التحقق من وجود حدث النقر
+            if (!btn.onclick && !btn._listeners) {
+                // إضافة مستمع جديد
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    const id = this.dataset.fileid;
+                    if (!id) {
+                        alert('⚠️ معرف الملف غير موجود');
+                        return;
+                    }
+                    
+                    const blob = FileManager.getBlob(id);
+                    const fileData = FileManager.getFile(id);
+                    
+                    if (blob) {
+                        try {
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = fileData?.fileName || 'ملف';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            setTimeout(() => URL.revokeObjectURL(url), 100);
+                            addLog(`✅ تم تحميل الملف: ${fileData?.fileName || 'ملف'}`, 'success');
+                        } catch (error) {
+                            addLog(`❌ فشل تحميل الملف: ${error.message}`, 'error');
+                        }
+                    } else {
+                        addLog(`❌ Blob غير موجود: ${id}`, 'error');
+                    }
+                });
+                fixedCount++;
+            }
+        });
+        
+        addLog(`✅ تم إصلاح ${fixedCount} زر تحميل`, 'success');
+        
+        // 2. التحقق من الصور
+        const images = document.querySelectorAll('.message-image-content');
+        let fixedImages = 0;
+        
+        images.forEach(img => {
+            const fileId = img.dataset.fileid;
+            if (!fileId) return;
+            
+            if (!img.src || img.src === '' || img.src.startsWith('blob:')) {
+                const fileData = FileManager.getFile(fileId);
+                if (fileData && fileData.dataUrl) {
+                    img.src = fileData.dataUrl;
+                    fixedImages++;
+                    addLog(`✅ تم إصلاح الصورة: ${fileId}`, 'success');
+                }
+            }
+        });
+        
+        addLog(`✅ تم إصلاح ${fixedImages} صورة`, 'success');
+        
+        addLog('🐛 انتهى التصحيح التلقائي', 'success');
+    }
+    
+    // ==================== اعتراض النقرات ====================
+    function interceptDownloadClicks() {
+        addLog('🔧 بدء اعتراض أزرار التحميل...', 'warn');
+        
+        const clickHandler = function(e) {
             const target = e.target.closest('.download-file-btn, [data-fileid]');
             if (!target) return;
             
             const fileId = target.dataset.fileid || target.getAttribute('data-fileid');
             const fileName = target.dataset.fileName || target.getAttribute('data-file-name') || 'غير معروف';
             
-            addDebugLog('🖱️ تم النقر على زر تحميل', 'download', {
+            // تحليل الزر
+            const hasClickListener = !!target.onclick || !!target._listeners;
+            const hasDataset = !!target.dataset.fileid;
+            
+            addLog('🖱️ تم النقر على زر تحميل', 'download', {
                 fileId: fileId || 'غير معروف',
                 fileName: fileName,
-                hasData: !!target.dataset.fileData,
-                dataLength: target.dataset.fileData?.length || 0,
-                dataPrefix: target.dataset.fileData?.substring(0, 30) || 'فارغ',
-                hasFullBase64: !!target.dataset.fullBase64,
+                hasClickListener: hasClickListener,
+                hasDataset: hasDataset,
                 classList: target.className,
                 id: target.id || 'بدون id',
                 dataset: target.dataset
             });
             
-            // ✅ التحقق من FileManager
+            // التحقق من FileManager
             if (fileId && typeof FileManager !== 'undefined') {
                 const fileData = FileManager.getFile(fileId);
+                const blob = FileManager.getBlob(fileId);
+                
                 if (fileData) {
-                    addDebugLog('✅ تم العثور على الملف في FileManager', 'success', {
+                    addLog('✅ الملف موجود في FileManager', 'success', {
                         fileName: fileData.fileName,
                         type: fileData.type,
-                        dataLength: fileData.dataUrl?.length || 0,
-                        dataPrefix: fileData.dataUrl?.substring(0, 30) || 'فارغ'
+                        dataUrlLength: fileData.dataUrl?.length || 0,
+                        dataUrlPrefix: fileData.dataUrl?.substring(0, 30) || 'فارغ',
+                        hasData: !!fileData.dataUrl,
+                        hasBlob: !!blob,
+                        blobSize: blob ? (blob.size / 1024).toFixed(1) + ' KB' : 'غير موجود'
                     });
                 } else {
-                    addDebugLog('❌ الملف غير موجود في FileManager', 'critical', {
+                    addLog('❌ الملف غير موجود في FileManager', 'critical', {
                         fileId: fileId
                     });
                 }
             }
             
-            // ✅ تتبع محاولات التحميل
-            downloadAttempts.push({
+            // تتبع المحاولة
+            const attempt = {
                 fileId: fileId || 'غير معروف',
                 fileName: fileName,
                 timestamp: new Date().toISOString(),
                 success: false,
-                method: 'click'
-            });
+                method: 'click',
+                hasClickListener: hasClickListener,
+                hasDataset: hasDataset
+            };
+            downloadAttempts.push(attempt);
             
-        }, true);
+            // تحديث المحاولة بعد 2 ثانية (للمتابعة)
+            setTimeout(() => {
+                const lastAttempt = downloadAttempts[downloadAttempts.length - 1];
+                if (lastAttempt) {
+                    lastAttempt.success = true;
+                    addLog('✅ اكتملت محاولة التحميل', 'success', {
+                        fileId: lastAttempt.fileId,
+                        success: true
+                    });
+                }
+            }, 2000);
+        };
+        
+        document.addEventListener('click', clickHandler, true);
+        eventListeners.push({ type: 'click', handler: clickHandler });
     }
     
-    // ✅ تشغيل الاعتراض
-    interceptDownloadClicks();
+    // ==================== بدء التشغيل ====================
+    function init() {
+        interceptDownloadClicks();
+        
+        setTimeout(() => {
+            addLog('🔍 تشغيل الفحص التلقائي...', 'warn');
+            fullScan();
+        }, CONFIG.autoScanDelay);
+        
+        addLog('🛠️ أداة تشخيص التحميل 3.0 جاهزة!', 'success');
+        addLog('💡 اضغط على أي زر تحميل لتحليل المشكلة', 'info');
+        addLog('🔍 زر "فحص" لمسح شامل للصفحة', 'info');
+        addLog('📊 زر "تحليل" لعرض تفاصيل عميقة', 'info');
+        addLog('🐛 زر "تصحيح" لإصلاح الأخطاء تلقائياً', 'info');
+    }
     
-    // ✅ تنفيذ الفحص التلقائي بعد 3 ثواني
-    setTimeout(() => {
-        addDebugLog('🔍 تشغيل الفحص التلقائي...', 'warn');
-        fullScan();
-    }, 3000);
-    
-    // ✅ إضافة دوال للاستخدام اليدوي
+    // ==================== دوال عامة ====================
     window.scanDownloads = fullScan;
     window.analyzeDownloads = deepAnalyze;
     window.clearDebugLogs = clearLogs;
+    window.fixDownloads = debugFix;
     
-    // ✅ رسالة الترحيب
-    addDebugLog('🛠️ أداة تشخيص التحميل 2.0 جاهزة!', 'success');
-    addDebugLog('💡 اضغط على أي زر تحميل لتحليل المشكلة', 'info');
-    addDebugLog('🔍 زر "فحص" لمسح شامل للصفحة', 'info');
-    addDebugLog('📊 زر "تحليل" لعرض تفاصيل عميقة', 'info');
-    addDebugLog('📋 زر "نسخ" لنسخ جميع السجلات', 'info');
+    // ==================== بدء التشغيل ====================
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
     
 })();
