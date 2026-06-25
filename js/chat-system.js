@@ -1144,7 +1144,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
-// ==================== القسم 26: displayMessage (معدل - تنزيل مباشر بدون تخزين) ====================
+// ==================== القسم 26: displayMessage (معدل - مع دعم الباكجات) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1270,7 +1270,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== الصور مع زر التنزيل المباشر ====================
+    // ==================== الصور مع زر التنزيل (دعم الباكج) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1288,17 +1288,36 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
             
-            // ✅ إضافة زر التنزيل المباشر للصور
+            // ✅ إضافة زر التنزيل مع دعم الباكج
             setTimeout(() => {
                 try {
+                    // إذا كان هناك باكج، استخدم بياناته
+                    if (msg._package && msg._package.data) {
+                        const fileData = {
+                            data: msg._package.data,
+                            category: 'image',
+                            fileId: msg._package.fileId,
+                            package: msg._package
+                        };
+                        if (typeof addDownloadButton === 'function') {
+                            addDownloadButton(div, fileData, msg.fileName || 'صورة.jpg', 'image/jpeg');
+                        }
+                        console.log('✅ تم إضافة زر التنزيل من الباكج للصورة');
+                        return;
+                    }
+                    
+                    // الطريقة القديمة (استخراج من data URL)
                     let cleanData = msg.data;
                     if (cleanData.startsWith('data:image/')) {
                         cleanData = cleanData.replace(/^data:image\/[^;]+;base64,/, '');
                     }
                     
-                    // التحقق من صحة البيانات
                     if (cleanData && cleanData.length > 10) {
-                        const fileData = { data: cleanData, category: 'image' };
+                        const fileData = { 
+                            data: cleanData, 
+                            category: 'image',
+                            fileId: msg.id
+                        };
                         const fileName = msg.fileName || 'صورة_' + Date.now() + '.jpg';
                         const fileType = 'image/jpeg';
                         
@@ -1338,7 +1357,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== الفيديو مع زر التنزيل المباشر ====================
+    // ==================== الفيديو مع زر التنزيل (دعم الباكج) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1359,16 +1378,36 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
             
-            // ✅ إضافة زر التنزيل المباشر للفيديو
+            // ✅ إضافة زر التنزيل مع دعم الباكج
             setTimeout(() => {
                 try {
+                    // إذا كان هناك باكج، استخدم بياناته
+                    if (msg._package && msg._package.data) {
+                        const fileData = {
+                            data: msg._package.data,
+                            category: 'video',
+                            fileId: msg._package.fileId,
+                            package: msg._package
+                        };
+                        if (typeof addDownloadButton === 'function') {
+                            addDownloadButton(div, fileData, msg.fileName || 'فيديو.mp4', 'video/mp4');
+                        }
+                        console.log('✅ تم إضافة زر التنزيل من الباكج للفيديو');
+                        return;
+                    }
+                    
+                    // الطريقة القديمة (استخراج من data URL)
                     let cleanData = msg.data;
                     if (cleanData.startsWith('data:video/')) {
                         cleanData = cleanData.replace(/^data:video\/[^;]+;base64,/, '');
                     }
                     
                     if (cleanData && cleanData.length > 10) {
-                        const fileData = { data: cleanData, category: 'video' };
+                        const fileData = { 
+                            data: cleanData, 
+                            category: 'video',
+                            fileId: msg.id
+                        };
                         const fileName = msg.fileName || 'فيديو_' + Date.now() + '.mp4';
                         const fileType = 'video/mp4';
                         
@@ -1387,7 +1426,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== الملفات مع زر التنزيل المباشر ====================
+    // ==================== الملفات مع زر التنزيل (دعم الباكج) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1403,9 +1442,25 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
             
-            // ✅ إضافة زر التنزيل المباشر للملفات
+            // ✅ إضافة زر التنزيل مع دعم الباكج
             setTimeout(() => {
                 try {
+                    // إذا كان هناك باكج، استخدم بياناته
+                    if (msg._package && msg._package.data) {
+                        const fileData = {
+                            data: msg._package.data,
+                            category: 'file',
+                            fileId: msg._package.fileId,
+                            package: msg._package
+                        };
+                        if (typeof addDownloadButton === 'function') {
+                            addDownloadButton(div, fileData, msg.fileName || 'ملف', 'application/octet-stream');
+                        }
+                        console.log('✅ تم إضافة زر التنزيل من الباكج للملف');
+                        return;
+                    }
+                    
+                    // الطريقة القديمة (استخراج من data URL)
                     let cleanData = msg.data;
                     if (cleanData.startsWith('data:application/octet-stream;base64,')) {
                         cleanData = cleanData.replace(/^data:application\/octet-stream;base64,/, '');
@@ -1414,7 +1469,11 @@ displayMessage(msg) {
                     }
                     
                     if (cleanData && cleanData.length > 10) {
-                        const fileData = { data: cleanData, category: 'file' };
+                        const fileData = { 
+                            data: cleanData, 
+                            category: 'file',
+                            fileId: msg.id
+                        };
                         const fileName = msg.fileName || 'ملف_' + Date.now();
                         const fileType = 'application/octet-stream';
                         
@@ -1651,125 +1710,256 @@ async sendMessage(text) {
             return false;
         }
     },
+
+    // ==================== القسم 30: sendImage (معدل - مع نظام الباكجات) ====================
+async sendImage(file) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
     
-    // ==================== القسم 30: sendImage ====================
-    async sendImage(file) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    try {
+        // ضغط الصورة
+        const compressed = await SecureChatSystem.compressImage(file);
+        const base64Data = await this.blobToBase64(compressed);
+        
+        // إنشاء الباكج
+        const pkg = FilePackage.createPackage(
+            base64Data,
+            file.name || 'صورة.jpg',
+            'image/jpeg',
+            'image',
+            window.auth.currentUser.uid,
+            this.currentChat
+        );
+        
+        const validation = FilePackage.validatePackage(pkg);
+        if (!validation.valid) {
+            alert('❌ فشل إنشاء الباكج: ' + validation.error);
             return;
         }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            const success = await this.sendFileWithRetry(file, 'image');
-            if (success) {
+            const serialized = FilePackage.serialize(pkg);
+            if (serialized) {
+                CallSystem.dc.send(JSON.stringify({
+                    type: 'file_package',
+                    package: serialized
+                }));
+                
                 const msgId = Date.now().toString();
-                const base64Data = await this.fileToBase64(file);
-                const dataUrl = `data:image/jpeg;base64,${base64Data}`;
-                this.displayMessage({ id: msgId, type: 'image', data: dataUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _isBase64: true });
-            } else alert('فشل إرسال الصورة');
+                this.displayMessage({
+                    id: msgId,
+                    type: 'image',
+                    data: 'data:image/jpeg;base64,' + base64Data,
+                    fileName: file.name,
+                    sender: 'me',
+                    time: new Date().toISOString(),
+                    status: 'sent',
+                    _isBase64: true,
+                    _package: pkg
+                });
+                
+                console.log('✅ تم إرسال باكج الصورة');
+                return;
+            }
         }
-    },
+        alert('❌ فشل إرسال الصورة');
+    } catch (error) {
+        console.error('❌ فشل إرسال الصورة:', error);
+        alert('فشل إرسال الصورة');
+    }
+},
 
-// ==================== القسم 31: sendVideoFile ====================
-    async sendVideoFile(file) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+// ==================== القسم 31: sendVideoFile (معدل - مع نظام الباكجات) ====================
+async sendVideoFile(file) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    try {
+        await SecureChatSystem.validateVideo(file);
+    } catch (error) {
+        alert(error.message);
+        return;
+    }
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    try {
+        const base64Data = await this.fileToBase64(file);
+        
+        // إنشاء الباكج
+        const pkg = FilePackage.createPackage(
+            base64Data,
+            file.name || 'فيديو.mp4',
+            'video/mp4',
+            'video',
+            window.auth.currentUser.uid,
+            this.currentChat
+        );
+        
+        const validation = FilePackage.validatePackage(pkg);
+        if (!validation.valid) {
+            alert('❌ فشل إنشاء الباكج: ' + validation.error);
             return;
         }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        try {
-            await SecureChatSystem.validateVideo(file);
-        } catch (error) {
-            alert(error.message);
-            return;
-        }
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
-            const success = await this.sendFileWithRetry(file, 'video');
-            if (success) {
-                try {
-                    const msgId = Date.now().toString();
-                    const base64Data = await this.fileToBase64(file);
-                    const dataUrl = `data:video/mp4;base64,${base64Data}`;
-                    this.displayMessage({ id: msgId, type: 'video', data: dataUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _isBase64: true });
-                } catch (error) { alert('فشل معالجة الفيديو'); }
-            } else alert('فشل إرسال الفيديو');
-        }
-    },
-
-// ==================== القسم 32: sendFile ====================
-    async sendFile(file) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return;
-        }
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            const success = await this.sendFileWithRetry(file, 'file');
-            if (success) {
+            const serialized = FilePackage.serialize(pkg);
+            if (serialized) {
+                CallSystem.dc.send(JSON.stringify({
+                    type: 'file_package',
+                    package: serialized
+                }));
+                
                 const msgId = Date.now().toString();
-                const base64Data = await this.fileToBase64(file);
-                const dataUrl = `data:application/octet-stream;base64,${base64Data}`;
-                this.displayMessage({ id: msgId, type: 'file', data: dataUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _isBase64: true });
-            } else alert('فشل إرسال الملف');
+                this.displayMessage({
+                    id: msgId,
+                    type: 'video',
+                    data: 'data:video/mp4;base64,' + base64Data,
+                    fileName: file.name,
+                    sender: 'me',
+                    time: new Date().toISOString(),
+                    status: 'sent',
+                    _isBase64: true,
+                    _package: pkg
+                });
+                
+                console.log(`✅ تم إرسال باكج الفيديو: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
+                return;
+            }
         }
-    },
+        alert('❌ فشل إرسال الفيديو');
+    } catch (error) {
+        console.error('❌ فشل إرسال الفيديو:', error);
+        alert(error.message || 'فشل إرسال الفيديو');
+    }
+},
 
-// ==================== القسم 33: sendVoiceNote ====================
-    async sendVoiceNote(audioBlob) { 
-        if (!this.currentChat) return;
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+// ==================== القسم 32: sendFile (معدل - مع نظام الباكجات) ====================
+async sendFile(file) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    try {
+        const base64Data = await this.fileToBase64(file);
+        
+        // تصنيف الملف
+        const classification = classifyFile ? classifyFile(file.name, file.type) : { category: 'file' };
+        
+        // إنشاء الباكج
+        const pkg = FilePackage.createPackage(
+            base64Data,
+            file.name || 'ملف',
+            file.type || 'application/octet-stream',
+            classification.category || 'file',
+            window.auth.currentUser.uid,
+            this.currentChat
+        );
+        
+        const validation = FilePackage.validatePackage(pkg);
+        if (!validation.valid) {
+            alert('❌ فشل إنشاء الباكج: ' + validation.error);
             return;
         }
         
         if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            const success = await this.sendFileWithRetry(audioBlob, 'voice');
-            if (success) {
+            const serialized = FilePackage.serialize(pkg);
+            if (serialized) {
+                CallSystem.dc.send(JSON.stringify({
+                    type: 'file_package',
+                    package: serialized
+                }));
+                
                 const msgId = Date.now().toString();
-                const base64Data = await this.blobToBase64(audioBlob);
-                const dataUrl = `data:audio/webm;base64,${base64Data}`;
-                this.displayMessage({ id: msgId, type: 'voice', data: dataUrl, sender: 'me', time: new Date().toISOString(), status: 'sent', _isBase64: true });
-            } else alert('فشل إرسال البصمة الصوتية');
+                this.displayMessage({
+                    id: msgId,
+                    type: 'file',
+                    data: 'data:application/octet-stream;base64,' + base64Data,
+                    fileName: file.name,
+                    sender: 'me',
+                    time: new Date().toISOString(),
+                    status: 'sent',
+                    _isBase64: true,
+                    _package: pkg
+                });
+                
+                console.log(`✅ تم إرسال باكج الملف: ${file.name} | ${(file.size/1024).toFixed(1)}KB`);
+                return;
+            }
         }
-    },
+        alert('❌ فشل إرسال الملف');
+    } catch (error) {
+        console.error('❌ فشل إرسال الملف:', error);
+        alert('فشل إرسال الملف');
+    }
+},
 
+// ==================== القسم 33: sendVoiceNote (بدون تغيير - بصمة صوتية بدون تنزيل) ====================
+async sendVoiceNote(audioBlob) { 
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
+        const success = await this.sendFileWithRetry(audioBlob, 'voice');
+        if (success) {
+            const msgId = Date.now().toString();
+            const base64Data = await this.blobToBase64(audioBlob);
+            const dataUrl = `data:audio/webm;base64,${base64Data}`;
+            this.displayMessage({ 
+                id: msgId, 
+                type: 'voice', 
+                data: dataUrl, 
+                sender: 'me', 
+                time: new Date().toISOString(), 
+                status: 'sent', 
+                _isBase64: true 
+            });
+        } else alert('فشل إرسال البصمة الصوتية');
+    }
+},
+
+// ==================== دوال مساعدة (بدون تغيير) ====================
 fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1793,7 +1983,6 @@ blobToBase64(blob) {
         reader.readAsDataURL(blob);
     });
 },
-
     
     // ==================== القسم 34: shareLocationDirect ====================
     
