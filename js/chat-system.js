@@ -1144,7 +1144,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
-// ==================== القسم 26: displayMessage (معدل - مع تنزيل للصور والفيديو والملفات فقط) ====================
+// ==================== القسم 26: displayMessage (معدل - تنزيل مباشر بدون تخزين) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1270,7 +1270,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== الصور مع زر التنزيل ====================
+    // ==================== الصور مع زر التنزيل المباشر ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1288,32 +1288,30 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
             
-            // ✅ إضافة زر التنزيل للصور
+            // ✅ إضافة زر التنزيل المباشر للصور
             setTimeout(() => {
                 try {
-                    // استخراج البيانات النقية من Base64
                     let cleanData = msg.data;
                     if (cleanData.startsWith('data:image/')) {
                         cleanData = cleanData.replace(/^data:image\/[^;]+;base64,/, '');
                     }
                     
-                    const fileData = {
-                        data: cleanData,
-                        category: 'image'
-                    };
-                    const fileName = msg.fileName || 'صورة_' + Date.now() + '.jpg';
-                    const fileType = 'image/jpeg';
-                    
-                    // استدعاء دالة إضافة زر التنزيل (يجب أن تكون معرفة مسبقاً)
-                    if (typeof addDownloadButton === 'function') {
-                        addDownloadButton(div, fileData, fileName, fileType, msg.id);
+                    // التحقق من صحة البيانات
+                    if (cleanData && cleanData.length > 10) {
+                        const fileData = { data: cleanData, category: 'image' };
+                        const fileName = msg.fileName || 'صورة_' + Date.now() + '.jpg';
+                        const fileType = 'image/jpeg';
+                        
+                        if (typeof addDownloadButton === 'function') {
+                            addDownloadButton(div, fileData, fileName, fileType);
+                        }
                     } else {
-                        console.warn('⚠️ دالة addDownloadButton غير معرفة');
+                        console.warn('⚠️ بيانات الصورة غير مكتملة للتنزيل');
                     }
                 } catch (error) {
                     console.warn('⚠️ فشل إضافة زر التنزيل للصورة:', error);
                 }
-            }, 50);
+            }, 100);
         } else {
             console.warn('⚠️ قالب imageMessageTemplate غير موجود');
         }
@@ -1340,7 +1338,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== الفيديو مع زر التنزيل ====================
+    // ==================== الفيديو مع زر التنزيل المباشر ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1361,37 +1359,35 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
             
-            // ✅ إضافة زر التنزيل للفيديو
+            // ✅ إضافة زر التنزيل المباشر للفيديو
             setTimeout(() => {
                 try {
-                    // استخراج البيانات النقية من Base64
                     let cleanData = msg.data;
                     if (cleanData.startsWith('data:video/')) {
                         cleanData = cleanData.replace(/^data:video\/[^;]+;base64,/, '');
                     }
                     
-                    const fileData = {
-                        data: cleanData,
-                        category: 'video'
-                    };
-                    const fileName = msg.fileName || 'فيديو_' + Date.now() + '.mp4';
-                    const fileType = 'video/mp4';
-                    
-                    if (typeof addDownloadButton === 'function') {
-                        addDownloadButton(div, fileData, fileName, fileType, msg.id);
+                    if (cleanData && cleanData.length > 10) {
+                        const fileData = { data: cleanData, category: 'video' };
+                        const fileName = msg.fileName || 'فيديو_' + Date.now() + '.mp4';
+                        const fileType = 'video/mp4';
+                        
+                        if (typeof addDownloadButton === 'function') {
+                            addDownloadButton(div, fileData, fileName, fileType);
+                        }
                     } else {
-                        console.warn('⚠️ دالة addDownloadButton غير معرفة');
+                        console.warn('⚠️ بيانات الفيديو غير مكتملة للتنزيل');
                     }
                 } catch (error) {
                     console.warn('⚠️ فشل إضافة زر التنزيل للفيديو:', error);
                 }
-            }, 50);
+            }, 100);
         } else {
             console.warn('⚠️ قالب videoMessageTemplate غير موجود');
         }
     }
     
-    // ==================== الملفات مع زر التنزيل ====================
+    // ==================== الملفات مع زر التنزيل المباشر ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1407,10 +1403,9 @@ displayMessage(msg) {
             }
             div.appendChild(clone);
             
-            // ✅ إضافة زر التنزيل للملفات
+            // ✅ إضافة زر التنزيل المباشر للملفات
             setTimeout(() => {
                 try {
-                    // استخراج البيانات النقية من Base64
                     let cleanData = msg.data;
                     if (cleanData.startsWith('data:application/octet-stream;base64,')) {
                         cleanData = cleanData.replace(/^data:application\/octet-stream;base64,/, '');
@@ -1418,22 +1413,21 @@ displayMessage(msg) {
                         cleanData = cleanData.replace(/^data:[^;]+;base64,/, '');
                     }
                     
-                    const fileData = {
-                        data: cleanData,
-                        category: 'file'
-                    };
-                    const fileName = msg.fileName || 'ملف_' + Date.now();
-                    const fileType = 'application/octet-stream';
-                    
-                    if (typeof addDownloadButton === 'function') {
-                        addDownloadButton(div, fileData, fileName, fileType, msg.id);
+                    if (cleanData && cleanData.length > 10) {
+                        const fileData = { data: cleanData, category: 'file' };
+                        const fileName = msg.fileName || 'ملف_' + Date.now();
+                        const fileType = 'application/octet-stream';
+                        
+                        if (typeof addDownloadButton === 'function') {
+                            addDownloadButton(div, fileData, fileName, fileType);
+                        }
                     } else {
-                        console.warn('⚠️ دالة addDownloadButton غير معرفة');
+                        console.warn('⚠️ بيانات الملف غير مكتملة للتنزيل');
                     }
                 } catch (error) {
                     console.warn('⚠️ فشل إضافة زر التنزيل للملف:', error);
                 }
-            }, 50);
+            }, 100);
         } else {
             console.warn('⚠️ قالب fileMessageTemplate غير موجود');
         }
@@ -1442,6 +1436,7 @@ displayMessage(msg) {
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
+
 
 // ==================== القسم 26.1: showImagePreview ====================
 showImagePreview(imageSrc) {
