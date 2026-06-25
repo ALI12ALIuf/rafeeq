@@ -750,20 +750,93 @@ window.addEventListener('unhandledrejection', (event) => {
 
 
 
+// ==================== نظام الباكجات للملفات ====================
 
-// ==================== نظام التنزيل المباشر (بدون تخزين) ====================
+const FilePackage = {
+    // إنشاء باكج جديد
+    createPackage(fileData, fileName, fileType, category, senderId, receiverId) {
+        return {
+            id: 'pkg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8),
+            fileId: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            fileName: fileName || 'ملف',
+            fileType: fileType || 'application/octet-stream',
+            fileSize: fileData ? Math.round(fileData.length * 0.75) : 0,
+            category: category || 'file',
+            timestamp: Date.now(),
+            sender: senderId || 'unknown',
+            receiver: receiverId || 'unknown',
+            data: fileData || '',
+            version: '2.0',
+            checksum: this.generateChecksum(fileData || '')
+        };
+    },
+    
+    generateChecksum(data) {
+        let hash = 0;
+        if (data.length === 0) return '0';
+        for (let i = 0; i < data.length; i++) {
+            const char = data.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return Math.abs(hash).toString(36);
+    },
+    
+    validatePackage(pkg) {
+        if (!pkg) return { valid: false, error: 'الباكج فارغ' };
+        if (!pkg.data || pkg.data.length < 10) {
+            return { valid: false, error: 'بيانات الملف غير مكتملة' };
+        }
+        if (!pkg.fileName) {
+            return { valid: false, error: 'اسم الملف غير موجود' };
+        }
+        return { valid: true };
+    },
+    
+    serialize(pkg) {
+        try {
+            return btoa(unescape(encodeURIComponent(JSON.stringify(pkg))));
+        } catch (error) {
+            console.error('❌ فشل تسلسل الباكج:', error);
+            return null;
+        }
+    },
+    
+    deserialize(serialized) {
+        try {
+            return JSON.parse(decodeURIComponent(escape(atob(serialized))));
+        } catch (error) {
+            console.error('❌ فشل استعادة الباكج:', error);
+            return null;
+        }
+    },
+    
+    getPackageSize(pkg) {
+        const serialized = this.serialize(pkg);
+        return serialized ? Math.round(serialized.length * 0.75) : 0;
+    },
+    
+    getInfo(pkg) {
+        return {
+            id: pkg.id,
+            fileName: pkg.fileName,
+            category: pkg.category,
+            size: this.getPackageSize(pkg),
+            timestamp: new Date(pkg.timestamp).toLocaleString()
+        };
+    }
+};
+
+// ==================== نظام التنزيل المباشر ====================
 
 const DownloadManager = {
-    // تنزيل ملف مباشر من Base64
     downloadFile(fileData, fileName, fileType) {
-        // التحقق من البيانات
         if (!fileData || fileData.length < 10) {
             this.showNotification('❌ بيانات الملف غير مكتملة', 'error');
             return false;
         }
         
         try {
-            // تحويل Base64 إلى Blob مباشرة
             const byteCharacters = atob(fileData);
             const byteNumbers = new Uint8Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
@@ -776,7 +849,6 @@ const DownloadManager = {
                 return false;
             }
             
-            // تنزيل مباشر
             this.downloadBlob(blob, fileName || 'ملف');
             return true;
             
@@ -787,7 +859,6 @@ const DownloadManager = {
         }
     },
     
-    // تنزيل Blob
     downloadBlob(blob, filename) {
         try {
             const url = URL.createObjectURL(blob);
@@ -806,14 +877,12 @@ const DownloadManager = {
             }, 1000);
             
         } catch (error) {
-            // طريقة بديلة
             const url = URL.createObjectURL(blob);
             window.open(url, '_blank');
             this.showNotification('📂 تم فتح الملف، اضغط حفظ', 'info');
         }
     },
     
-    // إشعارات
     showNotification(message, type = 'info') {
         const colors = {
             success: '#4CAF50',
@@ -855,13 +924,49 @@ const DownloadManager = {
     }
 };
 
-// ==================== إضافة زر التنزيل للرسائل ====================
+// ==================== إضافة زر التنزيل ====================
 
 function addDownloadButton(messageElement, fileData, fileName, fileType) {
-    // فقط للصور والفيديو والملفات
-    if (!fileData || !fileData.data || fileData.data.length < 10) return;
+    if (!fileData) return;
     
-    // التحقق من وجود زر مسبقاً
+    // ✅ إذا كان هناك باكج، استخدمه مباشرة
+    if (fileData.package && fileData.package.data) {
+        const downloadBtn = document.createElement('button');
+        downloadBtn.className = 'download-btn';
+        downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+        downloadBtn.title = 'تنزيل الملف';
+        
+        downloadBtn.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            downloadBtn.style.opacity = '0.5';
+            downloadBtn.style.pointerEvents = 'none';
+            
+            DownloadManager.downloadFile(
+                fileData.package.data,
+                fileData.package.fileName || fileName,
+                fileData.package.fileType || fileType
+            );
+            
+            setTimeout(() => {
+                downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+                downloadBtn.style.opacity = '1';
+                downloadBtn.style.pointerEvents = 'auto';
+            }, 1500);
+        };
+        
+        const content = messageElement.querySelector('.message-content');
+        if (content) {
+            content.style.position = 'relative';
+            content.appendChild(downloadBtn);
+        }
+        return;
+    }
+    
+    // الطريقة القديمة (إذا لم يكن هناك باكج)
+    if (!fileData.data || fileData.data.length < 10) return;
     if (messageElement.querySelector('.download-btn')) return;
     
     const downloadBtn = document.createElement('button');
@@ -873,19 +978,12 @@ function addDownloadButton(messageElement, fileData, fileName, fileType) {
         e.stopPropagation();
         e.preventDefault();
         
-        // تغيير مظهر الزر
         downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         downloadBtn.style.opacity = '0.5';
         downloadBtn.style.pointerEvents = 'none';
         
-        // تنزيل مباشر
-        DownloadManager.downloadFile(
-            fileData.data,
-            fileName || 'ملف',
-            fileType || 'application/octet-stream'
-        );
+        DownloadManager.downloadFile(fileData.data, fileName, fileType);
         
-        // إعادة الزر
         setTimeout(() => {
             downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
             downloadBtn.style.opacity = '1';
@@ -898,5 +996,16 @@ function addDownloadButton(messageElement, fileData, fileName, fileType) {
         content.style.position = 'relative';
         content.appendChild(downloadBtn);
     }
+}
+
+function classifyFile(filename, mimeType) {
+    const ext = filename.split('.').pop().toLowerCase();
+    if (mimeType?.startsWith('image/') || ['jpg','jpeg','png','gif','webp','svg','bmp','ico'].includes(ext)) {
+        return { category: 'image', icon: 'fa-image', color: '#4CAF50' };
+    }
+    if (mimeType?.startsWith('video/') || ['mp4','webm','avi','mov','mkv','flv','wmv','3gp'].includes(ext)) {
+        return { category: 'video', icon: 'fa-video', color: '#FF5722' };
+    }
+    return { category: 'file', icon: 'fa-file', color: '#607D8B' };
 }
 
