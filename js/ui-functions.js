@@ -750,6 +750,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 
 
+
 // ==================== نظام الباكجات للملفات ====================
 
 const FilePackage = {
@@ -827,7 +828,7 @@ const FilePackage = {
     }
 };
 
-// ==================== نظام التنزيل المباشر ====================
+// ==================== نظام التنزيل المباشر (معدل - يعمل لجميع الملفات) ====================
 
 const DownloadManager = {
     downloadFile(fileData, fileName, fileType) {
@@ -837,11 +838,31 @@ const DownloadManager = {
         }
         
         try {
-            const byteCharacters = atob(fileData);
-            const byteNumbers = new Uint8Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            // ✅ تنظيف البيانات قبل فك التشفير
+            let cleanData = fileData;
+            cleanData = cleanData.replace(/\s/g, '');
+            cleanData = cleanData.replace(/-/g, '+');
+            cleanData = cleanData.replace(/_/g, '/');
+            
+            // ✅ فك التشفير مع معالجة الأخطاء
+            let binaryString;
+            try {
+                binaryString = atob(cleanData);
+            } catch (e) {
+                console.warn('⚠️ فشل atob، محاولة الإصلاح...');
+                while (cleanData.length % 4 !== 0) {
+                    cleanData += '=';
+                }
+                binaryString = atob(cleanData);
             }
+            
+            // ✅ تحويل إلى Uint8Array
+            const byteNumbers = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                byteNumbers[i] = binaryString.charCodeAt(i);
+            }
+            
+            // ✅ إنشاء Blob
             const blob = new Blob([byteNumbers], { type: fileType || 'application/octet-stream' });
             
             if (blob.size === 0) {
@@ -849,19 +870,22 @@ const DownloadManager = {
                 return false;
             }
             
+            // ✅ تنزيل الملف
             this.downloadBlob(blob, fileName || 'ملف');
             return true;
             
         } catch (error) {
             console.error('❌ فشل التنزيل:', error);
-            this.showNotification('❌ فشل تنزيل الملف', 'error');
+            this.showNotification('❌ فشل تنزيل الملف: ' + error.message, 'error');
             return false;
         }
     },
     
     downloadBlob(blob, filename) {
         try {
+            // ✅ إنشاء رابط جديد في كل مرة
             const url = URL.createObjectURL(blob);
+            
             const link = document.createElement('a');
             link.href = url;
             link.download = filename;
@@ -874,12 +898,17 @@ const DownloadManager = {
                 URL.revokeObjectURL(url);
                 const sizeKB = (blob.size / 1024).toFixed(1);
                 this.showNotification(`✅ تم تنزيل ${filename} (${sizeKB} KB)`, 'success');
-            }, 1000);
+            }, 2000);
             
         } catch (error) {
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
-            this.showNotification('📂 تم فتح الملف، اضغط حفظ', 'info');
+            console.warn('⚠️ طريقة التنزيل الأولى فشلت');
+            try {
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+                this.showNotification('📂 تم فتح الملف، اضغط حفظ', 'info');
+            } catch (error2) {
+                this.showNotification('❌ فشل التنزيل، حاول مرة أخرى', 'error');
+            }
         }
     },
     
@@ -887,11 +916,11 @@ const DownloadManager = {
         const colors = {
             success: '#4CAF50',
             error: '#f44336',
-            info: '#2196F3'
+            info: '#2196F3',
+            warning: '#FF9800'
         };
         
-        const old = document.querySelectorAll('.download-notification');
-        old.forEach(el => el.remove());
+        document.querySelectorAll('.download-notification').forEach(el => el.remove());
         
         const notification = document.createElement('div');
         notification.className = 'download-notification';
