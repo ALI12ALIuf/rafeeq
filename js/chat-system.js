@@ -1144,7 +1144,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل - بدون تنزيل) ====================
+ // ==================== القسم 26: displayMessage (معدل - مع FileManager وأزرار ثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1177,6 +1177,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1209,6 +1210,7 @@ displayMessage(msg) {
         }
     }
     
+    // ==================== معالجة الموقع ====================
     else if (msg.type === 'location') {
         let locationData = msg.data;
         let locationUrl = '';
@@ -1270,6 +1272,7 @@ displayMessage(msg) {
         }
     }
     
+    // ==================== معالجة الصورة (مع زر تحميل ثابت) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1279,8 +1282,85 @@ displayMessage(msg) {
                 wrapper.style.border = `2px solid ${borderColor}`;
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
-                    img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                    const fileId = msg.fileId || msg.id;
+                    
+                    // ✅ استرجاع البيانات من FileManager
+                    let imageData = null;
+                    if (fileId) {
+                        imageData = FileManager.getFileDataUrl(fileId);
+                    }
+                    
+                    // ✅ إذا لم توجد في FileManager، استخدم msg.data (للتوافق مع النسخ القديمة)
+                    if (!imageData && msg.data) {
+                        imageData = msg.data;
+                    }
+                    
+                    if (imageData) {
+                        img.src = imageData;
+                    } else {
+                        img.alt = 'صورة غير متوفرة';
+                        console.warn(`⚠️ لا توجد بيانات للصورة: ${fileId || msg.id}`);
+                    }
+                    
+                    // ✅ تعيين fileId في dataset
+                    if (fileId) {
+                        img.dataset.fileid = fileId;
+                    }
+                    
+                    // ✅ معاينة الصورة
+                    img.onclick = function() {
+                        const id = this.dataset.fileid;
+                        let url = null;
+                        if (id) {
+                            url = FileManager.getFileDataUrl(id);
+                        }
+                        if (!url && msg.data) {
+                            url = msg.data;
+                        }
+                        if (url) {
+                            ChatSystem.showImagePreview(url);
+                        }
+                    };
+                    
+                    // ✅ زر التحميل (موجود في القالب)
+                    const downloadBtn = wrapper.querySelector('.download-file-btn');
+                    if (downloadBtn) {
+                        if (fileId) {
+                            downloadBtn.dataset.fileid = fileId;
+                            downloadBtn.style.display = 'flex';
+                            
+                            downloadBtn.onclick = null;
+                            downloadBtn.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                
+                                const id = this.dataset.fileid;
+                                if (!id) {
+                                    alert('⚠️ معرف الملف غير موجود');
+                                    return;
+                                }
+                                
+                                const dataUrl = FileManager.getFileDataUrl(id);
+                                
+                                if (dataUrl && dataUrl.startsWith('data:')) {
+                                    const fileData = FileManager.getFile(id);
+                                    const link = document.createElement('a');
+                                    link.href = dataUrl;
+                                    link.download = fileData ? fileData.fileName : 'صورة';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    console.log(`✅ تم تحميل الصورة: ${fileData ? fileData.fileName : 'صورة'}`);
+                                } else {
+                                    alert('⚠️ الصورة غير متوفرة للتحميل');
+                                }
+                            });
+                        } else {
+                            // ❌ إذا لم يوجد fileId، نخفي الزر
+                            downloadBtn.style.display = 'none';
+                        }
+                    }
+                    
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
                 }
@@ -1291,6 +1371,7 @@ displayMessage(msg) {
         }
     }
     
+    // ==================== معالجة البصمة الصوتية ====================
     else if (msg.type === 'voice') {
         const templateVoice = document.getElementById('voiceMessageTemplate');
         if (templateVoice) {
@@ -1311,6 +1392,7 @@ displayMessage(msg) {
         }
     }
     
+    // ==================== معالجة الفيديو (مع زر تحميل ثابت) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1320,14 +1402,87 @@ displayMessage(msg) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
-                if (source && msg.data) {
-                    source.src = msg.data;
-                    video.load();
+                if (source) {
+                    const fileId = msg.fileId || msg.id;
+                    
+                    // ✅ استرجاع البيانات من FileManager
+                    let videoData = null;
+                    if (fileId) {
+                        videoData = FileManager.getFileDataUrl(fileId);
+                    }
+                    
+                    // ✅ إذا لم توجد في FileManager، استخدم msg.data (للتوافق مع النسخ القديمة)
+                    if (!videoData && msg.data) {
+                        videoData = msg.data;
+                    }
+                    
+                    if (videoData) {
+                        source.src = videoData;
+                        video.load();
+                    } else {
+                        console.warn(`⚠️ لا توجد بيانات للفيديو: ${fileId || msg.id}`);
+                    }
+                    
+                    // ✅ تعيين fileId في dataset
+                    if (fileId) {
+                        thumbnail.dataset.fileid = fileId;
+                    }
+                    
+                    // ✅ معاينة الفيديو
+                    thumbnail.onclick = function(e) {
+                        e.stopPropagation();
+                        const id = this.dataset.fileid;
+                        let url = null;
+                        if (id) {
+                            url = FileManager.getFileDataUrl(id);
+                        }
+                        if (!url && msg.data) {
+                            url = msg.data;
+                        }
+                        if (url) {
+                            ChatSystem.showVideoPreview(url);
+                        }
+                    };
+                    
+                    // ✅ زر التحميل (موجود في القالب)
+                    const downloadBtn = thumbnail.querySelector('.download-file-btn');
+                    if (downloadBtn) {
+                        if (fileId) {
+                            downloadBtn.dataset.fileid = fileId;
+                            downloadBtn.style.display = 'flex';
+                            
+                            downloadBtn.onclick = null;
+                            downloadBtn.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                
+                                const id = this.dataset.fileid;
+                                if (!id) {
+                                    alert('⚠️ معرف الملف غير موجود');
+                                    return;
+                                }
+                                
+                                const dataUrl = FileManager.getFileDataUrl(id);
+                                
+                                if (dataUrl && dataUrl.startsWith('data:')) {
+                                    const fileData = FileManager.getFile(id);
+                                    const link = document.createElement('a');
+                                    link.href = dataUrl;
+                                    link.download = fileData ? fileData.fileName : 'فيديو';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    console.log(`✅ تم تحميل الفيديو: ${fileData ? fileData.fileName : 'فيديو'}`);
+                                } else {
+                                    alert('⚠️ الفيديو غير متوفر للتحميل');
+                                }
+                            });
+                        } else {
+                            // ❌ إذا لم يوجد fileId، نخفي الزر
+                            downloadBtn.style.display = 'none';
+                        }
+                    }
                 }
-                thumbnail.onclick = (e) => {
-                    e.stopPropagation();
-                    this.showVideoPreview(msg.data);
-                };
             }
             div.appendChild(clone);
         } else {
@@ -1335,6 +1490,7 @@ displayMessage(msg) {
         }
     }
     
+    // ==================== معالجة الملف (مع زر تحميل ثابت) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1347,7 +1503,47 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                // ❌ تم حذف زر التنزيل بالكامل
+                
+                // ✅ زر التحميل (موجود في القالب)
+                const downloadBtn = fileCard.querySelector('.download-file-btn');
+                if (downloadBtn) {
+                    const fileId = msg.fileId || msg.id;
+                    
+                    if (fileId) {
+                        downloadBtn.dataset.fileid = fileId;
+                        downloadBtn.style.display = 'flex';
+                        
+                        downloadBtn.onclick = null;
+                        downloadBtn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            
+                            const id = this.dataset.fileid;
+                            if (!id) {
+                                alert('⚠️ معرف الملف غير موجود');
+                                return;
+                            }
+                            
+                            const dataUrl = FileManager.getFileDataUrl(id);
+                            
+                            if (dataUrl && dataUrl.startsWith('data:')) {
+                                const fileData = FileManager.getFile(id);
+                                const link = document.createElement('a');
+                                link.href = dataUrl;
+                                link.download = fileData ? fileData.fileName : 'ملف';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                console.log(`✅ تم تحميل الملف: ${fileData ? fileData.fileName : 'ملف'}`);
+                            } else {
+                                alert('⚠️ الملف غير متوفر للتحميل');
+                            }
+                        });
+                    } else {
+                        // ❌ إذا لم يوجد fileId، نخفي الزر
+                        downloadBtn.style.display = 'none';
+                    }
+                }
             }
             div.appendChild(clone);
         } else {
