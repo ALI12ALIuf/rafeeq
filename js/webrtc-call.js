@@ -1190,7 +1190,7 @@ showCallUI(type) {
         }
     },
     
-    // ==================== 13. إرسال الملفات (Base64 كامل - بدون تنزيل) ====================
+    // ==================== 13. إرسال الملفات (نظام الباكجات - بدون تخزين) ====================
 
 async sendFileDirect(file, type) {
     if (!this.dc || this.dc.readyState !== 'open') {
@@ -1205,38 +1205,41 @@ async sendFileDirect(file, type) {
         }
         
         const base64String = await this.blobToBase64(blobToSend);
-        const chunkSize = 16000;
-        const totalChunks = Math.ceil(base64String.length / chunkSize);
-        const fileId = Date.now().toString();
         
-        console.log(`📤 إرسال ${type}: ${file.name || 'ملف'} (${totalChunks} جزء)`);
+        // ✅ إنشاء باكج بدلاً من التجزئة
+        const pkg = FilePackage.createPackage(
+            base64String,
+            file.name || 'ملف',
+            blobToSend.type || 'application/octet-stream',
+            type || 'file',
+            window.auth?.currentUser?.uid || 'unknown',
+            ChatSystem.currentChat || 'unknown'
+        );
         
-        for (let i = 0; i < totalChunks; i++) {
-            if (this.dc.readyState !== 'open') {
-                ChatSystem.hideProgressBar();
-                return false;
-            }
-            const start = i * chunkSize;
-            const end = Math.min(start + chunkSize, base64String.length);
-            const chunk = base64String.substring(start, end);
-            
-            const chunkData = {
-                type: type,
-                data: chunk,
-                chunk: i,
-                total: totalChunks,
-                id: fileId,
-                fileName: file.name || 'ملف'
-            };
-            this.dc.send(JSON.stringify(chunkData));
-            const progress = ((i + 1) / totalChunks) * 100;
-            const typeLabel = type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف';
-            ChatSystem.updateProgressBar(progress, `جاري إرسال ${typeLabel}...`);
-            await new Promise(r => setTimeout(r, 50));
+        const validation = FilePackage.validatePackage(pkg);
+        if (!validation.valid) {
+            console.error('❌ باكج غير صالح:', validation.error);
+            ChatSystem.hideProgressBar();
+            return false;
         }
+        
+        const serialized = FilePackage.serialize(pkg);
+        if (!serialized) {
+            console.error('❌ فشل تسلسل الباكج');
+            ChatSystem.hideProgressBar();
+            return false;
+        }
+        
+        // ✅ إرسال الباكج كامل (بدون تجزئة)
+        this.dc.send(JSON.stringify({
+            type: 'file_package',
+            package: serialized
+        }));
+        
         ChatSystem.hideProgressBar();
-        console.log('✅ تم إرسال الملف بنجاح (Base64)');
+        console.log(`✅ تم إرسال باكج ${type}: ${file.name || 'ملف'} (${Math.round(base64String.length * 0.75 / 1024)} KB)`);
         return true;
+        
     } catch (e) {
         console.error('❌ فشل إرسال الملف:', e);
         ChatSystem.hideProgressBar();
@@ -1256,48 +1259,45 @@ blobToBase64(blob) {
     });
 },
 
+// ✅ معالجة الباكجات المستلمة (بدلاً من التجزئة)
 handleChunkMessage(msg) {
-    if (!this.incomingChunks[msg.id]) {
-        this.incomingChunks[msg.id] = '';
-        this.incomingFileInfo[msg.id] = {
-            type: msg.type,
-            fileName: msg.fileName,
-            total: msg.total,
-            received: 0
-        };
-        ChatSystem.showProgressBar('جاري استلام الملف...', 0);
-    }
-    
-    this.incomingChunks[msg.id] += msg.data;
-    this.incomingFileInfo[msg.id].received++;
-    const progress = (this.incomingFileInfo[msg.id].received / msg.total) * 100;
-    const fileType = msg.type === 'video' ? 'الفيديو' : msg.type === 'image' ? 'الصورة' : 'الملف';
-    ChatSystem.updateProgressBar(progress, `جاري استلام ${fileType}...`);
-    
-    if (this.incomingFileInfo[msg.id].received === msg.total) {
-        const fullBase64 = this.incomingChunks[msg.id];
+    // ✅ إذا كانت رسالة باكج
+    if (msg.type === 'file_package' && msg.package) {
+        const pkg = FilePackage.deserialize(msg.package);
+        if (!pkg) {
+            console.error('❌ فشل استعادة الباكج');
+            return;
+        }
         
+        console.log('📦 استلام باكج:', FilePackage.getInfo(pkg));
+        
+        const validation = FilePackage.validatePackage(pkg);
+        if (!validation.valid) {
+            console.warn('⚠️ باكج غير صالح:', validation.error);
+            return;
+        }
+        
+        // تحديد نوع الملف
         let dataPrefix = '';
-        if (msg.type === 'image') {
+        if (pkg.category === 'image') {
             dataPrefix = 'data:image/jpeg;base64,';
-        } else if (msg.type === 'video') {
+        } else if (pkg.category === 'video') {
             dataPrefix = 'data:video/mp4;base64,';
-        } else if (msg.type === 'voice') {
+        } else if (pkg.category === 'voice') {
             dataPrefix = 'data:audio/webm;base64,';
-        } else if (msg.type === 'file') {
+        } else {
             dataPrefix = 'data:application/octet-stream;base64,';
         }
         
-        const dataUrl = dataPrefix + fullBase64;
-        
         const displayMsg = {
-            id: msg.id,
-            type: msg.type,
-            data: dataUrl,
-            fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+            id: pkg.fileId || Date.now().toString(),
+            type: pkg.category || 'file',
+            data: dataPrefix + pkg.data,
+            fileName: pkg.fileName || 'ملف',
             sender: 'friend',
-            time: new Date().toISOString(),
-            _isBase64: true
+            time: new Date(pkg.timestamp).toISOString(),
+            _isBase64: true,
+            _package: pkg // ✅ حفظ الباكج كاملاً للتنزيل
         };
         
         if (ChatSystem.currentChat) {
@@ -1305,9 +1305,12 @@ handleChunkMessage(msg) {
         }
         ChatSystem.hideProgressBar();
         
-        delete this.incomingChunks[msg.id];
-        delete this.incomingFileInfo[msg.id];
+        console.log(`✅ تم استلام وعرض ${pkg.category}: ${pkg.fileName}`);
+        return;
     }
+    
+    // ❌ الطريقة القديمة (التجزئة) - تم إزالتها
+    console.warn('⚠️ رسالة غير معروفة أو قديمة:', msg.type);
 },
 
 compressImage(file) {
