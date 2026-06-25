@@ -924,10 +924,13 @@ const DownloadManager = {
     }
 };
 
-// ==================== إضافة زر التنزيل ====================
+// ==================== إضافة زر التنزيل (معدل - يعمل عدة مرات) ====================
 
 function addDownloadButton(messageElement, fileData, fileName, fileType) {
     if (!fileData) return;
+    
+    // التحقق من وجود زر مسبقاً
+    if (messageElement.querySelector('.download-btn')) return;
     
     // ✅ إذا كان هناك باكج، استخدمه مباشرة
     if (fileData.package && fileData.package.data) {
@@ -935,26 +938,80 @@ function addDownloadButton(messageElement, fileData, fileName, fileType) {
         downloadBtn.className = 'download-btn';
         downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
         downloadBtn.title = 'تنزيل الملف';
+        downloadBtn.style.cssText = `
+            background: rgba(0,0,0,0.75) !important;
+            border: 2px solid #4CAF50 !important;
+            border-radius: 50% !important;
+            width: 36px !important;
+            height: 36px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            color: #4CAF50 !important;
+            font-size: 1rem !important;
+            transition: all 0.3s ease !important;
+            position: absolute !important;
+            top: 8px !important;
+            right: 8px !important;
+            backdrop-filter: blur(5px) !important;
+            z-index: 10 !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3) !important;
+        `;
         
-        downloadBtn.onclick = (e) => {
+        // ✅ تخزين البيانات في الزر نفسه لاستخدامها لاحقاً
+        downloadBtn._fileData = {
+            data: fileData.package.data,
+            fileName: fileData.package.fileName || fileName,
+            fileType: fileData.package.fileType || fileType
+        };
+        
+        downloadBtn.onclick = function(e) {
             e.stopPropagation();
             e.preventDefault();
             
-            downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            downloadBtn.style.opacity = '0.5';
-            downloadBtn.style.pointerEvents = 'none';
+            // ✅ منع الضغط المتكرر
+            if (this._downloading) return;
+            this._downloading = true;
             
-            DownloadManager.downloadFile(
-                fileData.package.data,
-                fileData.package.fileName || fileName,
-                fileData.package.fileType || fileType
-            );
+            // تغيير مظهر الزر
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            this.style.opacity = '0.5';
+            this.style.pointerEvents = 'none';
             
+            // ✅ استخدام البيانات المخزنة في الزر
+            const data = this._fileData;
+            if (data && data.data) {
+                DownloadManager.downloadFile(data.data, data.fileName, data.fileType);
+            } else {
+                DownloadManager.showNotification('❌ بيانات الملف غير متوفرة', 'error');
+            }
+            
+            // إعادة الزر بعد 2 ثانية
             setTimeout(() => {
-                downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-                downloadBtn.style.opacity = '1';
-                downloadBtn.style.pointerEvents = 'auto';
-            }, 1500);
+                this.innerHTML = '<i class="fas fa-download"></i>';
+                this.style.opacity = '1';
+                this.style.pointerEvents = 'auto';
+                this._downloading = false;
+            }, 2000);
+        };
+        
+        // إضافة تأثير hover
+        downloadBtn.onmouseenter = function() {
+            if (!this._downloading) {
+                this.style.transform = 'scale(1.1)';
+                this.style.background = 'rgba(76, 175, 80, 0.3)';
+                this.style.borderColor = '#66BB6A';
+                this.style.color = '#66BB6A';
+            }
+        };
+        downloadBtn.onmouseleave = function() {
+            if (!this._downloading) {
+                this.style.transform = 'scale(1)';
+                this.style.background = 'rgba(0,0,0,0.75)';
+                this.style.borderColor = '#4CAF50';
+                this.style.color = '#4CAF50';
+            }
         };
         
         const content = messageElement.querySelector('.message-content');
@@ -965,7 +1022,7 @@ function addDownloadButton(messageElement, fileData, fileName, fileType) {
         return;
     }
     
-    // الطريقة القديمة (إذا لم يكن هناك باكج)
+    // ✅ الطريقة القديمة (إذا لم يكن هناك باكج)
     if (!fileData.data || fileData.data.length < 10) return;
     if (messageElement.querySelector('.download-btn')) return;
     
@@ -973,22 +1030,75 @@ function addDownloadButton(messageElement, fileData, fileName, fileType) {
     downloadBtn.className = 'download-btn';
     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
     downloadBtn.title = 'تنزيل الملف';
+    downloadBtn.style.cssText = `
+        background: rgba(0,0,0,0.75) !important;
+        border: 2px solid #4CAF50 !important;
+        border-radius: 50% !important;
+        width: 36px !important;
+        height: 36px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        color: #4CAF50 !important;
+        font-size: 1rem !important;
+        transition: all 0.3s ease !important;
+        position: absolute !important;
+        top: 8px !important;
+        right: 8px !important;
+        backdrop-filter: blur(5px) !important;
+        z-index: 10 !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3) !important;
+    `;
     
-    downloadBtn.onclick = (e) => {
+    // ✅ تخزين البيانات في الزر
+    downloadBtn._fileData = {
+        data: fileData.data,
+        fileName: fileName,
+        fileType: fileType
+    };
+    
+    downloadBtn.onclick = function(e) {
         e.stopPropagation();
         e.preventDefault();
         
-        downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        downloadBtn.style.opacity = '0.5';
-        downloadBtn.style.pointerEvents = 'none';
+        if (this._downloading) return;
+        this._downloading = true;
         
-        DownloadManager.downloadFile(fileData.data, fileName, fileType);
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        this.style.opacity = '0.5';
+        this.style.pointerEvents = 'none';
+        
+        const data = this._fileData;
+        if (data && data.data) {
+            DownloadManager.downloadFile(data.data, data.fileName, data.fileType);
+        } else {
+            DownloadManager.showNotification('❌ بيانات الملف غير متوفرة', 'error');
+        }
         
         setTimeout(() => {
-            downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
-            downloadBtn.style.opacity = '1';
-            downloadBtn.style.pointerEvents = 'auto';
-        }, 1500);
+            this.innerHTML = '<i class="fas fa-download"></i>';
+            this.style.opacity = '1';
+            this.style.pointerEvents = 'auto';
+            this._downloading = false;
+        }, 2000);
+    };
+    
+    downloadBtn.onmouseenter = function() {
+        if (!this._downloading) {
+            this.style.transform = 'scale(1.1)';
+            this.style.background = 'rgba(76, 175, 80, 0.3)';
+            this.style.borderColor = '#66BB6A';
+            this.style.color = '#66BB6A';
+        }
+    };
+    downloadBtn.onmouseleave = function() {
+        if (!this._downloading) {
+            this.style.transform = 'scale(1)';
+            this.style.background = 'rgba(0,0,0,0.75)';
+            this.style.borderColor = '#4CAF50';
+            this.style.color = '#4CAF50';
+        }
     };
     
     const content = messageElement.querySelector('.message-content');
@@ -1008,4 +1118,5 @@ function classifyFile(filename, mimeType) {
     }
     return { category: 'file', icon: 'fa-file', color: '#607D8B' };
 }
+
 
