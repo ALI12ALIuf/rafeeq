@@ -1,5 +1,5 @@
-// ========== webrtc-call.js - النسخة النهائية (بدون تنزيل) ==========
-// جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات (Base64)
+// ========== webrtc-call.js - النسخة النهائية (مع دعم الباكجات) ==========
+// جميع ميزات الصوت + مكالمات الفيديو + إرسال الملفات (نظام الباكجات)
 
 const CallSystem = {
     pc: null, dc: null,
@@ -695,7 +695,7 @@ async createDataChannelOnly(calleeId) {
         rightThumb._cleanup = leftThumb._cleanup;
     },
 
-    // ==================== 9. Data Channel وإدارة الاتصال ====================
+    // ==================== 9. Data Channel وإدارة الاتصال (معدل - مع دعم الباكجات) ====================
 
 setupDataChannel(channel) {
     if (!channel) return;
@@ -705,6 +705,7 @@ setupDataChannel(channel) {
         try {
             const msg = JSON.parse(e.data);
             
+            // ✅ معالجة النصوص المباشرة
             if (msg.type === 'direct_text') {
                 console.log('📨 استلام رسالة نصية مباشرة:', msg.text);
                 const displayMsg = { 
@@ -721,6 +722,61 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // ✅ معالجة الباكجات (الملفات) - النظام الجديد
+            if (msg.type === 'file_package' && msg.package) {
+                console.log('📦 استلام باكج ملف');
+                try {
+                    const pkg = FilePackage.deserialize(msg.package);
+                    if (!pkg) {
+                        console.error('❌ فشل استعادة الباكج');
+                        return;
+                    }
+                    
+                    console.log('📦 معلومات الباكج:', FilePackage.getInfo(pkg));
+                    
+                    const validation = FilePackage.validatePackage(pkg);
+                    if (!validation.valid) {
+                        console.warn('⚠️ باكج غير صالح:', validation.error);
+                        return;
+                    }
+                    
+                    let dataPrefix = '';
+                    if (pkg.category === 'image') {
+                        dataPrefix = 'data:image/jpeg;base64,';
+                    } else if (pkg.category === 'video') {
+                        dataPrefix = 'data:video/mp4;base64,';
+                    } else if (pkg.category === 'voice') {
+                        dataPrefix = 'data:audio/webm;base64,';
+                    } else {
+                        dataPrefix = 'data:application/octet-stream;base64,';
+                    }
+                    
+                    const displayMsg = {
+                        id: pkg.fileId || Date.now().toString(),
+                        type: pkg.category || 'file',
+                        data: dataPrefix + pkg.data,
+                        fileName: pkg.fileName || 'ملف',
+                        sender: 'friend',
+                        time: new Date(pkg.timestamp).toISOString(),
+                        _isBase64: true,
+                        _package: pkg
+                    };
+                    
+                    if (ChatSystem.currentChat) {
+                        ChatSystem.displayMessage(displayMsg);
+                        ChatSystem.saveMessage(ChatSystem.currentChat, displayMsg);
+                    }
+                    
+                    ChatSystem.hideProgressBar();
+                    console.log(`✅ تم استلام وعرض ${pkg.category}: ${pkg.fileName}`);
+                    return;
+                } catch (error) {
+                    console.error('❌ خطأ في معالجة الباكج:', error);
+                    return;
+                }
+            }
+            
+            // ✅ معالجة إشارات WebRTC
             if (msg.type === 'webrtc_signal') {
                 console.log('📡 استلام إشارة WebRTC مباشرة:', msg.data);
                 if (msg.data.sdp && msg.data.sdp.type === 'offer') {
@@ -731,6 +787,7 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // ✅ معالجة إشارة إنهاء المحادثة
             if (msg.type === 'force_close_conversation') {
                 console.log('👢 استلام إشارة طرد مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -753,6 +810,7 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // ✅ معالجة إشارة إلغاء الميزات
             if (msg.type === 'force_disable_features') {
                 console.log('🔴 استلام إشارة إلغاء الميزات مباشرة من الطرف الآخر');
                 if (ChatSystem.currentChat) {
@@ -776,22 +834,34 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // ✅ معالجة ping
             if (msg.type === 'ping') return;
             
+            // ✅ معالجة حالة المكالمة
             if (msg.type === 'call_status') {
                 this.handleCallStatus(msg);
                 return;
             }
             
+            // ✅ معالجة الرسائل القديمة (للتوافق مع الإصدارات السابقة)
             if (msg.chunk !== undefined) {
                 this.handleChunkMessage(msg);
                 return;
             }
             
-            const displayMsg = { id: msg.id || Date.now().toString(), type: msg.type, data: msg.data, fileName: msg.fileName, sender: 'friend', time: new Date().toISOString() };
+            // ✅ أي رسالة أخرى
+            const displayMsg = { 
+                id: msg.id || Date.now().toString(), 
+                type: msg.type, 
+                data: msg.data, 
+                fileName: msg.fileName, 
+                sender: 'friend', 
+                time: new Date().toISOString() 
+            };
             if (ChatSystem.currentChat) {
                 ChatSystem.displayMessage(displayMsg);
             }
+            
         } catch (error) {
             console.error('خطأ في معالجة الرسالة:', error);
         }
@@ -1496,4 +1566,4 @@ window.startVideoCall = async () => {
     await CallSystem.startVideoCall(ChatSystem.currentChat);
 };
 
-console.log('✅ WebRTC Call System جاهز - مع دعم Base64 (بدون تنزيل)');
+console.log('✅ WebRTC Call System جاهز - مع دعم الباكجات');
