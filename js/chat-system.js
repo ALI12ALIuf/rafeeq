@@ -1144,7 +1144,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل - مع FileManager وأزرار ثابتة) ====================
+ // ==================== القسم 26: displayMessage (معدل - مع Blob للتحميل) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1272,7 +1272,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة (مع زر تحميل ثابت) ====================
+    // ==================== معالجة الصورة (مع Blob للتحميل) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1284,22 +1284,12 @@ displayMessage(msg) {
                 if (img) {
                     const fileId = msg.fileId || msg.id;
                     
-                    // ✅ استرجاع البيانات من FileManager
-                    let imageData = null;
-                    if (fileId) {
-                        imageData = FileManager.getFileDataUrl(fileId);
-                    }
-                    
-                    // ✅ إذا لم توجد في FileManager، استخدم msg.data (للتوافق مع النسخ القديمة)
-                    if (!imageData && msg.data) {
-                        imageData = msg.data;
-                    }
-                    
-                    if (imageData) {
-                        img.src = imageData;
+                    // ✅ استخدام data: URL للعرض (من msg._dataUrl)
+                    if (msg._dataUrl) {
+                        img.src = msg._dataUrl;
                     } else {
                         img.alt = 'صورة غير متوفرة';
-                        console.warn(`⚠️ لا توجد بيانات للصورة: ${fileId || msg.id}`);
+                        console.warn(`⚠️ لا توجد بيانات للعرض: ${fileId || msg.id}`);
                     }
                     
                     // ✅ تعيين fileId في dataset
@@ -1310,19 +1300,13 @@ displayMessage(msg) {
                     // ✅ معاينة الصورة
                     img.onclick = function() {
                         const id = this.dataset.fileid;
-                        let url = null;
-                        if (id) {
-                            url = FileManager.getFileDataUrl(id);
-                        }
-                        if (!url && msg.data) {
-                            url = msg.data;
-                        }
-                        if (url) {
-                            ChatSystem.showImagePreview(url);
+                        const data = FileManager.getFile(id);
+                        if (data && data.dataUrl) {
+                            ChatSystem.showImagePreview(data.dataUrl);
                         }
                     };
                     
-                    // ✅ زر التحميل (موجود في القالب)
+                    // ✅ زر التحميل باستخدام Blob
                     const downloadBtn = wrapper.querySelector('.download-file-btn');
                     if (downloadBtn) {
                         if (fileId) {
@@ -1340,23 +1324,36 @@ displayMessage(msg) {
                                     return;
                                 }
                                 
-                                const dataUrl = FileManager.getFileDataUrl(id);
+                                // ✅ استرجاع Blob من FileManager
+                                const blob = FileManager.getBlob(id);
+                                const fileData = FileManager.getFile(id);
                                 
-                                if (dataUrl && dataUrl.startsWith('data:')) {
-                                    const fileData = FileManager.getFile(id);
-                                    const link = document.createElement('a');
-                                    link.href = dataUrl;
-                                    link.download = fileData ? fileData.fileName : 'صورة';
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    console.log(`✅ تم تحميل الصورة: ${fileData ? fileData.fileName : 'صورة'}`);
+                                if (blob) {
+                                    try {
+                                        const url = URL.createObjectURL(blob);
+                                        const link = document.createElement('a');
+                                        link.href = url;
+                                        link.download = fileData?.fileName || 'صورة';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        
+                                        // ✅ تنظيف Blob URL بعد 100ms
+                                        setTimeout(() => {
+                                            URL.revokeObjectURL(url);
+                                        }, 100);
+                                        
+                                        console.log(`✅ تم تحميل الصورة: ${fileData?.fileName || 'صورة'}`);
+                                    } catch (error) {
+                                        console.error('❌ فشل تحميل الصورة:', error);
+                                        alert('⚠️ حدث خطأ أثناء تحميل الصورة');
+                                    }
                                 } else {
+                                    console.error('❌ Blob غير موجود:', id);
                                     alert('⚠️ الصورة غير متوفرة للتحميل');
                                 }
                             });
                         } else {
-                            // ❌ إذا لم يوجد fileId، نخفي الزر
                             downloadBtn.style.display = 'none';
                         }
                     }
@@ -1392,7 +1389,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو (مع زر تحميل ثابت) ====================
+    // ==================== معالجة الفيديو (مع Blob للتحميل) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1405,22 +1402,12 @@ displayMessage(msg) {
                 if (source) {
                     const fileId = msg.fileId || msg.id;
                     
-                    // ✅ استرجاع البيانات من FileManager
-                    let videoData = null;
-                    if (fileId) {
-                        videoData = FileManager.getFileDataUrl(fileId);
-                    }
-                    
-                    // ✅ إذا لم توجد في FileManager، استخدم msg.data (للتوافق مع النسخ القديمة)
-                    if (!videoData && msg.data) {
-                        videoData = msg.data;
-                    }
-                    
-                    if (videoData) {
-                        source.src = videoData;
+                    // ✅ استخدام data: URL للعرض
+                    if (msg._dataUrl) {
+                        source.src = msg._dataUrl;
                         video.load();
                     } else {
-                        console.warn(`⚠️ لا توجد بيانات للفيديو: ${fileId || msg.id}`);
+                        console.warn(`⚠️ لا توجد بيانات للعرض: ${fileId || msg.id}`);
                     }
                     
                     // ✅ تعيين fileId في dataset
@@ -1432,19 +1419,13 @@ displayMessage(msg) {
                     thumbnail.onclick = function(e) {
                         e.stopPropagation();
                         const id = this.dataset.fileid;
-                        let url = null;
-                        if (id) {
-                            url = FileManager.getFileDataUrl(id);
-                        }
-                        if (!url && msg.data) {
-                            url = msg.data;
-                        }
-                        if (url) {
-                            ChatSystem.showVideoPreview(url);
+                        const data = FileManager.getFile(id);
+                        if (data && data.dataUrl) {
+                            ChatSystem.showVideoPreview(data.dataUrl);
                         }
                     };
                     
-                    // ✅ زر التحميل (موجود في القالب)
+                    // ✅ زر التحميل باستخدام Blob
                     const downloadBtn = thumbnail.querySelector('.download-file-btn');
                     if (downloadBtn) {
                         if (fileId) {
@@ -1462,23 +1443,36 @@ displayMessage(msg) {
                                     return;
                                 }
                                 
-                                const dataUrl = FileManager.getFileDataUrl(id);
+                                // ✅ استرجاع Blob من FileManager
+                                const blob = FileManager.getBlob(id);
+                                const fileData = FileManager.getFile(id);
                                 
-                                if (dataUrl && dataUrl.startsWith('data:')) {
-                                    const fileData = FileManager.getFile(id);
-                                    const link = document.createElement('a');
-                                    link.href = dataUrl;
-                                    link.download = fileData ? fileData.fileName : 'فيديو';
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    console.log(`✅ تم تحميل الفيديو: ${fileData ? fileData.fileName : 'فيديو'}`);
+                                if (blob) {
+                                    try {
+                                        const url = URL.createObjectURL(blob);
+                                        const link = document.createElement('a');
+                                        link.href = url;
+                                        link.download = fileData?.fileName || 'فيديو';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        
+                                        // ✅ تنظيف Blob URL بعد 100ms
+                                        setTimeout(() => {
+                                            URL.revokeObjectURL(url);
+                                        }, 100);
+                                        
+                                        console.log(`✅ تم تحميل الفيديو: ${fileData?.fileName || 'فيديو'}`);
+                                    } catch (error) {
+                                        console.error('❌ فشل تحميل الفيديو:', error);
+                                        alert('⚠️ حدث خطأ أثناء تحميل الفيديو');
+                                    }
                                 } else {
+                                    console.error('❌ Blob غير موجود:', id);
                                     alert('⚠️ الفيديو غير متوفر للتحميل');
                                 }
                             });
                         } else {
-                            // ❌ إذا لم يوجد fileId، نخفي الزر
                             downloadBtn.style.display = 'none';
                         }
                     }
@@ -1490,7 +1484,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف (مع زر تحميل ثابت) ====================
+    // ==================== معالجة الملف (مع Blob للتحميل) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1504,7 +1498,7 @@ displayMessage(msg) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
                 
-                // ✅ زر التحميل (موجود في القالب)
+                // ✅ زر التحميل باستخدام Blob
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn) {
                     const fileId = msg.fileId || msg.id;
@@ -1524,23 +1518,36 @@ displayMessage(msg) {
                                 return;
                             }
                             
-                            const dataUrl = FileManager.getFileDataUrl(id);
+                            // ✅ استرجاع Blob من FileManager
+                            const blob = FileManager.getBlob(id);
+                            const fileData = FileManager.getFile(id);
                             
-                            if (dataUrl && dataUrl.startsWith('data:')) {
-                                const fileData = FileManager.getFile(id);
-                                const link = document.createElement('a');
-                                link.href = dataUrl;
-                                link.download = fileData ? fileData.fileName : 'ملف';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                console.log(`✅ تم تحميل الملف: ${fileData ? fileData.fileName : 'ملف'}`);
+                            if (blob) {
+                                try {
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = fileData?.fileName || 'ملف';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    
+                                    // ✅ تنظيف Blob URL بعد 100ms
+                                    setTimeout(() => {
+                                        URL.revokeObjectURL(url);
+                                    }, 100);
+                                    
+                                    console.log(`✅ تم تحميل الملف: ${fileData?.fileName || 'ملف'}`);
+                                } catch (error) {
+                                    console.error('❌ فشل تحميل الملف:', error);
+                                    alert('⚠️ حدث خطأ أثناء تحميل الملف');
+                                }
                             } else {
+                                console.error('❌ Blob غير موجود:', id);
                                 alert('⚠️ الملف غير متوفر للتحميل');
                             }
                         });
                     } else {
-                        // ❌ إذا لم يوجد fileId، نخفي الزر
                         downloadBtn.style.display = 'none';
                     }
                 }
@@ -2181,11 +2188,17 @@ updateLastMessage(friendId, lastMessage) {
 },
 
 
-   // ==================== القسم 37: closeChat ====================
+   // ==================== القسم 37: closeChat (معدل - مع تنظيف Blob) ====================
 closeChat() {
     console.log('🔴 closeChat - بدء إغلاق المحادثة');
     console.log('currentChat:', this.currentChat);
     console.log('featuresEnabled قبيل الإغلاق:', this.featuresEnabled);
+    
+    // ✅ مسح جميع الملفات من FileManager (بما فيها Blob)
+    if (typeof FileManager !== 'undefined') {
+        FileManager.clearAll();
+        console.log('🗑️ تم مسح جميع الملفات و Blob من FileManager');
+    }
     
     const chatId = this.currentChat;
     
