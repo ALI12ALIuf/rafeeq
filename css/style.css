@@ -15,7 +15,6 @@
     box-shadow: none !important;
 }
 
-/* 🛡️ الحماية المضافة لقفل أبعاد الموقع بالكامل ومنع التكبير والتصغير العشوائي */
 html, body {
     -webkit-text-size-adjust: 100%;
     -moz-text-size-adjust: 100%;
@@ -54,7 +53,6 @@ body {
     overflow: hidden;
 }
 
-/* منع تمرير الصفحة الخلفية نهائياً لضمان ثبات واجهة المحادثة */
 body.conversation-open {
     overflow: hidden !important;
     position: fixed !important;
@@ -243,16 +241,12 @@ body.conversation-open .conversation-page {
 .conversation-status.online { color: #4CAF50; }
 .conversation-status.offline { color: var(--text-light); }
 
-/* ==================== القسم 13.1: أزرار الاتصال ==================== */
 .call-buttons button { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
 .call-buttons button:hover { background: var(--light); }
 .call-buttons button i { font-size: 1.2rem; }
 
-/* ==================== القسم 13.2: أزرار Mute و Lock ==================== */
 .attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
 
-
-/* ==================== القسم 13.3: صندوق الرسائل ==================== */
 .messages-container { 
     flex: 1 !important; 
     overflow-y: auto !important; 
@@ -272,14 +266,12 @@ body.conversation-open .conversation-page {
 .message.received { align-self: flex-start; }
 .message-content { padding: 12px 16px; border-radius: 20px; background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); word-wrap: break-word; -webkit-tap-highlight-color: transparent; }
 
-/* ✅ المرسل: خلفية توافق الثيم + إطار أزرق */
 .message.sent .message-content { 
     background: var(--bg) !important; 
     color: var(--text) !important; 
     border: 1.5px solid #2196F3;
 }
 
-/* ✅ المستلم: خلفية توافق الثيم + إطار أخضر */
 .message.received .message-content { 
     background: var(--bg) !important; 
     color: var(--text) !important; 
@@ -293,8 +285,6 @@ body.conversation-open .conversation-page {
 .message-image { max-width: 200px; max-height: 200px; border-radius: 12px; cursor: pointer; }
 .message-audio { width: 250px; height: 40px; border-radius: 20px; }
 
-
-/* ==================== القسم 13.4: فوتر الإدخال ==================== */
 .message-input-container { 
     background: var(--card-bg); 
     border-top: 1px solid var(--border); 
@@ -355,7 +345,6 @@ body.conversation-open .conversation-page {
     max-height: 120px;
 }
 
-/* ✅ زر موحد (يتغير بين البصمة والإرسال) */
 #actionBtn { 
     width: 38px; 
     height: 38px; 
@@ -400,7 +389,6 @@ body.conversation-open .conversation-page {
     pointer-events: auto !important;
 }
 
-/* ===== واجهة تسجيل البصمة ===== */
 #voiceRecordingUI {
     display: none;
     align-items: center;
@@ -421,7 +409,6 @@ body.conversation-open .conversation-page {
     transition: width 0.3s, background-color 0.3s;
 }
 
-/* ✅ العدادات (كلها بلون التطبيق) */
 #voiceCurrentTime {
     color: var(--primary);
     font-weight: bold;
@@ -433,13 +420,11 @@ body.conversation-open .conversation-page {
     transition: color 0.3s;
 }
 
-/* ✅ الخط الفاصل بين العدادات (بلون التطبيق) */
 #voiceSeparator {
     color: var(--primary);
     transition: color 0.3s;
 }
 
-/* ✅ زر الإرسال (علامة الصح) */
 #voiceSendBtn {
     width: 32px;
     height: 32px;
@@ -460,7 +445,6 @@ body.conversation-open .conversation-page {
     transform: scale(1.05);
 }
 
-/* ✅ تحذير عند 4:40 (وميض - العدادات + الخط الفاصل + شريط التقدم) */
 #voiceRecordingUI.warning #voiceCurrentTime,
 #voiceRecordingUI.warning #voiceSeparator,
 #voiceRecordingUI.warning #voiceMaxTime {
@@ -484,7 +468,6 @@ body.conversation-open .conversation-page {
     100% { background-color: #ff4444; }
 }
 
-/* باقي الأزرار */
 #voiceCancelBtn {
     width: 32px;
     height: 32px;
@@ -525,17 +508,14 @@ body.conversation-open .conversation-page {
     transform: scale(1.05);
 }
 
-/* ✅ عند إخفاء حقل الكتابة أثناء التسجيل */
 #messageInput.hidden {
     display: none;
 }
 
-/* ==================== القسم 13.5: قائمة المرفقات ==================== */
 .attachment-menu { position: absolute; bottom: 80px; right: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2100; min-width: 150px; border: 1px solid var(--border); }
 .attachment-menu button { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: none; background: transparent; color: var(--text); cursor: pointer; border-radius: 12px; font-size: 0.95rem; width: 100%; text-align: right; }
 .attachment-menu button i { width: 24px; color: var(--primary); font-size: 1.2rem; }
 
-/* ==================== القسم 13.6: منتقي الإيموجي ==================== */
 .emoji-picker { position: absolute; bottom: 80px; right: 20px; background: var(--card-bg); border-radius: 20px; box-shadow: var(--shadow); padding: 12px; z-index: 2100; width: 300px; border: 1px solid var(--border); }
 .emoji-categories { display: flex; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .emoji-categories button { width: 40px; height: 40px; border-radius: 20px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.3rem; }
@@ -543,7 +523,6 @@ body.conversation-open .conversation-page {
 .emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: 200px; overflow-y: auto; }
 .emoji-grid button { width: 40px; height: 40px; border-radius: 8px; border: none; background: transparent; color: var(--text); cursor: pointer; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; }
 
-/* ==================== القسم 13.7: استعلامات المحادثة ==================== */
 @media (max-width: 480px) {
     .conversation-header { padding: 8px 12px; height: 60px; }
     .message { max-width: 85%; }
@@ -553,7 +532,6 @@ body.conversation-open .conversation-page {
     .send-btn, .voice-btn { width: 40px; height: 40px; font-size: 1.1rem; }
 }
 
-/* ==================== القسم 13.8: أنماط الثيم الداكن للمحادثة ==================== */
 .theme-dark .message.received .message-content { background: #2d2d2d; color: #fff; }
 .theme-dark .message.sent .message-content { background: #1976D2; }
 .theme-dark .message-info { color: #999; }
@@ -562,15 +540,12 @@ body.conversation-open .conversation-page {
 .theme-dark .emoji-categories { border-color: #444; }
 .theme-dark .emoji-categories button.active { background: #444; }
 
-/* ==================== القسم 13.9: حركات الرسائل ==================== */
 @keyframes messagePop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
-/* ==================== القسم 13.10: شريط التمرير ==================== */
 .messages-container::-webkit-scrollbar { width: 6px; }
 .messages-container::-webkit-scrollbar-track { background: transparent; }
 .messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* ==================== القسم 14: إصلاح الإيموجي داخل الإطارات الدائرية ==================== */
 .profile-avatar-emoji,
 .conversation-avatar-emoji,
 .chat-avatar-emoji,
@@ -584,7 +559,6 @@ body.conversation-open .conversation-page {
     justify-content: center;
 }
 
-/* ==================== القسم 15: إصلاح تداخل الصفحات ==================== */
 body.conversation-open .page:not(.conversation-page) {
     display: none !important;
 }
@@ -610,7 +584,6 @@ body:not(.conversation-open) .conversation-page {
     display: none !important;
 }
 
-/* ==================== القسم 16: تنسيق مشغل البصمة الصوتية ==================== */
 .message-audio {
     background: #4CAF50;
     border-radius: 20px;
@@ -638,7 +611,6 @@ body:not(.conversation-open) .conversation-page {
     border-radius: 10px;
 }
 
-/* ==================== القسم 17: أزرار التفعيل والطرد ==================== */
 .feature-toggle-container {
     display: inline-flex;
     align-items: center;
@@ -739,9 +711,6 @@ input:checked + .feature-slider:before {
     transform: scale(0.95);
 }
 
-/* ==================== القسم 18: ستايلات العناصر الثابتة ==================== */
-
-/* ستايلات السلايدر للمكالمات والموقع */
 .swipe-container {
     width: 100%;
     margin: 20px 0;
@@ -764,7 +733,6 @@ input:checked + .feature-slider:before {
     cursor: grabbing;
 }
 
-/* ستايلات التبديل (Toggle Switch) */
 .toggle-switch {
     position: relative;
     display: inline-block;
@@ -810,7 +778,6 @@ input:checked + .toggle-slider:before {
     transform: translateX(30px);
 }
 
-/* ستايلات أزرار اختيار عدد النقرات */
 .click-preset {
     background: #1a1a2e;
     color: white;
@@ -833,7 +800,6 @@ input:checked + .toggle-slider:before {
     border-color: #4CAF50;
 }
 
-/* حركات المكالمات الواردة */
 @keyframes float {
     0%, 100% { transform: translateY(0px); }
     50% { transform: translateY(-15px); }
@@ -847,16 +813,12 @@ input:checked + .toggle-slider:before {
     100% { transform: rotate(0deg); }
 }
 
-/* حركات أزرار المكالمات */
 @keyframes pulse {
     0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
     70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
 }
 
-/* ==================== القسم 19: ستايلات قوالب الرسائل الثابتة ==================== */
-
-/* قالب الصورة */
 .message-image-wrapper {
     cursor: pointer;
     display: inline-block;
@@ -873,7 +835,6 @@ input:checked + .toggle-slider:before {
     display: block;
 }
 
-/* قالب الفيديو */
 .video-thumbnail {
     position: relative;
     width: 250px;
@@ -908,7 +869,6 @@ input:checked + .toggle-slider:before {
     font-size: 1.5rem;
 }
 
-/* قالب البصمة الصوتية */
 .voice-message {
     background: #4CAF50;
     border-radius: 20px;
@@ -974,7 +934,6 @@ input:checked + .toggle-slider:before {
     opacity: 0.8;
 }
 
-/* قالب الملف */
 .file-card {
     background: #4CAF50;
     border-radius: 16px;
@@ -1013,31 +972,6 @@ input:checked + .toggle-slider:before {
     line-height: 1.3;
 }
 
-.download-file-btn {
-    color: white;
-    cursor: pointer;
-    background: rgba(255,255,255,0.2);
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    flex-shrink: 0;
-    border: none;
-}
-
-.download-file-btn:hover {
-    background: rgba(255,255,255,0.3);
-    transform: scale(1.05);
-}
-
-.download-file-btn:active {
-    transform: scale(0.95);
-}
-
-/* قالب الموقع */
 .location-card {
     cursor: pointer;
     background: #4CAF50;
@@ -1059,9 +993,6 @@ input:checked + .toggle-slider:before {
     transform: scale(0.95);
 }
 
-/* ==================== القسم 20: ستايلات واجهات المكالمات الثابتة ==================== */
-
-/* أزرار المكالمات */
 .call-btn {
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     backdrop-filter: blur(10px);
@@ -1084,16 +1015,32 @@ input:checked + .toggle-slider:before {
     background: linear-gradient(135deg, #ff6659, #e53935) !important;
 }
 
-/* الفيديو المحلي في المكالمة */
 .local-video {
     border: 3px solid rgba(255,255,255,0.3);
     transition: all 0.3s ease;
     box-shadow: 0 5px 20px rgba(0,0,0,0.3);
 }
 
-/* حركة الأفاتار في المكالمة الصوتية */
 .avatar-animation {
     animation: float 3s ease-in-out infinite;
 }
 
-
+/* ==================== إخفاء نهائي لكل ما يتعلق بالتنزيل ==================== */
+.download-file-btn,
+.download-btn,
+[onclick*="download"],
+[onclick*="Download"],
+[data-action="download"],
+.btn-download,
+.download-file-btn:hover,
+.download-file-btn:active {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    z-index: -9999 !important;
+}
