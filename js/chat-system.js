@@ -1144,7 +1144,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل - مع Blob للتحميل) ====================
+ // ==================== القسم 26: displayMessage (معدل - مع Blob للتحميل + دعم FileManager) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1285,8 +1285,19 @@ displayMessage(msg) {
                     const fileId = msg.fileId || msg.id;
                     
                     // ✅ استخدام data: URL للعرض (من msg._dataUrl)
-                    if (msg._dataUrl) {
-                        img.src = msg._dataUrl;
+                    let imageSrc = msg._dataUrl || null;
+                    
+                    // ✅ إذا لم توجد _dataUrl، حاول من FileManager
+                    if (!imageSrc && fileId && typeof FileManager !== 'undefined') {
+                        const fileData = FileManager.getFile(fileId);
+                        if (fileData && fileData.dataUrl) {
+                            imageSrc = fileData.dataUrl;
+                            console.log(`✅ تم استرجاع dataUrl من FileManager للصورة: ${fileId}`);
+                        }
+                    }
+                    
+                    if (imageSrc) {
+                        img.src = imageSrc;
                     } else {
                         img.alt = 'صورة غير متوفرة';
                         console.warn(`⚠️ لا توجد بيانات للعرض: ${fileId || msg.id}`);
@@ -1403,8 +1414,19 @@ displayMessage(msg) {
                     const fileId = msg.fileId || msg.id;
                     
                     // ✅ استخدام data: URL للعرض
-                    if (msg._dataUrl) {
-                        source.src = msg._dataUrl;
+                    let videoSrc = msg._dataUrl || null;
+                    
+                    // ✅ إذا لم توجد _dataUrl، حاول من FileManager
+                    if (!videoSrc && fileId && typeof FileManager !== 'undefined') {
+                        const fileData = FileManager.getFile(fileId);
+                        if (fileData && fileData.dataUrl) {
+                            videoSrc = fileData.dataUrl;
+                            console.log(`✅ تم استرجاع dataUrl من FileManager للفيديو: ${fileId}`);
+                        }
+                    }
+                    
+                    if (videoSrc) {
+                        source.src = videoSrc;
                         video.load();
                     } else {
                         console.warn(`⚠️ لا توجد بيانات للعرض: ${fileId || msg.id}`);
