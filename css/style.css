@@ -1025,22 +1025,16 @@ input:checked + .toggle-slider:before {
     animation: float 3s ease-in-out infinite;
 }
 
-/* ==================== إخفاء نهائي لكل ما يتعلق بالتنزيل ==================== */
-.download-file-btn,
-.download-btn,
-[onclick*="download"],
-[onclick*="Download"],
-[data-action="download"],
-.btn-download,
-.download-file-btn:hover,
+/* ==================== ستايلات أزرار التحميل ==================== */
+.download-file-btn {
+    transition: all 0.2s ease;
+}
+
+.download-file-btn:hover {
+    transform: scale(1.05);
+    opacity: 0.9;
+}
+
 .download-file-btn:active {
-    display: none !important;
-    pointer-events: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    width: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-    position: absolute !important;
-    z-index: -9999 !important;
+    transform: scale(0.95);
 }
