@@ -1190,7 +1190,7 @@ showCallUI(type) {
         }
     },
     
-    // ==================== 13. إرسال الملفات (Base64 كامل - بدون تنزيل) ====================
+    // ==================== 13. إرسال واستقبال الملفات (Base64 - مع FileManager) ====================
 
 async sendFileDirect(file, type) {
     if (!this.dc || this.dc.readyState !== 'open') {
@@ -1256,6 +1256,7 @@ blobToBase64(blob) {
     });
 },
 
+// ==================== handleChunkMessage (معدل - مع FileManager) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = '';
@@ -1277,39 +1278,85 @@ handleChunkMessage(msg) {
     if (this.incomingFileInfo[msg.id].received === msg.total) {
         const fullBase64 = this.incomingChunks[msg.id];
         
-        let dataPrefix = '';
+        // ✅ بناء data: URL
+        let dataUrl = '';
         if (msg.type === 'image') {
-            dataPrefix = 'data:image/jpeg;base64,';
+            dataUrl = 'data:image/jpeg;base64,' + fullBase64;
         } else if (msg.type === 'video') {
-            dataPrefix = 'data:video/mp4;base64,';
-        } else if (msg.type === 'voice') {
-            dataPrefix = 'data:audio/webm;base64,';
+            dataUrl = 'data:video/mp4;base64,' + fullBase64;
         } else if (msg.type === 'file') {
-            dataPrefix = 'data:application/octet-stream;base64,';
+            dataUrl = 'data:application/octet-stream;base64,' + fullBase64;
+        } else {
+            // ❌ أنواع غير مدعومة (voice, location, إلخ) - نعرضها بدون تحميل
+            const displayMsg = {
+                id: msg.id,
+                type: msg.type,
+                data: msg.data || '',
+                fileName: msg.fileName || 'ملف',
+                sender: 'friend',
+                time: new Date().toISOString(),
+                _isBase64: true
+            };
+            if (ChatSystem.currentChat) {
+                ChatSystem.displayMessage(displayMsg);
+            }
+            ChatSystem.hideProgressBar();
+            delete this.incomingChunks[msg.id];
+            delete this.incomingFileInfo[msg.id];
+            return;
         }
         
-        const dataUrl = dataPrefix + fullBase64;
+        const fileId = msg.id;
+        const fileName = msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف');
         
-        const displayMsg = {
-            id: msg.id,
+        // ✅ حفظ في FileManager (الذاكرة فقط)
+        const saved = FileManager.saveFile(fileId, dataUrl, {
+            fileName: fileName,
             type: msg.type,
-            data: dataUrl,
-            fileName: msg.fileName || (msg.type === 'image' ? 'صورة' : msg.type === 'video' ? 'فيديو' : 'ملف'),
+            sender: 'friend',
+            time: new Date().toISOString()
+        });
+        
+        if (!saved) {
+            console.warn('⚠️ فشل حفظ الملف في FileManager');
+            ChatSystem.hideProgressBar();
+            delete this.incomingChunks[msg.id];
+            delete this.incomingFileInfo[msg.id];
+            return;
+        }
+        
+        // ✅ رسالة للعرض (مع fileId فقط - بدون data مباشرة)
+        const displayMsg = {
+            id: fileId,
+            type: msg.type,
+            fileId: fileId,
+            fileName: fileName,
             sender: 'friend',
             time: new Date().toISOString(),
+            _hasFile: true,
             _isBase64: true
         };
         
         if (ChatSystem.currentChat) {
+            // ✅ حفظ في ذاكرة المحادثة
+            if (!ChatSystem.messages[ChatSystem.currentChat]) {
+                ChatSystem.messages[ChatSystem.currentChat] = [];
+            }
+            ChatSystem.messages[ChatSystem.currentChat].push(displayMsg);
+            
+            // ✅ عرض في المحادثة
             ChatSystem.displayMessage(displayMsg);
         }
         ChatSystem.hideProgressBar();
         
         delete this.incomingChunks[msg.id];
         delete this.incomingFileInfo[msg.id];
+        
+        console.log(`✅ تم استلام وعرض الملف: ${fileName} (ID: ${fileId}) - يحفظ في FileManager`);
     }
 },
 
+// ==================== compressImage (معدل) ====================
 compressImage(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
