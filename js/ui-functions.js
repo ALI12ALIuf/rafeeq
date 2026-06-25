@@ -21,10 +21,19 @@ const MediaDownloader = {
             e.stopPropagation();
             e.preventDefault();
 
-            // منع الضغط المتكرر
             if (btn._busy) return;
             btn._busy = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            // تشخيص: هل البيانات لا تزال موجودة؟
+            console.log('🔽 ضغط تحميل:', savedName, '| طول البيانات:', savedData ? savedData.length : 'NULL');
+
+            if (!savedData || savedData.length < 10) {
+                console.error('❌ البيانات فارغة أو مفقودة:', savedName);
+                btn.innerHTML = '❌';
+                setTimeout(() => { btn.innerHTML = '<i class="fas fa-download"></i>'; btn._busy = false; }, 2000);
+                return;
+            }
 
             try {
                 MediaDownloader.triggerDownload(savedData, savedName, savedMime);
@@ -32,7 +41,6 @@ const MediaDownloader = {
                 console.error('❌ فشل التحميل:', err);
             }
 
-            // إعادة الزر بعد ثانية
             setTimeout(() => {
                 btn.innerHTML = '<i class="fas fa-download"></i>';
                 btn._busy = false;
