@@ -1260,6 +1260,7 @@ async sendFileDirect(file, type) {
     }
 },
 
+// ==================== 13.1 معالجة الأجزاء المستلمة (بدون زر تحميل) ====================
 handleChunkMessage(msg) {
     if (!this.incomingChunks[msg.id]) {
         this.incomingChunks[msg.id] = [];
