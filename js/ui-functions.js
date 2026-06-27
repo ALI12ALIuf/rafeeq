@@ -666,23 +666,7 @@ window.closeVideoPreview = function() {
     if (video) { video.pause(); video.src = ''; }
 };
 
-window.downloadPreviewImage = function() {
-    const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
-};
-
-window.downloadPreviewVideo = function() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-};
+// تم إزالة دوال التحميل (downloadPreviewImage و downloadPreviewVideo) نهائياً
 
 // ==================== القسم 15: دوال مساعدة ====================
 function formatNumber(num) { 
