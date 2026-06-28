@@ -651,7 +651,7 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات (معدل) ====================
+// ==================== القسم 14: دوال إغلاق المعاينات والتحميل (معدل) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -668,26 +668,46 @@ window.closeVideoPreview = function() {
     if (modal) modal.style.display = 'none';
     if (video) { 
         video.pause(); 
-        // ✅ لا تمسح المصدر - فقط أوقف التشغيل
+        // ✅ لا تمسح المصدر
     }
 };
 
 window.downloadPreviewImage = function() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
+    
+    // ✅ أنشئ رابطاً جديداً في كل مرة
     const link = document.createElement('a');
     link.href = img.src;
     link.download = 'image.jpg';
+    
+    // ✅ أضف الرابط إلى DOM قبل النقر
+    document.body.appendChild(link);
     link.click();
+    
+    // ✅ أزل الرابط بعد النقر
+    setTimeout(() => {
+        document.body.removeChild(link);
+    }, 100);
 };
 
 window.downloadPreviewVideo = function() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
+    
+    // ✅ أنشئ رابطاً جديداً في كل مرة
     const link = document.createElement('a');
     link.href = video.src;
     link.download = 'video.mp4';
+    
+    // ✅ أضف الرابط إلى DOM قبل النقر
+    document.body.appendChild(link);
     link.click();
+    
+    // ✅ أزل الرابط بعد النقر
+    setTimeout(() => {
+        document.body.removeChild(link);
+    }, 100);
 };
 
 // ==================== القسم 15: دوال مساعدة ====================
