@@ -651,19 +651,25 @@ window.getEmojiForUser = u => {
     return m[u?.avatarType] || '👤'; 
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
+// ==================== القسم 14: دوال إغلاق المعاينات (معدل) ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
+    if (img) { 
+        // ✅ لا تمسح المصدر - فقط أعد تعيين التحويلات
+        img.style.transform = 'none'; 
+    }
 };
 
 window.closeVideoPreview = function() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    if (video) { 
+        video.pause(); 
+        // ✅ لا تمسح المصدر - فقط أوقف التشغيل
+    }
 };
 
 window.downloadPreviewImage = function() {
