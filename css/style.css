@@ -1084,3 +1084,286 @@ input:checked + .toggle-slider:before {
 .modal-save-btn:active { transform: scale(0.92); }
 
 .message-image-wrapper { position: relative !important; }
+
+
+
+
+/* ==================== مشغل الفيديو المخصص ==================== */
+
+.custom-video-container {
+    width: 100%;
+    max-width: 280px;
+    background: #0a0a0a;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.custom-video-wrapper {
+    position: relative;
+    width: 100%;
+    background: #000;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.custom-video-player {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    display: block;
+}
+
+.custom-video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.custom-video-wrapper:hover .custom-video-overlay,
+.custom-video-wrapper.active .custom-video-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.custom-video-play-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.8);
+    background: rgba(0,0,0,0.6);
+    color: white;
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    backdrop-filter: blur(5px);
+}
+
+.custom-video-play-btn:hover {
+    transform: scale(1.1);
+    background: rgba(255,255,255,0.2);
+}
+
+.custom-video-play-btn:active {
+    transform: scale(0.9);
+}
+
+/* ====== شريط التحكم السفلي ====== */
+.custom-video-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.custom-video-play-btn-small {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.custom-video-play-btn-small:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.custom-video-play-btn-small:active {
+    transform: scale(0.9);
+}
+
+.custom-video-progress-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.custom-video-progress-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+    min-width: 40px;
+}
+
+.custom-video-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
+.custom-video-progress-bar:hover {
+    height: 6px;
+}
+
+.custom-video-progress-bar:hover .custom-video-progress-fill {
+    height: 6px;
+}
+
+.custom-video-time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    font-family: monospace;
+    color: rgba(255,255,255,0.7);
+    direction: ltr;
+    flex-shrink: 0;
+    min-width: 90px;
+    justify-content: center;
+}
+
+.custom-video-current-time {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.custom-video-total-time {
+    color: rgba(255,255,255,0.5);
+}
+
+.custom-video-mute-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.custom-video-mute-btn:hover {
+    color: white;
+    background: rgba(255,255,255,0.1);
+}
+
+/* ====== رسالة الفيديو في المحادثة ====== */
+.message .custom-video-container {
+    max-width: 240px;
+}
+
+.message.sent .custom-video-container {
+    border-color: #2196F3;
+}
+
+.message.received .custom-video-container {
+    border-color: #4CAF50;
+}
+
+/* ====== أنيميشن زر التشغيل ====== */
+@keyframes videoPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.custom-video-play-btn.playing {
+    animation: videoPulse 2s ease-in-out infinite;
+}
+
+/* ====== زر الحفظ بالضغط المطول ====== */
+@keyframes savePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(76,175,80,0.7); }
+    70%  { box-shadow: 0 0 0 8px rgba(76,175,80,0); }
+    100% { box-shadow: 0 0 0 0 rgba(76,175,80,0); }
+}
+
+.media-save-btn {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #4CAF50;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    text-decoration: none;
+    cursor: pointer;
+    z-index: 20;
+    animation: savePulse 2s infinite;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+}
+
+.media-save-btn:active {
+    transform: scale(0.92);
+}
+
+.file-save-btn {
+    position: static;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.modal-save-btn {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #4CAF50;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    text-decoration: none;
+    cursor: pointer;
+    pointer-events: auto;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+    animation: savePulse 2s infinite;
+}
+
+.modal-save-btn:active {
+    transform: scale(0.92);
+}
+
+.message-image-wrapper {
+    position: relative !important;
+}
+
