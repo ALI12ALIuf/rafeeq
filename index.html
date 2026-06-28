@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rafeeq - رفيق</title>
+    
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" id="theme-color" content="#1a1a1a">
+</head>
+<body class="theme-dark" data-page="home">
+
+<!-- ==================== القسم 1: شاشة البداية (Splash Screen) ==================== -->
+<div class="splash-screen" id="splash">
+    <div class="splash-content">
+        <div class="app-icon">🛡️</div>
+        <h1>رفيق</h1>
+        <p>رفيقك الآمن في كل رحلة</p>
+        <div class="spinner"></div>
+    </div>
+</div>
+
+<!-- ==================== القسم 2: الحاوية الرئيسية ==================== -->
+<div class="app-container" id="app" style="display: none;">
+    
+    <!-- ==================== القسم 2.1: رأس التطبيق ==================== -->
+    <header class="app-header">
+        <div class="header-left"></div>
+        <div class="header-title"><h1 data-i18n="app_name">رفيق</h1></div>
+        <div class="header-right"></div>
+    </header>
+
+    <!-- ==================== القسم 2.2: المحتوى الرئيسي ==================== -->
+    <main class="app-content" id="mainContent">
+        
+        <!-- ===== القسم 2.2.1: صفحة الرئيسية (Home) ===== -->
+        <div class="page home-page active">
+            <div class="posts-section">
+                <div class="posts-container" id="postsContainer">
+                    <div class="post-card">
+                        <div class="post-header">
+                            <div class="post-avatar-emoji" id="postAvatarEmoji">👤</div>
+                            <div class="post-user"><h4>أحمد</h4><span class="post-time">منذ ساعتين</span></div>
+                            <button class="post-menu"><i class="fas fa-ellipsis-v"></i></button>
+                        </div>
+                        <div class="post-content">
+                            <div class="post-location"><i class="fas fa-map-marker-alt"></i><span>بغداد - أربيل</span></div>
+                            <div class="post-map-placeholder"><i class="fas fa-map"></i><span data-i18n="location_sharing">مشاركة الموقع</span></div>
+                        </div>
+                        <div class="post-actions">
+                            <button class="post-action"><i class="far fa-heart"></i> 24</button>
+                            <button class="post-action"><i class="far fa-comment"></i> 5</button>
+                            <button class="post-action"><i class="far fa-share-square"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== القسم 2.2.2: صفحة الدردشة (Chat) ===== -->
+        <div class="page chat-page">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
+                    <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
+                </div>
+                <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
+                
+                <!-- ✅ قالب نتيجة البحث (ثابت) -->
+                <template id="searchResultTemplate">
+                    <div class="search-result-item" style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--card-bg);border-radius:var(--radius);margin-bottom:4px;">
+                        <div class="search-result-avatar" style="width:40px;height:40px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;"></div>
+                        <div class="search-result-info" style="flex:1;">
+                            <h4 style="margin:0;font-size:0.95rem;"></h4>
+                            <p style="margin:0;color:var(--text-light);font-size:0.8rem;"></p>
+                        </div>
+                        <div class="search-result-action">
+                            <button class="search-action-btn" style="padding:6px 14px;border:none;border-radius:20px;background:var(--primary);color:white;cursor:pointer;font-size:0.85rem;"></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div class="chats-list" id="chatsList"></div>
+            
+            <!-- ✅ قالب عنصر المحادثة (ثابت) -->
+            <template id="chatItemTemplate">
+                <div class="chat-item" onclick="">
+                    <div class="chat-avatar-emoji"></div>
+                    <div class="chat-info">
+                        <h4></h4>
+                        <p class="last-message"></p>
+                    </div>
+                    <div class="chat-meta">
+                        <span class="chat-time"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
+        <div class="conversation-page" id="conversationPage" style="display: none;">
+            
+            <!-- ===== القسم 2.2.3.1: رأس المحادثة ===== -->
+            <div class="conversation-header">
+                <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
+                
+                <!-- ===== القسم 2.2.3.1.1: معلومات المستخدم ===== -->
+                <div class="conversation-user-info" style="gap:0;">
+                    <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
+                    <div class="conversation-user-details">
+                        <h3 id="conversationName" style="display:none;"></h3>
+                        <span class="conversation-status" id="conversationStatus" style="font-size:0.85rem;"></span>
+                    </div>
+                </div>
+                
+                <!-- ===== القسم 2.2.3.1.2: أزرار الاتصال والميزات ===== -->
+                <div class="call-buttons" style="display:flex;gap:12px;margin-right:auto;">
+                    <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة" style="display:none;">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                    
+                    <div id="featureToggleContainer" class="feature-toggle-container" style="display:none; align-items: center; gap: 8px;">
+                        <span class="feature-toggle-label" style="color: #f44336; font-size: 0.7rem;">○</span>
+                        <label class="feature-switch" id="featureSwitchLabel">
+                            <input type="checkbox" id="featureToggleInput">
+                            <span class="feature-slider" id="featureToggleSlider"></span>
+                        </label>
+                        <span class="feature-toggle-label" style="color: #4CAF50; font-size: 0.7rem;">●</span>
+                    </div>
+                    
+                    <button onclick="startAudioCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال صوت">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                    <button onclick="startVideoCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال فيديو">
+                        <i class="fas fa-video"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ===== القسم 2.2.3.2: حاوية الرسائل ===== -->
+            <div class="messages-container" id="messagesContainer"></div>
+
+            <!-- ===== القسم 2.2.3.3: مدخل الرسائل ===== -->
+            <div class="message-input-container">
+                <div class="message-input-wrapper">
+                    <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
+                    <div class="input-area">
+                        <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()">
+                        
+                        <!-- ===== واجهة تسجيل البصمة ===== -->
+                        <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
+                            <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; position:relative; overflow:hidden;">
+                                <div id="voiceProgressFill" style="width:0%; height:100%; background:var(--primary); border-radius:2px; transition:width 0.3s;"></div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-family:monospace; direction:ltr; min-width:100px; justify-content:center;">
+                                <span id="voiceCurrentTime" style="color:var(--primary); font-weight:bold;">0:00</span>
+                                <span id="voiceSeparator" style="color:var(--primary);">/</span>
+                                <span id="voiceMaxTime" style="color:var(--primary);">5:00</span>
+                            </div>
+                            <button id="voicePlayBtn" style="display:none; width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:var(--primary); cursor:pointer; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s;">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button id="voiceCancelBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#ff4444; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <button id="voiceSendBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:var(--primary); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button id="actionBtn" class="voice-btn" onclick="handleActionButton()">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+                
+                <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
+                <div class="attachment-menu" id="attachmentMenu" style="display: none;">
+                    <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
+                    <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
+                    <button class="attach-option" onclick="sendFile()"><i class="fas fa-file"></i> ملف</button>
+                    <button class="attach-option" onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== القسم 2.2.4: صفحة الملف الشخصي (Profile) ===== -->
+        <div class="page profile-page">
+            <div class="profile-header">
+                <div class="profile-cover">
+                    <div class="profile-avatar-center"><div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div></div>
+                    <button class="edit-profile-btn-left" onclick="openEditProfileModal()"><i class="fas fa-pen"></i></button>
+                </div>
+                <div class="profile-info-container">
+                    <div class="profile-name-wrapper"><h2 id="profileName"></h2></div>
+                    <div class="profile-id-row">
+                        <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
+                        <span id="shareableId" class="id-value-numbers"></span>
+                        <span class="id-label-english">ID</span>
+                    </div>
+                </div>
+                <p class="profile-bio" id="profileBio"></p>
+                <div class="profile-stats">
+                    <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
+                    <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
+                    <a href="#" class="stat-link" onclick="showFriendRequests()"><span class="stat-value" id="friendRequestsCount">0</span><span data-i18n="friend_requests">الطلبات</span></a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== القسم 2.2.5: الصفحات الفرعية للملف الشخصي ===== -->
+        <div class="profile-pages">
+            <div class="profile-subpage" id="tripsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
+                <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
+            </div>
+            <div class="profile-subpage" id="friendsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friends">الأصدقاء</h3></div>
+                <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
+            </div>
+            <div class="profile-subpage" id="friendRequestsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friend_requests">طلبات الصداقة</h3></div>
+                <div class="users-list" id="friendRequestsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friend_requests">لا توجد طلبات</h3><p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p></div></div>
+            </div>
+            
+            <!-- ✅ قالب عنصر الصديق (ثابت) -->
+            <template id="friendItemTemplate">
+                <div class="user-item">
+                    <div class="user-avatar-emoji"></div>
+                    <div class="user-info">
+                        <h4></h4>
+                        <p></p>
+                    </div>
+                    <div class="user-actions">
+                        <button class="action-btn chat-btn" title="محادثة">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                        <button class="action-btn remove-btn" title="حذف" style="background:var(--danger);color:white;">
+                            <i class="fas fa-user-minus"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- ✅ قالب طلب الصداقة (ثابت) -->
+            <template id="friendRequestTemplate">
+                <div class="user-item" id="">
+                    <div class="user-avatar-emoji"></div>
+                    <div class="user-info">
+                        <h4></h4>
+                        <p></p>
+                    </div>
+                    <div class="user-actions">
+                        <button class="action-btn accept-btn" style="background:var(--success);color:white;" title="قبول">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button class="action-btn reject-btn" style="background:var(--danger);color:white;" title="رفض">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===== القسم 2.2.6: صفحة الإعدادات (Settings) ===== -->
+        <div class="page settings-page">
+            <div class="settings-list">
+                <div class="settings-item" onclick="openLanguageModal()">
+                    <div class="settings-item-left"><i class="fas fa-globe"></i><span data-i18n="language">اللغة</span></div>
+                    <i class="fas fa-chevron-left"></i>
+                </div>
+                <div class="settings-item" onclick="logout()">
+                    <div class="settings-item-left"><i class="fas fa-sign-out-alt" style="color: var(--danger);"></i><span data-i18n="logout" style="color: var(--danger);">تسجيل الخروج</span></div>
+                    <i class="fas fa-chevron-left" style="color: var(--danger);"></i>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===== القسم 3: شريط التنقل السفلي ===== -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-page="home"><i class="fas fa-home"></i><span data-i18n="home">الرئيسية</span></button>
+        <button class="nav-item" data-page="chat"><i class="fas fa-comment"></i><span data-i18n="chat">الدردشة</span></button>
+        <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span data-i18n="profile">الملف</span></button>
+        <button class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span data-i18n="settings">الإعدادات</span></button>
+    </nav>
+</div>
+
+<!-- ==================== القسم 4: العناصر الثابتة ==================== -->
+
+<!-- 4.1: شاشة المكالمة الواردة -->
+<div id="incomingCall" style="display:none; position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0e27;z-index:9999;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:system-ui,sans-serif;">
+    <div style="text-align:center;margin-bottom:50px;">
+        <div id="incomingCallAvatar" style="font-size:5.5rem;margin-bottom:15px;animation:float 2.5s ease-in-out infinite, ring 1.2s ease-in-out infinite;">👤</div>
+        <div id="incomingCallName" style="font-size:1.8rem;font-weight:bold;">مستخدم</div>
+    </div>
+    <div class="swipe-container" style="width:360px;margin:30px auto;position:relative;">
+        <div id="swipeButton" style="width:100%;height:80px;border-radius:50px;position:relative;overflow:hidden;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(90deg,#1a5a2a 0%,#1a5a2a 50%,#8b1a1a 50%,#8b1a1a 100%);border:2px solid #2196F3;box-shadow:0 8px 30px rgba(0,0,0,0.4);">
+            <div style="position:absolute;top:10px;bottom:10px;left:50%;width:2px;background:#2196F3;transform:translateX(-50%);border-radius:2px;box-shadow:0 0 8px #2196F3;"></div>
+            <div style="position:absolute;top:50%;left:50%;width:14px;height:14px;background:#2196F3;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 12px #2196F3;"></div>
+            <div id="leftThumb" style="position:absolute;top:8px;left:8px;width:64px;height:64px;border-radius:50%;background:linear-gradient(145deg,#4CAF50,#1b5e2a);display:flex;align-items:center;justify-content:center;font-size:1.8rem;cursor:grab;box-shadow:0 8px 25px rgba(0,0,0,0.5);color:white;border:2px solid #2196F3;backdrop-filter:blur(5px);transition:left 0.1s linear;z-index:30;">
+                <i class="fas fa-phone"></i>
+            </div>
+            <div id="rightThumb" style="position:absolute;top:8px;right:8px;width:64px;height:64px;border-radius:50%;background:linear-gradient(145deg,#f44336,#8b0000);display:flex;align-items:center;justify-content:center;font-size:1.8rem;cursor:grab;box-shadow:0 8px 25px rgba(0,0,0,0.5);color:white;border:2px solid #2196F3;backdrop-filter:blur(5px);transition:right 0.1s linear;z-index:30;">
+                <i class="fas fa-phone-slash"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4.2: واجهة المكالمة الصوتية -->
+<div id="audioCallUI" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:#0a0e27;">
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;text-align:center;color:white;">
+        <div id="callAvatar" style="font-size:6rem;margin-bottom:15px;animation:float 3s ease-in-out infinite;">👤</div>
+        <div id="callName" style="font-size:1.8rem;font-weight:bold;margin-bottom:5px;text-shadow:0 2px 10px rgba(0,0,0,0.3);">مستخدم</div>
+        <div style="margin-top:8px;color:#4CAF50;font-size:0.9rem;background:rgba(76,175,80,0.2);padding:5px 15px;border-radius:20px;display:inline-block;">
+            <i class="fas fa-phone-alt" style="margin-left:5px;"></i> <span id="callTimer">00:00</span>
+        </div>
+    </div>
+    <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;padding:0 20px;">
+        <button id="speakerBtn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-volume-up"></i>
+        </button>
+        <button id="endCallBtn" style="width:80px;height:80px;border-radius:50%;border:none;font-size:2.2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;background:linear-gradient(135deg,#f44336,#d32f2f);animation:pulse 1.5s infinite;transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-phone-slash"></i>
+        </button>
+        <button id="muteBtn" style="width:65px;height:65px;border-radius:50%;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-microphone"></i>
+        </button>
+    </div>
+</div>
+
+<!-- 4.3: واجهة المكالمة المرئية -->
+<div id="videoCallUI" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9997;background:#0a0e27;">
+    <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;position:fixed;top:0;left:0;z-index:9998;background:#0a0e27;"></video>
+    <video id="localVideo" autoplay playsinline muted style="width:120px;height:170px;object-fit:cover;position:fixed;bottom:100px;right:20px;z-index:9999;border-radius:16px;border:3px solid rgba(255,255,255,0.3);cursor:pointer;box-shadow:0 5px 20px rgba(0,0,0,0.3);transition:all 0.3s ease;"></video>
+    <div style="position:fixed;bottom:40px;left:0;right:0;z-index:9999;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;padding:0 20px;">
+        <button id="switchCameraBtn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+        <button id="muteAudioBtn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-microphone"></i>
+        </button>
+        <button id="endCallBtnVideo" style="width:75px;height:75px;border-radius:50%;border:none;font-size:2rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;background:linear-gradient(135deg,#f44336,#d32f2f);animation:pulse 1.5s infinite;transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-phone-slash"></i>
+        </button>
+        <button id="muteVideoBtn" style="width:60px;height:60px;border-radius:50%;border:none;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);color:#2196F3;background:rgba(30,30,40,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <i class="fas fa-video"></i>
+        </button>
+    </div>
+</div>
+
+<!-- 4.4: معاينة الصورة -->
+<div id="imagePreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10050;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-x pan-y;">
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10051;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;border-radius:16px;">
+        <img id="previewImage" style="max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.1s;touch-action:none;cursor:default;">
+    </div>
+    <div style="position:absolute;top:30px;left:0;right:0;display:flex;justify-content:space-between;padding:0 30px;pointer-events:none;z-index:10052;">
+        <button onclick="closeImagePreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-arrow-right"></i>
+        </button>
+        <button onclick="downloadPreviewImage()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-download"></i>
+        </button>
+    </div>
+</div>
+
+<!-- 4.5: معاينة الفيديو -->
+<div id="videoPreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10060;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10061;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;flex-direction:column;background:#000;border-radius:16px;overflow:hidden;">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;">
+            <video id="previewVideo" style="max-width:100%;max-height:100%;object-fit:contain;" controls playsinline></video>
+        </div>
+    </div>
+    <div style="position:absolute;top:30px;left:0;right:0;display:flex;justify-content:space-between;padding:0 35px;pointer-events:none;z-index:10062;">
+        <button onclick="closeVideoPreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-arrow-right"></i>
+        </button>
+        <button onclick="downloadPreviewVideo()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-download"></i>
+        </button>
+    </div>
+</div>
+
+<!-- 4.6: مشاركة الموقع -->
+<div id="locationSwipeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10003;align-items:center;justify-content:center;backdrop-filter:blur(5px);font-family:system-ui,sans-serif;">
+    <div style="background:#0a0e27;border-radius:40px;width:340px;max-width:90%;padding:30px 20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4);">
+        <div style="font-size:3rem;margin-bottom:10px;">🗺️</div>
+        <h3 style="color:white;margin:0 0 5px;">مشاركة الموقع</h3>
+        <p style="color:#aaa;font-size:0.8rem;margin-bottom:20px;">هل تريد مشاركة موقعك الحالي</p>
+        <div style="background:rgba(76,175,80,0.15);border-radius:20px;padding:12px;margin-bottom:20px;">
+            <div style="color:#4CAF50;font-size:0.9rem;font-weight:bold;margin-bottom:5px;">الإحداثيات</div>
+            <div style="color:white;font-weight:bold;font-size:0.9rem;" id="locationCoordsText">0.000000 , 0.000000</div>
+        </div>
+        <div style="margin-bottom:15px;">
+            <div style="color:white;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">عدد مرات فتح الموقع</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;" id="clickPresets">
+                <button class="click-preset" data-clicks="1">1</button>
+                <button class="click-preset" data-clicks="2">2</button>
+                <button class="click-preset" data-clicks="3">3</button>
+                <button class="click-preset" data-clicks="4">4</button>
+                <button class="click-preset" data-clicks="5">5</button>
+            </div>
+        </div>
+        <div style="margin-bottom:15px;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+                <span style="color:white;font-size:0.8rem;">بلا حدود</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="unlimitedToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span style="color:#aaa;font-size:0.8rem;">محدود</span>
+            </div>
+        </div>
+        <p style="color:#888;font-size:0.65rem;margin:10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
+        <div class="swipe-container" style="width:100%;margin:20px 0;position:relative;">
+            <div id="locationSwipeButton" style="width:100%;height:70px;border-radius:50px;position:relative;overflow:hidden;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(90deg,#1a5a2a 0%,#1a5a2a 50%,#8b1a1a 50%,#8b1a1a 100%);border:2px solid #2196F3;">
+                <div style="position:absolute;top:10px;bottom:10px;left:50%;width:2px;background:#2196F3;transform:translateX(-50%);"></div>
+                <div style="position:absolute;top:50%;left:50%;width:10px;height:10px;background:#2196F3;border-radius:50%;transform:translate(-50%,-50%);"></div>
+                <div id="locationLeftThumb" style="position:absolute;top:8px;left:8px;width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#4CAF50,#1b5e2a);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:grab;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:left 0.05s linear;color:white;">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div id="locationRightThumb" style="position:absolute;top:8px;right:8px;width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#f44336,#8b0000);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:grab;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:right 0.05s linear;color:white;">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4.7: شريط التقدم -->
+<div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
+    <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
+    <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
+</div>
+
+<!-- 4.8: شاشة تسجيل الدخول -->
+<div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
+    <div style="text-align:center;padding:20px;max-width:350px;">
+        <div style="font-size:5rem;">🛡️</div>
+        <h1 style="font-size:2rem;color:var(--primary);">رفيق</h1>
+        <p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p>
+        <button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;">
+            <i class="fab fa-google"></i> المتابعة بحساب جوجل
+        </button>
+    </div>
+</div>
+
+<!-- ==================== القسم 5: قوالب الرسائل الثابتة ==================== -->
+
+<!-- 5.0: قالب غلاف الرسالة -->
+<template id="messageWrapperTemplate">
+    <div class="message"></div>
+</template>
+
+<!-- 5.1: قالب الصورة -->
+<template id="imageMessageTemplate">
+    <div class="message-image-wrapper">
+        <img class="message-image-content" src="" alt="صورة" loading="lazy">
+    </div>
+</template>
+
+<!-- 5.2: قالب الفيديو -->
+<template id="videoMessageTemplate">
+    <div class="message-content video-thumbnail">
+        <video class="video-thumbnail-content" preload="metadata" playsinline>
+            <source src="" type="video/mp4">
+        </video>
+        <div class="video-play-overlay">
+            <i class="fas fa-expand"></i>
+        </div>
+    </div>
+</template>
+
+<!-- 5.3: قالب البصمة الصوتية -->
+<template id="voiceMessageTemplate">
+    <div class="message-content voice-message">
+        <div class="voice-controls">
+            <button class="voice-play-btn">
+                <i class="fas fa-play"></i>
+            </button>
+            <button class="voice-replay-btn">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <div class="voice-timer">
+                <span class="voice-current-time">0:00</span>
+                <span class="voice-duration">0:00</span>
+            </div>
+            <button class="voice-mute-btn">
+                <i class="fas fa-volume-up"></i>
+            </button>
+        </div>
+        <audio class="voice-audio-element" style="display:none;"></audio>
+    </div>
+</template>
+
+<!-- 5.4: قالب الملف -->
+<template id="fileMessageTemplate">
+    <div class="message-content file-card">
+        <div class="file-icon">📄</div>
+        <div class="file-info">
+            <div class="file-name"></div>
+        </div>
+        <button class="download-file-btn">
+            <i class="fas fa-download"></i>
+        </button>
+    </div>
+</template>
+
+<!-- 5.5: قالب الموقع -->
+<template id="locationMessageTemplate">
+    <div class="message-content location-card">
+        <i class="fas fa-map-marker-alt"></i>
+    </div>
+</template>
+
+<!-- ✅ 5.6: قالب الرسالة النصية (جديد) -->
+<template id="textMessageTemplate">
+    <div class="message-content" style="border: 1.5px solid var(--border-color); background: var(--bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;">
+        <span style="font-size: 1rem; line-height: 1.4; display: block;"></span>
+    </div>
+</template>
+    
+<!-- ==================== القسم 6: النوافذ المنبثقة (Modals) ==================== -->
+
+<!-- 6.1: نافذة تعديل الملف الشخصي -->
+<div class="modal" id="editProfileModal">
+    <div class="modal-content">
+        <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
+        <div class="edit-field"><label data-i18n="name">الاسم</label><div class="input-wrapper"><input type="text" id="editName" maxlength="25"><span class="char-counter" id="charCounter">0/25</span></div></div>
+        <div class="edit-field"><label data-i18n="avatar">صورتك الرمزية</label><div class="current-avatar" id="currentAvatarEmoji">👤</div><button class="change-avatar-btn" onclick="openAvatarModal()"><i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span></button></div>
+        <div class="modal-actions"><button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button><button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button></div>
+        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- 6.2: نافذة اختيار الصورة الرمزية -->
+<div class="modal" id="avatarModal">
+    <div class="modal-content">
+        <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
+        <div class="avatar-options">
+            <button class="avatar-option" onclick="selectAvatar('male')"><span>👨</span><span data-i18n="male">رجل</span></button>
+            <button class="avatar-option" onclick="selectAvatar('female')"><span>👩</span><span data-i18n="female">امرأة</span></button>
+            <button class="avatar-option" onclick="selectAvatar('boy')"><span>🧒</span><span data-i18n="boy">ولد</span></button>
+            <button class="avatar-option" onclick="selectAvatar('girl')"><span>👧</span><span data-i18n="girl">بنت</span></button>
+            <button class="avatar-option" onclick="selectAvatar('father')"><span>👨‍🦳</span><span data-i18n="father">أب</span></button>
+            <button class="avatar-option" onclick="selectAvatar('mother')"><span>👩‍🦳</span><span data-i18n="mother">أم</span></button>
+            <button class="avatar-option" onclick="selectAvatar('grandfather')"><span>👴</span><span data-i18n="grandfather">جد</span></button>
+            <button class="avatar-option" onclick="selectAvatar('grandmother')"><span>👵</span><span data-i18n="grandmother">جدة</span></button>
+        </div>
+        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- 6.3: نافذة اختيار اللغة -->
+<div class="modal" id="languageModal">
+    <div class="modal-content">
+        <h3 data-i18n="select_language">اختر اللغة</h3>
+        <div class="language-options">
+            <button class="language-option" onclick="changeLanguage('ar')"><span class="flag">🇮🇶</span><span data-i18n="arabic">العربية</span></button>
+            <button class="language-option" onclick="changeLanguage('en')"><span class="flag">🇬🇧</span><span data-i18n="english">English</span></button>
+        </div>
+        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- ==================== القسم 7: Firebase ==================== -->
+<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAuyKDI0JhPn-v02c5l7XekiyymNWeFPIQ",
+        authDomain: "rafeeq2-c0aef.firebaseapp.com",
+        projectId: "rafeeq2-c0aef",
+        storageBucket: "rafeeq2-c0aef.firebasestorage.app",
+        messagingSenderId: "1030537082006",
+        appId: "1:1030537082006:web:7eb0a052da85e1441bfeb7"
+    };
+    firebase.initializeApp(firebaseConfig);
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+    window.googleProvider = new firebase.auth.GoogleAuthProvider();
+</script>
+
+<!-- ==================== القسم 8: ملفات الجافاسكريبت ==================== -->
+<script src="js/i18n.js?v=2"></script>
+<script src="js/theme.js?v=2"></script>
+<script src="js/secure-chat.js?v=3"></script>
+<script src="js/webrtc-call.js?v=3"></script>
+<script src="js/chat-system.js?v=3"></script>
+<script src="js/ui-functions.js?v=3"></script>
+<script src="js/auth.js?v=3"></script>
+<script src="js/friends.js?v=3"></script>
+
+<!-- ==================== القسم 9: كود التشغيل ==================== -->
+<script>
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        var splash = document.getElementById('splash');
+        var app = document.getElementById('app');
+        if (splash && !splash.classList.contains('hide')) {
+            splash.classList.add('hide');
+            setTimeout(function() { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500);
+        }
+    }, 3000);
+    
+    const nameInput = document.getElementById('editName');
+    const charCounter = document.getElementById('charCounter');
+    if (nameInput && charCounter) {
+        charCounter.textContent = '0/25';
+        nameInput.addEventListener('input', function(e) {
+            let value = this.value;
+            if (value.length > 25) this.value = value.slice(0, 25);
+            charCounter.textContent = this.value.length + '/25';
+            charCounter.classList.toggle('full', this.value.length >= 25);
+        });
+    }
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') performSearch(); });
+});
+
+window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
+</script>
+
+<!-- ==================== القسم 10: أداة التشخيص ==================== -->
+<script>
+(function advancedDiagnosticTool() {
+    const panel = document.createElement('div');
+    panel.id = 'diagnosticTool';
+    panel.style.cssText = `
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.95);
+        color: #0f0;
+        font-size: 11px;
+        font-family: monospace;
+        padding: 8px;
+        border-radius: 10px;
+        z-index: 999999;
+        direction: ltr;
+        text-align: left;
+        border: 2px solid #ff6600;
+        box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        transition: all 0.3s ease;
+        resize: vertical;
+        overflow: auto;
+        max-height: 300px;
+        min-height: 100px;
+    `;
+    
+    const controlBar = document.createElement('div');
+    controlBar.style.cssText = `
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #ff6600;
+        flex-wrap: wrap;
+        position: sticky;
+        top: 0;
+        background: rgba(0,0,0,0.95);
+        z-index: 10;
+    `;
+    
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 نسخ الكل';
+    copyBtn.style.cssText = `background: #ff6600; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = '🗑️ مسح';
+    clearBtn.style.cssText = `background: #333; border: 1px solid #ff6600; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
+    const toggleSizeBtn = document.createElement('button');
+    toggleSizeBtn.textContent = '📐 تصغير';
+    toggleSizeBtn.style.cssText = `background: #2196F3; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
+    const hideBtn = document.createElement('button');
+    hideBtn.textContent = '👁️ إخفاء';
+    hideBtn.style.cssText = `background: #f00; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
+    const moveUpBtn = document.createElement('button');
+    moveUpBtn.textContent = '⬆️ لأعلى';
+    moveUpBtn.style.cssText = `background: #4CAF50; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
+    const moveDownBtn = document.createElement('button');
+    moveDownBtn.textContent = '⬇️ لأسفل';
+    moveDownBtn.style.cssText = `background: #4CAF50; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
+    const exportBtn = document.createElement('button');
+    exportBtn.textContent = '💾 تصدير';
+    exportBtn.style.cssText = `background: #9C27B0; border: none; color: white; padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer;`;
+    
+    controlBar.appendChild(copyBtn);
+    controlBar.appendChild(clearBtn);
+    controlBar.appendChild(toggleSizeBtn);
+    controlBar.appendChild(hideBtn);
+    controlBar.appendChild(moveUpBtn);
+    controlBar.appendChild(moveDownBtn);
+    controlBar.appendChild(exportBtn);
+    panel.appendChild(controlBar);
+    
+    const logContainer = document.createElement('div');
+    logContainer.id = 'diagnosticLogs';
+    logContainer.style.cssText = `max-height: 200px; overflow-y: auto; font-size: 10px;`;
+    panel.appendChild(logContainer);
+    document.body.appendChild(panel);
+    
+    let allLogs = [];
+    let isMinimized = false;
+    let originalHeight = '300px';
+    let isHidden = false;
+    
+    function addLog(msg, type = 'info') {
+        const line = document.createElement('div');
+        const time = new Date().toLocaleTimeString();
+        line.textContent = `${time} | ${msg}`;
+        if (type === 'error') { line.style.color = '#ff6666'; line.style.borderRight = '3px solid #ff0000'; line.style.paddingRight = '5px'; allLogs.push(`[${time}] ERROR: ${msg}`); }
+        else if (type === 'success') { line.style.color = '#66ff66'; allLogs.push(`[${time}] SUCCESS: ${msg}`); }
+        else if (type === 'warn') { line.style.color = '#ffaa66'; allLogs.push(`[${time}] WARN: ${msg}`); }
+        else { line.style.color = '#cccccc'; allLogs.push(`[${time}] INFO: ${msg}`); }
+        line.style.borderBottom = '1px solid #333';
+        line.style.padding = '3px 0';
+        line.style.fontFamily = 'monospace';
+        line.style.wordBreak = 'break-word';
+        logContainer.appendChild(line);
+        logContainer.scrollTop = logContainer.scrollHeight;
+        while (logContainer.children.length > 100) logContainer.removeChild(logContainer.children[0]);
+    }
+    
+    copyBtn.onclick = () => { const text = allLogs.join('\n'); navigator.clipboard.writeText(text).then(() => addLog('✅ تم نسخ ' + allLogs.length + ' سطر', 'success')).catch(() => addLog('❌ فشل النسخ', 'error')); };
+    clearBtn.onclick = () => { logContainer.innerHTML = ''; allLogs = []; addLog('🗑️ تم مسح السجل', 'warn'); };
+    toggleSizeBtn.onclick = () => { if (isMinimized) { panel.style.maxHeight = originalHeight; panel.style.minHeight = '100px'; toggleSizeBtn.textContent = '📐 تصغير'; isMinimized = false; } else { originalHeight = panel.style.maxHeight; panel.style.maxHeight = '40px'; panel.style.minHeight = '40px'; toggleSizeBtn.textContent = '📐 تكبير'; isMinimized = true; } };
+    hideBtn.onclick = () => { if (isHidden) { panel.style.display = 'block'; hideBtn.textContent = '👁️ إخفاء'; isHidden = false; } else { panel.style.display = 'none'; hideBtn.textContent = '👁️ إظهار'; isHidden = true; } };
+    let position = 10;
+    moveUpBtn.onclick = () => { position = Math.max(0, position - 20); panel.style.bottom = position + 'px'; addLog(`⬆️ تم نقل اللوحة للأعلى (${position}px)`, 'info'); };
+    moveDownBtn.onclick = () => { position = Math.min(window.innerHeight - 100, position + 20); panel.style.bottom = position + 'px'; addLog(`⬇️ تم نقل اللوحة للأسفل (${position}px)`, 'info'); };
+    exportBtn.onclick = () => { const text = allLogs.join('\n'); const blob = new Blob([text], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `diagnostic_${new Date().toISOString().slice(0,19)}.txt`; a.click(); URL.revokeObjectURL(url); addLog('💾 تم تصدير السجل', 'success'); };
+    
+    const originalLog = console.log, originalError = console.error, originalWarn = console.warn;
+    console.log = function(...args) { originalLog(...args); const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a).slice(0, 200) : String(a)).join(' '); addLog(msg, 'info'); };
+    console.error = function(...args) { originalError(...args); const msg = args.map(a => String(a)).join(' '); addLog(msg, 'error'); };
+    console.warn = function(...args) { originalWarn(...args); const msg = args.map(a => String(a)).join(' '); addLog(msg, 'warn'); };
+    
+    window.addEventListener('error', (e) => addLog(`🔥 خطأ: ${e.message}`, 'error'));
+    window.addEventListener('unhandledrejection', (e) => addLog(`🔥 Promise خطأ: ${e.reason}`, 'error'));
+    
+    setTimeout(() => {
+        addLog('═══════════════════════════════', 'warn');
+        addLog('📁 فحص الكائنات المهمة:', 'warn');
+        if (typeof CallSystem !== 'undefined') { addLog('✅ CallSystem موجود', 'success'); addLog(`   📌 pc: ${CallSystem.pc ? 'موجود' : 'غير موجود'}`, 'info'); addLog(`   📌 dc: ${CallSystem.dc ? 'موجود' : 'غير موجود'}`, 'info'); } else { addLog('❌ CallSystem غير موجود', 'error'); }
+        if (typeof ChatSystem !== 'undefined') { addLog('✅ ChatSystem موجود', 'success'); addLog(`   📌 featuresEnabled: ${ChatSystem.featuresEnabled}`, 'info'); addLog(`   📌 currentChat: ${ChatSystem.currentChat || 'لا يوجد'}`, 'info'); } else { addLog('❌ ChatSystem غير موجود', 'error'); }
+        if (typeof SecureChatSystem !== 'undefined') { addLog('✅ SecureChatSystem موجود', 'success'); } else { addLog('❌ SecureChatSystem غير موجود', 'error'); }
+        addLog('═══════════════════════════════', 'warn');
+    }, 500);
+    
+    addLog('🔍 أداة التشخيص المتقدمة تعمل', 'success');
+})();
+</script>
+    
+</body>
+</html>
