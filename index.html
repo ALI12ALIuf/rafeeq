@@ -180,7 +180,7 @@
                     </button>
                 </div>
                 
-                <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
+                <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات ===== -->
                 <div class="attachment-menu" id="attachmentMenu" style="display: none;">
                     <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
                     <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
@@ -356,7 +356,7 @@
     </div>
 </div>
 
-<!-- 4.4: معاينة الصورة (بدون زر تحميل) -->
+<!-- 4.4: معاينة الصورة -->
 <div id="imagePreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10050;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-x pan-y;">
     <div class="modal-frame" style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10051;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;border-radius:16px;">
@@ -366,14 +366,13 @@
         <button onclick="closeImagePreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
             <i class="fas fa-arrow-right"></i>
         </button>
-        <!-- زر الحفظ بالضغط المطول -->
         <a id="imgPreviewSaveBtn" class="modal-save-btn" href="#" title="اضغط مطولاً للحفظ" onclick="return false;" oncontextmenu="event.stopPropagation();">
             <i class="fas fa-hand-pointer"></i>
         </a>
     </div>
 </div>
 
-<!-- 4.5: معاينة الفيديو (بدون زر تحميل) -->
+<!-- 4.5: معاينة الفيديو -->
 <div id="videoPreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10060;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
     <div class="modal-frame" style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10061;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;flex-direction:column;background:#000;border-radius:16px;overflow:hidden;">
@@ -385,7 +384,6 @@
         <button onclick="closeVideoPreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
             <i class="fas fa-arrow-right"></i>
         </button>
-        <!-- زر الحفظ بالضغط المطول -->
         <a id="vidPreviewSaveBtn" class="modal-save-btn" href="#" title="اضغط مطولاً للحفظ" onclick="return false;" oncontextmenu="event.stopPropagation();">
             <i class="fas fa-hand-pointer"></i>
         </a>
@@ -463,21 +461,45 @@
     <div class="message"></div>
 </template>
 
-<!-- 5.1: قالب الصورة -->
+<!-- 5.1: قالب الصورة (مع زر حفظ) -->
 <template id="imageMessageTemplate">
-    <div class="message-image-wrapper">
+    <div class="message-image-wrapper" style="position:relative;">
         <img class="message-image-content" src="" alt="صورة" loading="lazy">
+        <a class="media-save-btn" href="#" download title="اضغط مطولاً للحفظ" onclick="event.preventDefault();" oncontextmenu="event.stopPropagation();" style="position:absolute;bottom:8px;left:8px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.7);border:2px solid #4CAF50;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.9rem;text-decoration:none;cursor:pointer;z-index:20;animation:savePulse 2s infinite;">
+            <i class="fas fa-hand-pointer"></i>
+        </a>
     </div>
 </template>
 
-<!-- 5.2: قالب الفيديو -->
-<template id="videoMessageTemplate">
-    <div class="message-content video-thumbnail">
-        <video class="video-thumbnail-content" preload="metadata" playsinline>
-            <source src="" type="video/mp4">
-        </video>
-        <div class="video-play-overlay">
-            <i class="fas fa-expand"></i>
+<!-- 5.2: قالب الفيديو (مخصص - مع عناصر تحكم) -->
+<template id="customVideoTemplate">
+    <div class="custom-video-container">
+        <div class="custom-video-wrapper">
+            <video class="custom-video-player" playsinline preload="metadata">
+                <source src="" type="video/mp4">
+            </video>
+            <div class="custom-video-overlay">
+                <button class="custom-video-play-btn">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
+        </div>
+        <div class="custom-video-controls">
+            <button class="custom-video-play-btn-small">
+                <i class="fas fa-play"></i>
+            </button>
+            <div class="custom-video-progress-container">
+                <div class="custom-video-progress-bar">
+                    <div class="custom-video-progress-fill"></div>
+                </div>
+                <div class="custom-video-time">
+                    <span class="custom-video-current-time">0:00</span>
+                    <span class="custom-video-total-time">0:00</span>
+                </div>
+            </div>
+            <button class="custom-video-mute-btn">
+                <i class="fas fa-volume-up"></i>
+            </button>
         </div>
     </div>
 </template>
@@ -504,14 +526,16 @@
     </div>
 </template>
 
-<!-- 5.4: قالب الملف (بدون زر تحميل) -->
+<!-- 5.4: قالب الملف (مع زر حفظ) -->
 <template id="fileMessageTemplate">
     <div class="message-content file-card">
         <div class="file-icon">📄</div>
         <div class="file-info">
             <div class="file-name"></div>
         </div>
-        <!-- تم إزالة زر التحميل نهائياً -->
+        <a class="media-save-btn file-save-btn" href="#" download title="اضغط مطولاً للحفظ" onclick="event.preventDefault();" oncontextmenu="event.stopPropagation();">
+            <i class="fas fa-hand-pointer"></i>
+        </a>
     </div>
 </template>
 
@@ -522,11 +546,16 @@
     </div>
 </template>
 
-<!-- ✅ 5.6: قالب الرسالة النصية (جديد) -->
+<!-- 5.6: قالب الرسالة النصية -->
 <template id="textMessageTemplate">
     <div class="message-content" style="border: 1.5px solid var(--border-color); background: var(--bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;">
         <span style="font-size: 1rem; line-height: 1.4; display: block;"></span>
     </div>
+</template>
+
+<!-- 5.7: قالب الفاصل الزمني -->
+<template id="timeSeparatorTemplate">
+    <div class="time-separator" style="text-align:center;margin:15px 0;font-size:0.7rem;color:var(--text-light);opacity:0.7;direction:ltr;"></div>
 </template>
     
 <!-- ==================== القسم 6: النوافذ المنبثقة (Modals) ==================== -->
