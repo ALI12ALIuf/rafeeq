@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1174,13 +1174,11 @@ displayMessage(msg) {
     const dateTime = formatDateTime(new Date(msg.time));
     const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
     
-    // ✅ إنشاء العنصر الرئيسي باستخدام cloneNode من قالب ثابت
     const template = document.getElementById('messageWrapperTemplate');
     let div;
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1187,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== القسم 26.1: معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1210,7 +1208,6 @@ displayMessage(msg) {
             console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1223,7 +1220,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الموقع ====================
+    // ==================== القسم 26.2: معالجة الموقع ====================
     else if (msg.type === 'location') {
         let locationData = msg.data;
         let locationUrl = '';
@@ -1285,7 +1282,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== القسم 26.3: معالجة الصورة ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1307,7 +1304,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة البصمة الصوتية ====================
+    // ==================== القسم 26.4: معالجة البصمة الصوتية ====================
     else if (msg.type === 'voice') {
         const templateVoice = document.getElementById('voiceMessageTemplate');
         if (templateVoice) {
@@ -1328,7 +1325,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== القسم 26.5: معالجة الفيديو (معدل - إضافة senderType) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1342,9 +1339,10 @@ displayMessage(msg) {
                     source.src = msg.data;
                     video.load();
                 }
+                const senderType = msg.sender === 'me' ? 'me' : 'received';
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
-                    this.showVideoPreview(msg.data);
+                    this.showVideoPreview(msg.data, senderType);
                 };
             }
             div.appendChild(clone);
@@ -1353,7 +1351,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== القسم 26.6: معالجة الملف ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1383,12 +1381,11 @@ displayMessage(msg) {
         }
     }
     
-    // ✅ إضافة الرسالة إلى الحاوية
     c.appendChild(div); 
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview ====================
+// ==================== القسم 26.7: showImagePreview ====================
 showImagePreview(imageSrc) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1400,7 +1397,7 @@ showImagePreview(imageSrc) {
     this.setupImageZoom(modal, img);
 },
 
-// ==================== القسم 26.1.1: setupImageZoom ====================
+// ==================== القسم 26.8: setupImageZoom ====================
 setupImageZoom(modal, img) {
     if (img._zoomCleanup) {
         img._zoomCleanup();
@@ -1490,39 +1487,85 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview (معدل - تحكم مخصص) ====================
-showVideoPreview(videoSrc) {
+// ==================== القسم 26.9: showVideoPreview (معدل - مع ألوان المرسل/المستلم) ====================
+showVideoPreview(videoSrc, senderType = 'received') {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (!modal || !video) return;
     
-    // إخفاء عناصر التحكم الافتراضية
-    video.removeAttribute('controls');
+    const color = senderType === 'me' ? '#2196F3' : '#4CAF50';
     
+    video.removeAttribute('controls');
     video.src = videoSrc;
     modal.style.display = 'flex';
     
-    // إظهار عناصر التحكم المخصصة
     const controls = document.getElementById('videoCustomControls');
     if (controls) controls.style.display = 'flex';
     
-    // إعادة تعيين حالة الأزرار
+    const frame = document.querySelector('#videoPreviewModal .video-frame');
+    if (frame) {
+        frame.style.border = `3px solid ${color}`;
+        frame.style.boxShadow = `0 0 0 2px ${color}33`;
+    }
+    
+    const backBtn = document.querySelector('#videoPreviewModal .back-btn-custom') || 
+                    document.querySelector('#videoPreviewModal button[onclick*="closeVideoPreview"]');
+    const downloadBtn = document.querySelector('#videoPreviewModal .download-btn-custom') || 
+                        document.querySelector('#videoPreviewModal button[onclick*="downloadPreviewVideo"]');
+    
+    if (backBtn) {
+        backBtn.style.border = `2px solid ${color}`;
+        backBtn.style.color = color;
+    }
+    if (downloadBtn) {
+        downloadBtn.style.border = `2px solid ${color}`;
+        downloadBtn.style.color = color;
+    }
+    
     const playBtn = document.getElementById('videoPlayBtn');
     const muteBtn = document.getElementById('videoMuteBtn');
     const progress = document.getElementById('videoProgress');
     const currentTime = document.getElementById('videoCurrentTime');
     const duration = document.getElementById('videoDuration');
     
-    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-    if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-    if (progress) progress.value = 0;
-    if (currentTime) currentTime.textContent = '0:00';
-    if (duration) duration.textContent = '0:00';
+    if (playBtn) {
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.style.color = color;
+    }
+    if (muteBtn) {
+        muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+        muteBtn.style.color = color;
+    }
+    if (progress) {
+        progress.value = 0;
+        progress.style.background = `linear-gradient(90deg, ${color}, ${color} 50%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.3) 100%)`;
+    }
+    if (currentTime) {
+        currentTime.textContent = '0:00';
+        currentTime.style.color = color;
+    }
+    if (duration) {
+        duration.textContent = '0:00';
+        duration.style.color = color;
+    }
     
-    // تشغيل تلقائي
+    const oldStyle = document.getElementById('videoProgressStyle');
+    if (oldStyle) oldStyle.remove();
+    
+    const style = document.createElement('style');
+    style.id = 'videoProgressStyle';
+    style.textContent = `
+        #videoProgress::-webkit-slider-thumb {
+            background: ${color} !important;
+        }
+        #videoProgress::-moz-range-thumb {
+            background: ${color} !important;
+        }
+    `;
+    document.head.appendChild(style);
+    
     video.play().catch(() => {});
     
-    // تحديث المدة عند تحميل الفيديو
     video.onloadedmetadata = function() {
         if (duration) {
             const mins = Math.floor(video.duration / 60);
@@ -1532,7 +1575,6 @@ showVideoPreview(videoSrc) {
         if (progress) progress.max = video.duration;
     };
     
-    // تحديث شريط التقدم والوقت أثناء التشغيل
     video.ontimeupdate = function() {
         if (progress) progress.value = video.currentTime;
         if (currentTime) {
@@ -1542,7 +1584,6 @@ showVideoPreview(videoSrc) {
         }
     };
     
-    // عند انتهاء الفيديو
     video.onended = function() {
         if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
         if (progress) progress.value = 0;
@@ -1550,7 +1591,7 @@ showVideoPreview(videoSrc) {
     };
 },
 
-// ==================== القسم 26.2.1: toggleVideoPlay ====================
+// ==================== القسم 26.10: toggleVideoPlay ====================
 toggleVideoPlay() {
     const video = document.getElementById('previewVideo');
     const playBtn = document.getElementById('videoPlayBtn');
@@ -1565,7 +1606,7 @@ toggleVideoPlay() {
     }
 },
 
-// ==================== القسم 26.2.2: toggleVideoMute ====================
+// ==================== القسم 26.11: toggleVideoMute ====================
 toggleVideoMute() {
     const video = document.getElementById('previewVideo');
     const muteBtn = document.getElementById('videoMuteBtn');
@@ -1575,14 +1616,14 @@ toggleVideoMute() {
     muteBtn.innerHTML = video.muted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>';
 },
 
-// ==================== القسم 26.2.3: seekVideo ====================
+// ==================== القسم 26.12: seekVideo ====================
 seekVideo(value) {
     const video = document.getElementById('previewVideo');
     if (!video) return;
     video.currentTime = parseFloat(value);
 },
 
-// ==================== القسم 26.2.4: closeVideoPreview (معدل) ====================
+// ==================== القسم 26.13: closeVideoPreview (معدل) ====================
 closeVideoPreview() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
@@ -1598,21 +1639,56 @@ closeVideoPreview() {
     }
     if (controls) controls.style.display = 'none';
     
-    // إعادة تعيين الأزرار
+    const tempStyle = document.getElementById('videoProgressStyle');
+    if (tempStyle) tempStyle.remove();
+    
+    const defaultColor = '#4CAF50';
     const playBtn = document.getElementById('videoPlayBtn');
     const muteBtn = document.getElementById('videoMuteBtn');
     const progress = document.getElementById('videoProgress');
     const currentTime = document.getElementById('videoCurrentTime');
     const duration = document.getElementById('videoDuration');
     
-    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-    if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-    if (progress) progress.value = 0;
-    if (currentTime) currentTime.textContent = '0:00';
-    if (duration) duration.textContent = '0:00';
+    if (playBtn) {
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.style.color = defaultColor;
+    }
+    if (muteBtn) {
+        muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+        muteBtn.style.color = defaultColor;
+    }
+    if (progress) {
+        progress.value = 0;
+        progress.style.background = `linear-gradient(90deg, ${defaultColor}, ${defaultColor} 50%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.3) 100%)`;
+    }
+    if (currentTime) {
+        currentTime.textContent = '0:00';
+        currentTime.style.color = defaultColor;
+    }
+    if (duration) {
+        duration.textContent = '0:00';
+        duration.style.color = defaultColor;
+    }
+    
+    const frame = document.querySelector('#videoPreviewModal .video-frame');
+    if (frame) {
+        frame.style.border = `3px solid ${defaultColor}`;
+        frame.style.boxShadow = '0 0 0 2px rgba(76, 175, 80, 0.3)';
+    }
+    
+    const backBtn = document.querySelector('#videoPreviewModal button[onclick*="closeVideoPreview"]');
+    const downloadBtn = document.querySelector('#videoPreviewModal button[onclick*="downloadPreviewVideo"]');
+    if (backBtn) {
+        backBtn.style.border = `2px solid ${defaultColor}`;
+        backBtn.style.color = 'white';
+    }
+    if (downloadBtn) {
+        downloadBtn.style.border = `2px solid ${defaultColor}`;
+        downloadBtn.style.color = 'white';
+    }
 },
 
-// ==================== القسم 26.2.5: downloadPreviewVideo (يبقى كما هو) ====================
+// ==================== القسم 26.14: downloadPreviewVideo ====================
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
@@ -1622,7 +1698,7 @@ downloadPreviewVideo() {
     link.click();
 },
 
-// ==================== القسم 26.3: دوال إغلاق المعاينات ====================
+// ==================== القسم 26.15: closeImagePreview ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
@@ -1630,13 +1706,7 @@ closeImagePreview() {
     if (img) { img.src = ''; img.style.transform = 'none'; }
 },
 
-closeVideoPreview() {
-    const modal = document.getElementById('videoPreviewModal');
-    const video = document.getElementById('previewVideo');
-    if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
-},
-
+// ==================== القسم 26.16: downloadPreviewImage ====================
 downloadPreviewImage() {
     const img = document.getElementById('previewImage');
     if (!img || !img.src) return;
@@ -1645,15 +1715,6 @@ downloadPreviewImage() {
     link.download = 'image.jpg';
     link.click();
 },
-
-downloadPreviewVideo() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-},  
     
 
     // ==================== القسم 27: sendMessage ====================
