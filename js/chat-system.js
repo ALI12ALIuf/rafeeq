@@ -1490,188 +1490,184 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview (نسخة معدلة - ثابتة) ====================
+// ==================== القسم 26.2: showVideoPreview (معدل - تصميم مخصص) ====================
 showVideoPreview(videoSrc) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
-    const playBtn = document.getElementById('videoPlayPauseBtn');
-    const currentTime = document.getElementById('videoCurrentTime');
-    const durationSpan = document.getElementById('videoDuration');
+    const playBtn = document.getElementById('videoPlayBtn');
+    const muteBtn = document.getElementById('videoMuteBtn');
+    const currentTimeEl = document.getElementById('videoCurrentTime');
+    const durationEl = document.getElementById('videoDuration');
     const progressFill = document.getElementById('videoProgressFill');
     const progressBar = document.getElementById('videoProgressBar');
-    const thumb = document.getElementById('videoThumb');
     
     if (!modal || !video) return;
     
-    // إزالة أي مستمعات قديمة
-    if (this._videoCleanup) {
-        this._videoCleanup();
-        this._videoCleanup = null;
-    }
+    // إيقاف أي فيديو سابق
+    video.pause();
+    video.src = '';
     
-    // تعيين مصدر الفيديو
+    // تعيين المصدر الجديد
     video.src = videoSrc;
-    video.load();
-    video.volume = 1.0;
-    video.muted = false;
-    
-    // إعادة تعيين واجهة التحكم
-    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-    if (currentTime) currentTime.textContent = '0:00';
-    if (durationSpan) durationSpan.textContent = '0:00';
-    if (progressFill) progressFill.style.width = '0%';
-    if (thumb) thumb.style.left = '0%';
-    
-    // عرض النافذة
     modal.style.display = 'flex';
     
-    // متغيرات الحالة
+    // إعادة تعيين العناصر
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    if (currentTimeEl) currentTimeEl.textContent = '0:00';
+    if (durationEl) durationEl.textContent = '0:00';
+    if (progressFill) progressFill.style.width = '0%';
+    
     let isPlaying = false;
+    let isMuted = false;
     let isDragging = false;
-    let wasPlayingBeforeDrag = false;
     
-    // ===== وظائف التحكم =====
-    const updateProgress = () => {
-        if (!video.duration || isNaN(video.duration)) return;
-        const percent = (video.currentTime / video.duration) * 100;
-        if (progressFill) progressFill.style.width = Math.min(percent, 100) + '%';
-        if (thumb) thumb.style.left = Math.min(percent, 100) + '%';
-        const mins = Math.floor(video.currentTime / 60);
-        const secs = Math.floor(video.currentTime % 60);
-        if (currentTime) currentTime.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-    
-    const setDuration = () => {
-        if (!video.duration || isNaN(video.duration)) return;
-        const mins = Math.floor(video.duration / 60);
-        const secs = Math.floor(video.duration % 60);
-        if (durationSpan) durationSpan.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-    
-    const togglePlay = () => {
-        if (video.paused) {
-            video.play().catch(() => {});
-            if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-            isPlaying = true;
-        } else {
-            video.pause();
-            if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-            isPlaying = false;
+    // تحميل البيانات
+    video.addEventListener('loadedmetadata', function() {
+        const duration = this.duration;
+        if (!isNaN(duration) && duration > 0) {
+            const mins = Math.floor(duration / 60);
+            const secs = Math.floor(duration % 60);
+            if (durationEl) durationEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
         }
-    };
+    });
     
-    // ===== ربط الأحداث =====
-    // زر التشغيل/الإيقاف
+    // تحديث العداد والتقدم
+    video.addEventListener('timeupdate', function() {
+        if (!isDragging) {
+            const current = this.currentTime;
+            const duration = this.duration;
+            if (!isNaN(duration) && duration > 0) {
+                const mins = Math.floor(current / 60);
+                const secs = Math.floor(current % 60);
+                if (currentTimeEl) currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                if (progressFill) progressFill.style.width = `${(current / duration) * 100}%`;
+            }
+        }
+    });
+    
+    // زر التشغيل
     if (playBtn) {
-        playBtn.onclick = (e) => {
+        playBtn.onclick = function(e) {
             e.stopPropagation();
-            togglePlay();
+            if (isPlaying) {
+                video.pause();
+                this.innerHTML = '<i class="fas fa-play"></i>';
+                isPlaying = false;
+            } else {
+                video.play();
+                this.innerHTML = '<i class="fas fa-pause"></i>';
+                isPlaying = true;
+            }
+        };
+    }
+    
+    // زر كتم الصوت
+    if (muteBtn) {
+        muteBtn.onclick = function(e) {
+            e.stopPropagation();
+            if (isMuted) {
+                video.muted = false;
+                this.innerHTML = '<i class="fas fa-volume-up"></i>';
+                isMuted = false;
+            } else {
+                video.muted = true;
+                this.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                isMuted = true;
+            }
         };
     }
     
     // شريط التقدم (السحب)
     if (progressBar) {
-        const startDrag = (e) => {
+        progressBar.onmousedown = function(e) {
             e.preventDefault();
-            e.stopPropagation();
             isDragging = true;
-            wasPlayingBeforeDrag = !video.paused;
-            if (!video.paused) video.pause();
+            const rect = this.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const clamped = Math.max(0, Math.min(1, x));
+            if (!isNaN(video.duration) && video.duration > 0) {
+                video.currentTime = clamped * video.duration;
+                if (progressFill) progressFill.style.width = `${clamped * 100}%`;
+                const current = video.currentTime;
+                const mins = Math.floor(current / 60);
+                const secs = Math.floor(current % 60);
+                if (currentTimeEl) currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
         };
         
-        const moveDrag = (e) => {
-            if (!isDragging) return;
+        progressBar.ontouchstart = function(e) {
             e.preventDefault();
-            e.stopPropagation();
-            const rect = progressBar.getBoundingClientRect();
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            let percent = (clientX - rect.left) / rect.width;
-            percent = Math.max(0, Math.min(1, percent));
-            if (video.duration && !isNaN(video.duration)) {
-                video.currentTime = percent * video.duration;
-                updateProgress();
+            isDragging = true;
+            const rect = this.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = (touch.clientX - rect.left) / rect.width;
+            const clamped = Math.max(0, Math.min(1, x));
+            if (!isNaN(video.duration) && video.duration > 0) {
+                video.currentTime = clamped * video.duration;
+                if (progressFill) progressFill.style.width = `${clamped * 100}%`;
+                const current = video.currentTime;
+                const mins = Math.floor(current / 60);
+                const secs = Math.floor(current % 60);
+                if (currentTimeEl) currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
             }
-        };
-        
-        const endDrag = (e) => {
-            if (!isDragging) return;
-            isDragging = false;
-            if (wasPlayingBeforeDrag) {
-                video.play().catch(() => {});
-                if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                isPlaying = true;
-            }
-        };
-        
-        progressBar.addEventListener('mousedown', startDrag);
-        progressBar.addEventListener('touchstart', startDrag, { passive: false });
-        document.addEventListener('mousemove', moveDrag);
-        document.addEventListener('touchmove', moveDrag, { passive: false });
-        document.addEventListener('mouseup', endDrag);
-        document.addEventListener('touchend', endDrag);
-        
-        // حفظ دالة التنظيف
-        this._videoCleanup = () => {
-            progressBar.removeEventListener('mousedown', startDrag);
-            progressBar.removeEventListener('touchstart', startDrag);
-            document.removeEventListener('mousemove', moveDrag);
-            document.removeEventListener('touchmove', moveDrag);
-            document.removeEventListener('mouseup', endDrag);
-            document.removeEventListener('touchend', endDrag);
         };
     }
     
-    // حدث تحميل البيانات (للمدة)
-    video.onloadedmetadata = () => {
-        setDuration();
-        updateProgress();
-    };
+    // منع التفاعل المباشر مع الفيديو
+    video.style.pointerEvents = 'none';
     
-    // تحديث التقدم أثناء التشغيل
-    video.ontimeupdate = () => {
-        if (!isDragging) {
-            updateProgress();
+    // مستمعات عامة للسحب
+    document.onmousemove = function(e) {
+        if (isDragging && progressBar) {
+            const rect = progressBar.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const clamped = Math.max(0, Math.min(1, x));
+            if (!isNaN(video.duration) && video.duration > 0) {
+                video.currentTime = clamped * video.duration;
+                if (progressFill) progressFill.style.width = `${clamped * 100}%`;
+                const current = video.currentTime;
+                const mins = Math.floor(current / 60);
+                const secs = Math.floor(current % 60);
+                if (currentTimeEl) currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
         }
     };
     
-    // عند انتهاء الفيديو
-    video.onended = () => {
-        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-        isPlaying = false;
-        video.currentTime = 0;
-        updateProgress();
+    document.ontouchmove = function(e) {
+        if (isDragging && progressBar) {
+            const rect = progressBar.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = (touch.clientX - rect.left) / rect.width;
+            const clamped = Math.max(0, Math.min(1, x));
+            if (!isNaN(video.duration) && video.duration > 0) {
+                video.currentTime = clamped * video.duration;
+                if (progressFill) progressFill.style.width = `${clamped * 100}%`;
+                const current = video.currentTime;
+                const mins = Math.floor(current / 60);
+                const secs = Math.floor(current % 60);
+                if (currentTimeEl) currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
     };
     
-    // بدء التشغيل تلقائياً
-    video.play().catch(() => {});
-    if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-    isPlaying = true;
-},
-
-// ==================== دالة closeVideoPreview (معدلة) ====================
-closeVideoPreview() {
-    const modal = document.getElementById('videoPreviewModal');
-    const video = document.getElementById('previewVideo');
-    if (modal) modal.style.display = 'none';
-    if (video) {
-        video.pause();
-        video.src = '';
-        video.load();
-    }
-    // تنظيف المستمعات
-    if (this._videoCleanup) {
-        this._videoCleanup();
-        this._videoCleanup = null;
-    }
-    // إعادة تعيين الأزرار
-    const playBtn = document.getElementById('videoPlayPauseBtn');
-    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-    const progressFill = document.getElementById('videoProgressFill');
-    if (progressFill) progressFill.style.width = '0%';
-    const thumb = document.getElementById('videoThumb');
-    if (thumb) thumb.style.left = '0%';
-},
-
+    document.onmouseup = function() {
+        isDragging = false;
+    };
+    
+    document.ontouchend = function() {
+        isDragging = false;
+    };
+    
+    // تشغيل تلقائي
+    video.play().then(() => {
+        if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        isPlaying = true;
+    }).catch(() => {
+        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        isPlaying = false;
+    });
+}
+    
 // ==================== القسم 26.3: دوال إغلاق المعاينات ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
@@ -1683,8 +1679,27 @@ closeImagePreview() {
 closeVideoPreview() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
+    const playBtn = document.getElementById('videoPlayBtn');
+    const currentTimeEl = document.getElementById('videoCurrentTime');
+    const durationEl = document.getElementById('videoDuration');
+    const progressFill = document.getElementById('videoProgressFill');
+    
     if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    if (video) { 
+        video.pause(); 
+        video.src = ''; 
+        video.style.pointerEvents = 'none';
+    }
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    if (currentTimeEl) currentTimeEl.textContent = '0:00';
+    if (durationEl) durationEl.textContent = '0:00';
+    if (progressFill) progressFill.style.width = '0%';
+    
+    // تنظيف المستمعات العامة
+    document.onmousemove = null;
+    document.onmouseup = null;
+    document.ontouchmove = null;
+    document.ontouchend = null;
 },
 
 downloadPreviewImage() {
@@ -1703,9 +1718,9 @@ downloadPreviewVideo() {
     link.href = video.src;
     link.download = 'video.mp4';
     link.click();
-},  
-    
+},
 
+    
     // ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
     if (!this.currentChat || !text.trim()) return false; 
