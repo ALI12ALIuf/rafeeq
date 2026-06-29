@@ -115,3 +115,30 @@
     console.log('🛡️ تم تفعيل منع القائمة المنبثقة بنسبة 100% في جميع أنحاء الموقع');
     
 })();
+
+// ==================== منع الضغط المطول على الفيديو ====================
+document.addEventListener('touchstart', function(e) {
+    const target = e.target;
+    if (target.tagName === 'VIDEO' || target.closest('video')) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+// منع قائمة السياق على الفيديو
+document.addEventListener('contextmenu', function(e) {
+    if (e.target.tagName === 'VIDEO' || e.target.closest('video')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+}, { passive: false, capture: true });
+
+// منع السحب على الفيديو
+document.addEventListener('dragstart', function(e) {
+    if (e.target.tagName === 'VIDEO' || e.target.closest('video')) {
+        e.preventDefault();
+        return false;
+    }
+}, { passive: false, capture: true });
+
+
