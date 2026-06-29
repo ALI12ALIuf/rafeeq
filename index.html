@@ -372,19 +372,47 @@
     </div>
 </div>
 
-<!-- 4.5: معاينة الفيديو -->
+<!-- 4.5: معاينة الفيديو (معدل - تحكم مخصص) -->
 <div id="videoPreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10060;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
+    <!-- الإطار الأخضر -->
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10061;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
+    
+    <!-- حاوية الفيديو -->
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;flex-direction:column;background:#000;border-radius:16px;overflow:hidden;">
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;">
-            <video id="previewVideo" style="max-width:100%;max-height:100%;object-fit:contain;" controls playsinline></video>
+        
+        <!-- الفيديو -->
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;position:relative;">
+            <video id="previewVideo" style="max-width:100%;max-height:100%;object-fit:contain;" playsinline></video>
+        </div>
+        
+        <!-- عناصر التحكم المخصصة (أسفل الفيديو - ثابتة) -->
+        <div id="videoCustomControls" style="display:none;flex-shrink:0;padding:12px 20px;background:rgba(0,0,0,0.7);backdrop-filter:blur(5px);border-top:1px solid rgba(255,255,255,0.1);flex-direction:row;align-items:center;gap:12px;justify-content:space-between;">
+            
+            <!-- زر تشغيل/إيقاف -->
+            <button id="videoPlayBtn" onclick="ChatSystem.toggleVideoPlay()" style="background:none;border:none;color:white;font-size:1.4rem;cursor:pointer;width:40px;height:40px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;border-radius:50%;">
+                <i class="fas fa-play"></i>
+            </button>
+            
+            <!-- شريط التقدم -->
+            <div style="flex:1;display:flex;align-items:center;gap:10px;">
+                <span id="videoCurrentTime" style="color:white;font-size:0.75rem;font-family:monospace;min-width:40px;">0:00</span>
+                <input type="range" id="videoProgress" min="0" max="100" value="0" step="0.1" oninput="ChatSystem.seekVideo(this.value)" style="flex:1;height:4px;background:rgba(255,255,255,0.3);border-radius:2px;appearance:none;outline:none;cursor:pointer;">
+                <span id="videoDuration" style="color:white;font-size:0.75rem;font-family:monospace;min-width:40px;">0:00</span>
+            </div>
+            
+            <!-- زر كتم الصوت -->
+            <button id="videoMuteBtn" onclick="ChatSystem.toggleVideoMute()" style="background:none;border:none;color:white;font-size:1.2rem;cursor:pointer;width:40px;height:40px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;border-radius:50%;">
+                <i class="fas fa-volume-up"></i>
+            </button>
         </div>
     </div>
+    
+    <!-- أزرار الرجوع والتنزيل (تبقى كما هي) -->
     <div style="position:absolute;top:30px;left:0;right:0;display:flex;justify-content:space-between;padding:0 35px;pointer-events:none;z-index:10062;">
-        <button onclick="closeVideoPreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+        <button onclick="ChatSystem.closeVideoPreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
             <i class="fas fa-arrow-right"></i>
         </button>
-        <button onclick="downloadPreviewVideo()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+        <button onclick="ChatSystem.downloadPreviewVideo()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
             <i class="fas fa-download"></i>
         </button>
     </div>
