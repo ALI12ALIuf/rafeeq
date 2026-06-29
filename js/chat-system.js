@@ -1490,15 +1490,186 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview ====================
+// ==================== القسم 26.2: showVideoPreview (نسخة معدلة - ثابتة) ====================
 showVideoPreview(videoSrc) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
+    const playBtn = document.getElementById('videoPlayPauseBtn');
+    const currentTime = document.getElementById('videoCurrentTime');
+    const durationSpan = document.getElementById('videoDuration');
+    const progressFill = document.getElementById('videoProgressFill');
+    const progressBar = document.getElementById('videoProgressBar');
+    const thumb = document.getElementById('videoThumb');
+    
     if (!modal || !video) return;
     
+    // إزالة أي مستمعات قديمة
+    if (this._videoCleanup) {
+        this._videoCleanup();
+        this._videoCleanup = null;
+    }
+    
+    // تعيين مصدر الفيديو
     video.src = videoSrc;
+    video.load();
+    video.volume = 1.0;
+    video.muted = false;
+    
+    // إعادة تعيين واجهة التحكم
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    if (currentTime) currentTime.textContent = '0:00';
+    if (durationSpan) durationSpan.textContent = '0:00';
+    if (progressFill) progressFill.style.width = '0%';
+    if (thumb) thumb.style.left = '0%';
+    
+    // عرض النافذة
     modal.style.display = 'flex';
+    
+    // متغيرات الحالة
+    let isPlaying = false;
+    let isDragging = false;
+    let wasPlayingBeforeDrag = false;
+    
+    // ===== وظائف التحكم =====
+    const updateProgress = () => {
+        if (!video.duration || isNaN(video.duration)) return;
+        const percent = (video.currentTime / video.duration) * 100;
+        if (progressFill) progressFill.style.width = Math.min(percent, 100) + '%';
+        if (thumb) thumb.style.left = Math.min(percent, 100) + '%';
+        const mins = Math.floor(video.currentTime / 60);
+        const secs = Math.floor(video.currentTime % 60);
+        if (currentTime) currentTime.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+    
+    const setDuration = () => {
+        if (!video.duration || isNaN(video.duration)) return;
+        const mins = Math.floor(video.duration / 60);
+        const secs = Math.floor(video.duration % 60);
+        if (durationSpan) durationSpan.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+    
+    const togglePlay = () => {
+        if (video.paused) {
+            video.play().catch(() => {});
+            if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            isPlaying = true;
+        } else {
+            video.pause();
+            if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            isPlaying = false;
+        }
+    };
+    
+    // ===== ربط الأحداث =====
+    // زر التشغيل/الإيقاف
+    if (playBtn) {
+        playBtn.onclick = (e) => {
+            e.stopPropagation();
+            togglePlay();
+        };
+    }
+    
+    // شريط التقدم (السحب)
+    if (progressBar) {
+        const startDrag = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isDragging = true;
+            wasPlayingBeforeDrag = !video.paused;
+            if (!video.paused) video.pause();
+        };
+        
+        const moveDrag = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = progressBar.getBoundingClientRect();
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            let percent = (clientX - rect.left) / rect.width;
+            percent = Math.max(0, Math.min(1, percent));
+            if (video.duration && !isNaN(video.duration)) {
+                video.currentTime = percent * video.duration;
+                updateProgress();
+            }
+        };
+        
+        const endDrag = (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            if (wasPlayingBeforeDrag) {
+                video.play().catch(() => {});
+                if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                isPlaying = true;
+            }
+        };
+        
+        progressBar.addEventListener('mousedown', startDrag);
+        progressBar.addEventListener('touchstart', startDrag, { passive: false });
+        document.addEventListener('mousemove', moveDrag);
+        document.addEventListener('touchmove', moveDrag, { passive: false });
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+        
+        // حفظ دالة التنظيف
+        this._videoCleanup = () => {
+            progressBar.removeEventListener('mousedown', startDrag);
+            progressBar.removeEventListener('touchstart', startDrag);
+            document.removeEventListener('mousemove', moveDrag);
+            document.removeEventListener('touchmove', moveDrag);
+            document.removeEventListener('mouseup', endDrag);
+            document.removeEventListener('touchend', endDrag);
+        };
+    }
+    
+    // حدث تحميل البيانات (للمدة)
+    video.onloadedmetadata = () => {
+        setDuration();
+        updateProgress();
+    };
+    
+    // تحديث التقدم أثناء التشغيل
+    video.ontimeupdate = () => {
+        if (!isDragging) {
+            updateProgress();
+        }
+    };
+    
+    // عند انتهاء الفيديو
+    video.onended = () => {
+        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        isPlaying = false;
+        video.currentTime = 0;
+        updateProgress();
+    };
+    
+    // بدء التشغيل تلقائياً
     video.play().catch(() => {});
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+    isPlaying = true;
+},
+
+// ==================== دالة closeVideoPreview (معدلة) ====================
+closeVideoPreview() {
+    const modal = document.getElementById('videoPreviewModal');
+    const video = document.getElementById('previewVideo');
+    if (modal) modal.style.display = 'none';
+    if (video) {
+        video.pause();
+        video.src = '';
+        video.load();
+    }
+    // تنظيف المستمعات
+    if (this._videoCleanup) {
+        this._videoCleanup();
+        this._videoCleanup = null;
+    }
+    // إعادة تعيين الأزرار
+    const playBtn = document.getElementById('videoPlayPauseBtn');
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    const progressFill = document.getElementById('videoProgressFill');
+    if (progressFill) progressFill.style.width = '0%';
+    const thumb = document.getElementById('videoThumb');
+    if (thumb) thumb.style.left = '0%';
 },
 
 // ==================== القسم 26.3: دوال إغلاق المعاينات ====================
