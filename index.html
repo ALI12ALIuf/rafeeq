@@ -468,14 +468,25 @@
     </div>
 </template>
 
-<!-- 5.2: قالب الفيديو -->
+<!-- 5.2: قالب الفيديو (مشغل مخصص) -->
 <template id="videoMessageTemplate">
-    <div class="message-content video-thumbnail">
-        <video class="video-thumbnail-content" preload="metadata" playsinline>
-            <source src="" type="video/mp4">
-        </video>
-        <div class="video-play-overlay">
-            <i class="fas fa-expand"></i>
+    <div class="message-content video-container">
+        <div class="video-wrapper">
+            <video class="video-player" preload="metadata" playsinline>
+                <source src="" type="video/mp4">
+            </video>
+            <div class="video-controls-overlay">
+                <button class="video-play-btn"><i class="fas fa-play"></i></button>
+                <div class="video-progress-bar">
+                    <div class="video-progress-fill"></div>
+                </div>
+                <div class="video-time-display">
+                    <span class="video-current-time">0:00</span>
+                    <span class="video-duration">0:00</span>
+                </div>
+                <button class="video-mute-btn"><i class="fas fa-volume-up"></i></button>
+                <button class="video-fullscreen-btn"><i class="fas fa-expand"></i></button>
+            </div>
         </div>
     </div>
 </template>
