@@ -1097,3 +1097,202 @@ input:checked + .toggle-slider:before {
 }
 
 
+/* ==================== القسم 21: مشغل الفيديو المخصص ==================== */
+
+/* تخصيص شريط التقدم (input range) */
+#videoProgress {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#videoProgress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s;
+}
+
+#videoProgress::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+}
+
+#videoProgress::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+#videoProgress::-moz-range-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+/* تنسيق أزرار التحكم في الفيديو */
+#videoPlayBtn:hover,
+#videoMuteBtn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.05);
+}
+
+#videoPlayBtn:active,
+#videoMuteBtn:active {
+    transform: scale(0.95);
+}
+
+/* تنسيق أوقات الفيديو */
+#videoCurrentTime,
+#videoDuration {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: #ffffff;
+    min-width: 40px;
+    text-align: center;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* تنسيق حاوية التحكم السفلية */
+#videoCustomControls {
+    display: none;
+    flex-shrink: 0;
+    padding: 12px 20px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+/* عند ظهور عناصر التحكم */
+#videoCustomControls.active {
+    display: flex;
+}
+
+/* تحسين شكل أزرار الرجوع والتنزيل */
+#videoPreviewModal .back-btn-custom,
+#videoPreviewModal .download-btn-custom {
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid #4CAF50;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: white;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+#videoPreviewModal .back-btn-custom:hover,
+#videoPreviewModal .download-btn-custom:hover {
+    background: rgba(76, 175, 80, 0.3);
+    transform: scale(1.05);
+}
+
+#videoPreviewModal .back-btn-custom:active,
+#videoPreviewModal .download-btn-custom:active {
+    transform: scale(0.95);
+}
+
+/* تنسيق الإطار الأخضر حول الفيديو */
+#videoPreviewModal .video-frame {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    right: 15px;
+    bottom: 15px;
+    border: 3px solid #4CAF50;
+    border-radius: 20px;
+    pointer-events: none;
+    z-index: 10061;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+}
+
+/* تنسيق حاوية الفيديو الداخلية */
+#videoPreviewModal .video-container {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    right: 15px;
+    bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* تنسيق الفيديو نفسه */
+#previewVideo {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
+}
+
+/* تنسيق شريط التقدم عند التحميل */
+#videoProgress.loading {
+    background: linear-gradient(90deg, #4CAF50 0%, #4CAF50 30%, rgba(255,255,255,0.3) 30%, rgba(255,255,255,0.3) 100%);
+    background-size: 200% 100%;
+    animation: loadingProgress 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingProgress {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* تحسين المظهر على الهواتف */
+@media (max-width: 480px) {
+    #videoCustomControls {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+    
+    #videoPlayBtn,
+    #videoMuteBtn {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    #videoCurrentTime,
+    #videoDuration {
+        font-size: 0.65rem;
+        min-width: 32px;
+    }
+    
+    #videoProgress {
+        height: 3px;
+    }
+    
+    #videoProgress::-webkit-slider-thumb {
+        width: 12px;
+        height: 12px;
+    }
+}
+
