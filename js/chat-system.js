@@ -1490,15 +1490,136 @@ setupImageZoom(modal, img) {
     };
 },
 
-// ==================== القسم 26.2: showVideoPreview ====================
+// ==================== القسم 26.2: showVideoPreview (معدل - تحكم مخصص) ====================
 showVideoPreview(videoSrc) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (!modal || !video) return;
     
+    // إخفاء عناصر التحكم الافتراضية
+    video.removeAttribute('controls');
+    
     video.src = videoSrc;
     modal.style.display = 'flex';
+    
+    // إظهار عناصر التحكم المخصصة
+    const controls = document.getElementById('videoCustomControls');
+    if (controls) controls.style.display = 'flex';
+    
+    // إعادة تعيين حالة الأزرار
+    const playBtn = document.getElementById('videoPlayBtn');
+    const muteBtn = document.getElementById('videoMuteBtn');
+    const progress = document.getElementById('videoProgress');
+    const currentTime = document.getElementById('videoCurrentTime');
+    const duration = document.getElementById('videoDuration');
+    
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+    if (progress) progress.value = 0;
+    if (currentTime) currentTime.textContent = '0:00';
+    if (duration) duration.textContent = '0:00';
+    
+    // تشغيل تلقائي
     video.play().catch(() => {});
+    
+    // تحديث المدة عند تحميل الفيديو
+    video.onloadedmetadata = function() {
+        if (duration) {
+            const mins = Math.floor(video.duration / 60);
+            const secs = Math.floor(video.duration % 60);
+            duration.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        if (progress) progress.max = video.duration;
+    };
+    
+    // تحديث شريط التقدم والوقت أثناء التشغيل
+    video.ontimeupdate = function() {
+        if (progress) progress.value = video.currentTime;
+        if (currentTime) {
+            const mins = Math.floor(video.currentTime / 60);
+            const secs = Math.floor(video.currentTime % 60);
+            currentTime.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    };
+    
+    // عند انتهاء الفيديو
+    video.onended = function() {
+        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        if (progress) progress.value = 0;
+        if (currentTime) currentTime.textContent = '0:00';
+    };
+},
+
+// ==================== القسم 26.2.1: toggleVideoPlay ====================
+toggleVideoPlay() {
+    const video = document.getElementById('previewVideo');
+    const playBtn = document.getElementById('videoPlayBtn');
+    if (!video || !playBtn) return;
+    
+    if (video.paused) {
+        video.play();
+        playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+    } else {
+        video.pause();
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    }
+},
+
+// ==================== القسم 26.2.2: toggleVideoMute ====================
+toggleVideoMute() {
+    const video = document.getElementById('previewVideo');
+    const muteBtn = document.getElementById('videoMuteBtn');
+    if (!video || !muteBtn) return;
+    
+    video.muted = !video.muted;
+    muteBtn.innerHTML = video.muted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>';
+},
+
+// ==================== القسم 26.2.3: seekVideo ====================
+seekVideo(value) {
+    const video = document.getElementById('previewVideo');
+    if (!video) return;
+    video.currentTime = parseFloat(value);
+},
+
+// ==================== القسم 26.2.4: closeVideoPreview (معدل) ====================
+closeVideoPreview() {
+    const modal = document.getElementById('videoPreviewModal');
+    const video = document.getElementById('previewVideo');
+    const controls = document.getElementById('videoCustomControls');
+    
+    if (modal) modal.style.display = 'none';
+    if (video) {
+        video.pause();
+        video.src = '';
+        video.onloadedmetadata = null;
+        video.ontimeupdate = null;
+        video.onended = null;
+    }
+    if (controls) controls.style.display = 'none';
+    
+    // إعادة تعيين الأزرار
+    const playBtn = document.getElementById('videoPlayBtn');
+    const muteBtn = document.getElementById('videoMuteBtn');
+    const progress = document.getElementById('videoProgress');
+    const currentTime = document.getElementById('videoCurrentTime');
+    const duration = document.getElementById('videoDuration');
+    
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+    if (progress) progress.value = 0;
+    if (currentTime) currentTime.textContent = '0:00';
+    if (duration) duration.textContent = '0:00';
+},
+
+// ==================== القسم 26.2.5: downloadPreviewVideo (يبقى كما هو) ====================
+downloadPreviewVideo() {
+    const video = document.getElementById('previewVideo');
+    if (!video || !video.src) return;
+    const link = document.createElement('a');
+    link.href = video.src;
+    link.download = 'video.mp4';
+    link.click();
 },
 
 // ==================== القسم 26.3: دوال إغلاق المعاينات ====================
