@@ -1097,3 +1097,80 @@ input:checked + .toggle-slider:before {
 }
 
 
+/* ==================== القسم:21 تحكم الفيديو الثابت ==================== */
+#videoPreviewModal button:hover {
+    background: rgba(255,255,255,0.1);
+    transform: scale(1.05);
+}
+
+#videoPreviewModal button:active {
+    transform: scale(0.95);
+}
+
+#videoProgressBar {
+    touch-action: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+#videoProgressBar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+
+#videoProgressBar::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: 2px solid white;
+}
+
+#videoPlayPauseBtn i {
+    pointer-events: none;
+}
+
+/* منع ظهور أدوات التحكم الافتراضية */
+#previewVideo::-webkit-media-controls {
+    display: none !important;
+}
+
+#previewVideo::-webkit-media-controls-enclosure {
+    display: none !important;
+}
+
+#previewVideo::-webkit-media-controls-panel {
+    display: none !important;
+}
+
+#previewVideo::-webkit-media-controls-timeline {
+    display: none !important;
+}
+
+#previewVideo::-webkit-media-controls-play-button {
+    display: none !important;
+}
+
+#previewVideo::-webkit-media-controls-mute-button {
+    display: none !important;
+}
+
+#previewVideo::-webkit-media-controls-volume-slider {
+    display: none !important;
+}
+
+#previewVideo::-webkit-media-controls-current-time-display {
+    display: none !important;
+}
+
+#previewVideo::-webkit-media-controls-time-remaining-display {
+    display: none !important;
+}
