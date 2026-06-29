@@ -873,39 +873,119 @@ input:checked + .toggle-slider:before {
     display: block;
 }
 
-/* قالب الفيديو */
-.video-thumbnail {
-    position: relative;
-    width: 250px;
+/* قالب الفيديو - مشغل مخصص */
+.video-container {
+    background: #000;
     border-radius: 12px;
     overflow: hidden;
+    position: relative;
+    width: 280px;
+    max-width: 100%;
+}
+
+.video-wrapper {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%; /* نسبة 16:9 ثابتة */
     background: #000;
+}
+
+.video-player {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     cursor: pointer;
 }
 
-.video-thumbnail-content {
-    width: 100%;
-    height: auto;
-    max-height: 200px;
-    display: block;
-    pointer-events: none;
+/* تحكمات الفيديو */
+.video-controls-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 12px 14px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
-.video-play-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.6);
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
+.video-wrapper:hover .video-controls-overlay,
+.video-wrapper:focus-within .video-controls-overlay,
+.video-wrapper.controls-visible .video-controls-overlay {
+    opacity: 1;
+}
+
+.video-play-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.1rem;
+    cursor: pointer;
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(5px);
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.video-play-btn:hover {
+    background: rgba(255,255,255,0.15);
+}
+
+.video-progress-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+    min-width: 40px;
+}
+
+.video-progress-fill {
+    height: 100%;
+    background: #4CAF50;
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.05s linear;
+}
+
+.video-time-display {
     color: white;
-    font-size: 1.5rem;
+    font-size: 0.7rem;
+    font-family: monospace;
+    min-width: 75px;
+    text-align: center;
+    opacity: 0.9;
+}
+
+.video-mute-btn,
+.video-fullscreen-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.video-mute-btn:hover,
+.video-fullscreen-btn:hover {
+    background: rgba(255,255,255,0.15);
 }
 
 /* قالب البصمة الصوتية */
