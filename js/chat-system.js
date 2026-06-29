@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+// ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1328,25 +1328,144 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (مشغل مخصص) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
             const clone = templateVideo.content.cloneNode(true);
-            const thumbnail = clone.querySelector('.video-thumbnail');
-            if (thumbnail) {
-                thumbnail.style.border = `2px solid ${borderColor}`;
-                const video = thumbnail.querySelector('.video-thumbnail-content');
-                const source = video?.querySelector('source');
-                if (source && msg.data) {
-                    source.src = msg.data;
-                    video.load();
-                }
-                thumbnail.onclick = (e) => {
-                    e.stopPropagation();
-                    this.showVideoPreview(msg.data);
-                };
+            const container = clone.querySelector('.video-container');
+            if (container) {
+                container.style.border = `2px solid ${borderColor}`;
             }
+            const video = clone.querySelector('.video-player');
+            const source = video?.querySelector('source');
+            if (source && msg.data) {
+                source.src = msg.data;
+                video.load();
+            }
+            
+            // تحكمات المشغل المخصص
+            const playBtn = clone.querySelector('.video-play-btn');
+            const progressFill = clone.querySelector('.video-progress-fill');
+            const progressBar = clone.querySelector('.video-progress-bar');
+            const currentTimeSpan = clone.querySelector('.video-current-time');
+            const durationSpan = clone.querySelector('.video-duration');
+            const muteBtn = clone.querySelector('.video-mute-btn');
+            const fullscreenBtn = clone.querySelector('.video-fullscreen-btn');
+            const controlsOverlay = clone.querySelector('.video-controls-overlay');
+            
+            let isPlaying = false;
+            let isMuted = false;
+            let controlsTimeout = null;
+            
+            // إظهار/إخفاء التحكمات
+            const showControls = () => {
+                if (controlsOverlay) {
+                    controlsOverlay.style.opacity = '1';
+                    clearTimeout(controlsTimeout);
+                    controlsTimeout = setTimeout(() => {
+                        if (controlsOverlay) controlsOverlay.style.opacity = '0';
+                    }, 3000);
+                }
+            };
+            
+            // تشغيل/إيقاف
+            const togglePlay = () => {
+                if (video.paused) {
+                    video.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                    isPlaying = true;
+                } else {
+                    video.pause();
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    isPlaying = false;
+                }
+                showControls();
+            };
+            
+            playBtn.onclick = (e) => { e.stopPropagation(); togglePlay(); };
+            video.onclick = (e) => { e.stopPropagation(); togglePlay(); };
+            video.onplay = () => { isPlaying = true; playBtn.innerHTML = '<i class="fas fa-pause"></i>'; };
+            video.onpause = () => { isPlaying = false; playBtn.innerHTML = '<i class="fas fa-play"></i>'; };
+            
+            // إظهار التحكمات عند التمرير على الفيديو
+            video.onmouseenter = showControls;
+            video.onmousemove = showControls;
+            video.onmouseleave = () => {
+                clearTimeout(controlsTimeout);
+                if (controlsOverlay) controlsOverlay.style.opacity = '0';
+            };
+            
+            // شاشات اللمس
+            video.ontouchstart = showControls;
+            
+            // تحديث شريط التقدم
+            video.ontimeupdate = () => {
+                if (video.duration) {
+                    const percent = (video.currentTime / video.duration) * 100;
+                    progressFill.style.width = percent + '%';
+                    const mins = Math.floor(video.currentTime / 60);
+                    const secs = Math.floor(video.currentTime % 60);
+                    currentTimeSpan.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                }
+            };
+            
+            // عرض المدة الكلية
+            video.onloadedmetadata = () => {
+                if (video.duration && !isNaN(video.duration)) {
+                    const mins = Math.floor(video.duration / 60);
+                    const secs = Math.floor(video.duration % 60);
+                    durationSpan.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                }
+            };
+            
+            // شريط التقدم (نقر/سحب)
+            let isDragging = false;
+            progressBar.onmousedown = (e) => { 
+                e.stopPropagation();
+                isDragging = true; 
+                updateProgress(e); 
+                showControls();
+            };
+            document.onmousemove = (e) => { if (isDragging) updateProgress(e); };
+            document.onmouseup = () => { isDragging = false; };
+            
+            progressBar.ontouchstart = (e) => { 
+                e.stopPropagation();
+                isDragging = true; 
+                updateProgress(e.touches[0]); 
+                showControls();
+            };
+            document.ontouchmove = (e) => { if (isDragging) updateProgress(e.touches[0]); };
+            document.ontouchend = () => { isDragging = false; };
+            
+            const updateProgress = (e) => {
+                const rect = progressBar.getBoundingClientRect();
+                const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                if (video.duration) {
+                    video.currentTime = x * video.duration;
+                }
+            };
+            
+            // كتم الصوت
+            muteBtn.onclick = (e) => {
+                e.stopPropagation();
+                video.muted = !video.muted;
+                muteBtn.innerHTML = video.muted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>';
+                showControls();
+            };
+            
+            // ملء الشاشة
+            fullscreenBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (video.requestFullscreen) {
+                    video.requestFullscreen();
+                } else if (video.webkitRequestFullscreen) {
+                    video.webkitRequestFullscreen();
+                }
+                showControls();
+            };
+            
             div.appendChild(clone);
         } else {
             console.warn('⚠️ قالب videoMessageTemplate غير موجود');
