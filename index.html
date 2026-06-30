@@ -482,6 +482,111 @@
     </div>
 </div>
 
+<!-- 4.9: Modal التحكم بالصورة -->
+<div id="imageControlModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10070;align-items:center;justify-content:center;backdrop-filter:blur(5px);font-family:system-ui,sans-serif;">
+    <div style="background:#0a0e27;border-radius:40px;width:340px;max-width:90%;padding:30px 20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4);max-height:90vh;overflow-y:auto;">
+        <div style="font-size:3rem;margin-bottom:10px;">🖼️</div>
+        <h3 style="color:white;margin:0 0 5px;">التحكم بالصورة</h3>
+        <p style="color:#aaa;font-size:0.8rem;margin-bottom:20px;">اختر إعدادات الصورة قبل الإرسال</p>
+        
+        <!-- وقت مشاهدة الصورة -->
+        <div style="margin-bottom:15px;">
+            <div style="color:white;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">مدة مشاهدة الصورة</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;" id="imageTimePresets">
+                <button class="click-preset image-time-btn" data-seconds="10">10 ث</button>
+                <button class="click-preset image-time-btn" data-seconds="15">15 ث</button>
+                <button class="click-preset image-time-btn" data-seconds="30">30 ث</button>
+            </div>
+        </div>
+        
+        <!-- السماح بالتنزيل -->
+        <div style="margin-bottom:20px;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+                <span style="color:#aaa;font-size:0.8rem;">منع التنزيل</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="imageAllowDownloadToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <span style="color:white;font-size:0.8rem;">سماح بالتنزيل</span>
+            </div>
+        </div>
+        
+        <!-- سلايدر الإرسال -->
+        <div class="swipe-container" style="width:100%;margin:20px 0;position:relative;">
+            <div id="imageSwipeButton" style="width:100%;height:70px;border-radius:50px;position:relative;overflow:hidden;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(90deg,#1a5a2a 0%,#1a5a2a 50%,#8b1a1a 50%,#8b1a1a 100%);border:2px solid #2196F3;">
+                <div style="position:absolute;top:10px;bottom:10px;left:50%;width:2px;background:#2196F3;transform:translateX(-50%);"></div>
+                <div style="position:absolute;top:50%;left:50%;width:10px;height:10px;background:#2196F3;border-radius:50%;transform:translate(-50%,-50%);"></div>
+                <div id="imageLeftThumb" style="position:absolute;top:8px;left:8px;width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#4CAF50,#1b5e2a);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:grab;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:left 0.05s linear;color:white;">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div id="imageRightThumb" style="position:absolute;top:8px;right:8px;width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#f44336,#8b0000);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:grab;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:right 0.05s linear;color:white;">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- 4.10: Modal التحكم بالفيديو -->
+<div id="videoControlModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10080;align-items:center;justify-content:center;backdrop-filter:blur(5px);font-family:system-ui,sans-serif;">
+    <div style="background:#0a0e27;border-radius:40px;width:340px;max-width:90%;padding:30px 20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4);max-height:90vh;overflow-y:auto;">
+        <div style="font-size:3rem;margin-bottom:10px;">🎬</div>
+        <h3 style="color:white;margin:0 0 5px;">التحكم بالفيديو</h3>
+        <p style="color:#aaa;font-size:0.8rem;margin-bottom:20px;">اختر إعدادات الفيديو قبل الإرسال</p>
+        
+        <!-- عدد مرات تشغيل الفيديو -->
+        <div style="margin-bottom:15px;">
+            <div style="color:white;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">عدد مرات التشغيل</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;" id="videoPlayPresets">
+                <button class="click-preset video-play-btn" data-plays="1">1</button>
+                <button class="click-preset video-play-btn" data-plays="2">2</button>
+                <button class="click-preset video-play-btn" data-plays="3">3</button>
+                <button class="click-preset video-play-btn" data-plays="4">4</button>
+                <button class="click-preset video-play-btn" data-plays="5">5</button>
+            </div>
+        </div>
+        
+        <!-- غير محدود -->
+        <div style="margin-bottom:15px;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+                <span style="color:white;font-size:0.8rem;">بلا حدود</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="videoUnlimitedToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span style="color:#aaa;font-size:0.8rem;">محدود</span>
+            </div>
+        </div>
+        
+        <!-- السماح بالتنزيل -->
+        <div style="margin-bottom:20px;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+                <span style="color:#aaa;font-size:0.8rem;">منع التنزيل</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="videoAllowDownloadToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <span style="color:white;font-size:0.8rem;">سماح بالتنزيل</span>
+            </div>
+        </div>
+        
+        <!-- سلايدر الإرسال -->
+        <div class="swipe-container" style="width:100%;margin:20px 0;position:relative;">
+            <div id="videoSwipeButton" style="width:100%;height:70px;border-radius:50px;position:relative;overflow:hidden;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(90deg,#1a5a2a 0%,#1a5a2a 50%,#8b1a1a 50%,#8b1a1a 100%);border:2px solid #2196F3;">
+                <div style="position:absolute;top:10px;bottom:10px;left:50%;width:2px;background:#2196F3;transform:translateX(-50%);"></div>
+                <div style="position:absolute;top:50%;left:50%;width:10px;height:10px;background:#2196F3;border-radius:50%;transform:translate(-50%,-50%);"></div>
+                <div id="videoLeftThumb" style="position:absolute;top:8px;left:8px;width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#4CAF50,#1b5e2a);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:grab;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:left 0.05s linear;color:white;">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div id="videoRightThumb" style="position:absolute;top:8px;right:8px;width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#f44336,#8b0000);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:grab;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:right 0.05s linear;color:white;">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    
 <!-- ==================== القسم 5: قوالب الرسائل الثابتة ==================== -->
 
 <!-- 5.0: قالب غلاف الرسالة -->
