@@ -1154,7 +1154,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+ // ==================== القسم 26: displayMessage (معدل بالكامل - مع قيود الصورة والفيديو والتنزيل) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1180,7 +1180,6 @@ displayMessage(msg) {
     if (template) {
         div = template.content.cloneNode(true).firstElementChild;
     } else {
-        // ⚠️ Fallback فقط في حالة عدم وجود القالب (حل طوارئ)
         console.warn('⚠️ قالب messageWrapperTemplate غير موجود');
         div = document.createElement('div');
         div.className = 'message';
@@ -1189,7 +1188,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1210,7 +1209,6 @@ displayMessage(msg) {
             console.warn('⚠️ قالب textMessageTemplate غير موجود');
         }
         
-        // ✅ إضافة فاصل زمني كل 10 رسائل
         const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
         const currentMessageCount = existingTextMessages.length;
         
@@ -1285,7 +1283,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - مع وقت مشاهدة محدد) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1296,9 +1294,68 @@ displayMessage(msg) {
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
                     img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
-                    img.oncontextmenu = (e) => e.preventDefault();
-                    img.ondragstart = (e) => e.preventDefault();
+                    
+                    // ✅ التحكم بوقت المشاهدة
+                    let imageViewTime = msg.mediaSettings?.imageViewTime || 15;
+                    let isImageOpened = msg.mediaSettings?.imageOpened || false;
+                    let imageTimer = null;
+                    
+                    // ✅ إذا كانت الصورة مفتوحة مسبقاً، إقفالها
+                    if (isImageOpened) {
+                        img.style.opacity = '0.4';
+                        img.style.filter = 'grayscale(1)';
+                        img.style.cursor = 'default';
+                        img.onclick = null;
+                        
+                        const lockOverlay = document.createElement('div');
+                        lockOverlay.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;color:white;text-shadow:0 2px 10px rgba(0,0,0,0.8);pointer-events:none;';
+                        lockOverlay.innerHTML = '<i class="fas fa-lock"></i>';
+                        wrapper.style.position = 'relative';
+                        wrapper.appendChild(lockOverlay);
+                    } else {
+                        img.onclick = () => {
+                            if (isImageOpened) return;
+                            
+                            isImageOpened = true;
+                            msg.mediaSettings.imageOpened = true;
+                            this.showImagePreview(msg.data);
+                            
+                            // ✅ بدء المؤقت بعد فتح الصورة
+                            if (imageTimer) clearTimeout(imageTimer);
+                            imageTimer = setTimeout(() => {
+                                this.closeImagePreview();
+                                
+                                // ✅ إقفال الصورة نهائياً
+                                img.style.opacity = '0.4';
+                                img.style.filter = 'grayscale(1)';
+                                img.style.cursor = 'default';
+                                img.onclick = null;
+                                
+                                const lockOverlay = document.createElement('div');
+                                lockOverlay.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;color:white;text-shadow:0 2px 10px rgba(0,0,0,0.8);pointer-events:none;';
+                                lockOverlay.innerHTML = '<i class="fas fa-lock"></i>';
+                                wrapper.style.position = 'relative';
+                                wrapper.appendChild(lockOverlay);
+                                
+                                // ✅ حفظ التحديث
+                                if (ChatSystem.currentChat) {
+                                    const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                                    const msgIndex = messages.findIndex(m => m.id === msg.id);
+                                    if (msgIndex !== -1) {
+                                        messages[msgIndex].mediaSettings = msg.mediaSettings;
+                                        ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                                    }
+                                }
+                            }, imageViewTime * 1000);
+                        };
+                    }
+                    
+                    // ✅ منع التنزيل إذا لم يسمح المرسل
+                    const allowDownload = msg.mediaSettings?.allowDownload !== false;
+                    if (!allowDownload) {
+                        img.oncontextmenu = (e) => e.preventDefault();
+                        img.ondragstart = (e) => e.preventDefault();
+                    }
                 }
             }
             div.appendChild(clone);
@@ -1328,7 +1385,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (معدل - مع عدد مرات التشغيل) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
@@ -1342,10 +1399,59 @@ displayMessage(msg) {
                     source.src = msg.data;
                     video.load();
                 }
-                thumbnail.onclick = (e) => {
-                    e.stopPropagation();
-                    this.showVideoPreview(msg.data);
-                };
+                
+                // ✅ التحكم بعدد مرات التشغيل
+                let playsRemaining = msg.mediaSettings?.videoPlaysRemaining;
+                const maxPlays = msg.mediaSettings?.videoMaxPlays;
+                const allowDownload = msg.mediaSettings?.allowDownload !== false;
+                const isLocked = (playsRemaining !== undefined && playsRemaining <= 0);
+                
+                // ✅ إذا كان الفيديو مقفلاً
+                if (isLocked) {
+                    const overlay = thumbnail.querySelector('.video-play-overlay');
+                    if (overlay) {
+                        overlay.innerHTML = '<i class="fas fa-lock" style="font-size:2rem;"></i>';
+                        overlay.style.background = 'rgba(0,0,0,0.7)';
+                    }
+                    thumbnail.style.opacity = '0.6';
+                    thumbnail.style.cursor = 'default';
+                    thumbnail.onclick = null;
+                } else {
+                    thumbnail.onclick = (e) => {
+                        e.stopPropagation();
+                        
+                        if (playsRemaining !== undefined && playsRemaining <= 0) return;
+                        
+                        // ✅ تمرير إعداد السماح بالتنزيل
+                        this.showVideoPreview(msg.data, allowDownload);
+                        
+                        // ✅ تقليل العدد إذا كان محدوداً
+                        if (msg.sender !== 'me' && playsRemaining !== undefined && maxPlays < 999999) {
+                            playsRemaining--;
+                            msg.mediaSettings.videoPlaysRemaining = playsRemaining;
+                            if (playsRemaining <= 0) {
+                                // ✅ إقفال الفيديو
+                                const overlay = thumbnail.querySelector('.video-play-overlay');
+                                if (overlay) {
+                                    overlay.innerHTML = '<i class="fas fa-lock" style="font-size:2rem;"></i>';
+                                    overlay.style.background = 'rgba(0,0,0,0.7)';
+                                }
+                                thumbnail.style.opacity = '0.6';
+                                thumbnail.style.cursor = 'default';
+                                thumbnail.onclick = null;
+                            }
+                            // حفظ التحديث
+                            if (ChatSystem.currentChat) {
+                                const messages = ChatSystem.messages[ChatSystem.currentChat] || [];
+                                const msgIndex = messages.findIndex(m => m.id === msg.id);
+                                if (msgIndex !== -1) {
+                                    messages[msgIndex].mediaSettings = msg.mediaSettings;
+                                    ChatSystem.saveMessage(ChatSystem.currentChat, messages[msgIndex]);
+                                }
+                            }
+                        }
+                    };
+                }
             }
             div.appendChild(clone);
         } else {
@@ -1353,7 +1459,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل - مع التحكم بالتنزيل) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1366,15 +1472,23 @@ displayMessage(msg) {
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
+                
+                // ✅ التحكم بظهور زر التنزيل
+                const allowDownload = msg.mediaSettings?.allowDownload !== false;
                 const downloadBtn = fileCard.querySelector('.download-file-btn');
                 if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = msg.data;
-                        link.download = msg.fileName || 'ملف';
-                        link.click();
-                    };
+                    if (allowDownload) {
+                        downloadBtn.style.display = 'flex';
+                        downloadBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            const link = document.createElement('a');
+                            link.href = msg.data;
+                            link.download = msg.fileName || 'ملف';
+                            link.click();
+                        };
+                    } else {
+                        downloadBtn.style.display = 'none';
+                    }
                 }
             }
             div.appendChild(clone);
@@ -1491,8 +1605,8 @@ setupImageZoom(modal, img) {
 },
 
 
-// ==================== القسم 26.2: showVideoPreview (معدل - تحكم مخصص) ====================
-showVideoPreview(videoSrc) {
+// ==================== القسم 26.2: showVideoPreview (معدل - منع الترجيح والتحكم بالتنزيل) ====================
+showVideoPreview(videoSrc, allowDownload = true) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (!modal || !video) return;
@@ -1507,10 +1621,31 @@ showVideoPreview(videoSrc) {
     const controls = document.getElementById('videoCustomControls');
     if (controls) controls.style.display = 'flex';
     
+    // ✅ منع الترجيح (تعطيل شريط التقدم)
+    const progress = document.getElementById('videoProgress');
+    if (progress) {
+        progress.disabled = true;
+        progress.style.cursor = 'default';
+        progress.style.opacity = '0.5';
+    }
+    
+    // ✅ التحكم في زر التنزيل
+    const downloadBtn = document.querySelector('#videoPreviewModal button[onclick*="downloadPreviewVideo"]');
+    if (downloadBtn) {
+        if (allowDownload) {
+            downloadBtn.style.display = 'flex';
+            downloadBtn.style.pointerEvents = 'auto';
+            downloadBtn.style.opacity = '1';
+        } else {
+            downloadBtn.style.display = 'none';
+            downloadBtn.style.pointerEvents = 'none';
+            downloadBtn.style.opacity = '0';
+        }
+    }
+    
     // إعادة تعيين حالة الأزرار
     const playBtn = document.getElementById('videoPlayBtn');
     const muteBtn = document.getElementById('videoMuteBtn');
-    const progress = document.getElementById('videoProgress');
     const currentTime = document.getElementById('videoCurrentTime');
     const duration = document.getElementById('videoDuration');
     
@@ -1543,7 +1678,7 @@ showVideoPreview(videoSrc) {
         }
     };
     
-    // تحديث شريط التقدم والوقت أثناء التشغيل
+    // تحديث شريط التقدم والوقت أثناء التشغيل (للقراءة فقط)
     video.ontimeupdate = function() {
         if (progress) {
             progress.value = video.currentTime;
@@ -1885,8 +2020,7 @@ async sendMessage(text) {
 
     
     // ==================== القسم 34: shareLocationDirect ====================
-    
-   async shareLocationDirect() { 
+async shareLocationDirect() { 
     if (!this.currentChat) return; 
     if (!this.friendInConversation || !this.featuresEnabled) {
         alert(this.featuresEnabled ? 'لا يمكن المشاركة - الطرف الآخر ليس في المحادثة' : 'لا يمكن المشاركة - الميزات غير مفعلة');
@@ -1914,7 +2048,7 @@ async sendMessage(text) {
     }
 },
 
-// ==================== القسم 34.1: showLocationSwipeModalWithClicks ====================
+// ==================== القسم 34.1: showLocationSwipeModalWithClicks (معدل) ====================
 showLocationSwipeModalWithClicks(locationData) {
     const modal = document.getElementById('locationSwipeModal');
     const coordsText = document.getElementById('locationCoordsText');
@@ -1923,15 +2057,42 @@ showLocationSwipeModalWithClicks(locationData) {
     coordsText.textContent = `${locationData.lat} , ${locationData.lng}`;
     modal.style.display = 'flex';
     
+    // ✅ إعادة تعيين الاختيارات الافتراضية
+    this._selectedClicks = 1;
+    this._selectedVideoPlays = 1;
+    this._selectedImageTime = 15;
+    this._allowDownload = true;
+    
+    // ✅ تعيين الاختيار الافتراضي للموقع
+    document.querySelectorAll('#clickPresets .click-preset').forEach((btn, index) => {
+        btn.style.background = index === 0 ? '#4CAF50' : '#1a1a2e';
+        btn.style.borderColor = index === 0 ? '#4CAF50' : '#4CAF50';
+    });
+    
+    // ✅ تعيين الاختيار الافتراضي للفيديو
+    document.querySelectorAll('#videoPlayPresets .video-preset').forEach((btn, index) => {
+        btn.style.background = index === 0 ? '#4CAF50' : '#1a1a2e';
+        btn.style.borderColor = index === 0 ? '#4CAF50' : '#4CAF50';
+    });
+    
+    // ✅ تعيين الاختيار الافتراضي لوقت الصورة (15 ثانية)
+    document.querySelectorAll('#imageTimePresets .image-time-preset').forEach((btn, index) => {
+        const isDefault = btn.dataset.seconds === '15';
+        btn.style.background = isDefault ? '#4CAF50' : '#1a1a2e';
+        btn.style.borderColor = isDefault ? '#4CAF50' : '#4CAF50';
+    });
+    
     this.setupLocationSwipe(locationData);
 },
 
+// ==================== القسم 34.2: setupLocationSwipe (معدل) ====================
 setupLocationSwipe(locationData) {
     const modal = document.getElementById('locationSwipeModal');
     const button = document.getElementById('locationSwipeButton');
     const leftThumb = document.getElementById('locationLeftThumb');
     const rightThumb = document.getElementById('locationRightThumb');
     const unlimitedToggle = document.getElementById('unlimitedToggle');
+    const allowDownloadToggle = document.getElementById('allowDownloadToggle');
     
     if (!button || !leftThumb || !rightThumb) return;
     
@@ -1939,9 +2100,15 @@ setupLocationSwipe(locationData) {
     if (rightThumb._cleanup) rightThumb._cleanup();
     
     let selectedClicks = 1;
+    let selectedVideoPlays = 1;
+    let selectedImageTime = 15;
+    let allowDownload = true;
     let selectedButton = null;
+    let selectedVideoButton = null;
+    let selectedImageTimeButton = null;
     
-    document.querySelectorAll('.click-preset').forEach(btn => {
+    // ✅ اختيار عدد مرات فتح الموقع
+    document.querySelectorAll('#clickPresets .click-preset').forEach(btn => {
         btn.onclick = () => {
             if (selectedButton) {
                 selectedButton.style.background = '#1a1a2e';
@@ -1954,30 +2121,66 @@ setupLocationSwipe(locationData) {
         };
     });
     
-    const firstBtn = document.querySelector('.click-preset[data-clicks="1"]');
-    if (firstBtn) {
-        firstBtn.style.background = '#4CAF50';
-        firstBtn.style.borderColor = '#4CAF50';
-        selectedButton = firstBtn;
-        selectedClicks = 1;
+    // ✅ اختيار عدد مرات تشغيل الفيديو
+    document.querySelectorAll('#videoPlayPresets .video-preset').forEach(btn => {
+        btn.onclick = () => {
+            if (selectedVideoButton) {
+                selectedVideoButton.style.background = '#1a1a2e';
+                selectedVideoButton.style.borderColor = '#4CAF50';
+            }
+            selectedVideoButton = btn;
+            selectedVideoButton.style.background = '#4CAF50';
+            selectedVideoButton.style.borderColor = '#4CAF50';
+            selectedVideoPlays = parseInt(btn.dataset.clicks);
+        };
+    });
+    
+    // ✅ اختيار وقت مشاهدة الصورة
+    document.querySelectorAll('#imageTimePresets .image-time-preset').forEach(btn => {
+        btn.onclick = () => {
+            if (selectedImageTimeButton) {
+                selectedImageTimeButton.style.background = '#1a1a2e';
+                selectedImageTimeButton.style.borderColor = '#4CAF50';
+            }
+            selectedImageTimeButton = btn;
+            selectedImageTimeButton.style.background = '#4CAF50';
+            selectedImageTimeButton.style.borderColor = '#4CAF50';
+            selectedImageTime = parseInt(btn.dataset.seconds);
+        };
+    });
+    
+    // ✅ السماح بالتنزيل
+    if (allowDownloadToggle) {
+        allowDownloadToggle.onchange = () => {
+            allowDownload = allowDownloadToggle.checked;
+        };
     }
     
-    unlimitedToggle.addEventListener('change', () => {
+    // تعيين الاختيار الافتراضي
+    const firstBtn = document.querySelector('#clickPresets .click-preset[data-clicks="1"]');
+    if (firstBtn) { firstBtn.style.background = '#4CAF50'; selectedButton = firstBtn; selectedClicks = 1; }
+    
+    const firstVideoBtn = document.querySelector('#videoPlayPresets .video-preset[data-clicks="1"]');
+    if (firstVideoBtn) { firstVideoBtn.style.background = '#4CAF50'; selectedVideoButton = firstVideoBtn; selectedVideoPlays = 1; }
+    
+    const defaultImageBtn = document.querySelector('#imageTimePresets .image-time-preset[data-seconds="15"]');
+    if (defaultImageBtn) { defaultImageBtn.style.background = '#4CAF50'; selectedImageTimeButton = defaultImageBtn; selectedImageTime = 15; }
+    
+    // غير محدود
+    unlimitedToggle.onchange = () => {
         if (unlimitedToggle.checked) {
-            document.querySelectorAll('.click-preset').forEach(btn => {
+            document.querySelectorAll('#clickPresets .click-preset').forEach(btn => {
                 btn.style.opacity = '0.5';
                 btn.style.pointerEvents = 'none';
             });
         } else {
-            document.querySelectorAll('.click-preset').forEach(btn => {
+            document.querySelectorAll('#clickPresets .click-preset').forEach(btn => {
                 btn.style.opacity = '1';
                 btn.style.pointerEvents = 'auto';
             });
-            if (selectedButton) {
-                selectedButton.style.background = '#4CAF50';
-            }
+            if (selectedButton) selectedButton.style.background = '#4CAF50';
         }
-    });
+    };
     
     const buttonWidth = button.clientWidth;
     const centerPos = buttonWidth / 2;
@@ -2020,6 +2223,18 @@ setupLocationSwipe(locationData) {
                 if (maxClicks > 5) maxClicks = 5;
             }
             
+            // ✅ تخزين جميع الإعدادات في mediaSettings
+            const mediaSettings = {
+                locationMaxClicks: maxClicks,
+                locationClicksRemaining: maxClicks,
+                videoMaxPlays: selectedVideoPlays,
+                videoPlaysRemaining: selectedVideoPlays,
+                imageViewTime: selectedImageTime,
+                imageOpened: false,
+                allowDownload: allowDownload
+            };
+            
+            locationData.mediaSettings = mediaSettings;
             locationData.maxClicks = maxClicks;
             locationData.clicksRemaining = maxClicks;
             
@@ -2093,7 +2308,7 @@ setupLocationSwipe(locationData) {
             modal.style.display = 'none';
         }
     }, 30000);
-}, 
+},
     
     
     // ==================== القسم 35: saveMessage ====================
