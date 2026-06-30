@@ -1490,6 +1490,7 @@ setupImageZoom(modal, img) {
     };
 },
 
+
 // ==================== القسم 26.2: showVideoPreview (معدل - تحكم مخصص) ====================
 showVideoPreview(videoSrc) {
     const modal = document.getElementById('videoPreviewModal');
@@ -1515,7 +1516,11 @@ showVideoPreview(videoSrc) {
     
     if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
     if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-    if (progress) progress.value = 0;
+    if (progress) {
+        progress.value = 0;
+        // تحديث لون شريط التقدم إلى الأخضر
+        progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
+    }
     if (currentTime) currentTime.textContent = '0:00';
     if (duration) duration.textContent = '0:00';
     
@@ -1529,12 +1534,20 @@ showVideoPreview(videoSrc) {
             const secs = Math.floor(video.duration % 60);
             duration.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
         }
-        if (progress) progress.max = video.duration;
+        if (progress) {
+            progress.max = video.duration;
+            progress.value = 0;
+        }
     };
     
     // تحديث شريط التقدم والوقت أثناء التشغيل
     video.ontimeupdate = function() {
-        if (progress) progress.value = video.currentTime;
+        if (progress) {
+            progress.value = video.currentTime;
+            // تحديث لون شريط التقدم ليعكس التقدم الفعلي
+            const percent = (video.currentTime / video.duration) * 100;
+            progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 ${percent}%, rgba(255,255,255,0.2) ${percent}%, rgba(255,255,255,0.2) 100%)`;
+        }
         if (currentTime) {
             const mins = Math.floor(video.currentTime / 60);
             const secs = Math.floor(video.currentTime % 60);
@@ -1545,7 +1558,10 @@ showVideoPreview(videoSrc) {
     // عند انتهاء الفيديو
     video.onended = function() {
         if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-        if (progress) progress.value = 0;
+        if (progress) {
+            progress.value = 0;
+            progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
+        }
         if (currentTime) currentTime.textContent = '0:00';
     };
 },
@@ -1607,7 +1623,10 @@ closeVideoPreview() {
     
     if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
     if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-    if (progress) progress.value = 0;
+    if (progress) {
+        progress.value = 0;
+        progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
+    }
     if (currentTime) currentTime.textContent = '0:00';
     if (duration) duration.textContent = '0:00';
 },
@@ -1621,6 +1640,7 @@ downloadPreviewVideo() {
     link.download = 'video.mp4';
     link.click();
 },
+
 
 // ==================== القسم 26.3: دوال إغلاق المعاينات ====================
 closeImagePreview() {
