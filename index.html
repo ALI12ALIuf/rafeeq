@@ -393,10 +393,10 @@
                 <i class="fas fa-play"></i>
             </button>
             
-            <!-- شريط التقدم -->
-            <div style="flex:1;display:flex;align-items:center;gap:10px;">
+            <!-- شريط التقدم - إضافة dir="ltr" -->
+            <div style="flex:1;display:flex;align-items:center;gap:10px;direction:ltr;">
                 <span id="videoCurrentTime" style="color:white;font-size:0.75rem;font-family:monospace;min-width:40px;">0:00</span>
-                <input type="range" id="videoProgress" min="0" max="100" value="0" step="0.1" oninput="ChatSystem.seekVideo(this.value)" style="flex:1;height:4px;background:rgba(255,255,255,0.3);border-radius:2px;appearance:none;outline:none;cursor:pointer;">
+                <input type="range" id="videoProgress" min="0" max="100" value="0" step="0.1" oninput="ChatSystem.seekVideo(this.value)" style="flex:1;height:4px;background:rgba(255,255,255,0.3);border-radius:2px;appearance:none;outline:none;cursor:pointer;direction:ltr;">
                 <span id="videoDuration" style="color:white;font-size:0.75rem;font-family:monospace;min-width:40px;">0:00</span>
             </div>
             
