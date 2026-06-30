@@ -1188,9 +1188,9 @@ input:checked + .toggle-slider:before {
     display: flex;
 }
 
-/* تحسين شكل أزرار الرجوع والتنزيل */
-#videoPreviewModal .back-btn-custom,
-#videoPreviewModal .download-btn-custom {
+/* تنسيق أزرار الرجوع والتنزيل */
+#videoBackBtn,
+#videoDownloadBtn {
     background: rgba(0, 0, 0, 0.7);
     border: 2px solid #4CAF50;
     border-radius: 50%;
@@ -1206,19 +1206,19 @@ input:checked + .toggle-slider:before {
     transition: all 0.2s ease;
 }
 
-#videoPreviewModal .back-btn-custom:hover,
-#videoPreviewModal .download-btn-custom:hover {
+#videoBackBtn:hover,
+#videoDownloadBtn:hover {
     background: rgba(76, 175, 80, 0.3);
     transform: scale(1.05);
 }
 
-#videoPreviewModal .back-btn-custom:active,
-#videoPreviewModal .download-btn-custom:active {
+#videoBackBtn:active,
+#videoDownloadBtn:active {
     transform: scale(0.95);
 }
 
-/* تنسيق الإطار الأخضر حول الفيديو */
-#videoPreviewModal .video-frame {
+/* الإطار الأخضر حول الفيديو */
+#videoFrameBorder {
     position: absolute;
     top: 15px;
     left: 15px;
@@ -1229,41 +1229,81 @@ input:checked + .toggle-slider:before {
     pointer-events: none;
     z-index: 10061;
     box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* تنسيق حاوية الفيديو الداخلية */
-#videoPreviewModal .video-container {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    right: 15px;
-    bottom: 15px;
-    display: flex;
-    flex-direction: column;
-    background: #000;
-    border-radius: 16px;
-    overflow: hidden;
+/* ==================== القسم 21.1: ألوان أزرار معاينة الفيديو حسب جهة الإرسال ==================== */
+
+/* الإطار - أزرق للمرسل */
+#videoFrameBorder.frame-sent {
+    border-color: #2196F3 !important;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3) !important;
 }
 
-/* تنسيق الفيديو نفسه */
-#previewVideo {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    width: 100%;
-    height: 100%;
+/* الإطار - أخضر للمستلم */
+#videoFrameBorder.frame-received {
+    border-color: #4CAF50 !important;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3) !important;
 }
 
-/* تنسيق شريط التقدم عند التحميل */
-#videoProgress.loading {
-    background: linear-gradient(90deg, #4CAF50 0%, #4CAF50 30%, rgba(255,255,255,0.3) 30%, rgba(255,255,255,0.3) 100%);
-    background-size: 200% 100%;
-    animation: loadingProgress 1.5s ease-in-out infinite;
+/* زر الرجوع - أزرق للمرسل */
+#videoBackBtn.btn-sent {
+    border-color: #2196F3 !important;
+    color: #2196F3 !important;
 }
 
-@keyframes loadingProgress {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+/* زر الرجوع - أخضر للمستلم */
+#videoBackBtn.btn-received {
+    border-color: #4CAF50 !important;
+    color: #4CAF50 !important;
+}
+
+/* زر التنزيل - أزرق للمرسل */
+#videoDownloadBtn.btn-sent {
+    border-color: #2196F3 !important;
+    color: #2196F3 !important;
+}
+
+/* زر التنزيل - أخضر للمستلم */
+#videoDownloadBtn.btn-received {
+    border-color: #4CAF50 !important;
+    color: #4CAF50 !important;
+}
+
+/* زر كتم الصوت - أزرق للمرسل */
+#videoMuteBtn.btn-sent {
+    color: #2196F3 !important;
+}
+
+/* زر كتم الصوت - أخضر للمستلم */
+#videoMuteBtn.btn-received {
+    color: #4CAF50 !important;
+}
+
+/* شريط التقدم - أزرق للمرسل */
+#videoProgress.progress-sent {
+    accent-color: #2196F3 !important;
+}
+
+#videoProgress.progress-sent::-webkit-slider-thumb {
+    background: #2196F3 !important;
+}
+
+#videoProgress.progress-sent::-moz-range-thumb {
+    background: #2196F3 !important;
+}
+
+/* شريط التقدم - أخضر للمستلم */
+#videoProgress.progress-received {
+    accent-color: #4CAF50 !important;
+}
+
+#videoProgress.progress-received::-webkit-slider-thumb {
+    background: #4CAF50 !important;
+}
+
+#videoProgress.progress-received::-moz-range-thumb {
+    background: #4CAF50 !important;
 }
 
 /* تحسين المظهر على الهواتف */
@@ -1295,4 +1335,5 @@ input:checked + .toggle-slider:before {
         height: 12px;
     }
 }
+
 
