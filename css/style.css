@@ -1103,27 +1103,34 @@ input:checked + .toggle-slider:before {
 #videoProgress {
     -webkit-appearance: none;
     appearance: none;
-    height: 4px;
+    width: 100%;
+    height: 6px;
     background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
+    border-radius: 4px;
     outline: none;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.3s;
+    position: relative;
 }
 
-/* المسار الخلفي (الجزء الفارغ) */
+/* لون الخلفية عند التحميل */
 #videoProgress::-webkit-slider-runnable-track {
-    height: 4px;
+    width: 100%;
+    height: 6px;
     background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
+    border-radius: 4px;
+    transition: background 0.3s;
 }
 
-/* ✅ المسار الممتلئ (الجزء الأخضر) */
-#videoProgress::-webkit-slider-runnable-track {
-    background: linear-gradient(to right, #4CAF50 0%, #4CAF50 var(--progress, 0%), rgba(255, 255, 255, 0.2) var(--progress, 0%), rgba(255, 255, 255, 0.2) 100%);
+#videoProgress::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    border: none;
 }
 
-/* ✅ الدائرة الخضراء مع الإطار الأبيض */
+/* الدائرة (المنزلق) */
 #videoProgress::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -1132,34 +1139,16 @@ input:checked + .toggle-slider:before {
     border-radius: 50%;
     background: #4CAF50;
     cursor: pointer;
-    border: 2.5px solid #ffffff;
+    border: 2px solid white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     transition: all 0.15s ease;
-    margin-top: -6px;
     position: relative;
     z-index: 2;
+    margin-top: -5px;
 }
 
 #videoProgress::-webkit-slider-thumb:hover {
-    transform: scale(1.15);
-    box-shadow: 0 2px 12px rgba(76, 175, 80, 0.5);
-}
-
-#videoProgress::-webkit-slider-thumb:active {
-    transform: scale(0.95);
-}
-
-/* ✅ فايرفوكس */
-#videoProgress::-moz-range-track {
-    height: 4px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-}
-
-#videoProgress::-moz-range-progress {
-    height: 4px;
-    background: #4CAF50;
-    border-radius: 2px;
+    transform: scale(1.2);
 }
 
 #videoProgress::-moz-range-thumb {
@@ -1168,11 +1157,29 @@ input:checked + .toggle-slider:before {
     border-radius: 50%;
     background: #4CAF50;
     cursor: pointer;
-    border: 2.5px solid #ffffff;
+    border: 2px solid white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-/* ✅ تنسيق أوقات الفيديو */
+/* إضافة لون أخضر خلف الدائرة (نصف ممتلئ) */
+#videoProgress {
+    background: linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%);
+    border-radius: 4px;
+}
+
+/* تنسيق أزرار التحكم في الفيديو */
+#videoPlayBtn:hover,
+#videoMuteBtn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.05);
+}
+
+#videoPlayBtn:active,
+#videoMuteBtn:active {
+    transform: scale(0.95);
+}
+
+/* تنسيق أوقات الفيديو */
 #videoCurrentTime,
 #videoDuration {
     font-family: 'Courier New', monospace;
@@ -1184,7 +1191,7 @@ input:checked + .toggle-slider:before {
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* ✅ تنسيق حاوية التحكم السفلية */
+/* تنسيق حاوية التحكم السفلية */
 #videoCustomControls {
     display: none;
     flex-shrink: 0;
@@ -1199,94 +1206,87 @@ input:checked + .toggle-slider:before {
     justify-content: space-between;
 }
 
+/* عند ظهور عناصر التحكم */
 #videoCustomControls.active {
     display: flex;
 }
 
-/* ✅ أزرار التحكم */
-#videoPlayBtn,
-#videoMuteBtn {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.4rem;
-    cursor: pointer;
-    width: 40px;
-    height: 40px;
+/* تنسيق الإطار الأخضر حول الفيديو */
+#videoPreviewModal .video-frame {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    right: 15px;
+    bottom: 15px;
+    border: 3px solid #4CAF50;
+    border-radius: 20px;
+    pointer-events: none;
+    z-index: 10061;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+}
+
+/* تنسيق حاوية الفيديو الداخلية */
+#videoPreviewModal .video-container {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    right: 15px;
+    bottom: 15px;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    border-radius: 50%;
+    flex-direction: column;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
 }
 
-#videoPlayBtn:hover,
-#videoMuteBtn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: scale(1.05);
+/* تنسيق الفيديو نفسه */
+#previewVideo {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
 }
 
-#videoPlayBtn:active,
-#videoMuteBtn:active {
-    transform: scale(0.95);
+/* تنسيق شريط التقدم عند التحميل */
+#videoProgress.loading {
+    background: linear-gradient(90deg, #4CAF50 0%, #4CAF50 30%, rgba(255,255,255,0.3) 30%, rgba(255,255,255,0.3) 100%);
+    background-size: 200% 100%;
+    animation: loadingProgress 1.5s ease-in-out infinite;
 }
 
-/* ✅ أزرار الرجوع والتنزيل */
-#videoPreviewModal .back-btn-custom,
-#videoPreviewModal .download-btn-custom {
-    background: rgba(0, 0, 0, 0.7);
-    border: 2px solid #4CAF50;
-    border-radius: 50%;
-    width: 45px;
-    height: 45px;
-    cursor: pointer;
-    font-size: 1.2rem;
-    color: white;
-    pointer-events: auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
+@keyframes loadingProgress {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
-#videoPreviewModal .back-btn-custom:hover,
-#videoPreviewModal .download-btn-custom:hover {
-    background: rgba(76, 175, 80, 0.3);
-    transform: scale(1.05);
+/* تحسين المظهر على الهواتف */
+@media (max-width: 480px) {
+    #videoCustomControls {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+    
+    #videoPlayBtn,
+    #videoMuteBtn {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    #videoCurrentTime,
+    #videoDuration {
+        font-size: 0.65rem;
+        min-width: 32px;
+    }
+    
+    #videoProgress {
+        height: 4px;
+    }
+    
+    #videoProgress::-webkit-slider-thumb {
+        width: 14px;
+        height: 14px;
+    }
 }
-
-/* ==================== القسم 21.1: ألوان الإطارات حسب جهة الإرسال ==================== */
-
-/* ✅ للمرسل (أزرق) */
-#videoPreviewModal.sent .video-frame {
-    border-color: #2196F3 !important;
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3) !important;
-}
-
-#videoPreviewModal.sent .back-btn-custom,
-#videoPreviewModal.sent .download-btn-custom {
-    border-color: #2196F3 !important;
-}
-
-#videoPreviewModal.sent .back-btn-custom:hover,
-#videoPreviewModal.sent .download-btn-custom:hover {
-    background: rgba(33, 150, 243, 0.3) !important;
-}
-
-/* ✅ للمستلم (أخضر) */
-#videoPreviewModal.received .video-frame {
-    border-color: #4CAF50 !important;
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3) !important;
-}
-
-#videoPreviewModal.received .back-btn-custom,
-#videoPreviewModal.received .download-btn-custom {
-    border-color: #4CAF50 !important;
-}
-
-#videoPreviewModal.received .back-btn-custom:hover,
-#videoPreviewModal.received .download-btn-custom:hover {
-    background: rgba(76, 175, 80, 0.3) !important;
-}
-
 
