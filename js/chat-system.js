@@ -1518,7 +1518,8 @@ showVideoPreview(videoSrc) {
     if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
     if (progress) {
         progress.value = 0;
-        // تحديث لون شريط التقدم إلى الأخضر
+        // ✅ إجبار الاتجاه من اليسار إلى اليمين
+        progress.style.direction = 'ltr';
         progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
     }
     if (currentTime) currentTime.textContent = '0:00';
@@ -1537,6 +1538,8 @@ showVideoPreview(videoSrc) {
         if (progress) {
             progress.max = video.duration;
             progress.value = 0;
+            // ✅ إجبار الاتجاه من اليسار إلى اليمين مرة أخرى
+            progress.style.direction = 'ltr';
         }
     };
     
@@ -1544,7 +1547,7 @@ showVideoPreview(videoSrc) {
     video.ontimeupdate = function() {
         if (progress) {
             progress.value = video.currentTime;
-            // تحديث لون شريط التقدم ليعكس التقدم الفعلي
+            // ✅ تحديث لون شريط التقدم من اليسار إلى اليمين
             const percent = (video.currentTime / video.duration) * 100;
             progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 ${percent}%, rgba(255,255,255,0.2) ${percent}%, rgba(255,255,255,0.2) 100%)`;
         }
@@ -1625,6 +1628,7 @@ closeVideoPreview() {
     if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
     if (progress) {
         progress.value = 0;
+        progress.style.direction = 'ltr';
         progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
     }
     if (currentTime) currentTime.textContent = '0:00';
