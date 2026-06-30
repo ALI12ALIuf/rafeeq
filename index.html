@@ -418,16 +418,20 @@
     </div>
 </div>
 
-<!-- 4.6: مشاركة الموقع -->
+<!-- 4.6: مشاركة الموقع (معدل - إضافة خيارات الصورة والفيديو والتنزيل) -->
 <div id="locationSwipeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10003;align-items:center;justify-content:center;backdrop-filter:blur(5px);font-family:system-ui,sans-serif;">
-    <div style="background:#0a0e27;border-radius:40px;width:340px;max-width:90%;padding:30px 20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4);">
+    <div style="background:#0a0e27;border-radius:40px;width:340px;max-width:90%;padding:30px 20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4);max-height:90vh;overflow-y:auto;">
         <div style="font-size:3rem;margin-bottom:10px;">🗺️</div>
         <h3 style="color:white;margin:0 0 5px;">مشاركة الموقع</h3>
         <p style="color:#aaa;font-size:0.8rem;margin-bottom:20px;">هل تريد مشاركة موقعك الحالي</p>
+        
+        <!-- إحداثيات الموقع -->
         <div style="background:rgba(76,175,80,0.15);border-radius:20px;padding:12px;margin-bottom:20px;">
             <div style="color:#4CAF50;font-size:0.9rem;font-weight:bold;margin-bottom:5px;">الإحداثيات</div>
             <div style="color:white;font-weight:bold;font-size:0.9rem;" id="locationCoordsText">0.000000 , 0.000000</div>
         </div>
+        
+        <!-- عدد مرات فتح الموقع -->
         <div style="margin-bottom:15px;">
             <div style="color:white;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">عدد مرات فتح الموقع</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;" id="clickPresets">
@@ -438,6 +442,42 @@
                 <button class="click-preset" data-clicks="5">5</button>
             </div>
         </div>
+        
+        <!-- ✅ وقت مشاهدة الصورة -->
+        <div style="margin-bottom:15px;">
+            <div style="color:white;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">مدة مشاهدة الصورة</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;" id="imageTimePresets">
+                <button class="click-preset image-time-preset" data-seconds="10">10 ث</button>
+                <button class="click-preset image-time-preset" data-seconds="15">15 ث</button>
+                <button class="click-preset image-time-preset" data-seconds="30">30 ث</button>
+            </div>
+        </div>
+        
+        <!-- ✅ عدد مرات تشغيل الفيديو -->
+        <div style="margin-bottom:15px;">
+            <div style="color:white;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">عدد مرات تشغيل الفيديو</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;" id="videoPlayPresets">
+                <button class="click-preset video-preset" data-clicks="1">1</button>
+                <button class="click-preset video-preset" data-clicks="2">2</button>
+                <button class="click-preset video-preset" data-clicks="3">3</button>
+                <button class="click-preset video-preset" data-clicks="4">4</button>
+                <button class="click-preset video-preset" data-clicks="5">5</button>
+            </div>
+        </div>
+        
+        <!-- ✅ السماح بالتنزيل -->
+        <div style="margin-bottom:15px;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+                <span style="color:#aaa;font-size:0.8rem;">منع التنزيل</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="allowDownloadToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <span style="color:white;font-size:0.8rem;">سماح بالتنزيل</span>
+            </div>
+        </div>
+        
+        <!-- غير محدود للموقع -->
         <div style="margin-bottom:15px;">
             <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
                 <span style="color:white;font-size:0.8rem;">بلا حدود</span>
@@ -448,7 +488,10 @@
                 <span style="color:#aaa;font-size:0.8rem;">محدود</span>
             </div>
         </div>
+        
         <p style="color:#888;font-size:0.65rem;margin:10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
+        
+        <!-- سلايدر الإرسال -->
         <div class="swipe-container" style="width:100%;margin:20px 0;position:relative;">
             <div id="locationSwipeButton" style="width:100%;height:70px;border-radius:50px;position:relative;overflow:hidden;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(90deg,#1a5a2a 0%,#1a5a2a 50%,#8b1a1a 50%,#8b1a1a 100%);border:2px solid #2196F3;">
                 <div style="position:absolute;top:10px;bottom:10px;left:50%;width:2px;background:#2196F3;transform:translateX(-50%);"></div>
