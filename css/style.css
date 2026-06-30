@@ -1099,7 +1099,7 @@ input:checked + .toggle-slider:before {
 
 /* ==================== القسم 21: مشغل الفيديو المخصص ==================== */
 
-/* تخصيص شريط التقدم (input range) */
+/* تخصيص شريط التقدم (input range) - إجبار الاتجاه من اليسار إلى اليمين */
 #videoProgress {
     -webkit-appearance: none;
     appearance: none;
@@ -1110,7 +1110,7 @@ input:checked + .toggle-slider:before {
     outline: none;
     cursor: pointer;
     transition: background 0.3s;
-    position: relative;
+    direction: ltr !important;
 }
 
 /* لون الخلفية عند التحميل */
@@ -1120,6 +1120,7 @@ input:checked + .toggle-slider:before {
     background: rgba(255, 255, 255, 0.2);
     border-radius: 4px;
     transition: background 0.3s;
+    direction: ltr !important;
 }
 
 #videoProgress::-moz-range-track {
@@ -1128,6 +1129,7 @@ input:checked + .toggle-slider:before {
     background: rgba(255, 255, 255, 0.2);
     border-radius: 4px;
     border: none;
+    direction: ltr !important;
 }
 
 /* الدائرة (المنزلق) */
@@ -1159,12 +1161,6 @@ input:checked + .toggle-slider:before {
     cursor: pointer;
     border: 2px solid white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-/* إضافة لون أخضر خلف الدائرة (نصف ممتلئ) */
-#videoProgress {
-    background: linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%);
-    border-radius: 4px;
 }
 
 /* تنسيق أزرار التحكم في الفيديو */
