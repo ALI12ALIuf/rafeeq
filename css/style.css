@@ -1059,6 +1059,42 @@ input:checked + .toggle-slider:before {
     transform: scale(0.95);
 }
 
+/* ==================== أنماط19.1 الإقفال للصور والفيديو ==================== */
+
+/* قفل الصورة */
+.message-image-wrapper .lock-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* الصورة المغلقة */
+.message-image-wrapper.locked {
+    opacity: 0.4;
+    filter: grayscale(1);
+    cursor: default;
+}
+
+/* الفيديو المغلق */
+.video-thumbnail.locked {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.video-thumbnail.locked .video-play-overlay {
+    background: rgba(0, 0, 0, 0.7) !important;
+}
+
+.video-thumbnail.locked .video-play-overlay i {
+    font-size: 2rem !important;
+}
+
 /* ==================== القسم 20: ستايلات واجهات المكالمات الثابتة ==================== */
 
 /* أزرار المكالمات */
