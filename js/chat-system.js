@@ -1388,19 +1388,20 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview ====================
+// ==================== القسم 26.1: showImagePreview (معدل - فتح Modal التحكم) ====================
 showImagePreview(imageSrc) {
-    const modal = document.getElementById('imagePreviewModal');
-    const img = document.getElementById('previewImage');
-    if (!modal || !img) return;
+    // ✅ تخزين مصدر الصورة مؤقتاً
+    this._pendingImageSrc = imageSrc;
     
-    img.src = imageSrc;
-    modal.style.display = 'flex';
+    // ✅ فتح Modal التحكم بالصورة
+    const modal = document.getElementById('imageControlModal');
+    if (modal) modal.style.display = 'flex';
     
-    this.setupImageZoom(modal, img);
+    // ✅ إعداد الاختيارات الافتراضية
+    this.setupImageControlModal(imageSrc);
 },
 
-// ==================== القسم 26.1.1: setupImageZoom ====================
+// ==================== القسم 26.1.1: setupImageZoom (يبقى كما هو - للتكبير) ====================
 setupImageZoom(modal, img) {
     if (img._zoomCleanup) {
         img._zoomCleanup();
@@ -1490,86 +1491,200 @@ setupImageZoom(modal, img) {
     };
 },
 
-
-// ==================== القسم 26.2: showVideoPreview (معدل - تحكم مخصص) ====================
-showVideoPreview(videoSrc) {
-    const modal = document.getElementById('videoPreviewModal');
-    const video = document.getElementById('previewVideo');
-    if (!modal || !video) return;
+// ==================== القسم 26.1.2: setupImageControlModal (جديد) ====================
+setupImageControlModal(imageSrc) {
+    const modal = document.getElementById('imageControlModal');
+    const leftThumb = document.getElementById('imageLeftThumb');
+    const rightThumb = document.getElementById('imageRightThumb');
+    const button = document.getElementById('imageSwipeButton');
+    const allowDownloadToggle = document.getElementById('imageAllowDownloadToggle');
     
-    // إخفاء عناصر التحكم الافتراضية
-    video.removeAttribute('controls');
+    if (!modal || !leftThumb || !rightThumb || !button) return;
     
-    video.src = videoSrc;
-    modal.style.display = 'flex';
+    // ✅ إعادة تعيين الاختيارات
+    let selectedTime = 15;
+    let allowDownload = true;
+    let selectedButton = null;
     
-    // إظهار عناصر التحكم المخصصة
-    const controls = document.getElementById('videoCustomControls');
-    if (controls) controls.style.display = 'flex';
+    // ✅ اختيار وقت المشاهدة
+    document.querySelectorAll('#imageTimePresets .image-time-btn').forEach(btn => {
+        btn.onclick = () => {
+            if (selectedButton) {
+                selectedButton.style.background = '#1a1a2e';
+                selectedButton.style.borderColor = '#4CAF50';
+            }
+            selectedButton = btn;
+            selectedButton.style.background = '#4CAF50';
+            selectedButton.style.borderColor = '#4CAF50';
+            selectedTime = parseInt(btn.dataset.seconds);
+        };
+    });
     
-    // إعادة تعيين حالة الأزرار
-    const playBtn = document.getElementById('videoPlayBtn');
-    const muteBtn = document.getElementById('videoMuteBtn');
-    const progress = document.getElementById('videoProgress');
-    const currentTime = document.getElementById('videoCurrentTime');
-    const duration = document.getElementById('videoDuration');
-    
-    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-    if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-    if (progress) {
-        progress.value = 0;
-        // ✅ إجبار الاتجاه من اليسار إلى اليمين
-        progress.style.direction = 'ltr';
-        progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
+    // ✅ تعيين الاختيار الافتراضي (15 ثانية)
+    const defaultBtn = document.querySelector('#imageTimePresets .image-time-btn[data-seconds="15"]');
+    if (defaultBtn) {
+        defaultBtn.style.background = '#4CAF50';
+        defaultBtn.style.borderColor = '#4CAF50';
+        selectedButton = defaultBtn;
+        selectedTime = 15;
     }
-    if (currentTime) currentTime.textContent = '0:00';
-    if (duration) duration.textContent = '0:00';
     
-    // تشغيل تلقائي
-    video.play().catch(() => {});
+    // ✅ السماح بالتنزيل
+    if (allowDownloadToggle) {
+        allowDownloadToggle.onchange = () => {
+            allowDownload = allowDownloadToggle.checked;
+        };
+    }
     
-    // تحديث المدة عند تحميل الفيديو
-    video.onloadedmetadata = function() {
-        if (duration) {
-            const mins = Math.floor(video.duration / 60);
-            const secs = Math.floor(video.duration % 60);
-            duration.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-        if (progress) {
-            progress.max = video.duration;
-            progress.value = 0;
-            // ✅ إجبار الاتجاه من اليسار إلى اليمين مرة أخرى
-            progress.style.direction = 'ltr';
+    // ✅ تنظيف السلايدر القديم
+    if (leftThumb._cleanup) leftThumb._cleanup();
+    if (rightThumb._cleanup) rightThumb._cleanup();
+    
+    // ✅ إعداد السلايدر
+    const buttonWidth = button.clientWidth;
+    const centerPos = buttonWidth / 2;
+    const maxLeftMove = centerPos - 35;
+    const maxRightMove = centerPos - 35;
+    
+    let isDraggingLeft = false, isDraggingRight = false;
+    let leftCurrentPos = 8, rightCurrentPos = 8;
+    
+    const onLeftStart = (e) => { e.preventDefault(); isDraggingLeft = true; leftThumb.style.transition = 'none'; };
+    const onLeftMove = (e) => {
+        if (!isDraggingLeft) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newLeft = clientX - rect.left - 27;
+        newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
+        leftCurrentPos = newLeft;
+        leftThumb.style.left = newLeft + 'px';
+    };
+    const onLeftEnd = () => {
+        if (!isDraggingLeft) return;
+        isDraggingLeft = false;
+        leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (leftCurrentPos >= maxLeftMove - 10) {
+            leftThumb.style.left = maxLeftMove + 'px';
+            
+            // ✅ إرسال الصورة مع الإعدادات
+            setTimeout(() => {
+                this.sendImageWithSettings(imageSrc, selectedTime, allowDownload);
+                modal.style.display = 'none';
+            }, 200);
+        } else {
+            leftThumb.style.left = '8px';
         }
     };
     
-    // تحديث شريط التقدم والوقت أثناء التشغيل
-    video.ontimeupdate = function() {
-        if (progress) {
-            progress.value = video.currentTime;
-            // ✅ تحديث لون شريط التقدم من اليسار إلى اليمين
-            const percent = (video.currentTime / video.duration) * 100;
-            progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 ${percent}%, rgba(255,255,255,0.2) ${percent}%, rgba(255,255,255,0.2) 100%)`;
-        }
-        if (currentTime) {
-            const mins = Math.floor(video.currentTime / 60);
-            const secs = Math.floor(video.currentTime % 60);
-            currentTime.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    const onRightStart = (e) => { e.preventDefault(); isDraggingRight = true; rightThumb.style.transition = 'none'; };
+    const onRightMove = (e) => {
+        if (!isDraggingRight) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newRight = rect.right - clientX - 27;
+        newRight = Math.max(8, Math.min(newRight, maxRightMove));
+        rightCurrentPos = newRight;
+        rightThumb.style.right = newRight + 'px';
+    };
+    const onRightEnd = () => {
+        if (!isDraggingRight) return;
+        isDraggingRight = false;
+        rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (rightCurrentPos >= maxRightMove - 10) {
+            rightThumb.style.right = maxRightMove + 'px';
+            setTimeout(() => { modal.style.display = 'none'; }, 200);
+        } else {
+            rightThumb.style.right = '8px';
         }
     };
     
-    // عند انتهاء الفيديو
-    video.onended = function() {
-        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-        if (progress) {
-            progress.value = 0;
-            progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
-        }
-        if (currentTime) currentTime.textContent = '0:00';
+    leftThumb.addEventListener('mousedown', onLeftStart);
+    leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+    rightThumb.addEventListener('mousedown', onRightStart);
+    rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+    
+    const moveHandler = (e) => { onLeftMove(e); onRightMove(e); };
+    const endHandler = () => { onLeftEnd(); onRightEnd(); };
+    
+    document.addEventListener('mousemove', moveHandler);
+    document.addEventListener('mouseup', endHandler);
+    document.addEventListener('touchmove', moveHandler, { passive: false });
+    document.addEventListener('touchend', endHandler);
+    
+    leftThumb._cleanup = () => {
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('mouseup', endHandler);
+        document.removeEventListener('touchmove', moveHandler);
+        document.removeEventListener('touchend', endHandler);
     };
+    rightThumb._cleanup = leftThumb._cleanup;
 },
 
-// ==================== القسم 26.2.1: toggleVideoPlay ====================
+// ==================== القسم 26.1.3: sendImageWithSettings (جديد) ====================
+async sendImageWithSettings(imageSrc, viewTime, allowDownload) {
+    // ✅ إرسال الصورة مع الإعدادات عبر Data Channel
+    const settings = {
+        imageViewTime: viewTime,
+        allowDownload: allowDownload,
+        imageOpensRemaining: 1 // تفتح مرة واحدة فقط
+    };
+    
+    // ✅ هنا يتم إرسال الصورة مع الإعدادات
+    // ... كود الإرسال
+    console.log('📤 إرسال صورة مع إعدادات:', settings);
+    
+    // ✅ عرض الصورة في المحادثة مع الإعدادات
+    const msgId = Date.now().toString();
+    const tempUrl = imageSrc;
+    
+    this.displayMessage({
+        id: msgId,
+        type: 'image',
+        data: tempUrl,
+        sender: 'me',
+        time: new Date().toISOString(),
+        status: 'sent',
+        mediaSettings: settings
+    });
+},
+
+// ==================== القسم 26.1.4: closeImagePreview (معدل) ====================
+closeImagePreview() {
+    const modal = document.getElementById('imagePreviewModal');
+    const img = document.getElementById('previewImage');
+    if (modal) modal.style.display = 'none';
+    if (img) { 
+        img.src = ''; 
+        img.style.transform = 'none';
+        // ✅ إزالة مستمعي التكبير
+        if (img._zoomCleanup) {
+            img._zoomCleanup();
+            img._zoomCleanup = null;
+        }
+    }
+    
+    // ✅ إغلاق Modal التحكم أيضاً
+    const controlModal = document.getElementById('imageControlModal');
+    if (controlModal) controlModal.style.display = 'none';
+},
+
+
+// ==================== القسم 26.2: showVideoPreview (معدل - فتح Modal التحكم) ====================
+showVideoPreview(videoSrc) {
+    // ✅ تخزين مصدر الفيديو مؤقتاً
+    this._pendingVideoSrc = videoSrc;
+    
+    // ✅ فتح Modal التحكم بالفيديو
+    const modal = document.getElementById('videoControlModal');
+    if (modal) modal.style.display = 'flex';
+    
+    // ✅ إعداد الاختيارات الافتراضية
+    this.setupVideoControlModal(videoSrc);
+},
+
+// ==================== القسم 26.2.1: toggleVideoPlay (يبقى كما هو) ====================
 toggleVideoPlay() {
     const video = document.getElementById('previewVideo');
     const playBtn = document.getElementById('videoPlayBtn');
@@ -1584,7 +1699,7 @@ toggleVideoPlay() {
     }
 },
 
-// ==================== القسم 26.2.2: toggleVideoMute ====================
+// ==================== القسم 26.2.2: toggleVideoMute (يبقى كما هو) ====================
 toggleVideoMute() {
     const video = document.getElementById('previewVideo');
     const muteBtn = document.getElementById('videoMuteBtn');
@@ -1594,7 +1709,7 @@ toggleVideoMute() {
     muteBtn.innerHTML = video.muted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>';
 },
 
-// ==================== القسم 26.2.3: seekVideo ====================
+// ==================== القسم 26.2.3: seekVideo (يبقى كما هو) ====================
 seekVideo(value) {
     const video = document.getElementById('previewVideo');
     if (!video) return;
@@ -1633,6 +1748,10 @@ closeVideoPreview() {
     }
     if (currentTime) currentTime.textContent = '0:00';
     if (duration) duration.textContent = '0:00';
+    
+    // ✅ إغلاق Modal التحكم أيضاً
+    const controlModal = document.getElementById('videoControlModal');
+    if (controlModal) controlModal.style.display = 'none';
 },
 
 // ==================== القسم 26.2.5: downloadPreviewVideo (يبقى كما هو) ====================
@@ -1643,6 +1762,288 @@ downloadPreviewVideo() {
     link.href = video.src;
     link.download = 'video.mp4';
     link.click();
+},
+
+// ==================== القسم 26.2.6: setupVideoControlModal (جديد) ====================
+setupVideoControlModal(videoSrc) {
+    const modal = document.getElementById('videoControlModal');
+    const leftThumb = document.getElementById('videoLeftThumb');
+    const rightThumb = document.getElementById('videoRightThumb');
+    const button = document.getElementById('videoSwipeButton');
+    const unlimitedToggle = document.getElementById('videoUnlimitedToggle');
+    const allowDownloadToggle = document.getElementById('videoAllowDownloadToggle');
+    
+    if (!modal || !leftThumb || !rightThumb || !button) return;
+    
+    // ✅ إعادة تعيين الاختيارات
+    let selectedPlays = 1;
+    let allowDownload = true;
+    let isUnlimited = false;
+    let selectedButton = null;
+    
+    // ✅ اختيار عدد مرات التشغيل
+    document.querySelectorAll('#videoPlayPresets .video-play-btn').forEach(btn => {
+        btn.onclick = () => {
+            if (selectedButton) {
+                selectedButton.style.background = '#1a1a2e';
+                selectedButton.style.borderColor = '#4CAF50';
+            }
+            selectedButton = btn;
+            selectedButton.style.background = '#4CAF50';
+            selectedButton.style.borderColor = '#4CAF50';
+            selectedPlays = parseInt(btn.dataset.plays);
+        };
+    });
+    
+    // ✅ تعيين الاختيار الافتراضي (1 مرة)
+    const defaultBtn = document.querySelector('#videoPlayPresets .video-play-btn[data-plays="1"]');
+    if (defaultBtn) {
+        defaultBtn.style.background = '#4CAF50';
+        defaultBtn.style.borderColor = '#4CAF50';
+        selectedButton = defaultBtn;
+        selectedPlays = 1;
+    }
+    
+    // ✅ غير محدود
+    if (unlimitedToggle) {
+        unlimitedToggle.onchange = () => {
+            isUnlimited = unlimitedToggle.checked;
+            if (isUnlimited) {
+                document.querySelectorAll('#videoPlayPresets .video-play-btn').forEach(btn => {
+                    btn.style.opacity = '0.5';
+                    btn.style.pointerEvents = 'none';
+                });
+            } else {
+                document.querySelectorAll('#videoPlayPresets .video-play-btn').forEach(btn => {
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
+                });
+                if (selectedButton) selectedButton.style.background = '#4CAF50';
+            }
+        };
+    }
+    
+    // ✅ السماح بالتنزيل
+    if (allowDownloadToggle) {
+        allowDownloadToggle.onchange = () => {
+            allowDownload = allowDownloadToggle.checked;
+        };
+    }
+    
+    // ✅ تنظيف السلايدر القديم
+    if (leftThumb._cleanup) leftThumb._cleanup();
+    if (rightThumb._cleanup) rightThumb._cleanup();
+    
+    // ✅ إعداد السلايدر
+    const buttonWidth = button.clientWidth;
+    const centerPos = buttonWidth / 2;
+    const maxLeftMove = centerPos - 35;
+    const maxRightMove = centerPos - 35;
+    
+    let isDraggingLeft = false, isDraggingRight = false;
+    let leftCurrentPos = 8, rightCurrentPos = 8;
+    
+    const onLeftStart = (e) => { e.preventDefault(); isDraggingLeft = true; leftThumb.style.transition = 'none'; };
+    const onLeftMove = (e) => {
+        if (!isDraggingLeft) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newLeft = clientX - rect.left - 27;
+        newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
+        leftCurrentPos = newLeft;
+        leftThumb.style.left = newLeft + 'px';
+    };
+    const onLeftEnd = () => {
+        if (!isDraggingLeft) return;
+        isDraggingLeft = false;
+        leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (leftCurrentPos >= maxLeftMove - 10) {
+            leftThumb.style.left = maxLeftMove + 'px';
+            
+            // ✅ إرسال الفيديو مع الإعدادات
+            setTimeout(() => {
+                const maxPlays = isUnlimited ? 999999 : selectedPlays;
+                this.sendVideoWithSettings(videoSrc, maxPlays, allowDownload);
+                modal.style.display = 'none';
+            }, 200);
+        } else {
+            leftThumb.style.left = '8px';
+        }
+    };
+    
+    const onRightStart = (e) => { e.preventDefault(); isDraggingRight = true; rightThumb.style.transition = 'none'; };
+    const onRightMove = (e) => {
+        if (!isDraggingRight) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newRight = rect.right - clientX - 27;
+        newRight = Math.max(8, Math.min(newRight, maxRightMove));
+        rightCurrentPos = newRight;
+        rightThumb.style.right = newRight + 'px';
+    };
+    const onRightEnd = () => {
+        if (!isDraggingRight) return;
+        isDraggingRight = false;
+        rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (rightCurrentPos >= maxRightMove - 10) {
+            rightThumb.style.right = maxRightMove + 'px';
+            setTimeout(() => { modal.style.display = 'none'; }, 200);
+        } else {
+            rightThumb.style.right = '8px';
+        }
+    };
+    
+    leftThumb.addEventListener('mousedown', onLeftStart);
+    leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+    rightThumb.addEventListener('mousedown', onRightStart);
+    rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+    
+    const moveHandler = (e) => { onLeftMove(e); onRightMove(e); };
+    const endHandler = () => { onLeftEnd(); onRightEnd(); };
+    
+    document.addEventListener('mousemove', moveHandler);
+    document.addEventListener('mouseup', endHandler);
+    document.addEventListener('touchmove', moveHandler, { passive: false });
+    document.addEventListener('touchend', endHandler);
+    
+    leftThumb._cleanup = () => {
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('mouseup', endHandler);
+        document.removeEventListener('touchmove', moveHandler);
+        document.removeEventListener('touchend', endHandler);
+    };
+    rightThumb._cleanup = leftThumb._cleanup;
+},
+
+// ==================== القسم 26.2.7: sendVideoWithSettings (جديد) ====================
+async sendVideoWithSettings(videoSrc, maxPlays, allowDownload) {
+    // ✅ إعدادات الفيديو
+    const settings = {
+        videoMaxPlays: maxPlays,
+        videoPlaysRemaining: maxPlays,
+        allowDownload: allowDownload
+    };
+    
+    // ✅ هنا يتم إرسال الفيديو مع الإعدادات
+    console.log('📤 إرسال فيديو مع إعدادات:', settings);
+    
+    // ✅ عرض الفيديو في المحادثة مع الإعدادات
+    const msgId = Date.now().toString();
+    const tempUrl = videoSrc;
+    
+    this.displayMessage({
+        id: msgId,
+        type: 'video',
+        data: tempUrl,
+        fileName: 'فيديو',
+        sender: 'me',
+        time: new Date().toISOString(),
+        status: 'sent',
+        mediaSettings: settings
+    });
+},
+
+// ==================== القسم 26.2.8: playVideoWithSettings (جديد - للمستلم) ====================
+playVideoWithSettings(videoSrc, settings) {
+    // ✅ تشغيل الفيديو مع الإعدادات المستلمة
+    const modal = document.getElementById('videoPreviewModal');
+    const video = document.getElementById('previewVideo');
+    const controls = document.getElementById('videoCustomControls');
+    const downloadBtn = document.querySelector('#videoPreviewModal button[onclick*="downloadPreviewVideo"]');
+    
+    if (!modal || !video) return;
+    
+    // ✅ التحقق من الصلاحية
+    if (settings.videoPlaysRemaining !== undefined && settings.videoPlaysRemaining <= 0) {
+        alert('⚠️ انتهى عدد مرات تشغيل هذا الفيديو');
+        return;
+    }
+    
+    // ✅ إعداد الفيديو
+    video.removeAttribute('controls');
+    video.src = videoSrc;
+    modal.style.display = 'flex';
+    if (controls) controls.style.display = 'flex';
+    
+    // ✅ التحكم في زر التنزيل
+    if (downloadBtn) {
+        if (settings.allowDownload) {
+            downloadBtn.style.display = 'flex';
+            downloadBtn.style.pointerEvents = 'auto';
+            downloadBtn.style.opacity = '1';
+        } else {
+            downloadBtn.style.display = 'none';
+            downloadBtn.style.pointerEvents = 'none';
+            downloadBtn.style.opacity = '0';
+        }
+    }
+    
+    // ✅ إعداد شريط التقدم (للقراءة فقط - منع الترجيع)
+    const progress = document.getElementById('videoProgress');
+    if (progress) {
+        progress.disabled = true;
+        progress.style.cursor = 'default';
+        progress.style.opacity = '0.6';
+    }
+    
+    // ✅ إعادة تعيين الأزرار
+    const playBtn = document.getElementById('videoPlayBtn');
+    const muteBtn = document.getElementById('videoMuteBtn');
+    const currentTime = document.getElementById('videoCurrentTime');
+    const duration = document.getElementById('videoDuration');
+    
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+    if (progress) {
+        progress.value = 0;
+        progress.style.direction = 'ltr';
+        progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
+    }
+    if (currentTime) currentTime.textContent = '0:00';
+    if (duration) duration.textContent = '0:00';
+    
+    // ✅ تشغيل تلقائي
+    video.play().catch(() => {});
+    
+    // ✅ تحديث المدة عند تحميل الفيديو
+    video.onloadedmetadata = function() {
+        if (duration) {
+            const mins = Math.floor(video.duration / 60);
+            const secs = Math.floor(video.duration % 60);
+            duration.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        if (progress) {
+            progress.max = video.duration;
+            progress.value = 0;
+            progress.style.direction = 'ltr';
+        }
+    };
+    
+    // ✅ تحديث شريط التقدم والوقت أثناء التشغيل (للقراءة فقط)
+    video.ontimeupdate = function() {
+        if (progress) {
+            progress.value = video.currentTime;
+            const percent = (video.currentTime / video.duration) * 100;
+            progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 ${percent}%, rgba(255,255,255,0.2) ${percent}%, rgba(255,255,255,0.2) 100%)`;
+        }
+        if (currentTime) {
+            const mins = Math.floor(video.currentTime / 60);
+            const secs = Math.floor(video.currentTime % 60);
+            currentTime.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    };
+    
+    // ✅ عند انتهاء الفيديو
+    video.onended = function() {
+        if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        if (progress) {
+            progress.value = 0;
+            progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
+        }
+        if (currentTime) currentTime.textContent = '0:00';
+    };
 },
 
 
