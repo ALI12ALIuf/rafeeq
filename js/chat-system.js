@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة المعدلة (قوالب ثابتة + setupVoiceControls) ==========
+// ========== chat-system.js - النسخة المعدلة (قوالب ثابتة + setupVoiceControls + نظام الوسائط) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 const ChatSystem = {
@@ -12,6 +12,10 @@ const ChatSystem = {
     
     // ✅ قالب عنصر المحادثة (ثابت)
     chatItemTemplate: null,
+    
+    // ✅ متغيرات مؤقتة لإعدادات الوسائط
+    _mediaPendingFile: null,
+    _mediaPendingType: null,
     
     // ==================== القسم 2.5: دالة تحديث زر التفعيل ====================
 updateFeatureToggleUI() {
@@ -944,6 +948,11 @@ updateAllButtons() {
 closeConversation() {
     console.log("🚪 إغلاق صفحة المحادثة والعودة للقائمة الرئيسية");
     
+    // ✅ تدمير جميع عناصر الوسائط في المحادثة قبل الإغلاق
+    if (this.currentChat) {
+        this.destroyAllMediaInChat(this.currentChat);
+    }
+    
     document.body.classList.remove('conversation-open');
 
     this.currentChat = null;
@@ -1285,23 +1294,96 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - مع نظام الإعدادات والإشارات) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
+            const settings = msg.settings || {};
+            const isLocked = msg._mediaLocked || (settings.clicksRemaining !== undefined && settings.clicksRemaining <= 0);
+            
+            // ✅ إنشاء غلاف للوسائط
+            const wrapperDiv = document.createElement('div');
+            wrapperDiv.className = 'media-wrapper';
+            wrapperDiv.dataset.mediaId = msg.id;
+            wrapperDiv.dataset.mediaType = 'image';
+            wrapperDiv.dataset.sender = msg.sender;
+            if (isLocked) wrapperDiv.dataset.locked = 'true';
+            
             const clone = templateImg.content.cloneNode(true);
             const wrapper = clone.querySelector('.message-image-wrapper');
             if (wrapper) {
                 wrapper.style.border = `2px solid ${borderColor}`;
+                if (isLocked) {
+                    wrapper.classList.add('media-locked');
+                    // إضافة أيقونة القفل
+                    const lockIcon = document.createElement('div');
+                    lockIcon.className = 'media-lock-icon';
+                    lockIcon.textContent = '🔒';
+                    lockIcon.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:3rem;z-index:10;pointer-events:none;';
+                    wrapper.style.position = 'relative';
+                    wrapper.appendChild(lockIcon);
+                }
+                
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
                     img.src = msg.data;
-                    img.onclick = () => this.showImagePreview(msg.data);
+                    img.onclick = () => {
+                        if (isLocked) {
+                            alert('🔒 تم انتهاء عدد مرات المشاهدة المسموحة');
+                            return;
+                        }
+                        
+                        // ✅ إرسال إشارة بدء العرض إلى المرسل
+                        if (msg.sender === 'friend' && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                            CallSystem.dc.send(JSON.stringify({
+                                type: 'media_play_start',
+                                mediaId: msg.id,
+                                sender: ChatSystem.currentChat,
+                                timestamp: Date.now()
+                            }));
+                            console.log(`📤 إرسال إشارة بدء عرض للصورة ${msg.id}`);
+                        }
+                        
+                        // عرض الصورة مع الإعدادات
+                        this.showImagePreview(msg.data, {
+                            allowDownload: settings.allowDownload !== false,
+                            timerSeconds: settings.timerSeconds || 0,
+                            unlimited: settings.unlimited || false,
+                            msgId: msg.id,
+                            wrapperElement: wrapperDiv,
+                            settings: settings,
+                            sender: msg.sender
+                        });
+                    };
                     img.oncontextmenu = (e) => e.preventDefault();
                     img.ondragstart = (e) => e.preventDefault();
                 }
             }
-            div.appendChild(clone);
+            
+            // ✅ تخزين بيانات الوسائط في العنصر
+            wrapperDiv._mediaData = {
+                settings: settings,
+                msgId: msg.id,
+                dataUrl: msg.data,
+                fileName: msg.fileName
+            };
+            
+            wrapperDiv.appendChild(wrapper);
+            div.appendChild(wrapperDiv);
+            
+            // ✅ إذا كان المرسل، تخزين الحالة
+            if (msg.sender === 'me' && typeof CallSystem !== 'undefined') {
+                CallSystem._mediaStates[msg.id] = {
+                    maxClicks: settings.maxClicks || 0,
+                    clicksRemaining: settings.maxClicks || 0,
+                    unlimited: settings.unlimited || false,
+                    destroyed: false,
+                    timerSeconds: settings.timerSeconds || 0,
+                    allowDownload: settings.allowDownload !== false,
+                    type: 'image'
+                };
+                console.log(`📦 تخزين حالة وسائط للمرسل (صورة): ${msg.id}`);
+            }
         } else {
             console.warn('⚠️ قالب imageMessageTemplate غير موجود');
         }
@@ -1328,26 +1410,97 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
+    // ==================== معالجة الفيديو (معدل - مع نظام الإعدادات والإشارات) ====================
     else if (msg.type === 'video') {
         const templateVideo = document.getElementById('videoMessageTemplate');
         if (templateVideo) {
+            const settings = msg.settings || {};
+            const isLocked = msg._mediaLocked || (settings.clicksRemaining !== undefined && settings.clicksRemaining <= 0);
+            
+            // ✅ إنشاء غلاف للوسائط
+            const wrapperDiv = document.createElement('div');
+            wrapperDiv.className = 'media-wrapper';
+            wrapperDiv.dataset.mediaId = msg.id;
+            wrapperDiv.dataset.mediaType = 'video';
+            wrapperDiv.dataset.sender = msg.sender;
+            if (isLocked) wrapperDiv.dataset.locked = 'true';
+            
             const clone = templateVideo.content.cloneNode(true);
             const thumbnail = clone.querySelector('.video-thumbnail');
             if (thumbnail) {
                 thumbnail.style.border = `2px solid ${borderColor}`;
+                if (isLocked) {
+                    thumbnail.classList.add('media-locked');
+                    // إضافة أيقونة القفل
+                    const lockIcon = document.createElement('div');
+                    lockIcon.className = 'media-lock-icon';
+                    lockIcon.textContent = '🔒';
+                    lockIcon.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:3rem;z-index:10;pointer-events:none;';
+                    thumbnail.style.position = 'relative';
+                    thumbnail.appendChild(lockIcon);
+                }
+                
                 const video = thumbnail.querySelector('.video-thumbnail-content');
                 const source = video?.querySelector('source');
                 if (source && msg.data) {
                     source.src = msg.data;
                     video.load();
                 }
+                
                 thumbnail.onclick = (e) => {
                     e.stopPropagation();
-                    this.showVideoPreview(msg.data);
+                    if (isLocked) {
+                        alert('🔒 تم انتهاء عدد مرات التشغيل المسموحة');
+                        return;
+                    }
+                    
+                    // ✅ إرسال إشارة بدء التشغيل إلى المرسل
+                    if (msg.sender === 'friend' && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                        CallSystem.dc.send(JSON.stringify({
+                            type: 'media_play_start',
+                            mediaId: msg.id,
+                            sender: ChatSystem.currentChat,
+                            timestamp: Date.now()
+                        }));
+                        console.log(`📤 إرسال إشارة بدء تشغيل للفيديو ${msg.id}`);
+                    }
+                    
+                    this.showVideoPreview(msg.data, {
+                        allowDownload: settings.allowDownload !== false,
+                        clicksRemaining: settings.clicksRemaining,
+                        unlimited: settings.unlimited || false,
+                        msgId: msg.id,
+                        wrapperElement: wrapperDiv,
+                        settings: settings,
+                        sender: msg.sender
+                    });
                 };
             }
-            div.appendChild(clone);
+            
+            // ✅ تخزين بيانات الوسائط في العنصر
+            wrapperDiv._mediaData = {
+                settings: settings,
+                msgId: msg.id,
+                dataUrl: msg.data,
+                fileName: msg.fileName
+            };
+            
+            wrapperDiv.appendChild(thumbnail);
+            div.appendChild(wrapperDiv);
+            
+            // ✅ إذا كان المرسل، تخزين الحالة
+            if (msg.sender === 'me' && typeof CallSystem !== 'undefined') {
+                CallSystem._mediaStates[msg.id] = {
+                    maxClicks: settings.maxClicks || 0,
+                    clicksRemaining: settings.maxClicks || 0,
+                    unlimited: settings.unlimited || false,
+                    destroyed: false,
+                    timerSeconds: settings.timerSeconds || 0,
+                    allowDownload: settings.allowDownload !== false,
+                    type: 'video'
+                };
+                console.log(`📦 تخزين حالة وسائط للمرسل (فيديو): ${msg.id}`);
+            }
         } else {
             console.warn('⚠️ قالب videoMessageTemplate غير موجود');
         }
@@ -1388,14 +1541,94 @@ displayMessage(msg) {
     c.scrollTop = c.scrollHeight;
 },
 
-// ==================== القسم 26.1: showImagePreview ====================
-showImagePreview(imageSrc) {
+// ==================== القسم 26.1: showImagePreview (معدل - مع إشارات الوسائط) ====================
+showImagePreview(imageSrc, options = {}) {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
+    const downloadBtn = document.querySelector('#imagePreviewModal button[onclick*="downloadPreviewImage"]');
+    
     if (!modal || !img) return;
+    
+    const msgId = options.msgId || null;
+    const wrapperElement = options.wrapperElement || null;
+    const settings = options.settings || {};
+    const sender = options.sender || 'friend';
+    
+    // ✅ التحقق من السماح بالعرض
+    const isLocked = wrapperElement?.dataset?.locked === 'true';
+    if (isLocked) {
+        alert('🔒 تم انتهاء عدد مرات المشاهدة المسموحة');
+        return;
+    }
+    
+    // ✅ حفظ msgId في المودال
+    modal.dataset.currentMediaId = msgId;
+    
+    // ✅ التحكم في زر التنزيل
+    if (downloadBtn) {
+        if (options.allowDownload === false) {
+            downloadBtn.classList.add('download-btn-locked');
+            downloadBtn.style.pointerEvents = 'none';
+            downloadBtn.style.opacity = '0.4';
+        } else {
+            downloadBtn.classList.remove('download-btn-locked');
+            downloadBtn.style.pointerEvents = 'auto';
+            downloadBtn.style.opacity = '1';
+        }
+    }
     
     img.src = imageSrc;
     modal.style.display = 'flex';
+    
+    // إزالة أي مؤقت سابق
+    if (modal._timerInterval) {
+        clearInterval(modal._timerInterval);
+        modal._timerInterval = null;
+    }
+    
+    // مؤقت زمني للصورة (للمستلم فقط)
+    if (sender === 'friend' && options.timerSeconds && options.timerSeconds > 0 && !options.unlimited) {
+        let remaining = options.timerSeconds;
+        const timerOverlay = document.createElement('div');
+        timerOverlay.className = 'image-timer-overlay';
+        timerOverlay.textContent = `⏱️ ${remaining}s`;
+        timerOverlay.style.cssText = 'position:absolute;bottom:20px;right:20px;background:rgba(0,0,0,0.7);color:white;padding:4px 12px;border-radius:12px;font-size:0.8rem;font-family:monospace;z-index:10;';
+        modal.querySelector('div[style*="display:flex;align-items:center;justify-content:center"]')?.appendChild(timerOverlay);
+        
+        modal._timerInterval = setInterval(() => {
+            remaining--;
+            timerOverlay.textContent = `⏱️ ${remaining}s`;
+            if (remaining <= 0) {
+                clearInterval(modal._timerInterval);
+                modal._timerInterval = null;
+                
+                // ✅ إرسال إشارة انتهاء إلى المرسل
+                if (msgId && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+                    CallSystem.dc.send(JSON.stringify({
+                        type: 'media_play_end',
+                        mediaId: msgId,
+                        sender: ChatSystem.currentChat,
+                        timestamp: Date.now(),
+                        reason: 'timer_expired'
+                    }));
+                    console.log(`📤 إرسال إشارة انتهاء (مؤقت) للصورة ${msgId}`);
+                }
+                
+                // ✅ تدمير العنصر
+                if (wrapperElement && msgId) {
+                    wrapperElement.dataset.locked = 'true';
+                    const wrapper = wrapperElement.querySelector('.message-image-wrapper');
+                    if (wrapper) wrapper.classList.add('media-locked');
+                    
+                    setTimeout(() => {
+                        this.destroyMediaElement(wrapperElement, msgId);
+                    }, 500);
+                }
+                
+                this.closeImagePreview();
+            }
+        }, 1000);
+    }
     
     this.setupImageZoom(modal, img);
 },
@@ -1490,12 +1723,41 @@ setupImageZoom(modal, img) {
     };
 },
 
-
-// ==================== القسم 26.2: showVideoPreview (معدل - تحكم مخصص) ====================
-showVideoPreview(videoSrc) {
+// ==================== القسم 26.2: showVideoPreview (معدل - مع إشارات الوسائط) ====================
+showVideoPreview(videoSrc, options = {}) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     if (!modal || !video) return;
+    
+    const msgId = options.msgId || null;
+    const wrapperElement = options.wrapperElement || null;
+    const settings = options.settings || {};
+    const sender = options.sender || 'friend';
+    
+    // ✅ التحقق من السماح بالتشغيل
+    const isLocked = wrapperElement?.dataset?.locked === 'true';
+    if (isLocked) {
+        alert('🔒 تم انتهاء عدد مرات التشغيل المسموحة');
+        return;
+    }
+    
+    // ✅ حفظ msgId في المودال
+    modal.dataset.currentMediaId = msgId;
+    
+    // ✅ التحكم في زر التنزيل
+    const downloadBtn = document.querySelector('#videoPreviewModal button[onclick*="downloadPreviewVideo"]') ||
+                        document.querySelector('#videoPreviewModal .download-btn-custom');
+    if (downloadBtn) {
+        if (options.allowDownload === false) {
+            downloadBtn.classList.add('download-btn-locked');
+            downloadBtn.style.pointerEvents = 'none';
+            downloadBtn.style.opacity = '0.4';
+        } else {
+            downloadBtn.classList.remove('download-btn-locked');
+            downloadBtn.style.pointerEvents = 'auto';
+            downloadBtn.style.opacity = '1';
+        }
+    }
     
     // إخفاء عناصر التحكم الافتراضية
     video.removeAttribute('controls');
@@ -1518,7 +1780,6 @@ showVideoPreview(videoSrc) {
     if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
     if (progress) {
         progress.value = 0;
-        // ✅ إجبار الاتجاه من اليسار إلى اليمين
         progress.style.direction = 'ltr';
         progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
     }
@@ -1538,7 +1799,6 @@ showVideoPreview(videoSrc) {
         if (progress) {
             progress.max = video.duration;
             progress.value = 0;
-            // ✅ إجبار الاتجاه من اليسار إلى اليمين مرة أخرى
             progress.style.direction = 'ltr';
         }
     };
@@ -1547,7 +1807,6 @@ showVideoPreview(videoSrc) {
     video.ontimeupdate = function() {
         if (progress) {
             progress.value = video.currentTime;
-            // ✅ تحديث لون شريط التقدم من اليسار إلى اليمين
             const percent = (video.currentTime / video.duration) * 100;
             progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 ${percent}%, rgba(255,255,255,0.2) ${percent}%, rgba(255,255,255,0.2) 100%)`;
         }
@@ -1566,6 +1825,19 @@ showVideoPreview(videoSrc) {
             progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
         }
         if (currentTime) currentTime.textContent = '0:00';
+        
+        // ✅ إرسال إشارة انتهاء التشغيل إلى المرسل (للمستلم فقط)
+        if (sender === 'friend' && msgId && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+            CallSystem.dc.send(JSON.stringify({
+                type: 'media_play_end',
+                mediaId: msgId,
+                sender: ChatSystem.currentChat,
+                duration: video.duration,
+                timestamp: Date.now(),
+                reason: 'video_ended'
+            }));
+            console.log(`📤 إرسال إشارة انتهاء تشغيل للفيديو ${msgId}`);
+        }
     };
 },
 
@@ -1601,14 +1873,55 @@ seekVideo(value) {
     video.currentTime = parseFloat(value);
 },
 
-// ==================== القسم 26.2.4: closeVideoPreview (معدل) ====================
+// ==================== القسم 26.2.4: closeVideoPreview (معدل - مع إرسال إشارة النهاية) ====================
 closeVideoPreview() {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
     const controls = document.getElementById('videoCustomControls');
     
-    if (modal) modal.style.display = 'none';
+    // ✅ الحصول على msgId من المودال
+    const msgId = modal?.dataset?.currentMediaId || null;
+    
+    // ✅ إرسال إشارة انتهاء عند الإغلاق (إذا كان الفيديو مشغل)
+    if (msgId && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        if (video && !video.paused && video.currentTime > 0) {
+            CallSystem.dc.send(JSON.stringify({
+                type: 'media_play_end',
+                mediaId: msgId,
+                sender: ChatSystem.currentChat,
+                duration: video.currentTime,
+                timestamp: Date.now(),
+                reason: 'closed'
+            }));
+            console.log(`📤 إرسال إشارة انتهاء (إغلاق) للفيديو ${msgId}`);
+        }
+    }
+    
+    // إزالة حالة القفل من زر التنزيل
+    const downloadBtn = document.querySelector('#videoPreviewModal button[onclick*="downloadPreviewVideo"]') ||
+                        document.querySelector('#videoPreviewModal .download-btn-custom');
+    if (downloadBtn) {
+        downloadBtn.classList.remove('download-btn-locked');
+        downloadBtn.style.pointerEvents = 'auto';
+        downloadBtn.style.opacity = '1';
+    }
+    
+    if (modal) {
+        // إزالة أي مؤقتات
+        if (modal._timerInterval) {
+            clearInterval(modal._timerInterval);
+            modal._timerInterval = null;
+        }
+        // إزالة currentMediaId
+        delete modal.dataset.currentMediaId;
+        modal.style.display = 'none';
+    }
+    
     if (video) {
+        // إلغاء تحميل الـ blob URL
+        if (video.src && video.src.startsWith('blob:')) {
+            URL.revokeObjectURL(video.src);
+        }
         video.pause();
         video.src = '';
         video.onloadedmetadata = null;
@@ -1635,7 +1948,7 @@ closeVideoPreview() {
     if (duration) duration.textContent = '0:00';
 },
 
-// ==================== القسم 26.2.5: downloadPreviewVideo (يبقى كما هو) ====================
+// ==================== القسم 26.2.5: downloadPreviewVideo ====================
 downloadPreviewVideo() {
     const video = document.getElementById('previewVideo');
     if (!video || !video.src) return;
@@ -1645,20 +1958,59 @@ downloadPreviewVideo() {
     link.click();
 },
 
-
-// ==================== القسم 26.3: دوال إغلاق المعاينات ====================
+// ==================== القسم 26.3: closeImagePreview (معدل - مع إرسال إشارة النهاية) ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
-    if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
-},
-
-closeVideoPreview() {
-    const modal = document.getElementById('videoPreviewModal');
-    const video = document.getElementById('previewVideo');
-    if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
+    
+    // ✅ الحصول على msgId من المودال
+    const msgId = modal?.dataset?.currentMediaId || null;
+    
+    // ✅ إرسال إشارة انتهاء عند الإغلاق
+    if (msgId && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        CallSystem.dc.send(JSON.stringify({
+            type: 'media_play_end',
+            mediaId: msgId,
+            sender: ChatSystem.currentChat,
+            timestamp: Date.now(),
+            reason: 'closed'
+        }));
+        console.log(`📤 إرسال إشارة انتهاء (إغلاق) للصورة ${msgId}`);
+    }
+    
+    if (modal) {
+        // إلغاء المؤقت
+        if (modal._timerInterval) {
+            clearInterval(modal._timerInterval);
+            modal._timerInterval = null;
+        }
+        // إزالة أي عناصر مضافة
+        const overlays = modal.querySelectorAll('.image-timer-overlay');
+        overlays.forEach(el => el.remove());
+        const lockIcons = modal.querySelectorAll('div[style*="font-size:4rem"]');
+        lockIcons.forEach(el => el.remove());
+        // إزالة currentMediaId
+        delete modal.dataset.currentMediaId;
+        modal.style.display = 'none';
+    }
+    
+    // إعادة تعيين زر التنزيل
+    const downloadBtn = document.querySelector('#imagePreviewModal button[onclick*="downloadPreviewImage"]');
+    if (downloadBtn) {
+        downloadBtn.classList.remove('download-btn-locked');
+        downloadBtn.style.pointerEvents = 'auto';
+        downloadBtn.style.opacity = '1';
+    }
+    
+    if (img) {
+        if (img.src && img.src.startsWith('blob:')) {
+            URL.revokeObjectURL(img.src);
+        }
+        img.src = '';
+        img.style.transform = 'none';
+        img.style.filter = 'none';
+        img.style.opacity = '1';
+    }
 },
 
 downloadPreviewImage() {
@@ -1670,14 +2022,469 @@ downloadPreviewImage() {
     link.click();
 },
 
-downloadPreviewVideo() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-},  
+// ==================== القسم 26.4: تدمير عنصر الوسائط بالكامل ====================
+destroyMediaElement(wrapperElement, msgId, fromRemote = false) {
+    if (!wrapperElement) {
+        wrapperElement = document.querySelector(`.media-wrapper[data-media-id="${msgId}"]`);
+    }
+    
+    if (!wrapperElement) {
+        // ✅ إذا كان المرسل، حذف من الحالة فقط
+        if (typeof CallSystem !== 'undefined' && CallSystem._mediaStates) {
+            delete CallSystem._mediaStates[msgId];
+        }
+        console.log(`⚠️ لم يتم العثور على عنصر الوسائط ${msgId} (تم حذف الحالة)`);
+        return;
+    }
+    
+    console.log(`🗑️ تدمير عنصر الوسائط: ${msgId} (${fromRemote ? 'من جهة بعيدة' : 'محلياً'})`);
+    
+    // 1. إزالة أي مؤقتات مرتبطة
+    if (wrapperElement._timerInterval) {
+        clearInterval(wrapperElement._timerInterval);
+        wrapperElement._timerInterval = null;
+    }
+    
+    // 2. إلغاء تحميل أي بيانات blob
+    const mediaData = wrapperElement._mediaData || {};
+    if (mediaData.dataUrl && mediaData.dataUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(mediaData.dataUrl);
+        console.log('✅ تم تحرير URL للوسائط');
+    }
+    
+    // 3. إزالة أي عناصر فيديو/صوت/صور داخلية
+    const videoEl = wrapperElement.querySelector('video');
+    const imgEl = wrapperElement.querySelector('img');
+    const audioEl = wrapperElement.querySelector('audio');
+    
+    if (videoEl) {
+        videoEl.pause();
+        videoEl.src = '';
+        videoEl.load();
+    }
+    if (imgEl) {
+        imgEl.src = '';
+        imgEl.removeAttribute('src');
+    }
+    if (audioEl) {
+        audioEl.pause();
+        audioEl.src = '';
+        audioEl.load();
+    }
+    
+    // 4. إزالة العنصر من DOM
+    if (wrapperElement.parentNode) {
+        wrapperElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        wrapperElement.style.opacity = '0';
+        wrapperElement.style.transform = 'scale(0.8)';
+        
+        setTimeout(() => {
+            if (wrapperElement.parentNode) {
+                wrapperElement.parentNode.removeChild(wrapperElement);
+                console.log(`✅ تم حذف عنصر الوسائط من DOM: ${msgId}`);
+            }
+        }, 300);
+    }
+    
+    // 5. إزالة من ذاكرة الرسائل المحلية
+    if (this.currentChat && this.messages[this.currentChat]) {
+        const messages = this.messages[this.currentChat];
+        const index = messages.findIndex(m => m.id === msgId);
+        if (index !== -1) {
+            messages.splice(index, 1);
+            const key = `chat_${this.currentChat}`;
+            try {
+                localStorage.setItem(key, JSON.stringify(messages));
+                console.log(`✅ تم حذف الرسالة ${msgId} من localStorage`);
+            } catch(e) {
+                console.warn('فشل تحديث localStorage:', e);
+            }
+        }
+    }
+    
+    // 6. إلغاء أي مراجع في CallSystem
+    if (typeof CallSystem !== 'undefined') {
+        if (CallSystem.incomingChunks) {
+            delete CallSystem.incomingChunks[msgId];
+        }
+        if (CallSystem.incomingFileInfo) {
+            delete CallSystem.incomingFileInfo[msgId];
+        }
+        // حذف من حالة الوسائط
+        delete CallSystem._mediaStates[msgId];
+        delete CallSystem._mediaSettings[msgId];
+    }
+    
+    console.log(`✅ تم تدمير عنصر الوسائط بالكامل: ${msgId}`);
+},
+
+// ==================== القسم 26.5: تدمير جميع عناصر الوسائط في المحادثة ====================
+destroyAllMediaInChat(chatId) {
+    const container = document.getElementById('messagesContainer');
+    if (!container) return;
+    
+    const mediaElements = container.querySelectorAll('.media-wrapper');
+    mediaElements.forEach(el => {
+        const msgId = el.dataset.mediaId;
+        if (msgId) {
+            this.destroyMediaElement(el, msgId);
+        }
+    });
+    
+    console.log(`🧹 تم تدمير جميع عناصر الوسائط في المحادثة: ${chatId}`);
+},
+
+// ==================== القسم 26.6: تحديث حالة الوسائط من الإشارات ====================
+updateMediaAck(mediaId, allowed, clicksRemaining, unlimited) {
+    console.log(`🔄 تحديث حالة الوسائط ${mediaId}: allowed=${allowed}, remaining=${clicksRemaining}`);
+    
+    const wrapper = document.querySelector(`.media-wrapper[data-media-id="${mediaId}"]`);
+    if (!wrapper) return;
+    
+    if (!allowed) {
+        // 🔒 القفل
+        wrapper.dataset.locked = 'true';
+        const content = wrapper.querySelector('.message-image-wrapper, .video-thumbnail');
+        if (content) {
+            content.classList.add('media-locked');
+            // إضافة أيقونة القفل
+            const lockIcon = document.createElement('div');
+            lockIcon.className = 'media-lock-icon';
+            lockIcon.textContent = '🔒';
+            lockIcon.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:3rem;z-index:10;pointer-events:none;';
+            content.style.position = 'relative';
+            content.appendChild(lockIcon);
+        }
+        // تدمير بعد ثانيتين
+        setTimeout(() => {
+            this.destroyMediaElement(wrapper, mediaId);
+        }, 2000);
+    } else if (clicksRemaining !== undefined && clicksRemaining < 10) {
+        // عرض العدد المتبقي
+        wrapper.dataset.clicksRemaining = clicksRemaining;
+        // إزالة أي شارة قديمة
+        const oldBadge = wrapper.querySelector('.media-badge');
+        if (oldBadge) oldBadge.remove();
+        
+        // إضافة شارة جديدة
+        const badge = document.createElement('div');
+        badge.className = 'media-badge';
+        badge.textContent = `👁️ ${clicksRemaining}`;
+        badge.style.cssText = 'position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.7);color:#4CAF50;padding:2px 8px;border-radius:10px;font-size:0.7rem;z-index:5;';
+        wrapper.style.position = 'relative';
+        wrapper.appendChild(badge);
+    }
+},
+
+// ==================== القسم 26.7: نافذة إعدادات الوسائط ====================
+showMediaSettings(file, type) {
+    this._mediaPendingFile = file;
+    this._mediaPendingType = type;
+    
+    const modal = document.getElementById('mediaSettingsModal');
+    const icon = document.getElementById('mediaSettingsIcon');
+    const title = document.getElementById('mediaSettingsTitle');
+    const sub = document.getElementById('mediaSettingsSub');
+    const timerSection = document.getElementById('mediaTimerSection');
+    const clicksLabel = document.getElementById('mediaClicksLabel');
+    
+    if (!modal) return;
+    
+    // تحديد الأيقونة والعنوان حسب النوع
+    if (type === 'video') {
+        icon.textContent = '🎬';
+        title.textContent = 'إعدادات الفيديو';
+        sub.textContent = 'اختر عدد مرات التشغيل والمؤقت';
+        clicksLabel.textContent = 'عدد مرات التشغيل';
+        timerSection.style.display = 'none';
+    } else if (type === 'image') {
+        icon.textContent = '🖼️';
+        title.textContent = 'إعدادات الصورة';
+        sub.textContent = 'اختر مدة العرض وعدد المشاهدات';
+        clicksLabel.textContent = 'عدد مرات المشاهدة';
+        timerSection.style.display = 'block';
+    }
+    
+    // إعادة تعيين الاختيارات
+    document.querySelectorAll('.media-click-preset').forEach(btn => {
+        btn.classList.remove('selected');
+        btn.style.background = '#1a1a2e';
+        btn.style.borderColor = '#4CAF50';
+        if (btn.dataset.clicks === '1') {
+            btn.classList.add('selected');
+            btn.style.background = '#4CAF50';
+            btn.style.borderColor = '#4CAF50';
+        }
+    });
+    document.querySelectorAll('.media-timer-preset').forEach(btn => {
+        btn.classList.remove('selected');
+        btn.style.background = '#1a1a2e';
+        btn.style.borderColor = '#4CAF50';
+        if (btn.dataset.seconds === '15') {
+            btn.classList.add('selected');
+            btn.style.background = '#4CAF50';
+            btn.style.borderColor = '#4CAF50';
+        }
+    });
+    
+    document.getElementById('mediaUnlimitedToggle').checked = false;
+    document.getElementById('mediaDownloadToggle').checked = true;
+    
+    modal.style.display = 'flex';
+    this.setupMediaSwipe();
+},
+
+setupMediaSwipe() {
+    const modal = document.getElementById('mediaSettingsModal');
+    const button = document.getElementById('mediaSwipeButton');
+    const leftThumb = document.getElementById('mediaLeftThumb');
+    const rightThumb = document.getElementById('mediaRightThumb');
+    
+    if (!button || !leftThumb || !rightThumb) return;
+    
+    if (leftThumb._cleanup) leftThumb._cleanup();
+    if (rightThumb._cleanup) rightThumb._cleanup();
+    
+    let selectedClicks = 1;
+    let selectedTimer = 15;
+    let selectedButton = null;
+    let selectedTimerBtn = null;
+    
+    // اختيار عدد النقرات
+    document.querySelectorAll('.media-click-preset').forEach(btn => {
+        btn.onclick = () => {
+            if (selectedButton) {
+                selectedButton.style.background = '#1a1a2e';
+                selectedButton.style.borderColor = '#4CAF50';
+            }
+            selectedButton = btn;
+            selectedButton.style.background = '#4CAF50';
+            selectedButton.style.borderColor = '#4CAF50';
+            selectedClicks = parseInt(btn.dataset.clicks);
+        };
+    });
+    
+    // اختيار المؤقت (للصورة)
+    document.querySelectorAll('.media-timer-preset').forEach(btn => {
+        btn.onclick = () => {
+            if (selectedTimerBtn) {
+                selectedTimerBtn.style.background = '#1a1a2e';
+                selectedTimerBtn.style.borderColor = '#4CAF50';
+            }
+            selectedTimerBtn = btn;
+            selectedTimerBtn.style.background = '#4CAF50';
+            selectedTimerBtn.style.borderColor = '#4CAF50';
+            selectedTimer = parseInt(btn.dataset.seconds);
+        };
+    });
+    
+    // تعيين الاختيار الافتراضي
+    const firstClick = document.querySelector('.media-click-preset[data-clicks="1"]');
+    if (firstClick) {
+        firstClick.style.background = '#4CAF50';
+        firstClick.style.borderColor = '#4CAF50';
+        selectedButton = firstClick;
+    }
+    
+    const firstTimer = document.querySelector('.media-timer-preset[data-seconds="15"]');
+    if (firstTimer) {
+        firstTimer.style.background = '#4CAF50';
+        firstTimer.style.borderColor = '#4CAF50';
+        selectedTimerBtn = firstTimer;
+    }
+    
+    const unlimitedToggle = document.getElementById('mediaUnlimitedToggle');
+    const downloadToggle = document.getElementById('mediaDownloadToggle');
+    
+    unlimitedToggle.onchange = () => {
+        document.querySelectorAll('.media-click-preset').forEach(btn => {
+            btn.style.opacity = unlimitedToggle.checked ? '0.5' : '1';
+            btn.style.pointerEvents = unlimitedToggle.checked ? 'none' : 'auto';
+        });
+        document.querySelectorAll('.media-timer-preset').forEach(btn => {
+            btn.style.opacity = unlimitedToggle.checked ? '0.5' : '1';
+            btn.style.pointerEvents = unlimitedToggle.checked ? 'none' : 'auto';
+        });
+        if (unlimitedToggle.checked) {
+            if (selectedButton) {
+                selectedButton.style.background = '#1a1a2e';
+                selectedButton.style.borderColor = '#4CAF50';
+            }
+            if (selectedTimerBtn) {
+                selectedTimerBtn.style.background = '#1a1a2e';
+                selectedTimerBtn.style.borderColor = '#4CAF50';
+            }
+        } else {
+            if (selectedButton) {
+                selectedButton.style.background = '#4CAF50';
+                selectedButton.style.borderColor = '#4CAF50';
+            }
+            if (selectedTimerBtn) {
+                selectedTimerBtn.style.background = '#4CAF50';
+                selectedTimerBtn.style.borderColor = '#4CAF50';
+            }
+        }
+    };
+    
+    const buttonWidth = button.clientWidth;
+    const centerPos = buttonWidth / 2;
+    const maxLeftMove = centerPos - 30;
+    const maxRightMove = centerPos - 30;
+    
+    let isDraggingLeft = false, isDraggingRight = false;
+    let leftCurrentPos = 6, rightCurrentPos = 6;
+    
+    const onLeftStart = (e) => {
+        e.preventDefault();
+        isDraggingLeft = true;
+        leftThumb.style.transition = 'none';
+    };
+    
+    const onLeftMove = (e) => {
+        if (!isDraggingLeft) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newLeft = clientX - rect.left - 25;
+        newLeft = Math.max(6, Math.min(newLeft, maxLeftMove));
+        leftCurrentPos = newLeft;
+        leftThumb.style.left = newLeft + 'px';
+    };
+    
+    const onLeftEnd = () => {
+        if (!isDraggingLeft) return;
+        isDraggingLeft = false;
+        leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (leftCurrentPos >= maxLeftMove - 10) {
+            leftThumb.style.left = maxLeftMove + 'px';
+            
+            const unlimited = unlimitedToggle.checked;
+            let maxClicks = unlimited ? 999999 : selectedClicks;
+            let timerSeconds = unlimited ? 0 : (this._mediaPendingType === 'image' ? selectedTimer : 0);
+            const allowDownload = downloadToggle.checked;
+            
+            const settings = {
+                maxClicks: maxClicks,
+                clicksRemaining: maxClicks,
+                timerSeconds: timerSeconds,
+                allowDownload: allowDownload,
+                unlimited: unlimited,
+                type: this._mediaPendingType
+            };
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+                this.sendMediaWithSettings(this._mediaPendingFile, this._mediaPendingType, settings);
+            }, 200);
+        } else {
+            leftThumb.style.left = '6px';
+        }
+    };
+    
+    const onRightStart = (e) => {
+        e.preventDefault();
+        isDraggingRight = true;
+        rightThumb.style.transition = 'none';
+    };
+    
+    const onRightMove = (e) => {
+        if (!isDraggingRight) return;
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = button.getBoundingClientRect();
+        let newRight = rect.right - clientX - 25;
+        newRight = Math.max(6, Math.min(newRight, maxRightMove));
+        rightCurrentPos = newRight;
+        rightThumb.style.right = newRight + 'px';
+    };
+    
+    const onRightEnd = () => {
+        if (!isDraggingRight) return;
+        isDraggingRight = false;
+        rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+        if (rightCurrentPos >= maxRightMove - 10) {
+            rightThumb.style.right = maxRightMove + 'px';
+            setTimeout(() => {
+                modal.style.display = 'none';
+                this._mediaPendingFile = null;
+                this._mediaPendingType = null;
+            }, 200);
+        } else {
+            rightThumb.style.right = '6px';
+        }
+    };
+    
+    leftThumb.addEventListener('mousedown', onLeftStart);
+    leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+    rightThumb.addEventListener('mousedown', onRightStart);
+    rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+    
+    const moveHandler = (e) => { onLeftMove(e); onRightMove(e); };
+    const endHandler = () => { onLeftEnd(); onRightEnd(); };
+    
+    document.addEventListener('mousemove', moveHandler);
+    document.addEventListener('mouseup', endHandler);
+    document.addEventListener('touchmove', moveHandler, { passive: false });
+    document.addEventListener('touchend', endHandler);
+    
+    leftThumb._cleanup = () => {
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('mouseup', endHandler);
+        document.removeEventListener('touchmove', moveHandler);
+        document.removeEventListener('touchend', endHandler);
+    };
+    rightThumb._cleanup = leftThumb._cleanup;
+},
+
+// ==================== القسم 26.8: إرسال الوسائط مع الإعدادات ====================
+async sendMediaWithSettings(file, type, settings) {
+    if (!this.currentChat) return;
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return;
+    }
+    
+    if (!(await this._ensureChannelReady())) return;
+    
+    if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        const msgId = Date.now().toString();
+        const tempUrl = URL.createObjectURL(file);
+        
+        // ✅ إرسال الميتاداتا أولاً
+        const metadata = {
+            type: type,
+            id: msgId,
+            fileName: file.name || (type === 'video' ? 'فيديو' : 'صورة'),
+            settings: settings,
+            timestamp: Date.now()
+        };
+        
+        CallSystem.dc.send(JSON.stringify({
+            type: 'media_metadata',
+            data: metadata
+        }));
+        console.log(`📤 إرسال ميتاداتا وسائط ${msgId}:`, settings);
+        
+        // ✅ ثم إرسال الملف
+        const success = await this.sendFileWithRetry(file, type);
+        
+        if (success) {
+            this.displayMessage({
+                id: msgId,
+                type: type,
+                data: tempUrl,
+                fileName: file.name || (type === 'video' ? 'فيديو' : 'صورة'),
+                sender: 'me',
+                time: new Date().toISOString(),
+                settings: settings,
+                _blobUrl: tempUrl,
+                _mediaLocked: false,
+                _clicksRemaining: settings.maxClicks,
+                _timerRemaining: settings.timerSeconds
+            });
+        }
+    }
+},
     
 
     // ==================== القسم 27: sendMessage ====================
@@ -1766,7 +2573,7 @@ async sendMessage(text) {
         }
     },
     
-    // ==================== القسم 30: sendImage ====================
+    // ==================== القسم 30: sendImage (معدل - فتح نافذة الإعدادات) ====================
     async sendImage(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
@@ -1774,37 +2581,17 @@ async sendMessage(text) {
             return;
         }
         
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
-        
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            const success = await this.sendFileWithRetry(file, 'image');
-            if (success) {
-                const msgId = Date.now().toString();
-                const tempUrl = URL.createObjectURL(file);
-                this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-            } else alert('فشل إرسال الصورة');
-        }
+        // ✅ فتح نافذة الإعدادات بدلاً من الإرسال المباشر
+        this.showMediaSettings(file, 'image');
     },
 
-// ==================== القسم 31: sendVideoFile ====================
+// ==================== القسم 31: sendVideoFile (معدل - فتح نافذة الإعدادات) ====================
     async sendVideoFile(file) { 
         if (!this.currentChat) return;
         if (!this.friendInConversation || !this.featuresEnabled) {
             alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
             return;
         }
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') {
-            CallSystem.dc.send(JSON.stringify({ type: 'file_selection_start', timestamp: Date.now() }));
-        }
-        
-        await new Promise(r => setTimeout(r, 200));
         
         try {
             await SecureChatSystem.validateVideo(file);
@@ -1813,21 +2600,8 @@ async sendMessage(text) {
             return;
         }
         
-        if (!(await this._ensureChannelReady())) return;
-        
-        if (CallSystem.dc && CallSystem.dc.readyState === 'open') { 
-            console.log(`🎬 إرسال فيديو مباشر: ${file.name} | ${(file.size/1024/1024).toFixed(1)}MB`);
-            const success = await this.sendFileWithRetry(file, 'video');
-            if (success) {
-                try {
-                    const msgId = Date.now().toString();
-                    const tempUrl = URL.createObjectURL(file);
-                    
-                    this.displayMessage({ id: msgId, type: 'video', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
-                    
-                } catch (error) { alert('فشل معالجة الفيديو'); }
-            } else alert('فشل إرسال الفيديو');
-        }
+        // ✅ فتح نافذة الإعدادات بدلاً من الإرسال المباشر
+        this.showMediaSettings(file, 'video');
     },
 
 // ==================== القسم 32: sendFile ====================
@@ -2163,6 +2937,9 @@ closeChat() {
     
     if (chatId) {
         console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
+        
+        // ✅ تدمير جميع عناصر الوسائط في المحادثة
+        this.destroyAllMediaInChat(chatId);
         
         this.cleanConversationData(chatId, false);
         
