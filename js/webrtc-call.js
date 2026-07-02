@@ -10,6 +10,12 @@ const CallSystem = {
     isAudioMuted: false, isVideoMuted: false, isSpeakerEnabled: false,
     remoteAudioElement: null,
     _incomingCallTimeout: null,
+    
+    // ✅ تخزين حالة الوسائط للمرسل
+    _mediaStates: {},
+    // ✅ تخزين إعدادات الوسائط للمستلم
+    _mediaSettings: {},
+    
     servers: { 
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -791,6 +797,28 @@ setupDataChannel(channel) {
                 return;
             }
             
+            // ==================== إشارات الوسائط الجديدة ====================
+            if (msg.type === 'media_play_start') {
+                this.handleMediaPlayStart(msg);
+                return;
+            }
+            if (msg.type === 'media_play_end') {
+                this.handleMediaPlayEnd(msg);
+                return;
+            }
+            if (msg.type === 'media_destroy') {
+                this.handleMediaDestroy(msg);
+                return;
+            }
+            if (msg.type === 'media_play_ack') {
+                this.handleMediaPlayAck(msg);
+                return;
+            }
+            if (msg.type === 'media_metadata') {
+                this.handleMediaMetadata(msg);
+                return;
+            }
+            
             if (msg.chunk !== undefined) {
                 this.handleChunkMessage(msg);
                 return;
@@ -986,6 +1014,132 @@ async sendSignal(calleeId, data) {
     }
     
     console.error('❌ فشل إرسال الإشارة: لا توجد قناة مفتوحة');
+},
+
+// ==================== 9.6: معالجة إشارات الوسائط ====================
+
+handleMediaMetadata(msg) {
+    const { mediaId, settings } = msg.data || {};
+    if (!mediaId) return;
+    console.log(`📥 استلام ميتاداتا وسائط ${mediaId}:`, settings);
+    this._mediaSettings[mediaId] = settings || {};
+},
+
+handleMediaPlayStart(msg) {
+    const { mediaId, sender } = msg;
+    console.log(`▶️ استلام طلب تشغيل وسائط ${mediaId} من ${sender}`);
+    
+    const state = this._mediaStates[mediaId];
+    if (!state) {
+        console.log('⚠️ لا توجد وسائط بهذا المعرف');
+        this.sendSignal(ChatSystem.currentChat, {
+            type: 'media_play_ack',
+            mediaId: mediaId,
+            allowed: false,
+            reason: 'not_found',
+            timestamp: Date.now()
+        });
+        return;
+    }
+    
+    // ✅ إذا كانت بلا حدود
+    if (state.unlimited) {
+        this.sendSignal(ChatSystem.currentChat, {
+            type: 'media_play_ack',
+            mediaId: mediaId,
+            allowed: true,
+            clicksRemaining: 999999,
+            unlimited: true,
+            timestamp: Date.now()
+        });
+        return;
+    }
+    
+    // ✅ تقليل العدد
+    state.clicksRemaining--;
+    console.log(`📊 العدد المتبقي: ${state.clicksRemaining}`);
+    
+    // ✅ إرسال الرد
+    this.sendSignal(ChatSystem.currentChat, {
+        type: 'media_play_ack',
+        mediaId: mediaId,
+        allowed: state.clicksRemaining >= 0,
+        clicksRemaining: state.clicksRemaining,
+        timestamp: Date.now()
+    });
+    
+    // ✅ إذا وصل العدد إلى 0 → تدمير فوري
+    if (state.clicksRemaining <= 0) {
+        console.log(`💥 العدد انتهى، إرسال أمر تدمير الوسائط ${mediaId}`);
+        state.destroyed = true;
+        
+        this.sendSignal(ChatSystem.currentChat, {
+            type: 'media_destroy',
+            mediaId: mediaId,
+            timestamp: Date.now()
+        });
+        
+        // ✅ تدمير من جهة المرسل أيضاً
+        if (typeof ChatSystem !== 'undefined') {
+            ChatSystem.destroyMediaElement(null, mediaId, true);
+        }
+        delete this._mediaStates[mediaId];
+    }
+},
+
+handleMediaPlayEnd(msg) {
+    const { mediaId, sender } = msg;
+    console.log(`⏹️ استلام انتهاء تشغيل وسائط ${mediaId} من ${sender}`);
+    
+    const state = this._mediaStates[mediaId];
+    if (!state || state.destroyed || state.unlimited) return;
+    
+    // ✅ تقليل العدد مرة أخرى (في حالة لم يتم عبر play_start)
+    if (state.clicksRemaining > 0) {
+        state.clicksRemaining--;
+        console.log(`📊 (من play_end) العدد المتبقي: ${state.clicksRemaining}`);
+        
+        // ✅ إذا وصل العدد إلى 0 → تدمير
+        if (state.clicksRemaining <= 0) {
+            console.log(`💥 العدد انتهى (من play_end)، إرسال أمر تدمير الوسائط ${mediaId}`);
+            state.destroyed = true;
+            
+            this.sendSignal(ChatSystem.currentChat, {
+                type: 'media_destroy',
+                mediaId: mediaId,
+                timestamp: Date.now()
+            });
+            
+            if (typeof ChatSystem !== 'undefined') {
+                ChatSystem.destroyMediaElement(null, mediaId, true);
+            }
+            delete this._mediaStates[mediaId];
+        }
+    }
+},
+
+handleMediaPlayAck(msg) {
+    const { mediaId, allowed, clicksRemaining, unlimited } = msg;
+    console.log(`✅ استلام تأكيد تشغيل وسائط ${mediaId}: allowed=${allowed}, remaining=${clicksRemaining}`);
+    
+    // ✅ تحديث واجهة المستلم عبر ChatSystem
+    if (typeof ChatSystem !== 'undefined') {
+        ChatSystem.updateMediaAck(mediaId, allowed, clicksRemaining, unlimited);
+    }
+},
+
+handleMediaDestroy(msg) {
+    const { mediaId } = msg;
+    console.log(`💥 استلام أمر تدمير الوسائط ${mediaId}`);
+    
+    // ✅ تدمير العنصر من جهة المستلم
+    if (typeof ChatSystem !== 'undefined') {
+        ChatSystem.destroyMediaElement(null, mediaId);
+    }
+    
+    // ✅ حذف من الحالة
+    delete this._mediaStates[mediaId];
+    delete this._mediaSettings[mediaId];
 },
     
     // ==================== 10. واجهة المستخدم (معدلة - تستخدم واجهات ثابتة) ====================
