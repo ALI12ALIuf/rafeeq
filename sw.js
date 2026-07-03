@@ -1,9 +1,8 @@
-// ========== js/sw.js ==========
+// ========== sw.js ==========
 // Service Worker لإدارة الملفات المخزنة محلياً
 
 const CACHE_NAME = 'rafeeq-files-v1';
 
-// ✅ عند تثبيت الـ SW
 self.addEventListener('install', (event) => {
     console.log('📦 Service Worker - جاري التثبيت...');
     self.skipWaiting();
@@ -15,7 +14,6 @@ self.addEventListener('install', (event) => {
     );
 });
 
-// ✅ عند تفعيل الـ SW
 self.addEventListener('activate', (event) => {
     console.log('✅ Service Worker - تم التفعيل');
     event.waitUntil(clients.claim());
@@ -29,7 +27,6 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// ✅ تخزين الملفات
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'STORE_FILE') {
         const { fileId, blob, fileName, mimeType } = event.data.payload;
@@ -65,7 +62,6 @@ self.addEventListener('message', (event) => {
         );
     }
     
-    // ✅ حذف ملف
     if (event.data && event.data.type === 'DELETE_FILE') {
         const { fileId } = event.data.payload;
         
@@ -82,7 +78,6 @@ self.addEventListener('message', (event) => {
         );
     }
     
-    // ✅ تنظيف جميع الملفات
     if (event.data && event.data.type === 'CLEAR_ALL_FILES') {
         event.waitUntil(
             caches.open(CACHE_NAME).then((cache) => {
@@ -100,7 +95,6 @@ self.addEventListener('message', (event) => {
     }
 });
 
-// ✅ معالجة طلبات التنزيل
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
     
