@@ -633,11 +633,11 @@ window.addEventListener('load', function() {
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
 </script>
 
-<!-- ==================== القسم 10: تسجيل Service Worker ==================== -->
+<!-- ==================== القسم 10: تسجيل Service Worker (معدل - مسار /sw.js) ==================== -->
 <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/js/sw.js', {
+            navigator.serviceWorker.register('/sw.js', {
                 scope: '/'
             }).then((registration) => {
                 console.log('✅ Service Worker مسجل بنجاح');
