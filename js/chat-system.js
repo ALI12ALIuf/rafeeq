@@ -1008,52 +1008,97 @@ closeConversation() {
         if (bar) bar.style.display = 'none'; 
     },
     
+    // ==================== القسم 27: sendMessage (معدل - دعم طلبات الصداقة) ====================
+async sendMessage(text) { 
+    if (!this.currentChat || !text.trim()) return false; 
+    const mid = Date.now().toString(); 
     
-    // ==================== القسم 23: openChat ====================
-openChat(friendId, friendName, friendAvatar) {
-    if (this.currentChat && this.currentChat !== friendId) {
-        console.log('🧹 تنظيف المحادثة السابقة قبل فتح محادثة جديدة:', this.currentChat);
-        this.cleanConversationData(this.currentChat, false);
+    // ✅ التحقق إذا كانت الرسالة "قبول" أو "رفض" لطلب الصداقة
+    const lowerText = text.trim().toLowerCase();
+    if (lowerText === 'قبول' || lowerText === 'accept') {
+        // محاولة قبول طلب الصداقة المعلق
+        const requests = await getPendingFriendRequestsForUser(window.auth.currentUser.uid);
+        const pendingRequest = requests.find(r => r.from === this.currentChat);
+        if (pendingRequest) {
+            await acceptFriendRequestFromChat(pendingRequest.id, this.currentChat);
+            return true;
+        } else {
+            // إرسال كرسالة عادية
+        }
+    } else if (lowerText === 'رفض' || lowerText === 'reject') {
+        const requests = await getPendingFriendRequestsForUser(window.auth.currentUser.uid);
+        const pendingRequest = requests.find(r => r.from === this.currentChat);
+        if (pendingRequest) {
+            await rejectFriendRequestFromChat(pendingRequest.id);
+            return true;
+        } else {
+            // إرسال كرسالة عادية
+        }
     }
     
-    this.currentChat = friendId;
-    this.friendInConversation = false;
-    
-    this.resetFeatures();
-    document.body.classList.add('conversation-open');
-    const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
-    if (nameEl) nameEl.textContent = friendName;
-    if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
-    document.querySelector('.chat-page').style.display = 'none'; 
-    document.getElementById('conversationPage').style.display = 'flex';
-    this.displayMessages(friendId);
-    
-    setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
-    setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
-    
-    const toggleContainer = document.getElementById('featureToggleContainer');
-    const kickBtn = document.getElementById('kickBtn');
-    if (toggleContainer) toggleContainer.style.display = 'flex';
-    if (kickBtn) kickBtn.style.display = 'flex';
-    
-    this.updateAllButtons();
-    
-    setTimeout(() => {
-        if (this.featuresEnabled && (!CallSystem.dc || CallSystem.dc.readyState !== 'open')) {
-            console.log('⚠️ الميزات مفعلة ولكن القناة مغلقة - إعادة تعيين الميزات');
-            this.featuresEnabled = false;
-            this.featureRequestPending = false;
-            this.featureRequestReceived = false;
+    if (this.featuresEnabled && this.friendInConversation && CallSystem.dc && CallSystem.dc.readyState === 'open') {
+        try {
+            const messageData = {
+                type: 'direct_text',
+                id: mid,
+                text: text.trim(),
+                sender: 'me',
+                time: new Date().toISOString()
+            };
+            CallSystem.dc.send(JSON.stringify(messageData));
             
-            const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
-            
-            this.updateAllButtons();
-            console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
+            this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            console.log('✅ تم إرسال النص مباشرة عبر Data Channel');
+            return true;
+        } catch(e) {
+            console.log('⚠️ فشل الإرسال المباشر، الإرسال عبر Firebase بدلاً من ذلك:', e);
         }
-    }, 1000);
-},
+    }
     
+    try { 
+        const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
+        if (!pr || !pu) return false;
+        const sk = await SecureChatSystem.deriveSharedKey(pr, pu), enc = await SecureChatSystem.encryptData(text.trim(), sk); 
+        await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
+        this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+        this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+        console.log('✅ تم إرسال النص عبر Firebase (تشفير E2EE)');
+        return true; 
+    } catch (e) { 
+        console.error('❌ فشل إرسال النص:', e);
+        return false; 
+    } 
+},
+
+// ==================== القسم 28: sendFileWithRetry (معدل - دعم طلبات الصداقة) ====================
+async sendFileWithRetry(file, type, maxRetries = 3) {
+    // ✅ التحقق من وجود طلب صداقة معلق
+    if (window.auth?.currentUser && this.currentChat) {
+        const requests = await getPendingFriendRequestsForUser(window.auth.currentUser.uid);
+        const pendingRequest = requests.find(r => r.from === this.currentChat);
+        if (pendingRequest) {
+            alert('📩 لديك طلب صداقة معلق من هذا المستخدم. اكتب "قبول" أو "رفض" في الرسالة أولاً.');
+            return false;
+        }
+    }
+    
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return false;
+    }
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+            const success = await CallSystem.sendFileDirect(file, type);
+            if (success) { this.hideProgressBar(); return true; }
+            if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
+        } catch (error) {}
+    }
+    this.hideProgressBar(); return false;
+},
+ 
     
 // ==================== القسم 25: displayMessages ====================
     displayMessages(friendId) { 
@@ -1685,6 +1730,30 @@ async sendMessage(text) {
     if (!this.currentChat || !text.trim()) return false; 
     const mid = Date.now().toString(); 
     
+    // ✅ التحقق من وجود طلب صداقة معلق لهذا المستخدم قبل الإرسال
+    if (this.currentChat) {
+        try {
+            const uid = window.auth?.currentUser?.uid;
+            if (uid) {
+                const pendingRequests = await window.db.collection('friendRequests')
+                    .where('to', '==', uid)
+                    .where('from', '==', this.currentChat)
+                    .where('status', '==', 'pending')
+                    .get();
+                
+                if (!pendingRequests.empty) {
+                    // ✅ يوجد طلب صداقة معلق، لا نسمح بإرسال رسالة نصية
+                    // ولكن نعرض رسالة طلب الصداقة بدلاً من ذلك
+                    console.log('📩 يوجد طلب صداقة معلق من هذا المستخدم، عرض الطلب بدلاً من إرسال رسالة');
+                    this.displayFriendRequestsInChat(this.currentChat);
+                    return false;
+                }
+            }
+        } catch(e) {
+            console.warn('خطأ في التحقق من طلبات الصداقة:', e);
+        }
+    }
+    
     if (this.featuresEnabled && this.friendInConversation && CallSystem.dc && CallSystem.dc.readyState === 'open') {
         try {
             const messageData = {
@@ -1719,26 +1788,48 @@ async sendMessage(text) {
         return false; 
     } 
 },
-    
-    
-    // ==================== القسم 28: sendFileWithRetry ====================
-    async sendFileWithRetry(file, type, maxRetries = 3) {
-        if (!this.friendInConversation || !this.featuresEnabled) {
-            alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
-            return false;
+
+// ==================== القسم 28: sendFileWithRetry ====================
+async sendFileWithRetry(file, type, maxRetries = 3) {
+    // ✅ التحقق من وجود طلب صداقة معلق لهذا المستخدم قبل الإرسال
+    if (this.currentChat) {
+        try {
+            const uid = window.auth?.currentUser?.uid;
+            if (uid) {
+                const pendingRequests = await window.db.collection('friendRequests')
+                    .where('to', '==', uid)
+                    .where('from', '==', this.currentChat)
+                    .where('status', '==', 'pending')
+                    .get();
+                
+                if (!pendingRequests.empty) {
+                    // ✅ يوجد طلب صداقة معلق، لا نسمح بإرسال ملفات
+                    console.log('📩 يوجد طلب صداقة معلق من هذا المستخدم، عرض الطلب بدلاً من إرسال ملف');
+                    this.displayFriendRequestsInChat(this.currentChat);
+                    return false;
+                }
+            }
+        } catch(e) {
+            console.warn('خطأ في التحقق من طلبات الصداقة:', e);
         }
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
-                const success = await CallSystem.sendFileDirect(file, type);
-                if (success) { this.hideProgressBar(); return true; }
-                if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
-            } catch (error) {}
-        }
-        this.hideProgressBar(); return false;
-    },
+    }
     
+    if (!this.friendInConversation || !this.featuresEnabled) {
+        alert(this.featuresEnabled ? 'لا يمكن الإرسال - الطرف الآخر ليس في المحادثة' : 'لا يمكن الإرسال - الميزات غير مفعلة');
+        return false;
+    }
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            this.showProgressBar(`جاري إرسال ${type === 'video' ? 'الفيديو' : type === 'image' ? 'الصورة' : 'الملف'}...`, 0);
+            const success = await CallSystem.sendFileDirect(file, type);
+            if (success) { this.hideProgressBar(); return true; }
+            if (attempt < maxRetries) { this.updateProgressBar(0, `إعادة المحاولة ${attempt + 1}...`); await new Promise(r => setTimeout(r, 2000 * attempt)); }
+        } catch (error) {}
+    }
+    this.hideProgressBar(); return false;
+},
+
     // ==================== القسم 29: _ensureChannelReady ====================
     async _ensureChannelReady() {
         if (!this.friendInConversation || !this.featuresEnabled) {
