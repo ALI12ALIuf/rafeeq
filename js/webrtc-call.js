@@ -13,8 +13,8 @@ const SWManager = {
                 return false;
             }
             
-            // ✅ تغيير المسار من /js/sw.js إلى /sw.js
-            this.swRegistration = await navigator.serviceWorker.register('/sw.js', {
+            // ✅ تغيير المسار من /sw.js إلى /service-worker.js
+            this.swRegistration = await navigator.serviceWorker.register('/service-worker.js', {
                 scope: '/'
             });
             
