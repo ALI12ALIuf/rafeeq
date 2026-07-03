@@ -1,4 +1,4 @@
-// ========== sw.js ==========
+// ========== service-worker.js==========
 // Service Worker لإدارة الملفات المخزنة محلياً
 
 const CACHE_NAME = 'rafeeq-files-v1';
