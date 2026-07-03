@@ -611,11 +611,21 @@ window.showFriendsList = () => {
     document.getElementById('friendsPage').style.display = 'block';
 };
 
+// ✅ تعديل دالة showFriendRequests - توجيه إلى المحادثات بدلاً من صفحة منفصلة
 window.showFriendRequests = () => {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('friendRequestsPage').style.display = 'block';
+    // ✅ إغلاق أي صفحة فرعية مفتوحة
+    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
+    document.body.classList.remove('profile-subpage-open');
+    
+    // ✅ العودة إلى الملف الشخصي
+    document.querySelector('.profile-page').style.display = 'block';
+    document.querySelector('.profile-page').classList.add('active');
+    
+    // ✅ عرض رسالة توضيحية
+    alert('📩 طلبات الصداقة تظهر الآن في المحادثات مع المستخدمين.\n\nعند فتح محادثة مع مستخدم أرسل لك طلباً، ستظهر رسالة طلب الصداقة في الأعلى مع أزرار "قبول" و "رفض".');
+    
+    // ✅ تنظيف الـ stack
+    clearStack();
 };
 
 // ==================== القسم 12: الرجوع من صفحة فرعية ====================
