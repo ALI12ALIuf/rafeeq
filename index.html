@@ -72,7 +72,6 @@
                 </div>
                 <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
                 
-                <!-- ✅ قالب نتيجة البحث (ثابت) -->
                 <template id="searchResultTemplate">
                     <div class="search-result-item" style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--card-bg);border-radius:var(--radius);margin-bottom:4px;">
                         <div class="search-result-avatar" style="width:40px;height:40px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;"></div>
@@ -88,7 +87,6 @@
             </div>
             <div class="chats-list" id="chatsList"></div>
             
-            <!-- ✅ قالب عنصر المحادثة (ثابت) -->
             <template id="chatItemTemplate">
                 <div class="chat-item" onclick="">
                     <div class="chat-avatar-emoji"></div>
@@ -106,11 +104,9 @@
         <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
             
-            <!-- ===== القسم 2.2.3.1: رأس المحادثة ===== -->
             <div class="conversation-header">
                 <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
                 
-                <!-- ===== القسم 2.2.3.1.1: معلومات المستخدم ===== -->
                 <div class="conversation-user-info" style="gap:0;">
                     <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
                     <div class="conversation-user-details">
@@ -119,7 +115,6 @@
                     </div>
                 </div>
                 
-                <!-- ===== القسم 2.2.3.1.2: أزرار الاتصال والميزات ===== -->
                 <div class="call-buttons" style="display:flex;gap:12px;margin-right:auto;">
                     <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة" style="display:none;">
                         <i class="fas fa-sign-out-alt"></i>
@@ -143,17 +138,14 @@
                 </div>
             </div>
 
-            <!-- ===== القسم 2.2.3.2: حاوية الرسائل ===== -->
             <div class="messages-container" id="messagesContainer"></div>
 
-            <!-- ===== القسم 2.2.3.3: مدخل الرسائل ===== -->
             <div class="message-input-container">
                 <div class="message-input-wrapper">
                     <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
                     <div class="input-area">
                         <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()">
                         
-                        <!-- ===== واجهة تسجيل البصمة ===== -->
                         <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
                             <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; position:relative; overflow:hidden;">
                                 <div id="voiceProgressFill" style="width:0%; height:100%; background:var(--primary); border-radius:2px; transition:width 0.3s;"></div>
@@ -180,7 +172,6 @@
                     </button>
                 </div>
                 
-                <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
                 <div class="attachment-menu" id="attachmentMenu" style="display: none;">
                     <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
                     <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
@@ -229,7 +220,6 @@
                 <div class="users-list" id="friendRequestsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friend_requests">لا توجد طلبات</h3><p data-i18n="no_friend_requests_desc">لم يرسل لك أحد طلب صداقة بعد</p></div></div>
             </div>
             
-            <!-- ✅ قالب عنصر الصديق (ثابت) -->
             <template id="friendItemTemplate">
                 <div class="user-item">
                     <div class="user-avatar-emoji"></div>
@@ -248,7 +238,6 @@
                 </div>
             </template>
             
-            <!-- ✅ قالب طلب الصداقة (ثابت) -->
             <template id="friendRequestTemplate">
                 <div class="user-item" id="">
                     <div class="user-avatar-emoji"></div>
@@ -456,19 +445,16 @@
 
 <!-- ==================== القسم 5: قوالب الرسائل الثابتة ==================== -->
 
-<!-- 5.0: قالب غلاف الرسالة -->
 <template id="messageWrapperTemplate">
     <div class="message"></div>
 </template>
 
-<!-- 5.1: قالب الصورة -->
 <template id="imageMessageTemplate">
     <div class="message-image-wrapper">
         <img class="message-image-content" src="" alt="صورة" loading="lazy">
     </div>
 </template>
 
-<!-- 5.2: قالب الفيديو -->
 <template id="videoMessageTemplate">
     <div class="message-content video-thumbnail">
         <video class="video-thumbnail-content" preload="metadata" playsinline>
@@ -480,7 +466,6 @@
     </div>
 </template>
 
-<!-- 5.3: قالب البصمة الصوتية -->
 <template id="voiceMessageTemplate">
     <div class="message-content voice-message">
         <div class="voice-controls">
@@ -502,7 +487,6 @@
     </div>
 </template>
 
-<!-- 5.4: قالب الملف -->
 <template id="fileMessageTemplate">
     <div class="message-content file-card">
         <div class="file-icon">📄</div>
@@ -515,14 +499,12 @@
     </div>
 </template>
 
-<!-- 5.5: قالب الموقع -->
 <template id="locationMessageTemplate">
     <div class="message-content location-card">
         <i class="fas fa-map-marker-alt"></i>
     </div>
 </template>
 
-<!-- 5.6: قالب الرسالة النصية -->
 <template id="textMessageTemplate">
     <div class="message-content" style="border: 1.5px solid var(--border-color); background: var(--bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;">
         <span style="font-size: 1rem; line-height: 1.4; display: block;"></span>
@@ -633,14 +615,152 @@ window.addEventListener('load', function() {
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
 </script>
 
-<!-- ==================== القسم 10: تسجيل Service Worker ==================== -->
+<!-- ==================== القسم 10: تسجيل Service Worker (كود مدمج - بدون ملف خارجي) ==================== -->
 <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/service-worker.js', {
+            // ✅ إنشاء Service Worker من كود مدمج (بدون ملف خارجي)
+            const swCode = `
+// ========== Service Worker مدمج ==========
+const CACHE_NAME = 'rafeeq-files-v1';
+
+self.addEventListener('install', (event) => {
+    console.log('📦 Service Worker - جاري التثبيت...');
+    self.skipWaiting();
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log('✅ تم فتح الـ Cache');
+            return cache;
+        })
+    );
+});
+
+self.addEventListener('activate', (event) => {
+    console.log('✅ Service Worker - تم التفعيل');
+    event.waitUntil(clients.claim());
+    event.waitUntil(
+        caches.keys().then((keys) => {
+            return Promise.all(
+                keys.filter((key) => key !== CACHE_NAME)
+                    .map((key) => caches.delete(key))
+            );
+        })
+    );
+});
+
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'STORE_FILE') {
+        const { fileId, blob, fileName, mimeType } = event.data.payload;
+        
+        console.log(\`📥 تخزين ملف في SW: \${fileName} (\${fileId})\`);
+        
+        const response = new Response(blob, {
+            headers: {
+                'Content-Type': mimeType || 'application/octet-stream',
+                'Content-Disposition': \`attachment; filename="\${encodeURIComponent(fileName)}"\`,
+                'X-File-Name': encodeURIComponent(fileName),
+                'X-File-Id': fileId
+            }
+        });
+        
+        event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => {
+                return cache.put(\`/files/\${fileId}\`, response);
+            }).then(() => {
+                event.ports[0].postMessage({ 
+                    status: 'stored', 
+                    fileId: fileId,
+                    url: \`/files/\${fileId}\`
+                });
+                console.log(\`✅ تم تخزين الملف بنجاح: \${fileId}\`);
+            }).catch((error) => {
+                console.error('❌ فشل تخزين الملف:', error);
+                event.ports[0].postMessage({ 
+                    status: 'error', 
+                    error: error.message 
+                });
+            })
+        );
+    }
+    
+    if (event.data && event.data.type === 'DELETE_FILE') {
+        const { fileId } = event.data.payload;
+        
+        event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => {
+                return cache.delete(\`/files/\${fileId}\`);
+            }).then(() => {
+                console.log(\`🗑️ تم حذف الملف: \${fileId}\`);
+                event.ports[0].postMessage({ 
+                    status: 'deleted', 
+                    fileId: fileId 
+                });
+            })
+        );
+    }
+    
+    if (event.data && event.data.type === 'CLEAR_ALL_FILES') {
+        event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => {
+                return cache.keys().then((keys) => {
+                    return Promise.all(
+                        keys.filter((key) => key.url.startsWith('/files/'))
+                            .map((key) => cache.delete(key))
+                    );
+                });
+            }).then(() => {
+                console.log('🗑️ تم حذف جميع الملفات');
+                event.ports[0].postMessage({ status: 'cleared' });
+            })
+        );
+    }
+});
+
+self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+    
+    if (url.pathname.startsWith('/files/')) {
+        const fileId = url.pathname.split('/files/')[1];
+        
+        event.respondWith(
+            caches.open(CACHE_NAME).then((cache) => {
+                return cache.match(\`/files/\${fileId}\`).then((response) => {
+                    if (response) {
+                        console.log(\`📤 إرجاع الملف من SW: \${fileId}\`);
+                        
+                        const headers = new Headers(response.headers);
+                        headers.set('Access-Control-Allow-Origin', '*');
+                        headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+                        
+                        return new Response(response.body, {
+                            status: 200,
+                            statusText: 'OK',
+                            headers: headers
+                        });
+                    } else {
+                        console.warn(\`⚠️ الملف غير موجود في SW: \${fileId}\`);
+                        return new Response('File not found', { 
+                            status: 404,
+                            headers: { 'Content-Type': 'text/plain' }
+                        });
+                    }
+                });
+            })
+        );
+    }
+});
+
+console.log('✅ Service Worker جاهز للعمل');
+`;
+
+            // ✅ تحويل الكود إلى Blob URL وتسجيله
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            
+            navigator.serviceWorker.register(swUrl, {
                 scope: '/'
             }).then((registration) => {
-                console.log('✅ Service Worker مسجل بنجاح');
+                console.log('✅ Service Worker مسجل بنجاح (كود مدمج)');
             }).catch((error) => {
                 console.warn('⚠️ فشل تسجيل SW:', error);
             });
