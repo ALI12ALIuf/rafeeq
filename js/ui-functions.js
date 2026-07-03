@@ -19,7 +19,7 @@ function clearStack() {
     window._pageStack = [];
 }
 
-// ==================== القسم 2: تحميل المحادثات (معدل - استخدام القالب الثابت) ====================
+// ==================== القسم 2: تحميل المحادثات (معدل - يدعم طلبات الصداقة) ====================
 let chatsLoaded = false;
 
 async function loadChats(force = false) { 
@@ -32,8 +32,10 @@ async function loadChats(force = false) {
         return;
     }
     
-    const template = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
-    if (!template) {
+    const chatTemplate = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
+    const requestTemplate = document.getElementById('friendRequestChatTemplate');
+    
+    if (!chatTemplate) {
         console.warn('⚠️ قالب chatItemTemplate غير موجود');
         return;
     }
@@ -45,8 +47,59 @@ async function loadChats(force = false) {
         
         list.innerHTML = '';
         
+        // ===== القسم 2.1: عرض طلبات الصداقة في الأعلى =====
+        if (requestTemplate) {
+            const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
+            
+            for (const req of pendingRequests) {
+                try {
+                    const senderDoc = await window.db.collection('users').doc(req.from).get();
+                    if (!senderDoc.exists) continue;
+                    
+                    const sender = senderDoc.data();
+                    const clone = requestTemplate.content.cloneNode(true);
+                    const requestItem = clone.querySelector('.friend-request-item');
+                    
+                    const avatar = requestItem.querySelector('.chat-avatar-emoji');
+                    const nameSpan = requestItem.querySelector('.friend-request-name');
+                    const timeSpan = requestItem.querySelector('.chat-time');
+                    const acceptBtn = requestItem.querySelector('.accept-friend-btn');
+                    const rejectBtn = requestItem.querySelector('.reject-friend-btn');
+                    
+                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '👤';
+                    if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
+                    if (timeSpan) {
+                        const reqTime = req.timestamp?.toDate ? req.timestamp.toDate() : new Date(req.timestamp);
+                        timeSpan.textContent = reqTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    
+                    if (acceptBtn) {
+                        acceptBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            window.acceptFriendRequest(req.id, req.from);
+                        };
+                    }
+                    
+                    if (rejectBtn) {
+                        rejectBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            window.rejectFriendRequest(req.id);
+                        };
+                    }
+                    
+                    list.appendChild(clone);
+                    
+                } catch (e) {
+                    console.warn('خطأ في عرض طلب صداقة:', e);
+                }
+            }
+        }
+        
+        // ===== القسم 2.2: عرض قائمة الأصدقاء =====
         if (!friends.length) { 
-            list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
+            if (list.children.length === 0) {
+                list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
+            }
             chatsLoaded = true;
             return; 
         } 
@@ -72,7 +125,7 @@ async function loadChats(force = false) {
                         } 
                     } catch (e) {} 
                     
-                    const clone = template.content.cloneNode(true);
+                    const clone = chatTemplate.content.cloneNode(true);
                     const chatItem = clone.querySelector('.chat-item');
                     
                     const avatar = chatItem.querySelector('.chat-avatar-emoji');
@@ -80,7 +133,7 @@ async function loadChats(force = false) {
                     const lastMsg = chatItem.querySelector('.last-message');
                     const time = chatItem.querySelector('.chat-time');
                     
-                    if (avatar) avatar.textContent = window.getEmojiForUser(f);
+                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(f) : '👤';
                     if (name) name.textContent = f.name || 'مستخدم';
                     if (lastMsg) lastMsg.textContent = lm;
                     if (time) time.textContent = lt || '';
@@ -127,8 +180,6 @@ function setupChatListeners() {
 window.openChat = friendId => {
     if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
         pushPage('subpage', 'friendsPage');
-    } else if (document.getElementById('friendRequestsPage') && document.getElementById('friendRequestsPage').style.display === 'block') {
-        pushPage('subpage', 'friendRequestsPage');
     } else if (document.getElementById('tripsPage') && document.getElementById('tripsPage').style.display === 'block') {
         pushPage('subpage', 'tripsPage');
     } else if (document.querySelector('.profile-page') && getComputedStyle(document.querySelector('.profile-page')).display === 'block') {
@@ -609,13 +660,6 @@ window.showFriendsList = () => {
     document.body.classList.add('profile-subpage-open');
     document.querySelector('.profile-page').style.display = 'none';
     document.getElementById('friendsPage').style.display = 'block';
-};
-
-window.showFriendRequests = () => {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('friendRequestsPage').style.display = 'block';
 };
 
 // ==================== القسم 12: الرجوع من صفحة فرعية ====================
