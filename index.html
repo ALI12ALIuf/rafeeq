@@ -101,6 +101,31 @@
                     </div>
                 </div>
             </template>
+            
+            <!-- ✅ قالب طلب الصداقة (يظهر في قائمة الدردشة) -->
+            <template id="friendRequestChatTemplate">
+                <div class="chat-item friend-request-item" style="border: 2px solid #FFC107; background: var(--card-bg); border-radius: var(--radius); margin-bottom: 8px;">
+                    <div class="chat-avatar-emoji" style="background: #FFC10720; border: 2px solid #FFC107;"></div>
+                    <div class="chat-info" style="flex:1;">
+                        <h4 style="color: #FFC107; display: flex; align-items: center; gap: 8px;">
+                            <span class="friend-request-name"></span>
+                            <span style="font-size: 0.7rem; background: #FFC107; color: #000; padding: 2px 10px; border-radius: 12px;">طلب صداقة</span>
+                        </h4>
+                        <p class="last-message" style="color: var(--text-light); font-size: 0.8rem;">يريد إضافتك كصديق</p>
+                    </div>
+                    <div class="friend-request-actions" style="display: flex; gap: 6px; margin-right: 8px;">
+                        <button class="accept-friend-btn" style="background: #4CAF50; border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button class="reject-friend-btn" style="background: #f44336; border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="chat-meta">
+                        <span class="chat-time" style="font-size: 0.65rem; color: var(--text-light);"></span>
+                    </div>
+                </div>
+            </template>
         </div>
 
         <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
@@ -191,85 +216,58 @@
         </div>
 
         <!-- ===== القسم 2.2.4: صفحة الملف الشخصي (Profile) ===== -->
-<div class="page profile-page">
-    <div class="profile-header">
-        <div class="profile-cover">
-            <div class="profile-avatar-center"><div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div></div>
-            <button class="edit-profile-btn-left" onclick="openEditProfileModal()"><i class="fas fa-pen"></i></button>
-        </div>
-        <div class="profile-info-container">
-            <div class="profile-name-wrapper"><h2 id="profileName"></h2></div>
-            <div class="profile-id-row">
-                <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
-                <span id="shareableId" class="id-value-numbers"></span>
-                <span class="id-label-english">ID</span>
+        <div class="page profile-page">
+            <div class="profile-header">
+                <div class="profile-cover">
+                    <div class="profile-avatar-center"><div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div></div>
+                    <button class="edit-profile-btn-left" onclick="openEditProfileModal()"><i class="fas fa-pen"></i></button>
+                </div>
+                <div class="profile-info-container">
+                    <div class="profile-name-wrapper"><h2 id="profileName"></h2></div>
+                    <div class="profile-id-row">
+                        <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
+                        <span id="shareableId" class="id-value-numbers"></span>
+                        <span class="id-label-english">ID</span>
+                    </div>
+                </div>
+                <p class="profile-bio" id="profileBio"></p>
+                <div class="profile-stats">
+                    <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
+                    <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
+                </div>
             </div>
         </div>
-        <p class="profile-bio" id="profileBio"></p>
-        <div class="profile-stats">
-            <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
-            <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
-            <!-- تم إزالة طلبات الصداقة من الملف الشخصي -->
-        </div>
-    </div>
-</div>
 
-<!-- ===== القسم 2.2.5: الصفحات الفرعية للملف الشخصي ===== -->
-<div class="profile-pages">
-    <div class="profile-subpage" id="tripsPage" style="display: none;">
-        <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
-        <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
-    </div>
-    <div class="profile-subpage" id="friendsPage" style="display: none;">
-        <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friends">الأصدقاء</h3></div>
-        <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
-    </div>
-    <!-- تم إزالة صفحة طلبات الصداقة الفرعية -->
-    
-    <!-- ✅ قالب عنصر الصديق (ثابت) -->
-    <template id="friendItemTemplate">
-        <div class="user-item">
-            <div class="user-avatar-emoji"></div>
-            <div class="user-info">
-                <h4></h4>
-                <p></p>
+        <!-- ===== القسم 2.2.5: الصفحات الفرعية للملف الشخصي ===== -->
+        <div class="profile-pages">
+            <div class="profile-subpage" id="tripsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
+                <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
             </div>
-            <div class="user-actions">
-                <button class="action-btn chat-btn" title="محادثة">
-                    <i class="fas fa-comment"></i>
-                </button>
-                <button class="action-btn remove-btn" title="حذف" style="background:var(--danger);color:white;">
-                    <i class="fas fa-user-minus"></i>
-                </button>
+            <div class="profile-subpage" id="friendsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friends">الأصدقاء</h3></div>
+                <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
             </div>
+            
+            <!-- ✅ قالب عنصر الصديق (ثابت) -->
+            <template id="friendItemTemplate">
+                <div class="user-item">
+                    <div class="user-avatar-emoji"></div>
+                    <div class="user-info">
+                        <h4></h4>
+                        <p></p>
+                    </div>
+                    <div class="user-actions">
+                        <button class="action-btn chat-btn" title="محادثة">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                        <button class="action-btn remove-btn" title="حذف" style="background:var(--danger);color:white;">
+                            <i class="fas fa-user-minus"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
         </div>
-    </template>
-    
-    <!-- ✅ قالب طلب الصداقة (نفس الشكل الأصلي تماماً) -->
-<template id="friendRequestChatTemplate">
-    <div class="chat-item friend-request-item">
-        <div class="chat-avatar-emoji friend-request-avatar">👤</div>
-        <div class="chat-info">
-            <h4 class="friend-request-name"></h4>
-            <p class="friend-request-message">
-                <i class="fas fa-user-plus" style="color: #FFC107;"></i> يريد إضافتك كصديق
-            </p>
-            <div class="friend-request-actions">
-                <button class="friend-request-accept">
-                    <i class="fas fa-check"></i> قبول
-                </button>
-                <button class="friend-request-reject">
-                    <i class="fas fa-times"></i> رفض
-                </button>
-            </div>
-            <span class="friend-request-time"></span>
-        </div>
-        <div class="chat-meta">
-            <span class="chat-time">طلب</span>
-        </div>
-    </div>
-</template>
-</div>
 
         <!-- ===== القسم 2.2.6: صفحة الإعدادات (Settings) ===== -->
         <div class="page settings-page">
