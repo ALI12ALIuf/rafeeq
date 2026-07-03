@@ -1,4 +1,4 @@
-// ========== auth.js - النسخة المعدلة (بدون كابتشا) ==========
+// ========== auth.js - النسخة المعدلة (بدون كابتشا + إزالة عداد الطلبات) ==========
 // Firebase Auth الأساسي
 
 // ==================== القسم 1: دوال مساعدة ====================
@@ -36,7 +36,7 @@ function showLoginScreen() {
     if (loginScreen) loginScreen.style.display = 'flex';
 }
 
-// ==================== القسم 4: startGoogleLogin (معدل - بدون كابتشا) ====================
+// ==================== القسم 4: startGoogleLogin ====================
 async function startGoogleLogin() {
     try {
         if (!window.auth || !window.googleProvider) {
@@ -132,7 +132,7 @@ async function logout() {
     window.location.reload(); 
 }
 
-// ==================== القسم 8: loadUserData ====================
+// ==================== القسم 8: loadUserData (معدل - إزالة عداد الطلبات) ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
@@ -144,14 +144,15 @@ async function loadUserData(uid) {
             if (si) si.textContent = d.shareableId || '0000000000';
             const emoji = getEmojiForUser(d);
             if (pa) pa.textContent = emoji; if (ca) ca.textContent = emoji;
-            const fc = document.getElementById('friendsCount'), frc = document.getElementById('friendRequestsCount');
+            const fc = document.getElementById('friendsCount');
             if (fc) fc.textContent = formatNumber((d.friends || []).length);
-            if (frc) { try { const s = await window.db.collection('friendRequests').where('to', '==', uid).where('status', '==', 'pending').get(); frc.textContent = formatNumber(s.size); } catch (e) { frc.textContent = '0'; } }
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn('خطأ في loadUserData:', e);
+    }
 }
 
-// ==================== القسم 9: مراقب حالة تسجيل الدخول (معدل - بدون كابتشا) ====================
+// ==================== القسم 9: مراقب حالة تسجيل الدخول ====================
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
