@@ -1286,3 +1286,114 @@ input:checked + .toggle-slider:before {
     }
 }
 
+
+/* ==================== 22طلبات طلباتي المحادثات ==================== */
+.friend-request-item {
+    border-right: 3px solid #FFC107 !important;
+    background: rgba(255, 193, 7, 0.08) !important;
+    padding: 12px !important;
+    margin-bottom: 6px !important;
+    border-radius: var(--radius) !important;
+    transition: all 0.3s ease !important;
+    cursor: default !important;
+}
+
+.friend-request-item:hover {
+    background: rgba(255, 193, 7, 0.15) !important;
+}
+
+.friend-request-item .chat-info h4 {
+    color: #FFC107 !important;
+    font-weight: 600 !important;
+}
+
+.friend-request-message {
+    color: var(--text-light) !important;
+    font-size: 0.75rem !important;
+    margin: 2px 0 !important;
+}
+
+.friend-request-message i {
+    color: #FFC107 !important;
+    margin-left: 4px !important;
+}
+
+.friend-request-actions {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 4px !important;
+}
+
+.friend-request-actions button {
+    font-size: 0.7rem !important;
+    padding: 4px 14px !important;
+    border-radius: 20px !important;
+    transition: all 0.2s ease !important;
+    border: none !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    font-weight: 500 !important;
+}
+
+.friend-request-actions button:hover {
+    transform: scale(1.05) !important;
+}
+
+.friend-request-actions button:active {
+    transform: scale(0.95) !important;
+}
+
+.friend-request-actions .friend-request-accept {
+    background: #4CAF50 !important;
+    color: white !important;
+}
+
+.friend-request-actions .friend-request-accept:hover {
+    background: #43A047 !important;
+}
+
+.friend-request-actions .friend-request-reject {
+    background: #f44336 !important;
+    color: white !important;
+}
+
+.friend-request-actions .friend-request-reject:hover {
+    background: #E53935 !important;
+}
+
+.friend-request-time {
+    font-size: 0.6rem !important;
+    color: var(--text-light) !important;
+    opacity: 0.6 !important;
+    display: block !important;
+    margin-top: 2px !important;
+}
+
+.friend-request-item .chat-meta .chat-time {
+    color: #FFC107 !important;
+    font-weight: 600 !important;
+}
+
+/* ==================== إزالة طلبات الصداقة من الملف الشخصي (إخفاء نهائي) ==================== */
+#friendRequestsPage {
+    display: none !important;
+}
+
+#friendRequestsCount {
+    display: none !important;
+}
+
+/* ==================== تحسين عرض القائمة عند وجود طلبات ==================== */
+.chats-list .friend-request-item:first-child {
+    margin-top: 4px !important;
+}
+
+.chats-list .friend-request-item + .chat-item {
+    margin-top: 8px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding-top: 12px !important;
+}
+
+
