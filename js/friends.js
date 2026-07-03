@@ -1,5 +1,5 @@
 // ========== friends.js ==========
-// نظام الصداقة
+// نظام الصداقة - النسخة المعدلة (طلبات الصداقة تظهر في الدردشة)
 
 // ==================== القسم 1: عرض قائمة الأصدقاء ====================
 window.showFriendsList = function() { 
@@ -8,7 +8,7 @@ window.showFriendsList = function() {
     loadFriendsList(); 
 };
 
-// ==================== القسم 2: تحميل قائمة الأصدقاء (معدل - استخدام القالب الثابت) ====================
+// ==================== القسم 2: تحميل قائمة الأصدقاء ====================
 let friendsLoaded = false;
 
 async function loadFriendsList(force = false) {
@@ -114,150 +114,7 @@ async function updateFriendsCount() {
     } catch (e) {}
 }
 
-// ==================== القسم 5: عرض طلبات الصداقة ====================
-window.showFriendRequests = function() { 
-    document.querySelector('.profile-page').style.display = 'none'; 
-    document.getElementById('friendRequestsPage').style.display = 'block'; 
-    loadFriendRequests(); 
-};
-
-// ==================== القسم 6: تحميل طلبات الصداقة (معدل - استخدام القالب الثابت) ====================
-let requestsLoaded = false;
-
-async function loadFriendRequests(force = false) {
-    if (!window.auth?.currentUser) return;
-    const list = document.getElementById('friendRequestsList'); 
-    if (!list) return;
-    
-    if (requestsLoaded && !force) {
-        console.log('⏭️ قائمة طلبات الصداقة محملة مسبقاً، تخطي التحميل');
-        return;
-    }
-    
-    const template = document.getElementById('friendRequestTemplate');
-    if (!template) {
-        console.warn('⚠️ قالب friendRequestTemplate غير موجود');
-        return;
-    }
-    
-    try {
-        const s = await window.db.collection('friendRequests')
-            .where('to', '==', window.auth.currentUser.uid)
-            .where('status', '==', 'pending')
-            .get();
-            
-        list.innerHTML = '';
-            
-        if (s.empty) { 
-            list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3><p>لم يرسل لك أحد طلب صداقة بعد</p></div>`; 
-            requestsLoaded = true;
-            return; 
-        }
-        
-        let reqs = [];
-        s.forEach(d => reqs.push({ id: d.id, ...d.data() }));
-        reqs.sort((a, b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
-        
-        for (const r of reqs) {
-            try {
-                const sender = await window.db.collection('users').doc(r.from).get();
-                if (sender.exists) { 
-                    const sd = sender.data();
-                    
-                    const clone = template.content.cloneNode(true);
-                    const userItem = clone.querySelector('.user-item');
-                    
-                    if (userItem) userItem.id = `request-${r.id}`;
-                    
-                    const avatar = userItem.querySelector('.user-avatar-emoji');
-                    const name = userItem.querySelector('.user-info h4');
-                    const idText = userItem.querySelector('.user-info p');
-                    const acceptBtn = userItem.querySelector('.accept-btn');
-                    const rejectBtn = userItem.querySelector('.reject-btn');
-                    
-                    if (avatar) avatar.textContent = getEmojiForUser(sd);
-                    if (name) name.textContent = sd.name || 'مستخدم';
-                    if (idText) idText.textContent = sd.shareableId || '';
-                    
-                    if (acceptBtn) acceptBtn.onclick = () => acceptFriendRequest(r.id, r.from);
-                    if (rejectBtn) rejectBtn.onclick = () => rejectFriendRequest(r.id);
-                    
-                    list.appendChild(clone);
-                }
-            } catch (e) {
-                console.warn('خطأ في تحميل طلب:', e);
-            }
-        }
-        
-        requestsLoaded = true;
-        
-        if (list.children.length === 0) {
-            list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3><p>لم يرسل لك أحد طلب صداقة بعد</p></div>`;
-        }
-        
-    } catch (e) { 
-        console.error('خطأ في loadFriendRequests:', e);
-        list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>خطأ</h3><p>حاول تحديث الصفحة</p></div>`; 
-        requestsLoaded = true;
-    }
-}
-
-function refreshRequests() {
-    requestsLoaded = false;
-    loadFriendRequests(true);
-}
-
-// ==================== القسم 7: قبول طلب صداقة ====================
-window.acceptFriendRequest = async function(requestId, senderId) {
-    if (!window.auth?.currentUser) return;
-    try {
-        const uid = window.auth.currentUser.uid;
-        await window.db.collection('friendRequests').doc(requestId).update({ status: 'accepted', respondedAt: new Date() });
-        await window.db.collection('users').doc(uid).update({ friends: FieldValue.arrayUnion(senderId) });
-        await window.db.collection('users').doc(senderId).update({ friends: FieldValue.arrayUnion(uid) });
-        document.getElementById(`request-${requestId}`)?.remove();
-        await updateFriendRequestsCount(); 
-        await updateFriendsCount();
-        refreshFriends();
-        refreshRequests();
-        if (!document.querySelectorAll('[id^="request-"]').length) {
-            document.getElementById('friendRequestsList').innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3></div>`;
-            requestsLoaded = true;
-        }
-    } catch (e) { 
-        alert('حدث خطأ'); 
-    }
-};
-
-// ==================== القسم 8: رفض طلب صداقة ====================
-window.rejectFriendRequest = async function(requestId) {
-    if (!window.auth?.currentUser) return;
-    try { 
-        await window.db.collection('friendRequests').doc(requestId).update({ status: 'rejected', respondedAt: new Date() }); 
-        document.getElementById(`request-${requestId}`)?.remove(); 
-        await updateFriendRequestsCount(); 
-        refreshRequests();
-        if (!document.querySelectorAll('[id^="request-"]').length) {
-            document.getElementById('friendRequestsList').innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد طلبات</h3></div>`;
-            requestsLoaded = true;
-        }
-    } catch (e) {}
-};
-
-// ==================== القسم 9: تحديث عدد طلبات الصداقة ====================
-async function updateFriendRequestsCount() {
-    if (!window.auth?.currentUser) return;
-    try { 
-        const s = await window.db.collection('friendRequests')
-            .where('to', '==', window.auth.currentUser.uid)
-            .where('status', '==', 'pending')
-            .get(); 
-        const c = document.getElementById('friendRequestsCount'); 
-        if (c) c.textContent = formatNumber(s.size); 
-    } catch (e) {}
-}
-
-// ==================== القسم 10: إضافة صديق جديد ====================
+// ==================== القسم 5: إضافة صديق جديد (معدل - يضيف طلب في الدردشة) ====================
 window.addNewFriend = async function(targetUserId) {
     if (!window.auth?.currentUser) return;
     const uid = window.auth.currentUser.uid;
@@ -280,12 +137,16 @@ window.addNewFriend = async function(targetUserId) {
             alert('صديقك بالفعل'); 
             return; 
         }
+        
+        // إرسال طلب الصداقة
         await window.db.collection('friendRequests').add({ 
             from: uid, 
             to: targetUserId, 
             status: 'pending', 
-            timestamp: new Date() 
+            timestamp: new Date(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 ساعة
         });
+        
         const rc = document.getElementById('searchResultsContainer'); 
         if (rc) { 
             rc.style.display = 'none'; 
@@ -293,29 +154,129 @@ window.addNewFriend = async function(targetUserId) {
         }
         const si = document.getElementById('searchInput'); 
         if (si) si.value = '';
+        
         alert('تم إرسال طلب الصداقة');
+        
+        // تحديث قائمة الدردشة لإظهار الطلب للمستقبل
+        if (typeof loadChats === 'function') {
+            chatsLoaded = false;
+            loadChats(true);
+        }
+        
     } catch (e) { 
         alert('حدث خطأ'); 
     }
 };
 
-// ==================== القسم 11: مستمع طلبات الصداقة ====================
-function setupFriendRequestsListener(userId) {
+// ==================== القسم 6: قبول طلب صداقة (من الدردشة) ====================
+window.acceptFriendRequest = async function(requestId, senderId) {
+    if (!window.auth?.currentUser) return;
+    try {
+        const uid = window.auth.currentUser.uid;
+        await window.db.collection('friendRequests').doc(requestId).update({ 
+            status: 'accepted', 
+            respondedAt: new Date() 
+        });
+        await window.db.collection('users').doc(uid).update({ 
+            friends: FieldValue.arrayUnion(senderId) 
+        });
+        await window.db.collection('users').doc(senderId).update({ 
+            friends: FieldValue.arrayUnion(uid) 
+        });
+        
+        await updateFriendsCount();
+        refreshFriends();
+        
+        // تحديث قائمة الدردشة
+        if (typeof loadChats === 'function') {
+            chatsLoaded = false;
+            loadChats(true);
+        }
+        
+        alert('تم قبول طلب الصداقة بنجاح');
+        
+    } catch (e) { 
+        console.error('خطأ في قبول الطلب:', e);
+        alert('حدث خطأ'); 
+    }
+};
+
+// ==================== القسم 7: رفض طلب صداقة (من الدردشة) ====================
+window.rejectFriendRequest = async function(requestId) {
+    if (!window.auth?.currentUser) return;
     try { 
+        await window.db.collection('friendRequests').doc(requestId).update({ 
+            status: 'rejected', 
+            respondedAt: new Date() 
+        }); 
+        
+        // تحديث قائمة الدردشة
+        if (typeof loadChats === 'function') {
+            chatsLoaded = false;
+            loadChats(true);
+        }
+        
+    } catch (e) {
+        console.error('خطأ في رفض الطلب:', e);
+    }
+};
+
+// ==================== القسم 8: مستمع طلبات الصداقة (يعمل في الخلفية ويحدث الدردشة) ====================
+function setupFriendRequestsListener(userId) {
+    if (!userId) return;
+    
+    try { 
+        // استماع للطلبات الواردة (المستخدم هو المستقبل)
         window.db.collection('friendRequests')
             .where('to', '==', userId)
             .where('status', '==', 'pending')
-            .onSnapshot(s => { 
-                const c = document.getElementById('friendRequestsCount'); 
-                if (c) c.textContent = formatNumber(s.size); 
-                if (document.getElementById('friendRequestsPage')?.style.display === 'block') {
-                    refreshRequests();
+            .onSnapshot(snapshot => {
+                // تحديث قائمة الدردشة عند وجود تغيير في الطلبات
+                if (typeof loadChats === 'function') {
+                    chatsLoaded = false;
+                    loadChats(true);
                 }
-            }); 
-    } catch (e) {}
+                
+                console.log(`📬 تحديث طلبات الصداقة: ${snapshot.size} طلب معلق`);
+            }, error => {
+                console.warn('خطأ في مستمع طلبات الصداقة:', error);
+            });
+            
+    } catch (e) {
+        console.warn('خطأ في setupFriendRequestsListener:', e);
+    }
 }
 
-// ==================== القسم 12: البحث عن مستخدم (معدل - أيقونات فقط) ====================
+// ==================== القسم 9: تحميل طلبات الصداقة لعرضها في قائمة الدردشة ====================
+async function loadFriendRequestsForChat() {
+    if (!window.auth?.currentUser) return [];
+    
+    try {
+        const snapshot = await window.db.collection('friendRequests')
+            .where('to', '==', window.auth.currentUser.uid)
+            .where('status', '==', 'pending')
+            .get();
+        
+        const requests = [];
+        snapshot.forEach(doc => {
+            requests.push({ 
+                id: doc.id, 
+                ...doc.data() 
+            });
+        });
+        
+        // ترتيب حسب الأحدث
+        requests.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+        
+        return requests;
+        
+    } catch (e) {
+        console.warn('خطأ في تحميل طلبات الصداقة:', e);
+        return [];
+    }
+}
+
+// ==================== القسم 10: البحث عن مستخدم ====================
 window.findUserById = async function() {
     const inp = document.getElementById('searchInput');
     const rc = document.getElementById('searchResultsContainer');
@@ -341,7 +302,6 @@ window.findUserById = async function() {
         const s = await window.db.collection('users').where('shareableId', '==', q).get();
         
         if (s.empty) { 
-            // ✅ تعديل الرسالة هنا (بدون علامة 🔍)
             rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">لا يوجد مستخدم ID</div>`; 
             return; 
         }
@@ -350,7 +310,7 @@ window.findUserById = async function() {
         const uid = s.docs[0].id;
         const cu = window.auth?.currentUser;
         
-        // ✅ حساب شخصي: اسم + صورة + ID (بدون زر)
+        // حساب شخصي
         if (cu && uid === cu.uid) {
             const clone = template.content.cloneNode(true);
             const resultItem = clone.querySelector('.search-result-item');
@@ -383,7 +343,7 @@ window.findUserById = async function() {
             return;
         }
         
-        // ✅ تحديد حالة العلاقة مع المستخدم (للمستخدمين الآخرين)
+        // تحديد حالة العلاقة
         let btnIcon = '';
         let btnDisabled = false;
         let btnStyle = '';
@@ -460,7 +420,7 @@ window.findUserById = async function() {
     }
 };
 
-// ==================== القسم 13: إخفاء نتائج البحث ====================
+// ==================== القسم 11: إخفاء نتائج البحث ====================
 window.hideSearchResults = function() { 
     const rc = document.getElementById('searchResultsContainer'); 
     const inp = document.getElementById('searchInput');
@@ -472,3 +432,21 @@ window.hideSearchResults = function() {
         inp.value = '';
     }
 };
+
+// ==================== القسم 12: دوال مساعدة عامة ====================
+window.getEmojiForUser = function(userData) {
+    const emojiMap = { 
+        'male': '👨', 
+        'female': '👩', 
+        'boy': '🧒', 
+        'girl': '👧', 
+        'father': '👨‍🦳', 
+        'mother': '👩‍🦳', 
+        'grandfather': '👴', 
+        'grandmother': '👵' 
+    };
+    return emojiMap[userData?.avatarType] || '👤';
+};
+
+// تصدير الدوال العامة
+window.loadFriendRequestsForChat = loadFriendRequestsForChat;
