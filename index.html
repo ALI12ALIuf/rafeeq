@@ -245,27 +245,27 @@
         </div>
     </template>
     
-    <!-- ✅ قالب طلب الصداقة (نفس الشكل القديم ولكن داخل المحادثات) -->
+    <!-- ✅ قالب طلب الصداقة (نفس الشكل الأصلي تماماً) -->
 <template id="friendRequestChatTemplate">
-    <div class="chat-item friend-request-item" style="border-right: 3px solid #FFC107; background: rgba(255, 193, 7, 0.06);">
-        <div class="chat-avatar-emoji friend-request-avatar" style="background: #FFC107; color: #1a1a1a;">👤</div>
+    <div class="chat-item friend-request-item">
+        <div class="chat-avatar-emoji friend-request-avatar">👤</div>
         <div class="chat-info">
-            <h4 class="friend-request-name" style="color: var(--text); font-weight: 600;"></h4>
-            <p class="friend-request-message" style="color: var(--text-light); font-size: 0.75rem;">
+            <h4 class="friend-request-name"></h4>
+            <p class="friend-request-message">
                 <i class="fas fa-user-plus" style="color: #FFC107;"></i> يريد إضافتك كصديق
             </p>
-            <div class="friend-request-actions" style="display: flex; gap: 8px; margin-top: 4px;">
-                <button class="friend-request-accept" style="background: var(--success); color: white; border: none; padding: 4px 16px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+            <div class="friend-request-actions">
+                <button class="friend-request-accept">
                     <i class="fas fa-check"></i> قبول
                 </button>
-                <button class="friend-request-reject" style="background: var(--danger); color: white; border: none; padding: 4px 16px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                <button class="friend-request-reject">
                     <i class="fas fa-times"></i> رفض
                 </button>
             </div>
-            <span class="friend-request-time" style="font-size: 0.6rem; color: var(--text-light); opacity: 0.6; display: block; margin-top: 2px;"></span>
+            <span class="friend-request-time"></span>
         </div>
         <div class="chat-meta">
-            <span class="chat-time" style="color: #FFC107;">طلب</span>
+            <span class="chat-time">طلب</span>
         </div>
     </div>
 </template>
