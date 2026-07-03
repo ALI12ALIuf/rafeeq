@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة المعدلة (مع دوال إغلاق المعاينات) ==========
+// ========== ui-functions.js - النسخة المعدلة (مع دوال إغلاق المعاينات + طلبات الصداقة في المحادثات) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -19,7 +19,7 @@ function clearStack() {
     window._pageStack = [];
 }
 
-// ==================== القسم 2: تحميل المحادثات (معدل - استخدام القالب الثابت) ====================
+// ==================== القسم 2: تحميل المحادثات (معدل - إضافة طلبات الصداقة في الأعلى) ====================
 let chatsLoaded = false;
 
 async function loadChats(force = false) { 
@@ -32,20 +32,75 @@ async function loadChats(force = false) {
         return;
     }
     
-    const template = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
-    if (!template) {
+    const chatTemplate = document.getElementById('chatItemTemplate');
+    const requestTemplate = document.getElementById('friendRequestChatTemplate');
+    
+    if (!chatTemplate) {
         console.warn('⚠️ قالب chatItemTemplate غير موجود');
         return;
     }
     
     try { 
-        const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); 
+        const uid = window.auth.currentUser.uid;
+        const udoc = await window.db.collection('users').doc(uid).get(); 
         if (!udoc.exists) return; 
         const friends = udoc.data().friends || []; 
         
         list.innerHTML = '';
         
-        if (!friends.length) { 
+        // ========== 1. جلب طلبات الصداقة الواردة (تظهر في الأعلى) ==========
+        const requestsSnapshot = await window.db.collection('friendRequests')
+            .where('to', '==', uid)
+            .where('status', '==', 'pending')
+            .get();
+        
+        let requestItems = [];
+        for (const doc of requestsSnapshot.docs) {
+            const reqData = doc.data();
+            const senderDoc = await window.db.collection('users').doc(reqData.from).get();
+            if (senderDoc.exists) {
+                const sender = senderDoc.data();
+                const time = reqData.timestamp?.toDate ? reqData.timestamp.toDate() : new Date();
+                const timeStr = time.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+                
+                if (requestTemplate) {
+                    const clone = requestTemplate.content.cloneNode(true);
+                    const item = clone.querySelector('.chat-item');
+                    
+                    const avatar = item.querySelector('.friend-request-avatar');
+                    const name = item.querySelector('.friend-request-name');
+                    const timeEl = item.querySelector('.friend-request-time');
+                    const acceptBtn = item.querySelector('.friend-request-accept');
+                    const rejectBtn = item.querySelector('.friend-request-reject');
+                    
+                    if (avatar) avatar.textContent = window.getEmojiForUser(sender);
+                    if (name) name.textContent = sender.name || 'مستخدم';
+                    if (timeEl) timeEl.textContent = `🕒 ${timeStr}`;
+                    
+                    if (acceptBtn) {
+                        acceptBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            acceptFriendRequest(doc.id, reqData.from);
+                        };
+                    }
+                    
+                    if (rejectBtn) {
+                        rejectBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            rejectFriendRequest(doc.id);
+                        };
+                    }
+                    
+                    requestItems.push(clone);
+                }
+            }
+        }
+        
+        // إضافة الطلبات في البداية
+        requestItems.forEach(clone => list.appendChild(clone));
+        
+        // ========== 2. جلب المحادثات العادية (الأصدقاء) ==========
+        if (!friends.length && requestItems.length === 0) { 
             list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
             chatsLoaded = true;
             return; 
@@ -72,7 +127,7 @@ async function loadChats(force = false) {
                         } 
                     } catch (e) {} 
                     
-                    const clone = template.content.cloneNode(true);
+                    const clone = chatTemplate.content.cloneNode(true);
                     const chatItem = clone.querySelector('.chat-item');
                     
                     const avatar = chatItem.querySelector('.chat-avatar-emoji');
@@ -611,12 +666,7 @@ window.showFriendsList = () => {
     document.getElementById('friendsPage').style.display = 'block';
 };
 
-window.showFriendRequests = () => {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('friendRequestsPage').style.display = 'block';
-};
+// ==================== تم إزالة showFriendRequests (نقلت طلبات الصداقة إلى المحادثات) ====================
 
 // ==================== القسم 12: الرجوع من صفحة فرعية ====================
 window.goBack = () => {
