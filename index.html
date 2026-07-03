@@ -356,9 +356,9 @@
     </div>
 </div>
 
-<!-- 4.4: معاينة الصورة (بدون زر تحميل) -->
+<!-- 4.4: معاينة الصورة -->
 <div id="imagePreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10050;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-x pan-y;">
-    <div class="modal-frame" style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10051;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10051;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;border-radius:16px;">
         <img id="previewImage" style="max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.1s;touch-action:none;cursor:default;">
     </div>
@@ -366,44 +366,27 @@
         <button onclick="closeImagePreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
             <i class="fas fa-arrow-right"></i>
         </button>
-        <a id="imgPreviewSaveBtn" class="modal-save-btn pulse-green" href="#" download="صورة.jpg" title="اضغط مطولاً للحفظ" onclick="return false;" oncontextmenu="event.stopPropagation();"><i class="fas fa-hand-pointer"></i></a>
+        <button onclick="downloadPreviewImage()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-download"></i>
+        </button>
     </div>
 </div>
 
-<!-- 4.5: معاينة الفيديو (بدون زر تحميل) -->
+<!-- 4.5: معاينة الفيديو -->
 <div id="videoPreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10060;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
-    <div class="modal-frame" style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10061;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10061;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;flex-direction:column;background:#000;border-radius:16px;overflow:hidden;">
-        <!-- منطقة الفيديو -->
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;position:relative;">
-            <video id="previewVideo" style="max-width:100%;max-height:100%;object-fit:contain;" playsinline></video>
-            <!-- overlay تشغيل/إيقاف -->
-            <div id="vidModalOverlay" onclick="window._vidModalToggle()" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-                <div id="vidModalPlayIcon" style="width:56px;height:56px;border-radius:50%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:white;">
-                    <i class="fas fa-play"></i>
-                </div>
-            </div>
-        </div>
-        <!-- شريط التحكم المخصص -->
-        <div style="padding:8px 14px 10px;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;gap:6px;">
-            <input id="vidModalProgress" type="range" min="0" max="100" value="0"
-                style="width:100%;height:3px;cursor:pointer;outline:none;border:none;border-radius:2px;background:rgba(255,255,255,0.2);accent-color:#4CAF50;"
-                oninput="window._vidModalSeek(this.value)" onclick="event.stopPropagation()">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <button onclick="window._vidModalToggle()" id="vidModalPlayBtn"
-                    style="width:32px;height:32px;border-radius:50%;border:1.5px solid #4CAF50;background:transparent;color:#4CAF50;display:flex;align-items:center;justify-content:center;font-size:0.8rem;cursor:pointer;flex-shrink:0;">
-                    <i class="fas fa-play"></i>
-                </button>
-                <span id="vidModalTime" style="font-size:0.68rem;color:#ccc;white-space:nowrap;min-width:80px;">0:00 / 0:00</span>
-            </div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;">
+            <video id="previewVideo" style="max-width:100%;max-height:100%;object-fit:contain;" controls playsinline></video>
         </div>
     </div>
-    <!-- أزرار أعلى -->
     <div style="position:absolute;top:30px;left:0;right:0;display:flex;justify-content:space-between;padding:0 35px;pointer-events:none;z-index:10062;">
         <button onclick="closeVideoPreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
             <i class="fas fa-arrow-right"></i>
         </button>
-        <a id="vidPreviewSaveBtn" class="modal-save-btn pulse-green" href="#" download="فيديو.mp4" title="اضغط مطولاً للحفظ" onclick="return false;" oncontextmenu="event.stopPropagation();"><i class="fas fa-hand-pointer"></i></a>
+        <button onclick="downloadPreviewVideo()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-download"></i>
+        </button>
     </div>
 </div>
 
@@ -519,14 +502,16 @@
     </div>
 </template>
 
-<!-- 5.4: قالب الملف (بدون زر تحميل) -->
+<!-- 5.4: قالب الملف -->
 <template id="fileMessageTemplate">
     <div class="message-content file-card">
         <div class="file-icon">📄</div>
         <div class="file-info">
             <div class="file-name"></div>
         </div>
-        <!-- تم إزالة زر التحميل نهائياً -->
+        <button class="download-file-btn">
+            <i class="fas fa-download"></i>
+        </button>
     </div>
 </template>
 
@@ -537,7 +522,7 @@
     </div>
 </template>
 
-<!-- ✅ 5.6: قالب الرسالة النصية (جديد) -->
+<!-- 5.6: قالب الرسالة النصية -->
 <template id="textMessageTemplate">
     <div class="message-content" style="border: 1.5px solid var(--border-color); background: var(--bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;">
         <span style="font-size: 1rem; line-height: 1.4; display: block;"></span>
@@ -648,7 +633,22 @@ window.addEventListener('load', function() {
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
 </script>
 
-<!-- ==================== القسم 10: أداة التشخيص ==================== -->
+<!-- ==================== القسم 10: تسجيل Service Worker ==================== -->
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/js/sw.js', {
+                scope: '/'
+            }).then((registration) => {
+                console.log('✅ Service Worker مسجل بنجاح');
+            }).catch((error) => {
+                console.warn('⚠️ فشل تسجيل SW:', error);
+            });
+        });
+    }
+</script>
+
+<!-- ==================== القسم 11: أداة التشخيص ==================== -->
 <script>
 (function advancedDiagnosticTool() {
     const panel = document.createElement('div');
