@@ -63,14 +63,30 @@ if (requestTemplate) {
             const avatar = requestItem.querySelector('.chat-avatar-emoji');
             const nameSpan = requestItem.querySelector('.friend-request-name');
             const idSpan = requestItem.querySelector('.friend-request-id');
+            const copyBtn = requestItem.querySelector('.copy-id-btn');
             const acceptBtn = requestItem.querySelector('.accept-friend-btn');
             const rejectBtn = requestItem.querySelector('.reject-friend-btn');
             
             if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '👤';
             if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
-            if (idSpan) {
-                // عرض الـ ID فقط (كلمة ID مضمنة في القالب)
-                idSpan.textContent = sender.shareableId || '0000000000';
+            if (idSpan) idSpan.textContent = sender.shareableId || '0000000000';
+            
+            // زر نسخ الـ ID
+            if (copyBtn) {
+                copyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const id = sender.shareableId || '0000000000';
+                    navigator.clipboard.writeText(id).then(() => {
+                        // تغيير مؤقت للأيقونة
+                        const icon = copyBtn.querySelector('i');
+                        if (icon) {
+                            icon.className = 'fas fa-check';
+                            setTimeout(() => {
+                                icon.className = 'fas fa-copy';
+                            }, 1500);
+                        }
+                    }).catch(() => {});
+                };
             }
             
             if (acceptBtn) {
