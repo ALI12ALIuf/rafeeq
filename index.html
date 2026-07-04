@@ -67,9 +67,9 @@
 <div class="page chat-page">
     <div class="search-container">
         <div class="search-box">
-            <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
-            <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" oninput="toggleClearButton()" autocomplete="off">
-            <i class="fas fa-times" id="clearSearchBtn" style="cursor: pointer; color: #ffffff; font-size: 1rem; display: none; margin-right: 8px; transition: all 0.2s; padding: 4px; border-radius: 50%;" onclick="clearSearch()"></i>
+            <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer; flex-shrink: 0;"></i>
+            <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" oninput="toggleClearButton()" autocomplete="off" style="flex: 1; min-width: 0; background: none; border: none; color: var(--text); font-size: 0.9rem; outline: none; padding: 4px 0; width: 100%; box-sizing: border-box;">
+            <i class="fas fa-times" id="clearSearchBtn" style="flex-shrink: 0; cursor: pointer; color: #ffffff; font-size: 1rem; display: none; margin-right: 4px; padding: 4px; border-radius: 50%; transition: all 0.2s; background: transparent; width: 28px; height: 28px; align-items: center; justify-content: center;" onclick="clearSearch()"></i>
         </div>
         <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
         
@@ -112,27 +112,27 @@
                     <span class="friend-request-name"></span>
                 </h4>
                 <p style="margin: 2px 0 0; color: var(--text-light); font-size: 0.75rem; display: flex; align-items: center; gap: 4px; justify-content: flex-start;">
-                        <button class="copy-id-btn" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.7rem; display: inline-flex; align-items: center; justify-content: center; padding: 2px; transition: all 0.2s; flex-shrink: 0;" title="نسخ ID">
-                            <i class="fas fa-copy" style="font-size: 0.7rem;"></i>
-                        </button>
-                        <span class="friend-request-id" style="font-size: 0.75rem; font-family: monospace; direction: ltr;"></span>
-                        <span style="color: var(--primary); font-weight: 700; font-size: 0.85rem; font-family: sans-serif;">ID</span>
-                    </p>
-                </div>
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0;">
-                    <span style="font-size: 0.6rem; color: #fff; background: var(--primary); padding: 2px 10px; border-radius: 10px; font-weight: 500; white-space: nowrap;">طلب</span>
-                    <div class="friend-request-actions" style="display: flex; gap: 4px;">
-                        <button class="accept-friend-btn" style="background: #4CAF50; border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
-                            <i class="fas fa-check"></i>
-                        </button>
-                        <button class="reject-friend-btn" style="background: #f44336; border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
+                    <button class="copy-id-btn" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.7rem; display: inline-flex; align-items: center; justify-content: center; padding: 2px; transition: all 0.2s; flex-shrink: 0;" title="نسخ ID">
+                        <i class="fas fa-copy" style="font-size: 0.7rem;"></i>
+                    </button>
+                    <span class="friend-request-id" style="font-size: 0.75rem; font-family: monospace; direction: ltr;"></span>
+                    <span style="color: var(--primary); font-weight: 700; font-size: 0.85rem; font-family: sans-serif;">ID</span>
+                </p>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0;">
+                <span style="font-size: 0.6rem; color: #fff; background: var(--primary); padding: 2px 10px; border-radius: 10px; font-weight: 500; white-space: nowrap;">طلب</span>
+                <div class="friend-request-actions" style="display: flex; gap: 4px;">
+                    <button class="accept-friend-btn" style="background: #4CAF50; border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                        <i class="fas fa-check"></i>
+                    </button>
+                    <button class="reject-friend-btn" style="background: #f44336; border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
             </div>
-        </template>
-    </div>
+        </div>
+    </template>
+</div>
       
 
         <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
