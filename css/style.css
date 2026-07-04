@@ -1286,3 +1286,64 @@ input:checked + .toggle-slider:before {
     }
 }
 
+/* ==================== القسم 22: إصلاح حقل البحث ==================== */
+.search-box {
+    display: flex;
+    align-items: center;
+    background: var(--light);
+    border-radius: 25px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.search-box i.fa-search {
+    flex-shrink: 0;
+    color: var(--text-light);
+}
+
+#searchInput {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 0.9rem;
+    outline: none;
+    padding: 4px 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#searchInput::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#clearSearchBtn {
+    flex-shrink: 0;
+    cursor: pointer;
+    color: #ffffff;
+    font-size: 1rem;
+    margin-right: 4px;
+    padding: 4px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    background: transparent;
+    width: 28px;
+    height: 28px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+#clearSearchBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#clearSearchBtn.visible {
+    display: flex !important;
+}
+
