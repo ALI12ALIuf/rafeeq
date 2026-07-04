@@ -323,9 +323,38 @@ window.findUserById = async function() {
             }
             if (idText) {
                 const shareableId = u.shareableId || '';
-                idText.innerHTML = `${shareableId} <span style="color: var(--primary); font-weight: 600; font-size: 0.75rem; font-family: sans-serif;">ID</span>`;
-                idText.style.direction = 'ltr';
-                idText.style.textAlign = 'left';
+                idText.innerHTML = `
+                    <button class="copy-id-btn" style="background:transparent;border:none;color:var(--primary);cursor:pointer;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;padding:2px;transition:all 0.2s;flex-shrink:0;" title="نسخ ID">
+                        <i class="fas fa-copy" style="font-size:0.7rem;"></i>
+                    </button>
+                    <span style="font-size:0.75rem;font-family:monospace;direction:ltr;">${shareableId}</span>
+                    <span style="color:var(--primary);font-weight:700;font-size:0.85rem;font-family:sans-serif;">ID</span>
+                `;
+                idText.style.display = 'flex';
+                idText.style.alignItems = 'center';
+                idText.style.gap = '4px';
+                idText.style.justifyContent = 'flex-start';
+                idText.style.margin = '2px 0 0';
+                idText.style.color = 'var(--text-light)';
+                idText.style.fontSize = '0.75rem';
+                
+                // زر نسخ الـ ID
+                const copyBtn = idText.querySelector('.copy-id-btn');
+                if (copyBtn) {
+                    copyBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const id = shareableId || '0000000000';
+                        navigator.clipboard.writeText(id).then(() => {
+                            const icon = copyBtn.querySelector('i');
+                            if (icon) {
+                                icon.className = 'fas fa-check';
+                                setTimeout(() => {
+                                    icon.className = 'fas fa-copy';
+                                }, 1500);
+                            }
+                        }).catch(() => {});
+                    };
+                }
             }
             
             if (actionBtn) {
@@ -383,7 +412,7 @@ window.findUserById = async function() {
                     
                     if (!receivedRequests.empty) {
                         btnIcon = 'fa-check';
-                        btnText = 'قبول';
+                        btnText = '';
                         btnDisabled = false;
                         btnStyle = 'background:#4CAF50;color:white;';
                         btnAction = () => {
@@ -405,7 +434,7 @@ window.findUserById = async function() {
             } 
         } else {
             btnIcon = 'fa-lock';
-            btnText = 'تسجيل الدخول';
+            btnText = '';
             btnDisabled = true;
             btnStyle = 'background:#555;color:#888;cursor:not-allowed;';
             btnAction = null;
@@ -423,9 +452,37 @@ window.findUserById = async function() {
         if (name) name.textContent = u.name || 'مستخدم';
         if (idText) {
             const shareableId = u.shareableId || '';
-            idText.innerHTML = `${shareableId} <span style="color: var(--primary); font-weight: 600; font-size: 0.75rem; font-family: sans-serif;">ID</span>`;
-            idText.style.direction = 'ltr';
-            idText.style.textAlign = 'left';
+            idText.innerHTML = `
+                <button class="copy-id-btn" style="background:transparent;border:none;color:var(--primary);cursor:pointer;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;padding:2px;transition:all 0.2s;flex-shrink:0;" title="نسخ ID">
+                    <i class="fas fa-copy" style="font-size:0.7rem;"></i>
+                </button>
+                <span style="font-size:0.75rem;font-family:monospace;direction:ltr;">${shareableId}</span>
+                <span style="color:var(--primary);font-weight:700;font-size:0.85rem;font-family:sans-serif;">ID</span>
+            `;
+            idText.style.display = 'flex';
+            idText.style.alignItems = 'center';
+            idText.style.gap = '4px';
+            idText.style.justifyContent = 'flex-start';
+            idText.style.margin = '2px 0 0';
+            idText.style.color = 'var(--text-light)';
+            idText.style.fontSize = '0.75rem';
+            
+            const copyBtn = idText.querySelector('.copy-id-btn');
+            if (copyBtn) {
+                copyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const id = shareableId || '0000000000';
+                    navigator.clipboard.writeText(id).then(() => {
+                        const icon = copyBtn.querySelector('i');
+                        if (icon) {
+                            icon.className = 'fas fa-check';
+                            setTimeout(() => {
+                                icon.className = 'fas fa-copy';
+                            }, 1500);
+                        }
+                    }).catch(() => {});
+                };
+            }
         }
         
         if (actionBtn) {
