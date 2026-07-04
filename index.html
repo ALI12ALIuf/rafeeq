@@ -66,11 +66,11 @@
         <!-- ===== القسم 2.2.2: صفحة الدردشة (Chat) ===== -->
 <div class="page chat-page">
     <div class="search-container">
-        <div class="search-box" style="display:flex;align-items:center;gap:8px;background:var(--light);border-radius:25px;padding:0.5rem 1rem;margin-bottom:1rem;border:1px solid var(--border);">
-            <i class="fas fa-search" onclick="performSearch()" style="cursor:pointer;color:var(--text-light);font-size:1rem;"></i>
-            <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" style="flex:1;background:transparent;border:none;color:var(--text);font-size:0.9rem;outline:none;padding:4px 0;">
-            <button id="clearSearchBtn" onclick="clearSearch()" style="background:transparent;border:none;color:var(--text-light);cursor:pointer;font-size:1rem;display:none;padding:2px 6px;transition:all 0.2s;border-radius:50%;">
-                <i class="fas fa-times"></i>
+        <div class="search-box" style="display:flex;align-items:center;gap:6px;background:var(--light);border-radius:25px;padding:0.5rem 1rem;margin-bottom:1rem;border:1px solid var(--border);">
+            <i class="fas fa-search" onclick="performSearch()" style="cursor:pointer;color:var(--text-light);font-size:1rem;flex-shrink:0;"></i>
+            <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" style="flex:1;background:transparent;border:none;color:var(--text);font-size:0.9rem;outline:none;padding:4px 0;min-width:0;width:100%;">
+            <button id="clearSearchBtn" onclick="clearSearch()" style="background:transparent;border:none;color:var(--text-light);cursor:pointer;font-size:0.8rem;display:none;padding:0;width:20px;height:20px;flex-shrink:0;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;">
+                <i class="fas fa-times" style="font-size:0.7rem;"></i>
             </button>
         </div>
         <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
@@ -136,7 +136,6 @@
     </template>
 </div>
       
-
         <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
             
