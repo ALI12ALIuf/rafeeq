@@ -68,7 +68,10 @@ if (requestTemplate) {
             
             if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '👤';
             if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
-            if (idSpan) idSpan.textContent = sender.shareableId || '0000000000';
+            if (idSpan) {
+                // عرض الـ ID فقط (كلمة ID مضمنة في القالب)
+                idSpan.textContent = sender.shareableId || '0000000000';
+            }
             
             if (acceptBtn) {
                 acceptBtn.onclick = (e) => {
