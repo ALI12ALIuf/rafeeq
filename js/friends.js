@@ -114,7 +114,7 @@ async function updateFriendsCount() {
     } catch (e) {}
 }
 
-// ==================== القسم 5: إضافة صديق جديد (معدل - يضيف طلب في الدردشة) ====================
+// ==================== القسم 5: إضافة صديق جديد ====================
 window.addNewFriend = async function(targetUserId) {
     if (!window.auth?.currentUser) return;
     const uid = window.auth.currentUser.uid;
@@ -138,13 +138,12 @@ window.addNewFriend = async function(targetUserId) {
             return; 
         }
         
-        // إرسال طلب الصداقة
         await window.db.collection('friendRequests').add({ 
             from: uid, 
             to: targetUserId, 
             status: 'pending', 
             timestamp: new Date(),
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 ساعة
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
         });
         
         const rc = document.getElementById('searchResultsContainer'); 
@@ -157,7 +156,6 @@ window.addNewFriend = async function(targetUserId) {
         
         alert('تم إرسال طلب الصداقة');
         
-        // تحديث قائمة الدردشة لإظهار الطلب للمستقبل
         if (typeof loadChats === 'function') {
             chatsLoaded = false;
             loadChats(true);
@@ -168,17 +166,15 @@ window.addNewFriend = async function(targetUserId) {
     }
 };
 
-// ==================== القسم 6: قبول طلب صداقة (من الدردشة) ====================
+// ==================== القسم 6: قبول طلب صداقة ====================
 window.acceptFriendRequest = async function(requestId, senderId) {
     if (!window.auth?.currentUser) return;
     try {
         const uid = window.auth.currentUser.uid;
         
-        // ✅ حذف الطلب نهائياً من السيرفر بعد القبول
         await window.db.collection('friendRequests').doc(requestId).delete();
         console.log('🗑️ تم حذف طلب الصداقة المقبول نهائياً:', requestId);
         
-        // إضافة المستخدمين كأصدقاء
         await window.db.collection('users').doc(uid).update({ 
             friends: FieldValue.arrayUnion(senderId) 
         });
@@ -189,7 +185,6 @@ window.acceptFriendRequest = async function(requestId, senderId) {
         await updateFriendsCount();
         refreshFriends();
         
-        // تحديث قائمة الدردشة
         if (typeof loadChats === 'function') {
             chatsLoaded = false;
             loadChats(true);
@@ -203,15 +198,13 @@ window.acceptFriendRequest = async function(requestId, senderId) {
     }
 };
 
-// ==================== القسم 7: رفض طلب صداقة (من الدردشة) ====================
+// ==================== القسم 7: رفض طلب صداقة ====================
 window.rejectFriendRequest = async function(requestId) {
     if (!window.auth?.currentUser) return;
     try { 
-        // ✅ حذف الطلب نهائياً من السيرفر بدلاً من تحديث الحالة
         await window.db.collection('friendRequests').doc(requestId).delete();
         console.log('🗑️ تم حذف طلب الصداقة المرفوض نهائياً:', requestId);
         
-        // تحديث قائمة الدردشة
         if (typeof loadChats === 'function') {
             chatsLoaded = false;
             loadChats(true);
@@ -222,20 +215,15 @@ window.rejectFriendRequest = async function(requestId) {
     }
 };
 
-// ==================== القسم 8: مستمع طلبات الصداقة (يعمل في الخلفية ويحدث الدردشة) ====================
+// ==================== القسم 8: مستمع طلبات الصداقة ====================
 function setupFriendRequestsListener(userId) {
     if (!userId) return;
     
-    // ✅ بدء التنظيف الدوري للطلبات المنتهية (لجميع المستخدمين)
-    startFriendRequestsCleanup();
-    
     try { 
-        // استماع للطلبات الواردة (المستخدم هو المستقبل)
         window.db.collection('friendRequests')
             .where('to', '==', userId)
             .where('status', '==', 'pending')
             .onSnapshot(snapshot => {
-                // تحديث قائمة الدردشة عند وجود تغيير في الطلبات
                 if (typeof loadChats === 'function') {
                     chatsLoaded = false;
                     loadChats(true);
@@ -262,7 +250,7 @@ async function loadFriendRequestsForChat() {
             .get();
         
         const requests = [];
-        const seenIds = new Set(); // ✅ منع التكرار من المصدر
+        const seenIds = new Set();
         
         snapshot.forEach(doc => {
             if (!seenIds.has(doc.id)) {
@@ -274,7 +262,6 @@ async function loadFriendRequestsForChat() {
             }
         });
         
-        // ترتيب حسب الأحدث
         requests.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
         
         return requests;
@@ -285,40 +272,7 @@ async function loadFriendRequestsForChat() {
     }
 }
 
-// ==================== القسم 10: تنظيف طلبات الصداقة المنتهية (لجميع المستخدمين) ====================
-async function cleanExpiredFriendRequests() {
-    try {
-        const now = new Date();
-        const snapshot = await window.db.collection('friendRequests')
-            .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
-            .get();
-        
-        let deletedCount = 0;
-        for (const doc of snapshot.docs) {
-            const data = doc.data();
-            await doc.ref.delete();
-            deletedCount++;
-            console.log(`🗑️ تم حذف طلب منتهي: from=${data.from}, to=${data.to}, id=${doc.id}`);
-        }
-        
-        if (deletedCount > 0) {
-            console.log(`🗑️ تم حذف ${deletedCount} طلب صداقة منتهي الصلاحية (لجميع المستخدمين)`);
-        }
-    } catch (e) {
-        console.warn('خطأ في تنظيف طلبات الصداقة المنتهية:', e);
-    }
-}
-
-// ✅ بدء التنظيف الدوري (كل 24 ساعة)
-function startFriendRequestsCleanup() {
-    // تنظيف فوري عند بدء التشغيل
-    cleanExpiredFriendRequests();
-    
-    // ثم كل 24 ساعة
-    setInterval(cleanExpiredFriendRequests, 24 * 60 * 60 * 1000); // 24 ساعة
-}
-
-// ==================== القسم 11: البحث عن مستخدم ====================
+// ==================== القسم 10: البحث عن مستخدم ====================
 window.findUserById = async function() {
     const inp = document.getElementById('searchInput');
     const rc = document.getElementById('searchResultsContainer');
@@ -352,7 +306,6 @@ window.findUserById = async function() {
         const uid = s.docs[0].id;
         const cu = window.auth?.currentUser;
         
-        // حساب شخصي
         if (cu && uid === cu.uid) {
             const clone = template.content.cloneNode(true);
             const resultItem = clone.querySelector('.search-result-item');
@@ -385,7 +338,6 @@ window.findUserById = async function() {
             return;
         }
         
-        // تحديد حالة العلاقة
         let btnIcon = '';
         let btnDisabled = false;
         let btnStyle = '';
@@ -462,7 +414,7 @@ window.findUserById = async function() {
     }
 };
 
-// ==================== القسم 12: إخفاء نتائج البحث ====================
+// ==================== القسم 11: إخفاء نتائج البحث ====================
 window.hideSearchResults = function() { 
     const rc = document.getElementById('searchResultsContainer'); 
     const inp = document.getElementById('searchInput');
@@ -475,7 +427,7 @@ window.hideSearchResults = function() {
     }
 };
 
-// ==================== القسم 13: دوال مساعدة عامة ====================
+// ==================== القسم 12: دوال مساعدة عامة ====================
 window.getEmojiForUser = function(userData) {
     const emojiMap = { 
         'male': '👨', 
@@ -490,5 +442,4 @@ window.getEmojiForUser = function(userData) {
     return emojiMap[userData?.avatarType] || '👤';
 };
 
-// تصدير الدوال العامة
 window.loadFriendRequestsForChat = loadFriendRequestsForChat;
