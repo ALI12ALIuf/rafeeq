@@ -834,3 +834,42 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => { 
     console.error('❌ خطأ غير معالج:', event.reason); 
 });
+
+
+// ==================== 17التحكم بزر مسح البحث ====================
+
+window.toggleClearButton = function() {
+    const input = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    if (input && clearBtn) {
+        if (input.value.length > 0) {
+            clearBtn.classList.add('show');
+        } else {
+            clearBtn.classList.remove('show');
+        }
+    }
+};
+
+window.clearSearch = function() {
+    const input = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    if (clearBtn) {
+        clearBtn.classList.remove('show');
+    }
+    if (typeof window.hideSearchResults === 'function') {
+        window.hideSearchResults();
+    }
+};
+
+// ✅ عند تحميل الصفحة، تأكد من إخفاء الزر
+document.addEventListener('DOMContentLoaded', function() {
+    const clearBtn = document.getElementById('clearSearchBtn');
+    if (clearBtn) {
+        clearBtn.classList.remove('show');
+    }
+});
+
