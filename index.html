@@ -134,92 +134,92 @@
 </div>
 
         <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
-        <div class="conversation-page" id="conversationPage" style="display: none;">
-            
-            <!-- ===== القسم 2.2.3.1: رأس المحادثة ===== -->
-            <div class="conversation-header">
-                <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
-                
-                <!-- ===== القسم 2.2.3.1.1: معلومات المستخدم ===== -->
-                <div class="conversation-user-info" style="gap:0;">
-                    <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
-                    <div class="conversation-user-details">
-                        <h3 id="conversationName" style="display:none;"></h3>
-                        <span class="conversation-status" id="conversationStatus" style="font-size:0.85rem;"></span>
-                    </div>
-                </div>
-                
-                <!-- ===== القسم 2.2.3.1.2: أزرار الاتصال والميزات ===== -->
-                <div class="call-buttons" style="display:flex;gap:12px;margin-right:auto;">
-                    <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة" style="display:none;">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                    
-                    <div id="featureToggleContainer" class="feature-toggle-container" style="display:none; align-items: center; gap: 8px;">
-                        <span class="feature-toggle-label" style="color: #f44336; font-size: 0.7rem;">○</span>
-                        <label class="feature-switch" id="featureSwitchLabel">
-                            <input type="checkbox" id="featureToggleInput">
-                            <span class="feature-slider" id="featureToggleSlider"></span>
-                        </label>
-                        <span class="feature-toggle-label" style="color: #4CAF50; font-size: 0.7rem;">●</span>
-                    </div>
-                    
-                    <button onclick="startAudioCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال صوت">
-                        <i class="fas fa-phone"></i>
-                    </button>
-                    <button onclick="startVideoCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;"fontle="اتصال فيديو">
-                        <i class="fas fa-video"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- ===== القسم 2.2.3.2: حاوية الرسائل ===== -->
-            <div class="messages-container" id="messagesContainer"></div>
-
-            <!-- ===== القسم 2.2.3.3: مدخل الرسائل ===== -->
-            <div class="message-input-container">
-                <div class="message-input-wrapper">
-                    <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
-                    <div class="input-area">
-                        <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()">
-                        
-                        <!-- ===== واجهة تسجيل البصمة ===== -->
-                        <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
-                            <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; position:relative; overflow:hidden;">
-                                <div id="voiceProgressFill" style="width:0%; height:100%; background:var(--primary); border-radius:2px; transition:width 0.3s;"></div>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-family:monospace; direction:ltr; min-width:100px; justify-content:center;">
-                                <span id="voiceCurrentTime" style="color:var(--primary); font-weight:bold;">0:00</span>
-                                <span id="voiceSeparator" style="color:var(--primary);">/</span>
-                                <span id="voiceMaxTime" style="color:var(--primary);">5:00</span>
-                            </div>
-                            <button id="voicePlayBtn" style="display:none; width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:var(--primary); cursor:pointer; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s;">
-                                <i class="fas fa-play"></i>
-                            </button>
-                            <button id="voiceCancelBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#ff4444; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
-                                <i class="fas fa-times"></i>
-                            </button>
-                            <button id="voiceSendBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:var(--primary); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
-                                <i class="fas fa-check"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <button id="actionBtn" class="voice-btn" onclick="handleActionButton()">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                </div>
-                
-                <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
-                <div class="attachment-menu" id="attachmentMenu" style="display: none;">
-                    <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
-                    <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
-                    <button class="attach-option" onclick="sendFile()"><i class="fas fa-file"></i> ملف</button>
-                    <button class="attach-option" onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
-                </div>
+<div class="conversation-page" id="conversationPage" style="display: none;">
+    
+    <!-- ===== القسم 2.2.3.1: رأس المحادثة ===== -->
+    <div class="conversation-header">
+        <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
+        
+        <!-- ===== القسم 2.2.3.1.1: معلومات المستخدم ===== -->
+        <div class="conversation-user-info" style="gap:0;">
+            <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
+            <div class="conversation-user-details">
+                <h3 id="conversationName" style="display:none;"></h3>
+                <span class="conversation-status" id="conversationStatus" style="font-size:0.85rem;"></span>
             </div>
         </div>
+        
+        <!-- ===== القسم 2.2.3.1.2: أزرار الاتصال والميزات ===== -->
+        <div class="call-buttons" style="display:flex;gap:12px;margin-right:auto;">
+            <button id="kickBtn" class="kick-btn" title="طرد المستخدم من المحادثة" style="display:none;">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+            
+            <div id="featureToggleContainer" class="feature-toggle-container" style="display:none; align-items: center; gap: 8px;">
+                <span class="feature-toggle-label" style="color: #f44336; font-size: 0.7rem;">○</span>
+                <label class="feature-switch" id="featureSwitchLabel">
+                    <input type="checkbox" id="featureToggleInput">
+                    <span class="feature-slider" id="featureToggleSlider"></span>
+                </label>
+                <span class="feature-toggle-label" style="color: #4CAF50; font-size: 0.7rem;">●</span>
+            </div>
+            
+            <button onclick="startAudioCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال صوت">
+                <i class="fas fa-phone"></i>
+            </button>
+            <button onclick="startVideoCall()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="اتصال فيديو">
+                <i class="fas fa-video"></i>
+            </button>
+        </div>
+    </div>
 
+    <!-- ===== القسم 2.2.3.2: حاوية الرسائل ===== -->
+    <div class="messages-container" id="messagesContainer"></div>
+
+    <!-- ===== القسم 2.2.3.3: مدخل الرسائل ===== -->
+    <div class="message-input-container">
+        <div class="message-input-wrapper">
+            <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
+            <div class="input-area">
+                <input type="text" id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()">
+                
+                <!-- ===== واجهة تسجيل البصمة ===== -->
+                <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
+                    <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; position:relative; overflow:hidden;">
+                        <div id="voiceProgressFill" style="width:0%; height:100%; background:var(--primary); border-radius:2px; transition:width 0.3s;"></div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-family:monospace; direction:ltr; min-width:100px; justify-content:center;">
+                        <span id="voiceCurrentTime" style="color:var(--primary); font-weight:bold;">0:00</span>
+                        <span id="voiceSeparator" style="color:var(--primary);">/</span>
+                        <span id="voiceMaxTime" style="color:var(--primary);">5:00</span>
+                    </div>
+                    <button id="voicePlayBtn" style="display:none; width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:var(--primary); cursor:pointer; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s;">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button id="voiceCancelBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#ff4444; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button id="voiceSendBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:var(--primary); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <button id="actionBtn" class="voice-btn" onclick="handleActionButton()">
+                <i class="fas fa-microphone"></i>
+            </button>
+        </div>
+        
+        <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
+        <div class="attachment-menu" id="attachmentMenu" style="display: none;">
+            <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
+            <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
+            <button class="attach-option" onclick="sendFile()"><i class="fas fa-file"></i> ملف</button>
+            <button class="attach-option" onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
+        </div>
+    </div>
+</div>
+        
         <!-- ===== القسم 2.2.4: صفحة الملف الشخصي (Profile) ===== -->
         <div class="page profile-page">
             <div class="profile-header">
