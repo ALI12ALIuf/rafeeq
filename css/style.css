@@ -1296,26 +1296,30 @@ input:checked + .toggle-slider:before {
     margin-bottom: 1rem;
     gap: 8px;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
     overflow: hidden;
+    flex-wrap: nowrap;
 }
 
 .search-box i.fa-search {
-    flex-shrink: 0;
+    flex: 0 0 auto;
     color: var(--text-light);
+    font-size: 1rem;
 }
 
 #searchInput {
-    flex: 1;
-    min-width: 0;
-    background: none;
-    border: none;
+    flex: 0 1 auto;
+    min-width: 60px;
+    max-width: 200px;
+    background: none !important;
+    border: none !important;
     color: var(--text);
     font-size: 0.9rem;
-    outline: none;
+    outline: none !important;
     padding: 4px 0;
-    width: 100%;
     box-sizing: border-box;
+    height: auto;
 }
 
 #searchInput::placeholder {
@@ -1323,11 +1327,10 @@ input:checked + .toggle-slider:before {
 }
 
 #clearSearchBtn {
-    flex-shrink: 0;
+    flex: 0 0 auto;
     cursor: pointer;
     color: #ffffff;
     font-size: 1rem;
-    margin-right: 4px;
     padding: 4px;
     border-radius: 50%;
     transition: all 0.2s ease;
@@ -1337,10 +1340,12 @@ input:checked + .toggle-slider:before {
     display: none;
     align-items: center;
     justify-content: center;
+    border: none;
+    outline: none;
 }
 
 #clearSearchBtn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.15);
 }
 
 #clearSearchBtn.visible {
