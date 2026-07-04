@@ -834,3 +834,45 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => { 
     console.error('❌ خطأ غير معالج:', event.reason); 
 });
+
+
+// ==================== القسم 17: التحكم بزر مسح البحث ====================
+
+// إظهار/إخفاء زر المسح عند الكتابة في حقل البحث
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    
+    if (searchInput && clearBtn) {
+        searchInput.addEventListener('input', function() {
+            if (this.value.trim().length > 0) {
+                clearBtn.style.display = 'flex';
+            } else {
+                clearBtn.style.display = 'none';
+            }
+        });
+    }
+});
+
+// دالة مسح النص من حقل البحث
+window.clearSearch = function() {
+    const searchInput = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    const resultsContainer = document.getElementById('searchResultsContainer');
+    
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+    }
+    
+    if (clearBtn) {
+        clearBtn.style.display = 'none';
+    }
+    
+    // إخفاء نتائج البحث
+    if (resultsContainer) {
+        resultsContainer.style.display = 'none';
+        resultsContainer.innerHTML = '';
+    }
+};
+
