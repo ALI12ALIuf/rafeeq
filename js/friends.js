@@ -173,10 +173,12 @@ window.acceptFriendRequest = async function(requestId, senderId) {
     if (!window.auth?.currentUser) return;
     try {
         const uid = window.auth.currentUser.uid;
-        await window.db.collection('friendRequests').doc(requestId).update({ 
-            status: 'accepted', 
-            respondedAt: new Date() 
-        });
+        
+        // ✅ حذف الطلب نهائياً من السيرفر بعد القبول
+        await window.db.collection('friendRequests').doc(requestId).delete();
+        console.log('🗑️ تم حذف طلب الصداقة المقبول نهائياً:', requestId);
+        
+        // إضافة المستخدمين كأصدقاء
         await window.db.collection('users').doc(uid).update({ 
             friends: FieldValue.arrayUnion(senderId) 
         });
@@ -205,10 +207,9 @@ window.acceptFriendRequest = async function(requestId, senderId) {
 window.rejectFriendRequest = async function(requestId) {
     if (!window.auth?.currentUser) return;
     try { 
-        await window.db.collection('friendRequests').doc(requestId).update({ 
-            status: 'rejected', 
-            respondedAt: new Date() 
-        }); 
+        // ✅ حذف الطلب نهائياً من السيرفر بدلاً من تحديث الحالة
+        await window.db.collection('friendRequests').doc(requestId).delete();
+        console.log('🗑️ تم حذف طلب الصداقة المرفوض نهائياً:', requestId);
         
         // تحديث قائمة الدردشة
         if (typeof loadChats === 'function') {
@@ -224,6 +225,9 @@ window.rejectFriendRequest = async function(requestId) {
 // ==================== القسم 8: مستمع طلبات الصداقة (يعمل في الخلفية ويحدث الدردشة) ====================
 function setupFriendRequestsListener(userId) {
     if (!userId) return;
+    
+    // ✅ بدء التنظيف الدوري للطلبات المنتهية (لجميع المستخدمين)
+    startFriendRequestsCleanup();
     
     try { 
         // استماع للطلبات الواردة (المستخدم هو المستقبل)
@@ -281,7 +285,40 @@ async function loadFriendRequestsForChat() {
     }
 }
 
-// ==================== القسم 10: البحث عن مستخدم ====================
+// ==================== القسم 10: تنظيف طلبات الصداقة المنتهية (لجميع المستخدمين) ====================
+async function cleanExpiredFriendRequests() {
+    try {
+        const now = new Date();
+        const snapshot = await window.db.collection('friendRequests')
+            .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
+            .get();
+        
+        let deletedCount = 0;
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+            await doc.ref.delete();
+            deletedCount++;
+            console.log(`🗑️ تم حذف طلب منتهي: from=${data.from}, to=${data.to}, id=${doc.id}`);
+        }
+        
+        if (deletedCount > 0) {
+            console.log(`🗑️ تم حذف ${deletedCount} طلب صداقة منتهي الصلاحية (لجميع المستخدمين)`);
+        }
+    } catch (e) {
+        console.warn('خطأ في تنظيف طلبات الصداقة المنتهية:', e);
+    }
+}
+
+// ✅ بدء التنظيف الدوري (كل 24 ساعة)
+function startFriendRequestsCleanup() {
+    // تنظيف فوري عند بدء التشغيل
+    cleanExpiredFriendRequests();
+    
+    // ثم كل 24 ساعة
+    setInterval(cleanExpiredFriendRequests, 24 * 60 * 60 * 1000); // 24 ساعة
+}
+
+// ==================== القسم 11: البحث عن مستخدم ====================
 window.findUserById = async function() {
     const inp = document.getElementById('searchInput');
     const rc = document.getElementById('searchResultsContainer');
@@ -425,7 +462,7 @@ window.findUserById = async function() {
     }
 };
 
-// ==================== القسم 11: إخفاء نتائج البحث ====================
+// ==================== القسم 12: إخفاء نتائج البحث ====================
 window.hideSearchResults = function() { 
     const rc = document.getElementById('searchResultsContainer'); 
     const inp = document.getElementById('searchInput');
@@ -438,7 +475,7 @@ window.hideSearchResults = function() {
     }
 };
 
-// ==================== القسم 12: دوال مساعدة عامة ====================
+// ==================== القسم 13: دوال مساعدة عامة ====================
 window.getEmojiForUser = function(userData) {
     const emojiMap = { 
         'male': '👨', 
