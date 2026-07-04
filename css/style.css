@@ -1286,3 +1286,67 @@ input:checked + .toggle-slider:before {
     }
 }
 
+
+/* ====================22 زر مسح البحث ==================== */
+.search-box {
+    display: flex;
+    align-items: center;
+    background: var(--light);
+    border-radius: 25px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+    gap: 8px;
+    direction: rtl;
+}
+
+.search-box i.fa-search {
+    color: var(--text-light);
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.search-box input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 0.9rem;
+    outline: none;
+    min-width: 0;
+}
+
+.search-box input::placeholder {
+    color: var(--text-light);
+    opacity: 0.7;
+}
+
+#clearSearchBtn {
+    color: #fff !important;
+    font-size: 1rem !important;
+    flex-shrink: 0 !important;
+    padding: 4px !important;
+    cursor: pointer !important;
+    display: none !important;
+    transition: all 0.2s ease !important;
+    border-radius: 50% !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+#clearSearchBtn:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+    transform: scale(1.05);
+}
+
+#clearSearchBtn:active {
+    transform: scale(0.9);
+}
+
+#clearSearchBtn.show {
+    display: flex !important;
+}
+
