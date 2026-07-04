@@ -77,7 +77,6 @@ if (requestTemplate) {
                     e.stopPropagation();
                     const id = sender.shareableId || '0000000000';
                     navigator.clipboard.writeText(id).then(() => {
-                        // تغيير مؤقت للأيقونة
                         const icon = copyBtn.querySelector('i');
                         if (icon) {
                             icon.className = 'fas fa-check';
