@@ -107,8 +107,7 @@ if (requestTemplate) {
         } catch (e) {
             console.warn('خطأ في عرض طلب صداقة:', e);
         }
-    }
-}
+    }lett
         
         // ===== القسم 2.2: عرض قائمة الأصدقاء =====
         if (!friends.length) { 
