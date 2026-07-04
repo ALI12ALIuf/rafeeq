@@ -834,3 +834,36 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => { 
     console.error('❌ خطأ غير معالج:', event.reason); 
 });
+
+
+// ==================== القسم 17: دوال التحكم بزر مسح البحث ====================
+
+window.toggleClearButton = function() {
+    const input = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    if (input && clearBtn) {
+        clearBtn.style.display = input.value.length > 0 ? 'inline-block' : 'none';
+    }
+};
+
+window.clearSearch = function() {
+    const input = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    const results = document.getElementById('searchResultsContainer');
+    
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    if (clearBtn) {
+        clearBtn.style.display = 'none';
+    }
+    if (results) {
+        results.style.display = 'none';
+        results.innerHTML = '';
+    }
+    if (typeof window.toggleSendButton === 'function') {
+        window.toggleSendButton();
+    }
+};
+
