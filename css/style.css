@@ -1286,8 +1286,28 @@ input:checked + .toggle-slider:before {
     }
 }
 
-/* ==================== القسم 22: تنسيق حقل البحث مع زر المسح ==================== */
+/* زر مسح البحث */
+#clearSearchBtn {
+    cursor: pointer;
+    color: #ffffff;
+    font-size: 1rem;
+    margin-right: 8px;
+    transition: all 0.2s ease;
+    padding: 4px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
 
+#clearSearchBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+#clearSearchBtn:active {
+    transform: scale(0.9);
+}
+
+/* تنسيق حقل البحث مع وجود الزر */
 .search-box {
     display: flex;
     align-items: center;
@@ -1296,14 +1316,6 @@ input:checked + .toggle-slider:before {
     padding: 0.5rem 1rem;
     margin-bottom: 1rem;
     gap: 8px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.search-box i.fa-search {
-    flex-shrink: 0;
-    color: var(--text-light);
-    font-size: 1rem;
 }
 
 .search-box input {
@@ -1313,33 +1325,9 @@ input:checked + .toggle-slider:before {
     color: var(--text);
     font-size: 0.9rem;
     outline: none;
-    min-width: 0;
-    width: 100%;
 }
 
 .search-box input::placeholder {
     color: rgba(255, 255, 255, 0.4);
 }
 
-#clearSearchBtn {
-    flex-shrink: 0;
-    cursor: pointer;
-    color: #ffffff;
-    font-size: 1rem;
-    margin-right: 4px;
-    padding: 4px;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    display: none;
-    opacity: 0.7;
-}
-
-#clearSearchBtn:hover {
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.1);
-    transform: scale(1.1);
-}
-
-#clearSearchBtn:active {
-    transform: scale(0.9);
-}
