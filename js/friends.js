@@ -324,11 +324,11 @@ window.findUserById = async function() {
             if (idText) {
                 const shareableId = u.shareableId || '';
                 idText.innerHTML = `
-                    <button class="copy-id-btn" style="background:transparent;border:none;color:var(--primary);cursor:pointer;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;padding:2px;transition:all 0.2s;flex-shrink:0;" title="نسخ ID">
-                        <i class="fas fa-copy" style="font-size:0.7rem;"></i>
+                    <button class="copy-id-btn-search" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.7rem; display: inline-flex; align-items: center; justify-content: center; padding: 2px; transition: all 0.2s; flex-shrink: 0;" title="نسخ ID">
+                        <i class="fas fa-copy" style="font-size: 0.7rem;"></i>
                     </button>
-                    <span style="font-size:0.75rem;font-family:monospace;direction:ltr;">${shareableId}</span>
-                    <span style="color:var(--primary);font-weight:700;font-size:0.85rem;font-family:sans-serif;">ID</span>
+                    <span style="font-size: 0.75rem; font-family: monospace; direction: ltr;">${shareableId}</span>
+                    <span style="color: var(--primary); font-weight: 700; font-size: 0.85rem; font-family: sans-serif;">ID</span>
                 `;
                 idText.style.display = 'flex';
                 idText.style.alignItems = 'center';
@@ -339,11 +339,11 @@ window.findUserById = async function() {
                 idText.style.fontSize = '0.75rem';
                 
                 // زر نسخ الـ ID
-                const copyBtn = idText.querySelector('.copy-id-btn');
+                const copyBtn = idText.querySelector('.copy-id-btn-search');
                 if (copyBtn) {
                     copyBtn.onclick = (e) => {
                         e.stopPropagation();
-                        const id = shareableId || '0000000000';
+                        const id = shareableId;
                         navigator.clipboard.writeText(id).then(() => {
                             const icon = copyBtn.querySelector('i');
                             if (icon) {
@@ -414,7 +414,7 @@ window.findUserById = async function() {
                         btnIcon = 'fa-check';
                         btnText = '';
                         btnDisabled = false;
-                        btnStyle = 'background:#4CAF50;color:white;';
+                        btnStyle = 'background:#4CAF50;color:white;border-radius:50%;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;';
                         btnAction = () => {
                             const reqDoc = receivedRequests.docs[0];
                             window.acceptFriendRequest(reqDoc.id, uid);
@@ -436,7 +436,7 @@ window.findUserById = async function() {
             btnIcon = 'fa-lock';
             btnText = '';
             btnDisabled = true;
-            btnStyle = 'background:#555;color:#888;cursor:not-allowed;';
+            btnStyle = 'background:#555;color:#888;cursor:not-allowed;border-radius:50%;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;';
             btnAction = null;
         }
         
@@ -453,11 +453,11 @@ window.findUserById = async function() {
         if (idText) {
             const shareableId = u.shareableId || '';
             idText.innerHTML = `
-                <button class="copy-id-btn" style="background:transparent;border:none;color:var(--primary);cursor:pointer;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;padding:2px;transition:all 0.2s;flex-shrink:0;" title="نسخ ID">
-                    <i class="fas fa-copy" style="font-size:0.7rem;"></i>
+                <button class="copy-id-btn-search" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.7rem; display: inline-flex; align-items: center; justify-content: center; padding: 2px; transition: all 0.2s; flex-shrink: 0;" title="نسخ ID">
+                    <i class="fas fa-copy" style="font-size: 0.7rem;"></i>
                 </button>
-                <span style="font-size:0.75rem;font-family:monospace;direction:ltr;">${shareableId}</span>
-                <span style="color:var(--primary);font-weight:700;font-size:0.85rem;font-family:sans-serif;">ID</span>
+                <span style="font-size: 0.75rem; font-family: monospace; direction: ltr;">${shareableId}</span>
+                <span style="color: var(--primary); font-weight: 700; font-size: 0.85rem; font-family: sans-serif;">ID</span>
             `;
             idText.style.display = 'flex';
             idText.style.alignItems = 'center';
@@ -467,11 +467,12 @@ window.findUserById = async function() {
             idText.style.color = 'var(--text-light)';
             idText.style.fontSize = '0.75rem';
             
-            const copyBtn = idText.querySelector('.copy-id-btn');
+            // زر نسخ الـ ID
+            const copyBtn = idText.querySelector('.copy-id-btn-search');
             if (copyBtn) {
                 copyBtn.onclick = (e) => {
                     e.stopPropagation();
-                    const id = shareableId || '0000000000';
+                    const id = shareableId;
                     navigator.clipboard.writeText(id).then(() => {
                         const icon = copyBtn.querySelector('i');
                         if (icon) {
