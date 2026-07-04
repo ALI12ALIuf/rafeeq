@@ -306,6 +306,7 @@ window.findUserById = async function() {
         const uid = s.docs[0].id;
         const cu = window.auth?.currentUser;
         
+        // حساب شخصي
         if (cu && uid === cu.uid) {
             const clone = template.content.cloneNode(true);
             const resultItem = clone.querySelector('.search-result-item');
@@ -320,7 +321,12 @@ window.findUserById = async function() {
                 name.textContent = u.name || 'مستخدم';
                 name.style.color = 'var(--primary)';
             }
-            if (idText) idText.textContent = u.shareableId || '';
+            if (idText) {
+                const shareableId = u.shareableId || '';
+                idText.innerHTML = `${shareableId} <span style="color: var(--primary); font-weight: 600; font-size: 0.75rem; font-family: sans-serif;">ID</span>`;
+                idText.style.direction = 'ltr';
+                idText.style.textAlign = 'left';
+            }
             
             if (actionBtn) {
                 actionBtn.style.display = 'none';
@@ -338,7 +344,9 @@ window.findUserById = async function() {
             return;
         }
         
+        // تحديد حالة العلاقة
         let btnIcon = '';
+        let btnText = '';
         let btnDisabled = false;
         let btnStyle = '';
         let btnAction = null;
@@ -349,32 +357,55 @@ window.findUserById = async function() {
             
             if (myFriends.includes(uid)) { 
                 btnIcon = 'fa-comment';
+                btnText = '';
                 btnDisabled = false;
                 btnStyle = 'background:var(--primary);color:white;';
                 btnAction = () => openChat(uid);
             } else { 
-                const er = await window.db.collection('friendRequests')
+                const sentRequests = await window.db.collection('friendRequests')
                     .where('from','==',cu.uid)
                     .where('to','==',uid)
                     .where('status','==','pending')
-                    .get(); 
-                if (!er.empty) { 
+                    .get();
+                
+                if (!sentRequests.empty) { 
                     btnIcon = 'fa-clock';
+                    btnText = '';
                     btnDisabled = true;
-                    btnStyle = 'background:#555;color:#888;cursor:not-allowed;';
+                    btnStyle = 'background:transparent;color:white;border:2px solid var(--primary);border-radius:50%;width:36px;height:36px;padding:0;cursor:default;display:flex;align-items:center;justify-content:center;';
                     btnAction = null;
                 } else {
-                    btnIcon = 'fa-plus';
-                    btnDisabled = false;
-                    btnStyle = 'background:var(--primary);color:white;';
-                    btnAction = () => {
-                        addNewFriend(uid);
-                        hideSearchResults();
-                    };
+                    const receivedRequests = await window.db.collection('friendRequests')
+                        .where('from','==',uid)
+                        .where('to','==',cu.uid)
+                        .where('status','==','pending')
+                        .get();
+                    
+                    if (!receivedRequests.empty) {
+                        btnIcon = 'fa-check';
+                        btnText = 'قبول';
+                        btnDisabled = false;
+                        btnStyle = 'background:#4CAF50;color:white;';
+                        btnAction = () => {
+                            const reqDoc = receivedRequests.docs[0];
+                            window.acceptFriendRequest(reqDoc.id, uid);
+                            hideSearchResults();
+                        };
+                    } else {
+                        btnIcon = 'fa-plus';
+                        btnText = '';
+                        btnDisabled = false;
+                        btnStyle = 'background:var(--primary);color:white;';
+                        btnAction = () => {
+                            addNewFriend(uid);
+                            hideSearchResults();
+                        };
+                    }
                 }
             } 
         } else {
             btnIcon = 'fa-lock';
+            btnText = 'تسجيل الدخول';
             btnDisabled = true;
             btnStyle = 'background:#555;color:#888;cursor:not-allowed;';
             btnAction = null;
@@ -390,11 +421,20 @@ window.findUserById = async function() {
         
         if (avatar) avatar.textContent = getEmojiForUser(u);
         if (name) name.textContent = u.name || 'مستخدم';
-        if (idText) idText.textContent = u.shareableId || '';
+        if (idText) {
+            const shareableId = u.shareableId || '';
+            idText.innerHTML = `${shareableId} <span style="color: var(--primary); font-weight: 600; font-size: 0.75rem; font-family: sans-serif;">ID</span>`;
+            idText.style.direction = 'ltr';
+            idText.style.textAlign = 'left';
+        }
         
         if (actionBtn) {
-            actionBtn.innerHTML = `<i class="fas ${btnIcon}"></i>`;
-            actionBtn.style.cssText = `padding:8px 12px;border:none;border-radius:20px;${btnStyle}font-size:1rem;cursor:${btnDisabled ? 'not-allowed' : 'pointer'};display:flex;align-items:center;justify-content:center;gap:4px;min-width:40px;`;
+            if (btnText) {
+                actionBtn.innerHTML = `<i class="fas ${btnIcon}"></i> ${btnText}`;
+            } else {
+                actionBtn.innerHTML = `<i class="fas ${btnIcon}"></i>`;
+            }
+            actionBtn.style.cssText = `padding:6px 14px;border:none;border-radius:20px;${btnStyle}font-size:0.85rem;cursor:${btnDisabled ? 'not-allowed' : 'pointer'};display:flex;align-items:center;justify-content:center;gap:6px;min-width:40px;`;
             
             if (btnDisabled) {
                 actionBtn.disabled = true;
