@@ -102,16 +102,19 @@
         </div>
     </template>
     
-    <!-- ✅ قالب طلب الصداقة (يظهر في قائمة الدردشة - بنفس حجم عناصر المحادثة) -->
+    <!-- ✅ قالب طلب الصداقة (يظهر في قائمة الدردشة) -->
     <template id="friendRequestChatTemplate">
-        <div class="chat-item friend-request-item" style="border: 2px solid #FFC107; background: var(--card-bg); border-radius: var(--radius); margin-bottom: 8px; padding: 0.75rem; display: flex; align-items: center; gap: 1rem;">
+        <div class="chat-item friend-request-item" style="border: 2px solid var(--primary); background: var(--card-bg); border-radius: var(--radius); margin-bottom: 8px; padding: 0.75rem; display: flex; align-items: center; gap: 1rem;">
             <div class="chat-avatar-emoji" style="width: 50px; height: 50px; min-width: 50px; min-height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; line-height: 1; flex-shrink: 0;"></div>
             <div class="chat-info" style="flex: 1; min-width: 0;">
-                <h4 style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                <h4 style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px;">
                     <span class="friend-request-name"></span>
-                    <span style="font-size: 0.6rem; background: #FFC107; color: #000; padding: 1px 8px; border-radius: 10px; font-weight: 500;">طلب</span>
+                    <span style="font-size: 0.6rem; color: #fff; background: var(--primary); padding: 2px 10px; border-radius: 10px; font-weight: 500;">طلب</span>
                 </h4>
-                <p style="margin: 2px 0 0; color: var(--text-light); font-size: 0.75rem; direction: ltr; text-align: left; font-family: monospace;" class="friend-request-id"></p>
+                <p style="margin: 2px 0 0; color: var(--text-light); font-size: 0.75rem; direction: ltr; text-align: left; font-family: monospace; display: flex; align-items: center; gap: 6px;">
+                    <span class="friend-request-id"></span>
+                    <span style="color: var(--primary); font-weight: 600; font-size: 0.7rem; font-family: sans-serif;">ID</span>
+                </p>
             </div>
             <div class="friend-request-actions" style="display: flex; gap: 4px; flex-shrink: 0;">
                 <button class="accept-friend-btn" style="background: #4CAF50; border: none; color: white; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
