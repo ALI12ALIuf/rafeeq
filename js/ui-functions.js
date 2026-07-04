@@ -48,67 +48,71 @@ async function loadChats(force = false) {
         list.innerHTML = '';
         
         // ===== القسم 2.1: عرض طلبات الصداقة في الأعلى =====
-        if (requestTemplate) {
-            const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
+if (requestTemplate) {
+    const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
+    const addedRequestIds = new Set(); // ✅ منع التكرار
+    
+    for (const req of pendingRequests) {
+        // ✅ التحقق من عدم تكرار الطلب
+        if (addedRequestIds.has(req.id)) continue;
+        addedRequestIds.add(req.id);
+        
+        try {
+            const senderDoc = await window.db.collection('users').doc(req.from).get();
+            if (!senderDoc.exists) continue;
             
-            for (const req of pendingRequests) {
-                try {
-                    const senderDoc = await window.db.collection('users').doc(req.from).get();
-                    if (!senderDoc.exists) continue;
-                    
-                    const sender = senderDoc.data();
-                    const clone = requestTemplate.content.cloneNode(true);
-                    const requestItem = clone.querySelector('.friend-request-item');
-                    
-                    const avatar = requestItem.querySelector('.chat-avatar-emoji');
-                    const nameSpan = requestItem.querySelector('.friend-request-name');
-                    const idSpan = requestItem.querySelector('.friend-request-id');
-                    const copyBtn = requestItem.querySelector('.copy-id-btn');
-                    const acceptBtn = requestItem.querySelector('.accept-friend-btn');
-                    const rejectBtn = requestItem.querySelector('.reject-friend-btn');
-                    
-                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '👤';
-                    if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
-                    if (idSpan) idSpan.textContent = sender.shareableId || '0000000000';
-                    
-                    // زر نسخ الـ ID
-                    if (copyBtn) {
-                        copyBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            const id = sender.shareableId || '0000000000';
-                            navigator.clipboard.writeText(id).then(() => {
-                                const icon = copyBtn.querySelector('i');
-                                if (icon) {
-                                    icon.className = 'fas fa-check';
-                                    setTimeout(() => {
-                                        icon.className = 'fas fa-copy';
-                                    }, 1500);
-                                }
-                            }).catch(() => {});
-                        };
-                    }
-                    
-                    if (acceptBtn) {
-                        acceptBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            window.acceptFriendRequest(req.id, req.from);
-                        };
-                    }
-                    
-                    if (rejectBtn) {
-                        rejectBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            window.rejectFriendRequest(req.id);
-                        };
-                    }
-                    
-                    list.appendChild(clone);
-                    
-                } catch (e) {
-                    console.warn('خطأ في عرض طلب صداقة:', e);
-                }
+            const sender = senderDoc.data();
+            const clone = requestTemplate.content.cloneNode(true);
+            const requestItem = clone.querySelector('.friend-request-item');
+            
+            const avatar = requestItem.querySelector('.chat-avatar-emoji');
+            const nameSpan = requestItem.querySelector('.friend-request-name');
+            const idSpan = requestItem.querySelector('.friend-request-id');
+            const copyBtn = requestItem.querySelector('.copy-id-btn');
+            const acceptBtn = requestItem.querySelector('.accept-friend-btn');
+            const rejectBtn = requestItem.querySelector('.reject-friend-btn');
+            
+            if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '👤';
+            if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
+            if (idSpan) idSpan.textContent = sender.shareableId || '0000000000';
+            
+            if (copyBtn) {
+                copyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const id = sender.shareableId || '0000000000';
+                    navigator.clipboard.writeText(id).then(() => {
+                        const icon = copyBtn.querySelector('i');
+                        if (icon) {
+                            icon.className = 'fas fa-check';
+                            setTimeout(() => {
+                                icon.className = 'fas fa-copy';
+                            }, 1500);
+                        }
+                    }).catch(() => {});
+                };
             }
+            
+            if (acceptBtn) {
+                acceptBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    window.acceptFriendRequest(req.id, req.from);
+                };
+            }
+            
+            if (rejectBtn) {
+                rejectBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    window.rejectFriendRequest(req.id);
+                };
+            }
+            
+            list.appendChild(clone);
+            
+        } catch (e) {
+            console.warn('خطأ في عرض طلب صداقة:', e);
         }
+    }
+}
         
         // ===== القسم 2.2: عرض قائمة الأصدقاء =====
         if (!friends.length) { 
