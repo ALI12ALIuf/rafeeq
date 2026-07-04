@@ -258,11 +258,16 @@ async function loadFriendRequestsForChat() {
             .get();
         
         const requests = [];
+        const seenIds = new Set(); // ✅ منع التكرار من المصدر
+        
         snapshot.forEach(doc => {
-            requests.push({ 
-                id: doc.id, 
-                ...doc.data() 
-            });
+            if (!seenIds.has(doc.id)) {
+                seenIds.add(doc.id);
+                requests.push({ 
+                    id: doc.id, 
+                    ...doc.data() 
+                });
+            }
         });
         
         // ترتيب حسب الأحدث
