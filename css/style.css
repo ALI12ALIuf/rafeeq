@@ -1343,4 +1343,3 @@ input:checked + .toggle-slider:before {
 #clearSearchBtn:active {
     transform: scale(0.9);
 }
-
