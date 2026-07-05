@@ -21,98 +21,111 @@ function clearStack() {
 
 // ==================== القسم 2: تحميل المحادثات (معدل - يدعم طلبات الصداقة) ====================
 let chatsLoaded = false;
+let isLoadingChats = false; // ✅ منع التحميل المتزامن
 
 async function loadChats(force = false) { 
     if (!window.auth || !window.auth.currentUser) return; 
     const list = document.getElementById('chatsList'); 
     if (!list) return; 
     
+    // ✅ منع التحميل المتزامن
+    if (isLoadingChats) {
+        console.log('⏳ جاري تحميل المحادثات بالفعل، تخطي...');
+        return;
+    }
+    
     if (chatsLoaded && !force) {
         console.log('⏭️ قائمة المحادثات محملة مسبقاً، تخطي التحميل');
         return;
     }
+    
+    isLoadingChats = true;
     
     const chatTemplate = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
     const requestTemplate = document.getElementById('friendRequestChatTemplate');
     
     if (!chatTemplate) {
         console.warn('⚠️ قالب chatItemTemplate غير موجود');
+        isLoadingChats = false;
         return;
     }
     
     try { 
         const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); 
-        if (!udoc.exists) return; 
+        if (!udoc.exists) {
+            isLoadingChats = false;
+            return; 
+        }
         const friends = udoc.data().friends || []; 
         
         list.innerHTML = '';
         
         // ===== القسم 2.1: عرض طلبات الصداقة في الأعلى =====
-if (requestTemplate) {
-    const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
-    const addedRequestIds = new Set(); // ✅ منع التكرار
-    
-    for (const req of pendingRequests) {
-        // ✅ التحقق من عدم تكرار الطلب
-        if (addedRequestIds.has(req.id)) continue;
-        addedRequestIds.add(req.id);
-        
-        try {
-            const senderDoc = await window.db.collection('users').doc(req.from).get();
-            if (!senderDoc.exists) continue;
+        if (requestTemplate) {
+            const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
+            const addedRequestIds = new Set(); // ✅ منع التكرار
             
-            const sender = senderDoc.data();
-            const clone = requestTemplate.content.cloneNode(true);
-            const requestItem = clone.querySelector('.friend-request-item');
-            
-            const avatar = requestItem.querySelector('.chat-avatar-emoji');
-            const nameSpan = requestItem.querySelector('.friend-request-name');
-            const idSpan = requestItem.querySelector('.friend-request-id');
-            const copyBtn = requestItem.querySelector('.copy-id-btn');
-            const acceptBtn = requestItem.querySelector('.accept-friend-btn');
-            const rejectBtn = requestItem.querySelector('.reject-friend-btn');
-            
-            if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '👤';
-            if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
-            if (idSpan) idSpan.textContent = sender.shareableId || '0000000000';
-            
-            if (copyBtn) {
-                copyBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    const id = sender.shareableId || '0000000000';
-                    navigator.clipboard.writeText(id).then(() => {
-                        const icon = copyBtn.querySelector('i');
-                        if (icon) {
-                            icon.className = 'fas fa-check';
-                            setTimeout(() => {
-                                icon.className = 'fas fa-copy';
-                            }, 1500);
-                        }
-                    }).catch(() => {});
-                };
+            for (const req of pendingRequests) {
+                // ✅ التحقق من عدم تكرار الطلب
+                if (addedRequestIds.has(req.id)) continue;
+                addedRequestIds.add(req.id);
+                
+                try {
+                    const senderDoc = await window.db.collection('users').doc(req.from).get();
+                    if (!senderDoc.exists) continue;
+                    
+                    const sender = senderDoc.data();
+                    const clone = requestTemplate.content.cloneNode(true);
+                    const requestItem = clone.querySelector('.friend-request-item');
+                    
+                    const avatar = requestItem.querySelector('.chat-avatar-emoji');
+                    const nameSpan = requestItem.querySelector('.friend-request-name');
+                    const idSpan = requestItem.querySelector('.friend-request-id');
+                    const copyBtn = requestItem.querySelector('.copy-id-btn');
+                    const acceptBtn = requestItem.querySelector('.accept-friend-btn');
+                    const rejectBtn = requestItem.querySelector('.reject-friend-btn');
+                    
+                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '👤';
+                    if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
+                    if (idSpan) idSpan.textContent = sender.shareableId || '0000000000';
+                    
+                    if (copyBtn) {
+                        copyBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            const id = sender.shareableId || '0000000000';
+                            navigator.clipboard.writeText(id).then(() => {
+                                const icon = copyBtn.querySelector('i');
+                                if (icon) {
+                                    icon.className = 'fas fa-check';
+                                    setTimeout(() => {
+                                        icon.className = 'fas fa-copy';
+                                    }, 1500);
+                                }
+                            }).catch(() => {});
+                        };
+                    }
+                    
+                    if (acceptBtn) {
+                        acceptBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            window.acceptFriendRequest(req.id, req.from);
+                        };
+                    }
+                    
+                    if (rejectBtn) {
+                        rejectBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            window.rejectFriendRequest(req.id);
+                        };
+                    }
+                    
+                    list.appendChild(clone);
+                    
+                } catch (e) {
+                    console.warn('خطأ في عرض طلب صداقة:', e);
+                }
             }
-            
-            if (acceptBtn) {
-                acceptBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    window.acceptFriendRequest(req.id, req.from);
-                };
-            }
-            
-            if (rejectBtn) {
-                rejectBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    window.rejectFriendRequest(req.id);
-                };
-            }
-            
-            list.appendChild(clone);
-            
-        } catch (e) {
-            console.warn('خطأ في عرض طلب صداقة:', e);
         }
-    }
-}
         
         // ===== القسم 2.2: عرض قائمة الأصدقاء =====
         if (!friends.length) { 
@@ -121,10 +134,17 @@ if (requestTemplate) {
                 list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
             }
             chatsLoaded = true;
+            isLoadingChats = false;
             return; 
         } 
         
+        const addedFriendIds = new Set(); // ✅ منع تكرار الأصدقاء
+        
         for (const fid of friends) { 
+            // ✅ التحقق من عدم تكرار الصديق
+            if (addedFriendIds.has(fid)) continue;
+            addedFriendIds.add(fid);
+            
             try { 
                 const fdoc = await window.db.collection('users').doc(fid).get(); 
                 if (fdoc.exists) { 
@@ -168,6 +188,7 @@ if (requestTemplate) {
         } 
         
         chatsLoaded = true;
+        isLoadingChats = false;
         
         if (list.children.length === 0) {
             list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا توجد محادثات نشطة</h3><p>ابدأ بإضافة أصدقاء جدد</p></div>`;
@@ -177,6 +198,7 @@ if (requestTemplate) {
         console.error('خطأ في loadChats:', e);
         list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>حدث خطأ</h3><p>حاول تحديث الصفحة</p></div>`;
         chatsLoaded = true;
+        isLoadingChats = false;
     } 
 }
 
