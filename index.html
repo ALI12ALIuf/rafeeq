@@ -222,27 +222,34 @@
         </div>
 
         <!-- ===== القسم 2.2.4: صفحة الملف الشخصي (Profile) ===== -->
-        <div class="page profile-page">
-            <div class="profile-header">
-                <div class="profile-cover">
-                    <div class="profile-avatar-center"><div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div></div>
-                    <button class="edit-profile-btn-left" onclick="openEditProfileModal()"><i class="fas fa-pen"></i></button>
-                </div>
-                <div class="profile-info-container">
-                    <div class="profile-name-wrapper"><h2 id="profileName"></h2></div>
-                    <div class="profile-id-row">
-                        <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
-                        <span id="shareableId" class="id-value-numbers"></span>
-                        <span class="id-label-english">ID</span>
-                    </div>
-                </div>
-                <p class="profile-bio" id="profileBio"></p>
-                <div class="profile-stats">
-                    <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
-                    <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
-                </div>
+<div class="page profile-page">
+    <div class="profile-header">
+        <div class="profile-cover">
+            <div class="profile-avatar-center"><div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div></div>
+            <button class="edit-profile-btn-left" onclick="openEditProfileModal()"><i class="fas fa-pen"></i></button>
+        </div>
+        <div class="profile-info-container">
+            <div class="profile-name-wrapper"><h2 id="profileName"></h2></div>
+            <div class="profile-id-row">
+                <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
+                <span id="shareableId" class="id-value-numbers"></span>
+                <span class="id-label-english">ID</span>
             </div>
         </div>
+        <p class="profile-bio" id="profileBio"></p>
+        <div class="profile-stats">
+            <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
+            <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
+        </div>
+    </div>
+    
+    <!-- ✅ زر الإعدادات داخل الملف الشخصي -->
+    <div class="profile-settings-btn" style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; border: 1px solid var(--border);" onclick="switchPage('settings')">
+        <i class="fas fa-cog" style="color: var(--primary); font-size: 1.2rem;"></i>
+        <span style="color: var(--text); font-size: 0.95rem;" data-i18n="settings">الإعدادات</span>
+        <i class="fas fa-chevron-left" style="color: var(--text-light); margin-right: auto;"></i>
+    </div>
+</div>
 
         <!-- ===== القسم 2.2.5: الصفحات الفرعية للملف الشخصي ===== -->
         <div class="profile-pages">
@@ -290,12 +297,11 @@
         </div>
     </main>
 
-    <!-- ===== القسم 3: شريط التنقل السفلي ===== -->
+        <!-- ===== القسم 3: شريط التنقل السفلي ===== -->
     <nav class="bottom-nav">
         <button class="nav-item active" data-page="home"><i class="fas fa-home"></i><span data-i18n="home">الرئيسية</span></button>
         <button class="nav-item" data-page="chat"><i class="fas fa-comment"></i><span data-i18n="chat">الدردشة</span></button>
-        <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span data-i18n="profile">الملف</span></button>
-        <button class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span data-i18n="settings">الإعدادات</span></button>
+        <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span data-i18n="profile">الملف الشخصي</span></button>
     </nav>
 </div>
 
