@@ -797,6 +797,7 @@ function setupNavigation() {
     const nav = document.querySelectorAll('.nav-item'); 
     const pages = document.querySelectorAll('.page'); 
     if (!nav.length || !pages.length) return; 
+    
     function switchPage(id) { 
         clearStack(); 
         pages.forEach(p => p.classList.remove('active')); 
@@ -819,6 +820,10 @@ function setupNavigation() {
         if (id === 'chat') loadChats(); 
         nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); 
     } 
+    
+    // ✅ جعل دالة switchPage عامة للاستخدام من أي مكان
+    window.switchPage = switchPage;
+    
     nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); 
 }
 
