@@ -242,6 +242,13 @@
                     <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
                 </div>
             </div>
+            
+            <!-- ✅ زر الإعدادات داخل الملف الشخصي (أسفل الصفحة) -->
+            <div class="profile-settings-btn" style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; border: 1px solid var(--border);" onclick="switchPage('settings')">
+                <i class="fas fa-cog" style="color: var(--primary); font-size: 1.2rem;"></i>
+                <span style="color: var(--text); font-size: 0.95rem;" data-i18n="settings">الإعدادات</span>
+                <i class="fas fa-chevron-left" style="color: var(--text-light); margin-right: auto;"></i>
+            </div>
         </div>
 
         <!-- ===== القسم 2.2.5: الصفحات الفرعية للملف الشخصي ===== -->
@@ -295,7 +302,6 @@
         <button class="nav-item active" data-page="home"><i class="fas fa-home"></i><span data-i18n="home">الرئيسية</span></button>
         <button class="nav-item" data-page="chat"><i class="fas fa-comment"></i><span data-i18n="chat">الدردشة</span></button>
         <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span data-i18n="profile">الملف</span></button>
-        <button class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span data-i18n="settings">الإعدادات</span></button>
     </nav>
 </div>
 
