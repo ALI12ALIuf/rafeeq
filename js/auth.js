@@ -14,11 +14,6 @@ function generateShareableId() {
     return id;
 }
 
-function getEmojiForUser(userData) {
-    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧', 'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵' };
-    return emojiMap[userData.avatarType] || '👤';
-}
-
 const FieldValue = firebase.firestore.FieldValue;
 
 // ==================== القسم 2: showApp ====================
@@ -69,7 +64,7 @@ async function saveUserAndEnter(user) {
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
                 email: user.email || '', shareableId: generateShareableId(),
-                bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date()
+                bio: '', avatarType: 'male_light', friends: [], blocked: [], createdAt: new Date()
             });
         } else {
             const userData = userDoc.data(); const updates = {};
@@ -102,7 +97,7 @@ function updateUserUI() {
     } 
 }
 
-// ==================== القسم 7: logout (معدل - إضافة تنظيف شامل) ====================
+// ==================== القسم 7: logout ====================
 async function logout() { 
     if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
         console.log('🧹 تنظيف العناصر الديناميكية قبل تسجيل الخروج');
@@ -132,7 +127,7 @@ async function logout() {
     window.location.reload(); 
 }
 
-// ==================== القسم 8: loadUserData (معدل - إزالة عداد الطلبات) ====================
+// ==================== القسم 8: loadUserData ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
@@ -142,8 +137,11 @@ async function loadUserData(uid) {
             if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 25);
             if (pb) pb.textContent = d.bio || '';
             if (si) si.textContent = d.shareableId || '0000000000';
-            const emoji = getEmojiForUser(d);
-            if (pa) pa.textContent = emoji; if (ca) ca.textContent = emoji;
+            
+            const emoji = window.getEmojiForUser ? window.getEmojiForUser(d) : '👤';
+            if (pa) pa.textContent = emoji;
+            if (ca) ca.textContent = emoji;
+            
             const fc = document.getElementById('friendsCount');
             if (fc) fc.textContent = formatNumber((d.friends || []).length);
         }
