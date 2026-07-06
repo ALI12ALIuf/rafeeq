@@ -233,6 +233,11 @@ window.openChat = friendId => {
     window.db.collection('users').doc(friendId).get().then(doc => {
         if (doc.exists) {
             const f = doc.data();
+            // ✅ تغيير عنوان الصفحة إلى اسم المستخدم عند فتح المحادثة
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle) {
+                pageTitle.textContent = f.name || 'مستخدم';
+            }
             ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤');
         }
     }).catch(() => {});
@@ -645,6 +650,9 @@ window.closeConversation = () => {
         document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
         document.body.classList.remove('profile-subpage-open');
         
+        // ✅ إعادة عنوان الصفحة عند إغلاق المحادثة
+        const pageTitle = document.getElementById('pageTitle');
+        
         if (lastPage && lastPage.type === 'subpage') {
             document.body.classList.add('profile-subpage-open');
             document.querySelector('.profile-page').style.display = 'none';
@@ -652,15 +660,18 @@ window.closeConversation = () => {
                 document.getElementById(lastPage.id).style.display = 'block';
             }
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
+            if (pageTitle) pageTitle.textContent = 'الملف الشخصي';
         } else if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
             document.querySelector('.profile-page').classList.add('active');
             document.querySelector('.profile-page').style.display = 'block';
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
+            if (pageTitle) pageTitle.textContent = 'الملف الشخصي';
         } else {
             document.querySelector('.chat-page').classList.add('active');
             document.querySelector('.chat-page').style.display = 'block';
             loadChats();
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'chat') n.classList.add('active'); });
+            if (pageTitle) pageTitle.textContent = 'الدردشة';
         }
     }, 200);
 };
@@ -718,6 +729,10 @@ window.goBack = () => {
         document.querySelector('.profile-page').style.display = 'block';
         document.querySelector('.profile-page').classList.add('active');
     }
+    
+    // ✅ تحديث عنوان الصفحة عند الرجوع للملف الشخصي
+    const pageTitle = document.getElementById('pageTitle');
+    if (pageTitle) pageTitle.textContent = 'الملف الشخصي';
 };
 
 // ==================== القسم 13: الصورة الرمزية ====================
@@ -798,6 +813,14 @@ function setupNavigation() {
     const pages = document.querySelectorAll('.page'); 
     if (!nav.length || !pages.length) return; 
     
+    // ✅ ترجمة النصوص للشريط العلوي
+    const pageTitles = {
+        'home': 'الرئيسية',
+        'chat': 'الدردشة',
+        'profile': 'الملف الشخصي',
+        'settings': 'الإعدادات'
+    };
+    
     function switchPage(id) { 
         clearStack(); 
         pages.forEach(p => p.classList.remove('active')); 
@@ -815,6 +838,12 @@ function setupNavigation() {
         
         if (typeof window.hideSearchResults === 'function') {
             window.hideSearchResults();
+        }
+        
+        // ✅ تغيير عنوان الصفحة في الشريط العلوي
+        const pageTitle = document.getElementById('pageTitle');
+        if (pageTitle) {
+            pageTitle.textContent = pageTitles[id] || 'رفيق';
         }
         
         if (id === 'chat') loadChats(); 
