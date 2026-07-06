@@ -164,21 +164,39 @@ async function loadUserData(uid) {
 // ==================== القسم 9: مراقب حالة تسجيل الدخول ====================
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
-        const splash = document.getElementById('splash'), app = document.getElementById('app');
+        const splash = document.getElementById('splash');
+        const app = document.getElementById('app');
+        const loginScreen = document.getElementById('loginScreen');
         
         if (user) {
+            console.log('✅ مستخدم مسجل:', user.uid);
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
-            if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
+            if (typeof SecureChatSystem !== 'undefined') {
+                await SecureChatSystem.init();
+            }
+            if (splash) splash.style.display = 'none';
+            if (loginScreen) loginScreen.style.display = 'none';
+            if (app) {
+                app.style.display = 'flex';
+                app.style.visibility = 'visible';
+            }
             showApp();
         } else {
-            if (app) app.style.display = 'none';
-            if (splash) { splash.style.display = 'flex'; }
-            
-            setTimeout(() => {
-                if (splash) { splash.style.display = 'none'; }
+            console.log('❌ لا يوجد مستخدم مسجل، عرض شاشة تسجيل الدخول');
+            if (app) {
+                app.style.display = 'none';
+                app.style.visibility = 'hidden';
+            }
+            if (splash) {
+                splash.style.display = 'flex';
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    showLoginScreen();
+                }, 1500);
+            } else {
                 showLoginScreen();
-            }, 2500);
+            }
         }
     });
 }
