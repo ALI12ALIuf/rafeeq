@@ -587,15 +587,21 @@
 <div class="modal" id="avatarModal">
     <div class="modal-content">
         <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
-        <div class="avatar-options">
-            <button class="avatar-option" onclick="selectAvatar('male')"><span>👨</span><span data-i18n="male">رجل</span></button>
-            <button class="avatar-option" onclick="selectAvatar('female')"><span>👩</span><span data-i18n="female">امرأة</span></button>
-            <button class="avatar-option" onclick="selectAvatar('boy')"><span>🧒</span><span data-i18n="boy">ولد</span></button>
-            <button class="avatar-option" onclick="selectAvatar('girl')"><span>👧</span><span data-i18n="girl">بنت</span></button>
-            <button class="avatar-option" onclick="selectAvatar('father')"><span>👨‍🦳</span><span data-i18n="father">أب</span></button>
-            <button class="avatar-option" onclick="selectAvatar('mother')"><span>👩‍🦳</span><span data-i18n="mother">أم</span></button>
-            <button class="avatar-option" onclick="selectAvatar('grandfather')"><span>👴</span><span data-i18n="grandfather">جد</span></button>
-            <button class="avatar-option" onclick="selectAvatar('grandmother')"><span>👵</span><span data-i18n="grandmother">جدة</span></button>
+        <div class="avatar-options-simple">
+            <div class="avatar-group">
+                <div class="avatar-options-row">
+                    <button class="avatar-option" onclick="selectAvatar('male_light')" title="فاتح">🧔🏻‍♂️</button>
+                    <button class="avatar-option" onclick="selectAvatar('male_medium')" title="متوسط">🧔🏼‍♂️</button>
+                    <button class="avatar-option" onclick="selectAvatar('male_dark')" title="غامق">🧔🏽‍♂️</button>
+                </div>
+            </div>
+            <div class="avatar-group">
+                <div class="avatar-options-row">
+                    <button class="avatar-option" onclick="selectAvatar('female_light')" title="فاتح">👩🏻</button>
+                    <button class="avatar-option" onclick="selectAvatar('female_medium')" title="متوسط">👩🏼</button>
+                    <button class="avatar-option" onclick="selectAvatar('female_dark')" title="غامق">👩🏽</button>
+                </div>
+            </div>
         </div>
         <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
     </div>
