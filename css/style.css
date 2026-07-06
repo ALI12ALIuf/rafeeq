@@ -1460,3 +1460,56 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
+
+
+/* ==================== 24تخصيص تخصيص ==================== */
+
+/* أزرار اختيار الخيارات */
+.avatar-opt {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.avatar-opt:hover {
+    transform: scale(1.1);
+}
+
+.avatar-opt-btn {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.avatar-opt-btn:hover {
+    transform: scale(1.05);
+    border-color: var(--primary) !important;
+}
+
+/* معاينة الشخصية */
+#avatarPreview {
+    transition: all 0.3s ease;
+}
+
+/* نافذة تخصيص الشخصية */
+#avatarModal .modal-content {
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+/* تنسيق خيارات الألوان */
+#avatarModal .modal-content label {
+    font-weight: 500;
+}
+
+/* تنسيق الأزرار المختارة */
+.avatar-opt-btn.selected {
+    background: var(--primary) !important;
+    color: white !important;
+    border-color: var(--primary) !important;
+}
+
+.avatar-opt.selected {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px var(--primary);
+}
+
+
