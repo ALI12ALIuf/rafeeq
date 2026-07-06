@@ -30,11 +30,24 @@
 <div class="app-container" id="app" style="display: none;">
     
     <!-- ==================== القسم 2.1: رأس التطبيق ==================== -->
-    <header class="app-header">
-        <div class="header-left"></div>
-        <div class="header-title"><h1 data-i18n="app_name">رفيق</h1></div>
-        <div class="header-right"></div>
-    </header>
+<header class="app-header">
+    <div class="header-left"></div>
+    <div class="header-title" style="display: flex; gap: 1.5rem; justify-content: center; flex: 1;">
+        <button class="nav-item-top active" data-page="home" onclick="switchPage('home')" style="background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; padding: 4px 8px; border-bottom: 2px solid transparent; transition: all 0.3s;">
+            <span data-i18n="home">الرئيسية</span>
+        </button>
+        <button class="nav-item-top" data-page="chat" onclick="switchPage('chat')" style="background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; padding: 4px 8px; border-bottom: 2px solid transparent; transition: all 0.3s;">
+            <span data-i18n="chat">الدردشة</span>
+        </button>
+        <button class="nav-item-top" data-page="profile" onclick="switchPage('profile')" style="background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; padding: 4px 8px; border-bottom: 2px solid transparent; transition: all 0.3s;">
+            <span data-i18n="profile">الملف الشخصي</span>
+        </button>
+        <button class="nav-item-top" data-page="settings" onclick="switchPage('settings')" style="background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; padding: 4px 8px; border-bottom: 2px solid transparent; transition: all 0.3s;">
+            <span data-i18n="settings">الإعدادات</span>
+        </button>
+    </div>
+    <div class="header-right"></div>
+</header>
 
     <!-- ==================== القسم 2.2: المحتوى الرئيسي ==================== -->
     <main class="app-content" id="mainContent">
@@ -297,11 +310,12 @@
         </div>
     </main>
 
-        <!-- ===== القسم 3: شريط التنقل السفلي ===== -->
+            <!-- ===== القسم 3: شريط التنقل السفلي ===== -->
     <nav class="bottom-nav">
-        <button class="nav-item active" data-page="home"><i class="fas fa-home"></i><span data-i18n="home">الرئيسية</span></button>
-        <button class="nav-item" data-page="chat"><i class="fas fa-comment"></i><span data-i18n="chat">الدردشة</span></button>
-        <button class="nav-item" data-page="profile"><i class="fas fa-user"></i><span data-i18n="profile">الملف الشخصي</span></button>
+        <button class="nav-item active" data-page="home" onclick="switchPage('home')"><i class="fas fa-home"></i></button>
+        <button class="nav-item" data-page="chat" onclick="switchPage('chat')"><i class="fas fa-comment"></i></button>
+        <button class="nav-item" data-page="profile" onclick="switchPage('profile')"><i class="fas fa-user"></i></button>
+        <button class="nav-item" data-page="settings" onclick="switchPage('settings')"><i class="fas fa-cog"></i></button>
     </nav>
 </div>
 
