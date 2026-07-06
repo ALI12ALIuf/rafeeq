@@ -716,21 +716,251 @@ window.goBack = () => {
     }
 };
 
-// ==================== القسم 13: الصورة الرمزية ====================
-window.selectAvatar = t => { 
-    const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; 
-    const e = m[t] || '👤'; 
-    const profileAvatar = document.getElementById('profileAvatarEmoji'), currentAvatar = document.getElementById('currentAvatarEmoji'); 
-    if (profileAvatar) profileAvatar.textContent = e; 
-    if (currentAvatar) currentAvatar.textContent = e; 
-    if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ avatarType: t }).then(() => closeModal()).catch(() => {}); 
+// ==================== القسم 13: تخصيص الشخصية ====================
+
+// البيانات الافتراضية للشخصية
+let customAvatarData = {
+    skin: 'medium',
+    eyes: 'brown',
+    hair: 'black',
+    hairLength: 'medium',
+    beard: 'none',
+    glasses: 'none'
 };
 
-window.openAvatarModal = () => document.getElementById('avatarModal')?.classList.add('active');
+// دالة تحديث المعاينة
+function updateAvatarPreview() {
+    const preview = document.getElementById('avatarPreview');
+    if (!preview) return;
+    
+    // بناء الشخصية باستخدام الإيموجي + التعديلات
+    let emoji = '👤';
+    const skinMap = {
+        'light': '🏻',
+        'medium': '🏽',
+        'tan': '🏾',
+        'dark': '🏿',
+        'olive': '🏽'
+    };
+    
+    // اختيار الإيموجي الأساسي حسب طول الشعر
+    const hairEmojis = {
+        'short': '👦',
+        'medium': '👨',
+        'long': '👩',
+        'bald': '👨‍🦲'
+    };
+    
+    // محاولة بناء شخصية
+    let baseEmoji = hairEmojis[customAvatarData.hairLength] || '👤';
+    
+    // إضافة لون البشرة
+    const skinCode = skinMap[customAvatarData.skin] || '';
+    if (skinCode && baseEmoji !== '👤') {
+        // بعض الإيموجيات تدعم تعديل لون البشرة
+        baseEmoji = baseEmoji.replace(/[\uD83C\uDFFB-\uD83C\uDFFF]/, '');
+        // نضيف لون البشرة كـ modifier
+        baseEmoji = baseEmoji + skinCode;
+    }
+    
+    // إضافة اللحية
+    if (customAvatarData.beard === 'full') {
+        baseEmoji = '🧔' + skinCode;
+    } else if (customAvatarData.beard === 'light') {
+        baseEmoji = '🧔‍♂️' + skinCode;
+    }
+    
+    // إضافة النظارات
+    if (customAvatarData.glasses === 'glasses') {
+        baseEmoji = '👓' + baseEmoji;
+    } else if (customAvatarData.glasses === 'sunglasses') {
+        baseEmoji = '🕶️' + baseEmoji;
+    }
+    
+    preview.textContent = baseEmoji || '👤';
+}
 
-window.getEmojiForUser = u => { 
-    const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; 
-    return m[u?.avatarType] || '👤'; 
+// دالة اختيار خيار (للأزرار الدائرية)
+function selectAvatarOption(category, value, event) {
+    // تحديث البيانات
+    customAvatarData[category] = value;
+    
+    // تحديث المظهر (إزالة التحديد من الكل)
+    const parent = event.target.closest('div[id$="Options"]');
+    if (parent) {
+        parent.querySelectorAll('.avatar-opt, .avatar-opt-btn').forEach(btn => {
+            btn.style.borderColor = 'var(--border)';
+            btn.style.background = btn.classList.contains('avatar-opt') ? btn.style.background : 'transparent';
+        });
+        event.target.style.borderColor = 'var(--primary)';
+        if (event.target.classList.contains('avatar-opt-btn')) {
+            event.target.style.background = 'var(--primary)';
+            event.target.style.color = 'white';
+        }
+    }
+    
+    updateAvatarPreview();
+}
+
+// دالة حفظ الشخصية المخصصة
+window.saveCustomAvatar = function() {
+    if (!auth?.currentUser) {
+        alert('الرجاء تسجيل الدخول أولاً');
+        return;
+    }
+    
+    // حفظ البيانات في قاعدة البيانات
+    db.collection('users').doc(auth.currentUser.uid).update({
+        avatar: customAvatarData
+    }).then(() => {
+        // تحديث الواجهة
+        const profileAvatar = document.getElementById('profileAvatarEmoji');
+        const preview = document.getElementById('avatarPreview');
+        if (profileAvatar) profileAvatar.textContent = preview.textContent;
+        if (currentAvatar) currentAvatar.textContent = preview.textContent;
+        
+        closeModal();
+        alert('تم حفظ الشخصية بنجاح!');
+    }).catch((error) => {
+        console.error('خطأ في حفظ الشخصية:', error);
+        alert('حدث خطأ في حفظ الشخصية');
+    });
+};
+
+// دالة تحميل الشخصية المحفوظة
+async function loadCustomAvatar(userId) {
+    try {
+        const doc = await db.collection('users').doc(userId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            if (data.avatar && typeof data.avatar === 'object') {
+                customAvatarData = data.avatar;
+                return customAvatarData;
+            }
+        }
+    } catch (e) {
+        console.warn('خطأ في تحميل الشخصية:', e);
+    }
+    return null;
+}
+
+// دالة الحصول على إيموجي الشخصية لعرضها
+window.getAvatarEmoji = function(userData) {
+    if (userData?.avatar && typeof userData.avatar === 'object') {
+        // محاولة بناء إيموجي من البيانات
+        const skinMap = {
+            'light': '🏻',
+            'medium': '🏽',
+            'tan': '🏾',
+            'dark': '🏿',
+            'olive': '🏽'
+        };
+        const hairMap = {
+            'short': '👦',
+            'medium': '👨',
+            'long': '👩',
+            'bald': '👨‍🦲'
+        };
+        const skin = skinMap[userData.avatar.skin] || '';
+        let emoji = hairMap[userData.avatar.hairLength] || '👤';
+        
+        if (userData.avatar.beard === 'full' || userData.avatar.beard === 'light') {
+            emoji = '🧔' + skin;
+        }
+        // نضيف لون البشرة
+        if (skin && emoji !== '👤' && !emoji.includes(skin)) {
+            emoji = emoji.replace(/[\uD83C\uDFFB-\uD83C\uDFFF]/, '') + skin;
+        }
+        return emoji || '👤';
+    }
+    return '👤';
+};
+
+// دالة فتح نافذة تخصيص الشخصية
+window.openAvatarModal = function() {
+    const modal = document.getElementById('avatarModal');
+    if (!modal) return;
+    
+    // تحميل البيانات المحفوظة
+    if (auth?.currentUser) {
+        loadCustomAvatar(auth.currentUser.uid).then(data => {
+            if (data) {
+                customAvatarData = data;
+                updateAvatarPreview();
+                
+                // تحديث واجهة الاختيارات
+                document.querySelectorAll('.avatar-opt, .avatar-opt-btn').forEach(btn => {
+                    btn.style.borderColor = 'var(--border)';
+                    btn.style.background = btn.classList.contains('avatar-opt') ? btn.style.background : 'transparent';
+                    btn.style.color = 'var(--text)';
+                });
+                
+                // تحديد الخيارات المحفوظة
+                document.querySelectorAll('.avatar-opt').forEach(btn => {
+                    const skin = btn.dataset.skin;
+                    const eyes = btn.dataset.eyes;
+                    const hair = btn.dataset.hair;
+                    if (skin && skin === customAvatarData.skin) {
+                        btn.style.borderColor = 'var(--primary)';
+                    }
+                    if (eyes && eyes === customAvatarData.eyes) {
+                        btn.style.borderColor = 'var(--primary)';
+                    }
+                    if (hair && hair === customAvatarData.hair) {
+                        btn.style.borderColor = 'var(--primary)';
+                    }
+                });
+                
+                document.querySelectorAll('.avatar-opt-btn').forEach(btn => {
+                    const hairLength = btn.dataset.hairlength;
+                    const beard = btn.dataset.beard;
+                    const glasses = btn.dataset.glasses;
+                    if (hairLength && hairLength === customAvatarData.hairLength) {
+                        btn.style.borderColor = 'var(--primary)';
+                        btn.style.background = 'var(--primary)';
+                        btn.style.color = 'white';
+                    }
+                    if (beard && beard === customAvatarData.beard) {
+                        btn.style.borderColor = 'var(--primary)';
+                        btn.style.background = 'var(--primary)';
+                        btn.style.color = 'white';
+                    }
+                    if (glasses && glasses === customAvatarData.glasses) {
+                        btn.style.borderColor = 'var(--primary)';
+                        btn.style.background = 'var(--primary)';
+                        btn.style.color = 'white';
+                    }
+                });
+            }
+        });
+    }
+    
+    modal.classList.add('active');
+};
+
+// ربط الأحداث عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    // ربط أحداث اختيار الخيارات
+    document.querySelectorAll('.avatar-opt').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            const category = Object.keys(this.dataset)[0];
+            const value = this.dataset[category];
+            selectAvatarOption(category, value, e);
+        });
+    });
+    
+    document.querySelectorAll('.avatar-opt-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            const category = Object.keys(this.dataset)[0];
+            const value = this.dataset[category];
+            selectAvatarOption(category, value, e);
+        });
+    });
+});
+
+// ✅ تحديث دالة getEmojiForUser القديمة لتستخدم النظام الجديد
+window.getEmojiForUser = function(userData) {
+    return window.getAvatarEmoji(userData);
 };
 
 // ==================== القسم 14: دوال إغلاق المعاينات ====================
