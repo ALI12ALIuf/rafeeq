@@ -14,9 +14,18 @@ function generateShareableId() {
     return id;
 }
 
+const avatarMap = {
+    'male_light': '🧔🏻‍♂️',
+    'male_medium': '🧔🏼‍♂️',
+    'male_dark': '🧔🏽‍♂️',
+    'female_light': '👩🏻',
+    'female_medium': '👩🏼',
+    'female_dark': '👩🏽'
+};
+
 function getEmojiForUser(userData) {
-    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧', 'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵' };
-    return emojiMap[userData.avatarType] || '👤';
+    if (!userData) return '👤';
+    return avatarMap[userData.avatarType] || '👤';
 }
 
 const FieldValue = firebase.firestore.FieldValue;
