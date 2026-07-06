@@ -1338,121 +1338,125 @@ input:checked + .toggle-slider:before {
 
 
 
-/* ==================== 23تقليل حجم القوائم فقط ==================== */
+/* ====================23 تقليل المساحة في الرأس والشريط السفلي ==================== */
 
-/* رأس التطبيق */
+/* 🔹 رأس التطبيق */
 .app-header {
     height: 44px !important;
-    padding: 0 0.5rem !important;
     min-height: 44px !important;
+    padding: 0 0.5rem !important;
+    border-bottom-width: 1px !important;
 }
 
 .app-header h1 {
-    font-size: 0.95rem !important;
+    font-size: 0.9rem !important;
     font-weight: 600 !important;
 }
 
-/* شريط التنقل السفلي */
+.app-header .header-left,
+.app-header .header-right {
+    gap: 0.25rem !important;
+}
+
+.app-header .icon-btn {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 0.9rem !important;
+}
+
+/* 🔹 شريط التنقل السفلي */
 .bottom-nav {
     height: 44px !important;
     min-height: 44px !important;
+    border-top-width: 1px !important;
 }
 
-.nav-item {
-    font-size: 0.55rem !important;
-    gap: 0 !important;
+.bottom-nav .nav-item {
     padding: 2px 0 !important;
+    gap: 0 !important;
 }
 
-.nav-item i {
+.bottom-nav .nav-item i {
     font-size: 1.1rem !important;
 }
 
-/* إخفاء النصوص في شريط التنقل السفلي */
-.nav-item span {
+.bottom-nav .nav-item span {
     display: none !important;
 }
 
-.nav-item.active i {
-    color: var(--primary) !important;
-}
-
-/* تقليل المسافات في المحتوى العام */
+/* 🔹 تعويض المسافات في المحتوى */
 .app-content {
     padding-top: 0.25rem !important;
     padding-bottom: 0.25rem !important;
 }
 
+/* 🔹 تحسين هوامش الصفحات */
 .page {
-    padding: 0.25rem 0.5rem !important;
+    padding: 0.5rem !important;
 }
 
-/* ===== صفحة الملف الشخصي (تم إرجاعها كما كانت) ===== */
-
-.profile-header {
-    margin-bottom: 1rem !important;
+/* 🔹 تحسين الهيدر في صفحة المحادثة */
+.conversation-header {
+    height: 50px !important;
+    padding: 4px 10px !important;
 }
 
-.profile-cover {
-    height: 150px !important;
-}
-
-.profile-avatar-center {
-    width: 100px !important;
-    height: 100px !important;
-}
-
-.profile-avatar-emoji {
-    font-size: 5rem !important;
-}
-
-.profile-info-container {
-    padding: 1rem !important;
-    margin-top: 10px !important;
-    gap: 1rem !important;
-}
-
-.profile-name-wrapper h2 {
-    font-size: 1.3rem !important;
-}
-
-.profile-id-row {
-    padding: 0.5rem 1rem !important;
-    min-width: 250px !important;
-}
-
-.id-value-numbers {
-    font-size: 1.1rem !important;
-}
-
-.profile-bio {
-    padding: 0 1rem 1rem !important;
+.conversation-header .back-btn {
+    width: 32px !important;
+    height: 32px !important;
     font-size: 0.9rem !important;
 }
 
-.profile-stats {
-    padding: 1rem !important;
+.conversation-header .conversation-avatar-emoji {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    font-size: 1.6rem !important;
 }
 
-.stat-link {
-    padding: 10px !important;
+.conversation-header .conversation-user-details h3 {
+    font-size: 0.85rem !important;
 }
 
-.stat-value {
-    font-size: 1.2rem !important;
+.conversation-header .call-buttons button {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 1rem !important;
 }
 
-.stat-link span:last-child {
-    font-size: 0.8rem !important;
+/* 🔹 مدخل الرسائل */
+.message-input-container {
+    padding: 4px 8px !important;
 }
 
-/* زر الإعدادات */
+.message-input-wrapper {
+    padding: 0 4px !important;
+    border-radius: 20px !important;
+}
+
+#messageInput {
+    padding: 6px 4px !important;
+    font-size: 0.85rem !important;
+    min-height: 28px !important;
+    max-height: 80px !important;
+}
+
+.attach-btn,
+#actionBtn {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 1rem !important;
+}
+
+/* 🔹 زر الإعدادات في الملف الشخصي */
 .profile-settings-btn {
-    margin-top: 1rem !important;
-    padding: 0.75rem 1rem !important;
+    padding: 0.5rem 0.75rem !important;
+    margin-top: 0.5rem !important;
+    font-size: 0.85rem !important;
 }
 
 .profile-settings-btn i {
-    font-size: 1.2rem !important;
+    font-size: 1rem !important;
 }
 
