@@ -70,15 +70,6 @@ const i18n = {
             change_avatar: 'تغيير',
             choose_avatar: 'اختر صورتك الرمزية',
             
-            male: 'رجل',
-            female: 'امرأة',
-            boy: 'ولد',
-            girl: 'بنت',
-            father: 'أب',
-            mother: 'أم',
-            grandfather: 'جد',
-            grandmother: 'جدة',
-            
             no_trips: 'لا توجد رحلات',
             no_trips_desc: 'لم تقم بأي رحلة بعد',
             no_followers: 'لا يوجد متابعين',
@@ -177,15 +168,6 @@ const i18n = {
             avatar: 'Avatar',
             change_avatar: 'Change',
             choose_avatar: 'Choose Avatar',
-            
-            male: 'Male',
-            female: 'Female',
-            boy: 'Boy',
-            girl: 'Girl',
-            father: 'Father',
-            mother: 'Mother',
-            grandfather: 'Grandfather',
-            grandmother: 'Grandmother',
             
             no_trips: 'No Trips',
             no_trips_desc: "You haven't taken any trips yet",
