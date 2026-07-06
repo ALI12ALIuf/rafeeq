@@ -1460,3 +1460,51 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
+/* ====================24 تنسيق أفاتار جديد (بسيط) ==================== */
+
+.avatar-options-simple {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 1rem 0;
+    padding: 4px;
+}
+
+.avatar-group {
+    background: var(--light);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    text-align: center;
+}
+
+.avatar-options-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.avatar-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    background: transparent;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 2.2rem;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.avatar-option:hover {
+    border-color: var(--primary);
+    transform: scale(1.08);
+    background: rgba(33, 150, 243, 0.08);
+}
+
+.avatar-option:active {
+    transform: scale(0.95);
+}
+
