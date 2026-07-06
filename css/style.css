@@ -1462,7 +1462,7 @@ input:checked + .toggle-slider:before {
 
 
 
-/* ==================== 24تخصيص تخصيص ==================== */
+/* ====================24 تخصيص الشخصية (نسخة مبسطة وآمنة) ==================== */
 
 /* أزرار اختيار الخيارات */
 .avatar-opt {
@@ -1477,6 +1477,8 @@ input:checked + .toggle-slider:before {
 .avatar-opt-btn {
     transition: all 0.2s ease;
     cursor: pointer;
+    background: transparent !important;
+    color: var(--text) !important;
 }
 
 .avatar-opt-btn:hover {
@@ -1484,26 +1486,9 @@ input:checked + .toggle-slider:before {
     border-color: var(--primary) !important;
 }
 
-/* معاينة الشخصية */
-#avatarPreview {
-    transition: all 0.3s ease;
-}
-
-/* نافذة تخصيص الشخصية */
-#avatarModal .modal-content {
-    max-height: 85vh;
-    overflow-y: auto;
-}
-
-/* تنسيق خيارات الألوان */
-#avatarModal .modal-content label {
-    font-weight: 500;
-}
-
-/* تنسيق الأزرار المختارة */
 .avatar-opt-btn.selected {
     background: var(--primary) !important;
-    color: white !important;
+    color: #fff !important;
     border-color: var(--primary) !important;
 }
 
@@ -1512,4 +1497,23 @@ input:checked + .toggle-slider:before {
     box-shadow: 0 0 0 2px var(--primary);
 }
 
+/* معاينة الشخصية */
+#avatarPreview {
+    transition: all 0.3s ease;
+    font-size: 4.5rem !important;
+    line-height: 1 !important;
+}
+
+/* نافذة تخصيص الشخصية */
+#avatarModal .modal-content {
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+/* منع أي تجميد أو تأخير في الإيموجي */
+#avatarPreview {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeSpeed;
+}
 
