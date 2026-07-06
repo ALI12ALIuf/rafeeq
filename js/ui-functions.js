@@ -795,6 +795,7 @@ function ensureSinglePage() {
 
 function setupNavigation() { 
     const nav = document.querySelectorAll('.nav-item'); 
+    const navTop = document.querySelectorAll('.nav-item-top');
     const pages = document.querySelectorAll('.page'); 
     if (!nav.length || !pages.length) return; 
     
@@ -817,14 +818,21 @@ function setupNavigation() {
             window.hideSearchResults();
         }
         
-        if (id === 'chat') loadChats(); 
-        nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); 
+        if (id === 'chat') loadChats();
+        
+        // ✅ تحديث الشريط السفلي
+        nav.forEach(n => n.classList.toggle('active', n.dataset.page === id));
+        
+        // ✅ تحديث الشريط العلوي
+        navTop.forEach(n => n.classList.toggle('active', n.dataset.page === id));
     } 
     
     // ✅ جعل دالة switchPage عامة للاستخدام من أي مكان
     window.switchPage = switchPage;
     
+    // ✅ إضافة مستمعي الأحداث لكل من الشريط العلوي والسفلي
     nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); 
+    navTop.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page)));
 }
 
 function setupModals() { 
