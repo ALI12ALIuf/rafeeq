@@ -15,12 +15,22 @@ function generateShareableId() {
 }
 
 const avatarMap = {
+    // القيم الجديدة
     'male_light': '🧔🏻‍♂️',
     'male_medium': '🧔🏼‍♂️',
     'male_dark': '🧔🏽‍♂️',
     'female_light': '👩🏻',
     'female_medium': '👩🏼',
-    'female_dark': '👩🏽'
+    'female_dark': '👩🏽',
+    // القيم القديمة (لدعم المستخدمين الحاليين)
+    'male': '🧔🏻‍♂️',
+    'female': '👩🏻',
+    'boy': '🧒',
+    'girl': '👧',
+    'father': '👨‍🦳',
+    'mother': '👩‍🦳',
+    'grandfather': '👴',
+    'grandmother': '👵'
 };
 
 function getEmojiForUser(userData) {
@@ -78,7 +88,7 @@ async function saveUserAndEnter(user) {
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
                 email: user.email || '', shareableId: generateShareableId(),
-                bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date()
+                bio: '', avatarType: 'male_light', friends: [], blocked: [], createdAt: new Date()
             });
         } else {
             const userData = userDoc.data(); const updates = {};
