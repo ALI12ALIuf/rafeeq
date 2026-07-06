@@ -717,20 +717,38 @@ window.goBack = () => {
 };
 
 // ==================== القسم 13: الصورة الرمزية ====================
-window.selectAvatar = t => { 
-    const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; 
-    const e = m[t] || '👤'; 
-    const profileAvatar = document.getElementById('profileAvatarEmoji'), currentAvatar = document.getElementById('currentAvatarEmoji'); 
-    if (profileAvatar) profileAvatar.textContent = e; 
-    if (currentAvatar) currentAvatar.textContent = e; 
-    if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ avatarType: t }).then(() => closeModal()).catch(() => {}); 
+
+const avatarMap = {
+    'male_light': '🧔🏻‍♂️',
+    'male_medium': '🧔🏼‍♂️',
+    'male_dark': '🧔🏽‍♂️',
+    'female_light': '👩🏻',
+    'female_medium': '👩🏼',
+    'female_dark': '👩🏽'
+};
+
+window.selectAvatar = function(type) { 
+    const emoji = avatarMap[type] || '👤';
+    
+    const profileAvatar = document.getElementById('profileAvatarEmoji');
+    const currentAvatar = document.getElementById('currentAvatarEmoji');
+    
+    if (profileAvatar) profileAvatar.textContent = emoji;
+    if (currentAvatar) currentAvatar.textContent = emoji;
+    
+    if (window.auth?.currentUser) {
+        window.db.collection('users').doc(window.auth.currentUser.uid)
+            .update({ avatarType: type })
+            .then(() => closeModal())
+            .catch(() => {});
+    }
 };
 
 window.openAvatarModal = () => document.getElementById('avatarModal')?.classList.add('active');
 
-window.getEmojiForUser = u => { 
-    const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; 
-    return m[u?.avatarType] || '👤'; 
+window.getEmojiForUser = function(userData) {
+    if (!userData) return '👤';
+    return avatarMap[userData.avatarType] || '👤';
 };
 
 // ==================== القسم 14: دوال إغلاق المعاينات ====================
@@ -813,7 +831,6 @@ function setupNavigation() {
             window.hideSearchResults();
         }
         
-        // ✅ تحديث عنوان الصفحة في رأس التطبيق
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) {
             const titles = {
