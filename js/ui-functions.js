@@ -21,14 +21,13 @@ function clearStack() {
 
 // ==================== القسم 2: تحميل المحادثات (معدل - يدعم طلبات الصداقة) ====================
 let chatsLoaded = false;
-let isLoadingChats = false; // ✅ منع التحميل المتزامن
+let isLoadingChats = false;
 
 async function loadChats(force = false) { 
     if (!window.auth || !window.auth.currentUser) return; 
     const list = document.getElementById('chatsList'); 
     if (!list) return; 
     
-    // ✅ منع التحميل المتزامن
     if (isLoadingChats) {
         console.log('⏳ جاري تحميل المحادثات بالفعل، تخطي...');
         return;
@@ -63,10 +62,9 @@ async function loadChats(force = false) {
         // ===== القسم 2.1: عرض طلبات الصداقة في الأعلى =====
         if (requestTemplate) {
             const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
-            const addedRequestIds = new Set(); // ✅ منع التكرار
+            const addedRequestIds = new Set();
             
             for (const req of pendingRequests) {
-                // ✅ التحقق من عدم تكرار الطلب
                 if (addedRequestIds.has(req.id)) continue;
                 addedRequestIds.add(req.id);
                 
@@ -129,7 +127,6 @@ async function loadChats(force = false) {
         
         // ===== القسم 2.2: عرض قائمة الأصدقاء =====
         if (!friends.length) { 
-            // إذا كان هناك طلبات صداقة معروضة، لا نعرض رسالة "لا توجد محادثات"
             if (list.children.length === 0) {
                 list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
             }
@@ -138,10 +135,9 @@ async function loadChats(force = false) {
             return; 
         } 
         
-        const addedFriendIds = new Set(); // ✅ منع تكرار الأصدقاء
+        const addedFriendIds = new Set();
         
         for (const fid of friends) { 
-            // ✅ التحقق من عدم تكرار الصديق
             if (addedFriendIds.has(fid)) continue;
             addedFriendIds.add(fid);
             
@@ -233,11 +229,6 @@ window.openChat = friendId => {
     window.db.collection('users').doc(friendId).get().then(doc => {
         if (doc.exists) {
             const f = doc.data();
-            // ✅ تغيير عنوان الصفحة إلى اسم المستخدم عند فتح المحادثة
-            const pageTitle = document.getElementById('pageTitle');
-            if (pageTitle) {
-                pageTitle.textContent = f.name || 'مستخدم';
-            }
             ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤');
         }
     }).catch(() => {});
@@ -650,9 +641,6 @@ window.closeConversation = () => {
         document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
         document.body.classList.remove('profile-subpage-open');
         
-        // ✅ إعادة عنوان الصفحة عند إغلاق المحادثة
-        const pageTitle = document.getElementById('pageTitle');
-        
         if (lastPage && lastPage.type === 'subpage') {
             document.body.classList.add('profile-subpage-open');
             document.querySelector('.profile-page').style.display = 'none';
@@ -660,18 +648,15 @@ window.closeConversation = () => {
                 document.getElementById(lastPage.id).style.display = 'block';
             }
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
-            if (pageTitle) pageTitle.textContent = 'الملف الشخصي';
         } else if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
             document.querySelector('.profile-page').classList.add('active');
             document.querySelector('.profile-page').style.display = 'block';
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
-            if (pageTitle) pageTitle.textContent = 'الملف الشخصي';
         } else {
             document.querySelector('.chat-page').classList.add('active');
             document.querySelector('.chat-page').style.display = 'block';
             loadChats();
             document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'chat') n.classList.add('active'); });
-            if (pageTitle) pageTitle.textContent = 'الدردشة';
         }
     }, 200);
 };
@@ -729,10 +714,6 @@ window.goBack = () => {
         document.querySelector('.profile-page').style.display = 'block';
         document.querySelector('.profile-page').classList.add('active');
     }
-    
-    // ✅ تحديث عنوان الصفحة عند الرجوع للملف الشخصي
-    const pageTitle = document.getElementById('pageTitle');
-    if (pageTitle) pageTitle.textContent = 'الملف الشخصي';
 };
 
 // ==================== القسم 13: الصورة الرمزية ====================
@@ -813,14 +794,6 @@ function setupNavigation() {
     const pages = document.querySelectorAll('.page'); 
     if (!nav.length || !pages.length) return; 
     
-    // ✅ ترجمة النصوص للشريط العلوي
-    const pageTitles = {
-        'home': 'الرئيسية',
-        'chat': 'الدردشة',
-        'profile': 'الملف الشخصي',
-        'settings': 'الإعدادات'
-    };
-    
     function switchPage(id) { 
         clearStack(); 
         pages.forEach(p => p.classList.remove('active')); 
@@ -840,17 +813,23 @@ function setupNavigation() {
             window.hideSearchResults();
         }
         
-        // ✅ تغيير عنوان الصفحة في الشريط العلوي
+        // ✅ تحديث عنوان الصفحة في رأس التطبيق
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) {
-            pageTitle.textContent = pageTitles[id] || 'رفيق';
+            const titles = {
+                'home': 'الرئيسية',
+                'chat': 'الدردشة',
+                'profile': 'الملف الشخصي',
+                'settings': 'الإعدادات'
+            };
+            pageTitle.textContent = titles[id] || id;
+            pageTitle.setAttribute('data-i18n', id);
         }
         
         if (id === 'chat') loadChats(); 
         nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); 
     } 
     
-    // ✅ جعل دالة switchPage عامة للاستخدام من أي مكان
     window.switchPage = switchPage;
     
     nav.forEach(n => n.addEventListener('click', () => switchPage(n.dataset.page))); 
