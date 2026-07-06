@@ -583,19 +583,91 @@
     </div>
 </div>
 
-<!-- 6.2: نافذة اختيار الصورة الرمزية -->
+<!-- 6.2: نافذة تخصيص الشخصية -->
 <div class="modal" id="avatarModal">
-    <div class="modal-content">
-        <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
-        <div class="avatar-options">
-            <button class="avatar-option" onclick="selectAvatar('male')"><span>👨</span><span data-i18n="male">رجل</span></button>
-            <button class="avatar-option" onclick="selectAvatar('female')"><span>👩</span><span data-i18n="female">امرأة</span></button>
-            <button class="avatar-option" onclick="selectAvatar('boy')"><span>🧒</span><span data-i18n="boy">ولد</span></button>
-            <button class="avatar-option" onclick="selectAvatar('girl')"><span>👧</span><span data-i18n="girl">بنت</span></button>
-            <button class="avatar-option" onclick="selectAvatar('father')"><span>👨‍🦳</span><span data-i18n="father">أب</span></button>
-            <button class="avatar-option" onclick="selectAvatar('mother')"><span>👩‍🦳</span><span data-i18n="mother">أم</span></button>
-            <button class="avatar-option" onclick="selectAvatar('grandfather')"><span>👴</span><span data-i18n="grandfather">جد</span></button>
-            <button class="avatar-option" onclick="selectAvatar('grandmother')"><span>👵</span><span data-i18n="grandmother">جدة</span></button>
+    <div class="modal-content" style="max-width: 450px;">
+        <h3 data-i18n="customize_avatar">🎨 تخصيص شخصيتك</h3>
+        
+        <!-- معاينة الشخصية -->
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div id="avatarPreview" style="font-size: 5rem; background: var(--light); width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; border: 3px solid var(--primary);">👤</div>
+        </div>
+        
+        <!-- خيارات التخصيص -->
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            
+            <!-- لون البشرة -->
+            <div>
+                <label style="color: var(--text-light); font-size: 0.85rem; display: block; margin-bottom: 0.3rem;">لون البشرة</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="skinOptions">
+                    <button class="avatar-opt" data-skin="light" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #FFDFC4; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-skin="medium" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #E8B88A; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-skin="tan" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #C68642; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-skin="dark" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #8D5524; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-skin="olive" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #B5A088; cursor: pointer;"></button>
+                </div>
+            </div>
+            
+            <!-- لون العيون -->
+            <div>
+                <label style="color: var(--text-light); font-size: 0.85rem; display: block; margin-bottom: 0.3rem;">لون العيون</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="eyesOptions">
+                    <button class="avatar-opt" data-eyes="brown" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #5C3A21; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-eyes="blue" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #4A7A9C; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-eyes="green" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #2E7D32; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-eyes="hazel" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #8B7D3C; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-eyes="black" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #1A1A1A; cursor: pointer;"></button>
+                </div>
+            </div>
+            
+            <!-- لون الشعر -->
+            <div>
+                <label style="color: var(--text-light); font-size: 0.85rem; display: block; margin-bottom: 0.3rem;">لون الشعر</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="hairOptions">
+                    <button class="avatar-opt" data-hair="black" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #1A1A1A; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-hair="brown" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #5C3A21; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-hair="blonde" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #E8C87A; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-hair="red" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #A8321A; cursor: pointer;"></button>
+                    <button class="avatar-opt" data-hair="white" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #D4D4D4; cursor: pointer;"></button>
+                </div>
+            </div>
+            
+            <!-- طول الشعر -->
+            <div>
+                <label style="color: var(--text-light); font-size: 0.85rem; display: block; margin-bottom: 0.3rem;">طول الشعر</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="hairLengthOptions">
+                    <button class="avatar-opt-btn" data-hairlength="short" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">قصير</button>
+                    <button class="avatar-opt-btn" data-hairlength="medium" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">متوسط</button>
+                    <button class="avatar-opt-btn" data-hairlength="long" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">طويل</button>
+                    <button class="avatar-opt-btn" data-hairlength="bald" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">أصلع</button>
+                </div>
+            </div>
+            
+            <!-- اللحية -->
+            <div>
+                <label style="color: var(--text-light); font-size: 0.85rem; display: block; margin-bottom: 0.3rem;">اللحية</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="beardOptions">
+                    <button class="avatar-opt-btn" data-beard="none" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">بدون</button>
+                    <button class="avatar-opt-btn" data-beard="light" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">خفيفة</button>
+                    <button class="avatar-opt-btn" data-beard="full" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">كثيفة</button>
+                </div>
+            </div>
+            
+            <!-- النظارات -->
+            <div>
+                <label style="color: var(--text-light); font-size: 0.85rem; display: block; margin-bottom: 0.3rem;">النظارات</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="glassesOptions">
+                    <button class="avatar-opt-btn" data-glasses="none" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">بدون</button>
+                    <button class="avatar-opt-btn" data-glasses="glasses" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">نظارة</button>
+                    <button class="avatar-opt-btn" data-glasses="sunglasses" style="padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 0.8rem;">شمسية</button>
+                </div>
+            </div>
+            
+        </div>
+        
+        <div class="modal-actions" style="margin-top: 1.5rem;">
+            <button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
+            <button class="modal-btn" onclick="saveCustomAvatar()" style="background: var(--primary); color: white; border: none;" data-i18n="save">حفظ</button>
         </div>
         <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
     </div>
