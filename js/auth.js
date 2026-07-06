@@ -1,4 +1,4 @@
-// ========== auth.js - النسخة المعدلة (بدون كابتشا + إزالة عداد الطلبات) ==========
+// ========== auth.js - النسخة المعدلة (نظام أفاتار جديد 6 خيارات) ==========
 // Firebase Auth الأساسي
 
 // ==================== القسم 1: دوال مساعدة ====================
@@ -14,9 +14,18 @@ function generateShareableId() {
     return id;
 }
 
+const avatarMap = {
+    'male_light': '🧔🏻‍♂️',
+    'male_medium': '🧔🏼‍♂️',
+    'male_dark': '🧔🏽‍♂️',
+    'female_light': '👩🏻',
+    'female_medium': '👩🏼',
+    'female_dark': '👩🏽'
+};
+
 function getEmojiForUser(userData) {
-    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧', 'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵' };
-    return emojiMap[userData.avatarType] || '👤';
+    if (!userData) return '👤';
+    return avatarMap[userData.avatarType] || '👤';
 }
 
 const FieldValue = firebase.firestore.FieldValue;
@@ -69,7 +78,7 @@ async function saveUserAndEnter(user) {
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
                 email: user.email || '', shareableId: generateShareableId(),
-                bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date()
+                bio: '', avatarType: 'male_light', friends: [], blocked: [], createdAt: new Date()
             });
         } else {
             const userData = userDoc.data(); const updates = {};
@@ -102,7 +111,7 @@ function updateUserUI() {
     } 
 }
 
-// ==================== القسم 7: logout (معدل - إضافة تنظيف شامل) ====================
+// ==================== القسم 7: logout ====================
 async function logout() { 
     if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
         console.log('🧹 تنظيف العناصر الديناميكية قبل تسجيل الخروج');
@@ -132,7 +141,7 @@ async function logout() {
     window.location.reload(); 
 }
 
-// ==================== القسم 8: loadUserData (معدل - إزالة عداد الطلبات) ====================
+// ==================== القسم 8: loadUserData ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
