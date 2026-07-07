@@ -526,18 +526,17 @@ window.hideSearchResults = function() {
 };
 
 // ==================== القسم 12: دوال مساعدة عامة ====================
+// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
 window.getEmojiForUser = function(userData) {
-    const emojiMap = { 
-        'male': '👨', 
-        'female': '👩', 
-        'boy': '🧒', 
-        'girl': '👧', 
-        'father': '👨‍🦳', 
-        'mother': '👩‍🦳', 
-        'grandfather': '👴', 
-        'grandmother': '👵' 
+    const emojiMap = {
+        'man_light': '🧔🏻‍♂️',
+        'man_medium': '🧔🏼‍♂️',
+        'man_dark': '🧔🏽‍♂️',
+        'woman_light': '👩🏻',
+        'woman_medium': '👩🏼',
+        'woman_dark': '👩🏽'
     };
-    return emojiMap[userData?.avatarType] || '👤';
+    return emojiMap[userData?.avatarType] || '🧔🏻‍♂️';
 };
 
 window.loadFriendRequestsForChat = loadFriendRequestsForChat;
