@@ -583,30 +583,30 @@
     </div>
 </div>
 
-<!-- 6.2: نافذة اختيار الصورة الرمزية (معدلة - بدون نصوص) -->
+<!-- 6.2: نافذة اختيار الصورة الرمزية (معدلة - بدون نصوص + تحديد بالدائرة الزرقاء) -->
 <div class="modal" id="avatarModal">
     <div class="modal-content">
         <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
-        <div class="avatar-options" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; justify-items: center; margin: 1.5rem 0;">
-            <!-- رجل - 3 ألوان (بدون نصوص) -->
-            <button class="avatar-option" onclick="selectAvatar('man_light')" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; background: var(--light); border: 3px solid transparent; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; width: 100%; aspect-ratio: 1/1; min-width: 60px; font-size: 2.5rem;">
-                <span style="font-size: 2.5rem;">🧔🏻‍♂️</span>
+        <div class="avatar-options-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:15px 0;">
+            <!-- الصف الأول: رجل - 3 ألوان -->
+            <button class="avatar-option-btn" data-type="man_light" onclick="selectAvatar('man_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">🧔🏻‍♂️</span>
             </button>
-            <button class="avatar-option" onclick="selectAvatar('man_medium')" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; background: var(--light); border: 3px solid transparent; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; width: 100%; aspect-ratio: 1/1; min-width: 60px; font-size: 2.5rem;">
-                <span style="font-size: 2.5rem;">🧔🏼‍♂️</span>
+            <button class="avatar-option-btn" data-type="man_medium" onclick="selectAvatar('man_medium')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">🧔🏼‍♂️</span>
             </button>
-            <button class="avatar-option" onclick="selectAvatar('man_dark')" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; background: var(--light); border: 3px solid transparent; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; width: 100%; aspect-ratio: 1/1; min-width: 60px; font-size: 2.5rem;">
-                <span style="font-size: 2.5rem;">🧔🏽‍♂️</span>
+            <button class="avatar-option-btn" data-type="man_dark" onclick="selectAvatar('man_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">🧔🏽‍♂️</span>
             </button>
-            <!-- امرأة - 3 ألوان (بدون نصوص) -->
-            <button class="avatar-option" onclick="selectAvatar('woman_light')" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; background: var(--light); border: 3px solid transparent; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; width: 100%; aspect-ratio: 1/1; min-width: 60px; font-size: 2.5rem;">
-                <span style="font-size: 2.5rem;">👩🏻</span>
+            <!-- الصف الثاني: امرأة - 3 ألوان -->
+            <button class="avatar-option-btn" data-type="woman_light" onclick="selectAvatar('woman_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">👩🏻</span>
             </button>
-            <button class="avatar-option" onclick="selectAvatar('woman_medium')" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; background: var(--light); border: 3px solid transparent; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; width: 100%; aspect-ratio: 1/1; min-width: 60px; font-size: 2.5rem;">
-                <span style="font-size: 2.5rem;">👩🏼</span>
+            <button class="avatar-option-btn" data-type="woman_medium" onclick="selectAvatar('woman_medium')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">👩🏼</span>
             </button>
-            <button class="avatar-option" onclick="selectAvatar('woman_dark')" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; background: var(--light); border: 3px solid transparent; border-radius: var(--radius); cursor: pointer; transition: all 0.2s; width: 100%; aspect-ratio: 1/1; min-width: 60px; font-size: 2.5rem;">
-                <span style="font-size: 2.5rem;">👩🏽</span>
+            <button class="avatar-option-btn" data-type="woman_dark" onclick="selectAvatar('woman_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">👩🏽</span>
             </button>
         </div>
         <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
