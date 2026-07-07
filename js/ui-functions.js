@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة المعدلة (مع نظام الإيموجي الجديد) ==========
+// ========== ui-functions.js - النسخة المعدلة (مع نظام الإيموجي الجديد + دائرة زرقاء) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -716,8 +716,40 @@ window.goBack = () => {
     }
 };
 
-// ==================== القسم 13: الصورة الرمزية (معدل) ====================
-// ✅ دالة selectAvatar الجديدة - خيارين فقط مع 3 ألوان لكل منهما
+// ==================== القسم 13: الصورة الرمزية (معدل - مع دائرة زرقاء) ====================
+
+// ✅ فتح نافذة اختيار الصورة الرمزية مع تحديد الإيموجي الحالي
+window.openAvatarModal = function() {
+    const modal = document.getElementById('avatarModal');
+    if (!modal) return;
+    modal.classList.add('active');
+    
+    // جلب الإيموجي الحالي من الملف الشخصي
+    const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent || '🧔🏻‍♂️';
+    
+    // إزالة التحديد من جميع الأزرار
+    document.querySelectorAll('#avatarModal .avatar-option').forEach(btn => {
+        const ring = btn.querySelector('.avatar-ring');
+        if (ring) {
+            ring.style.borderColor = 'transparent';
+            ring.style.boxShadow = 'none';
+        }
+    });
+    
+    // البحث عن الزر الذي يحمل نفس الإيموجي وتحديده
+    document.querySelectorAll('#avatarModal .avatar-option').forEach(btn => {
+        const span = btn.querySelector('span');
+        if (span && span.textContent === currentEmoji) {
+            const ring = btn.querySelector('.avatar-ring');
+            if (ring) {
+                ring.style.borderColor = '#2196F3';
+                ring.style.boxShadow = '0 0 15px rgba(33, 150, 243, 0.5)';
+            }
+        }
+    });
+};
+
+// ✅ دالة selectAvatar الجديدة - مع دائرة زرقاء
 window.selectAvatar = function(type) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -728,20 +760,45 @@ window.selectAvatar = function(type) {
         'woman_dark': '👩🏽'
     };
     const emoji = emojiMap[type] || '🧔🏻‍♂️';
+    
+    // تحديث صورة الملف الشخصي
     const profileAvatar = document.getElementById('profileAvatarEmoji');
     const currentAvatar = document.getElementById('currentAvatarEmoji');
     if (profileAvatar) profileAvatar.textContent = emoji;
     if (currentAvatar) currentAvatar.textContent = emoji;
+    
+    // تحديث الدائرة الزرقاء في النافذة المنبثقة
+    document.querySelectorAll('#avatarModal .avatar-option').forEach(btn => {
+        const ring = btn.querySelector('.avatar-ring');
+        if (ring) {
+            ring.style.borderColor = 'transparent';
+            ring.style.boxShadow = 'none';
+        }
+    });
+    
+    // تحديد الزر الذي تم اختياره
+    document.querySelectorAll('#avatarModal .avatar-option').forEach(btn => {
+        if (btn.dataset.avatar === type) {
+            const ring = btn.querySelector('.avatar-ring');
+            if (ring) {
+                ring.style.borderColor = '#2196F3';
+                ring.style.boxShadow = '0 0 15px rgba(33, 150, 243, 0.5)';
+            }
+        }
+    });
+    
+    // حفظ في قاعدة البيانات
     if (auth?.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
-            .then(() => closeModal())
+            .then(() => console.log('✅ تم تحديث الصورة الرمزية:', type))
             .catch(() => {});
     }
+    
+    // إغلاق النافذة بعد تأخير بسيط
+    setTimeout(() => closeModal(), 300);
 };
 
-window.openAvatarModal = () => document.getElementById('avatarModal')?.classList.add('active');
-
-// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
+// ✅ دالة الإيموجي الجديدة
 window.getEmojiForUser = function(userData) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
