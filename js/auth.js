@@ -85,7 +85,7 @@ async function saveUserAndEnter(user) {
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
-            // ✅ دعم التوافق مع المستخدمين القدامى - تعيين قيمة افتراضية إذا كانت القيمة القديمة
+            // ✅ دعم التوافق مع المستخدمين القدامى
             if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
                 updates.avatarType = 'man_light';
             }
