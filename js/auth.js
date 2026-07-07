@@ -32,17 +32,33 @@ const FieldValue = firebase.firestore.FieldValue;
 
 // ==================== القسم 2: showApp ====================
 function showApp() {
-    const splash = document.getElementById('splash'), app = document.getElementById('app');
+    const splash = document.getElementById('splash');
+    const app = document.getElementById('app');
     const loginScreen = document.getElementById('loginScreen');
+    
+    if (splash) splash.style.display = 'none';
     if (loginScreen) loginScreen.style.display = 'none';
-    if (splash) { splash.style.display = 'none'; }
-    if (app) { app.style.display = 'flex'; }
+    if (app) {
+        app.style.display = 'flex';
+        app.style.visibility = 'visible';
+    }
 }
 
 // ==================== القسم 3: showLoginScreen ====================
 function showLoginScreen() {
+    const splash = document.getElementById('splash');
+    const app = document.getElementById('app');
     const loginScreen = document.getElementById('loginScreen');
-    if (loginScreen) loginScreen.style.display = 'flex';
+    
+    if (splash) splash.style.display = 'none';
+    if (app) {
+        app.style.display = 'none';
+        app.style.visibility = 'hidden';
+    }
+    if (loginScreen) {
+        loginScreen.style.display = 'flex';
+        loginScreen.style.visibility = 'visible';
+    }
 }
 
 // ==================== القسم 4: startGoogleLogin ====================
@@ -168,35 +184,43 @@ if (typeof window.auth !== 'undefined') {
         const app = document.getElementById('app');
         const loginScreen = document.getElementById('loginScreen');
         
+        // ✅ إخفاء كل شيء أولاً
+        if (splash) splash.style.display = 'none';
+        if (app) app.style.display = 'none';
+        if (loginScreen) loginScreen.style.display = 'none';
+        
         if (user) {
             console.log('✅ مستخدم مسجل:', user.uid);
-            await loadUserData(user.uid);
-            setupFriendRequestsListener(user.uid);
-            if (typeof SecureChatSystem !== 'undefined') {
-                await SecureChatSystem.init();
+            try {
+                await loadUserData(user.uid);
+                setupFriendRequestsListener(user.uid);
+                if (typeof SecureChatSystem !== 'undefined') {
+                    await SecureChatSystem.init();
+                }
+                // ✅ عرض التطبيق
+                if (app) {
+                    app.style.display = 'flex';
+                    app.style.visibility = 'visible';
+                }
+                if (loginScreen) loginScreen.style.display = 'none';
+                if (splash) splash.style.display = 'none';
+            } catch (error) {
+                console.error('خطأ في تحميل بيانات المستخدم:', error);
+                // إذا فشل التحميل، اعرض شاشة تسجيل الدخول
+                if (loginScreen) loginScreen.style.display = 'flex';
             }
-            if (splash) splash.style.display = 'none';
-            if (loginScreen) loginScreen.style.display = 'none';
-            if (app) {
-                app.style.display = 'flex';
-                app.style.visibility = 'visible';
-            }
-            showApp();
         } else {
             console.log('❌ لا يوجد مستخدم مسجل، عرض شاشة تسجيل الدخول');
+            // ✅ عرض شاشة تسجيل الدخول فقط
+            if (loginScreen) {
+                loginScreen.style.display = 'flex';
+                loginScreen.style.visibility = 'visible';
+            }
             if (app) {
                 app.style.display = 'none';
                 app.style.visibility = 'hidden';
             }
-            if (splash) {
-                splash.style.display = 'flex';
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                    showLoginScreen();
-                }, 1500);
-            } else {
-                showLoginScreen();
-            }
+            if (splash) splash.style.display = 'none';
         }
     });
 }
