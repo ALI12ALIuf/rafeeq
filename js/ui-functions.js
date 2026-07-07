@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة المعدلة (مع نظام الإيموجي الجديد) ==========
+// ========== ui-functions.js - النسخة المعدلة (مع نظام الإيموجي الجديد + التحديد) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -716,8 +716,9 @@ window.goBack = () => {
     }
 };
 
-// ==================== القسم 13: الصورة الرمزية (معدل) ====================
-// ✅ دالة selectAvatar الجديدة - خيارين فقط مع 3 ألوان لكل منهما
+// ==================== القسم 13: الصورة الرمزية (معدل - مع التحديد بالدائرة الزرقاء) ====================
+
+// ✅ دالة selectAvatar الجديدة - مع تحديث واجهة الاختيار
 window.selectAvatar = function(type) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -732,14 +733,53 @@ window.selectAvatar = function(type) {
     const currentAvatar = document.getElementById('currentAvatarEmoji');
     if (profileAvatar) profileAvatar.textContent = emoji;
     if (currentAvatar) currentAvatar.textContent = emoji;
+    
+    // ✅ تحديث واجهة الاختيار - إضافة الدائرة الزرقاء حول المحدد
+    document.querySelectorAll('.avatar-option-btn').forEach(btn => {
+        btn.style.borderColor = 'transparent';
+        btn.style.background = 'var(--light)';
+        btn.style.boxShadow = 'none';
+    });
+    
+    const selectedBtn = document.querySelector(`.avatar-option-btn[data-type="${type}"]`);
+    if (selectedBtn) {
+        selectedBtn.style.borderColor = '#2196F3';
+        selectedBtn.style.background = 'rgba(33, 150, 243, 0.15)';
+        selectedBtn.style.boxShadow = '0 0 20px rgba(33, 150, 243, 0.3)';
+    }
+    
     if (auth?.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
-            .then(() => closeModal())
+            .then(() => {
+                // نغلق النافذة بعد 500ms ليعطي انطباع بالاختيار
+                setTimeout(() => closeModal(), 500);
+            })
             .catch(() => {});
     }
 };
 
-window.openAvatarModal = () => document.getElementById('avatarModal')?.classList.add('active');
+window.openAvatarModal = function() {
+    const modal = document.getElementById('avatarModal');
+    if (modal) modal.classList.add('active');
+    
+    // ✅ عند فتح النافذة، نحدد الإيموجي الحالي
+    const currentAvatar = document.getElementById('profileAvatarEmoji')?.textContent;
+    const currentType = auth?.currentUser ? null : null;
+    
+    // نبحث عن الزر المطابق للإيموجي الحالي
+    document.querySelectorAll('.avatar-option-btn').forEach(btn => {
+        const emojiSpan = btn.querySelector('span');
+        if (emojiSpan && emojiSpan.textContent === currentAvatar) {
+            btn.style.borderColor = '#2196F3';
+            btn.style.background = 'rgba(33, 150, 243, 0.15)';
+            btn.style.boxShadow = '0 0 20px rgba(33, 150, 243, 0.3)';
+        } else {
+            btn.style.borderColor = 'transparent';
+            btn.style.background = 'var(--light)';
+            btn.style.boxShadow = 'none';
+        }
+    });
+};
 
 // ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
 window.getEmojiForUser = function(userData) {
@@ -751,7 +791,11 @@ window.getEmojiForUser = function(userData) {
         'woman_medium': '👩🏼',
         'woman_dark': '👩🏽'
     };
-    return emojiMap[userData?.avatarType] || '🧔🏻‍♂️';
+    // دعم التوافق مع المستخدمين القدامى
+    if (!userData?.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
+        return '🧔🏻‍♂️';
+    }
+    return emojiMap[userData.avatarType] || '🧔🏻‍♂️';
 };
 
 // ==================== القسم 14: دوال إغلاق المعاينات ====================
