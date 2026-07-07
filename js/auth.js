@@ -14,9 +14,18 @@ function generateShareableId() {
     return id;
 }
 
+const avatarMap = {
+    'male_light': '🧔🏻‍♂️',
+    'male_medium': '🧔🏼‍♂️',
+    'male_dark': '🧔🏽‍♂️',
+    'female_light': '👩🏻',
+    'female_medium': '👩🏼',
+    'female_dark': '👩🏽'
+};
+
 function getEmojiForUser(userData) {
-    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧', 'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵' };
-    return emojiMap[userData.avatarType] || '👤';
+    if (!userData) return '👤';
+    return avatarMap[userData.avatarType] || '👤';
 }
 
 const FieldValue = firebase.firestore.FieldValue;
@@ -69,7 +78,7 @@ async function saveUserAndEnter(user) {
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
                 email: user.email || '', shareableId: generateShareableId(),
-                bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date()
+                bio: '', avatarType: 'male_light', friends: [], blocked: [], createdAt: new Date()
             });
         } else {
             const userData = userDoc.data(); const updates = {};
