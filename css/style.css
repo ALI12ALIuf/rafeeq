@@ -1460,3 +1460,49 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
+
+/* ==================== 24ستايلات اختيار الصورة الرمزية الجديدة ==================== */
+#avatarModal .avatar-option {
+    transition: transform 0.2s ease;
+    background: var(--card-bg) !important;
+    border-radius: 50% !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+#avatarModal .avatar-option:hover {
+    transform: scale(1.05);
+}
+
+#avatarModal .avatar-option:active {
+    transform: scale(0.95);
+}
+
+#avatarModal .avatar-option .avatar-ring {
+    border-radius: 50%;
+    border: 3px solid transparent;
+    transition: all 0.25s ease;
+}
+
+#avatarModal .avatar-option .avatar-ring.active {
+    border-color: #2196F3;
+    box-shadow: 0 0 20px rgba(33, 150, 243, 0.4);
+}
+
+#avatarModal .avatar-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    padding: 15px 0;
+    justify-items: center;
+}
+
+@media (max-width: 400px) {
+    #avatarModal .avatar-option {
+        width: 60px !important;
+        height: 60px !important;
+    }
+    #avatarModal .avatar-option span {
+        font-size: 2.5rem !important;
+    }
+}
+
