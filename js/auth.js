@@ -24,7 +24,11 @@ function getEmojiForUser(userData) {
         'woman_medium': '👩🏼',
         'woman_dark': '👩🏽'
     };
-    return emojiMap[userData?.avatarType] || '🧔🏻‍♂️';
+    // دعم التوافق مع المستخدمين القدامى
+    if (!userData?.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
+        return '🧔🏻‍♂️';
+    }
+    return emojiMap[userData.avatarType] || '🧔🏻‍♂️';
 }
 
 const FieldValue = firebase.firestore.FieldValue;
