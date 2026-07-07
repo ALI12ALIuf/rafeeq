@@ -1,4 +1,4 @@
-// ========== auth.js - النسخة المعدلة (بدون كابتشا + إزالة عداد الطلبات) ==========
+// ========== auth.js - النسخة المعدلة (نظام الإيموجي الجديد) ==========
 // Firebase Auth الأساسي
 
 // ==================== القسم 1: دوال مساعدة ====================
@@ -14,9 +14,17 @@ function generateShareableId() {
     return id;
 }
 
+// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
 function getEmojiForUser(userData) {
-    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧', 'father': '👨‍🦳', 'mother': '👩‍🦳', 'grandfather': '👴', 'grandmother': '👵' };
-    return emojiMap[userData.avatarType] || '👤';
+    const emojiMap = {
+        'man_light': '🧔🏻‍♂️',
+        'man_medium': '🧔🏼‍♂️',
+        'man_dark': '🧔🏽‍♂️',
+        'woman_light': '👩🏻',
+        'woman_medium': '👩🏼',
+        'woman_dark': '👩🏽'
+    };
+    return emojiMap[userData?.avatarType] || '🧔🏻‍♂️';
 }
 
 const FieldValue = firebase.firestore.FieldValue;
@@ -69,13 +77,18 @@ async function saveUserAndEnter(user) {
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
                 email: user.email || '', shareableId: generateShareableId(),
-                bio: '', avatarType: 'male', friends: [], blocked: [], createdAt: new Date()
+                bio: '', avatarType: 'man_light', // ✅ القيمة الافتراضية الجديدة
+                friends: [], blocked: [], createdAt: new Date()
             });
         } else {
             const userData = userDoc.data(); const updates = {};
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
+            // ✅ دعم التوافق مع المستخدمين القدامى - تعيين قيمة افتراضية إذا كانت القيمة القديمة
+            if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
+                updates.avatarType = 'man_light';
+            }
             if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
         }
         await loadUserData(user.uid);
@@ -132,7 +145,7 @@ async function logout() {
     window.location.reload(); 
 }
 
-// ==================== القسم 8: loadUserData (معدل - إزالة عداد الطلبات) ====================
+// ==================== القسم 8: loadUserData ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
