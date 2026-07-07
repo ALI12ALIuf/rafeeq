@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة المعدلة (مع دوال إغلاق المعاينات) ==========
+// ========== ui-functions.js - النسخة المعدلة (مع نظام الإيموجي الجديد) ==========
 // وظائف الواجهة العامة
 
 // ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
@@ -83,7 +83,7 @@ async function loadChats(force = false) {
                     const acceptBtn = requestItem.querySelector('.accept-friend-btn');
                     const rejectBtn = requestItem.querySelector('.reject-friend-btn');
                     
-                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '👤';
+                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '🧔🏻‍♂️';
                     if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
                     if (idSpan) idSpan.textContent = sender.shareableId || '0000000000';
                     
@@ -169,7 +169,7 @@ async function loadChats(force = false) {
                     const lastMsg = chatItem.querySelector('.last-message');
                     const time = chatItem.querySelector('.chat-time');
                     
-                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(f) : '👤';
+                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️';
                     if (name) name.textContent = f.name || 'مستخدم';
                     if (lastMsg) lastMsg.textContent = lm;
                     if (time) time.textContent = lt || '';
@@ -229,7 +229,7 @@ window.openChat = friendId => {
     window.db.collection('users').doc(friendId).get().then(doc => {
         if (doc.exists) {
             const f = doc.data();
-            ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '👤');
+            ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
         }
     }).catch(() => {});
 };
@@ -668,7 +668,7 @@ window.openEditProfileModal = () => {
     const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent; 
     if (nameInput) nameInput.value = currentName || ''; 
     const avatarPreview = document.getElementById('currentAvatarEmoji'); 
-    if (avatarPreview) avatarPreview.textContent = currentEmoji || '👤'; 
+    if (avatarPreview) avatarPreview.textContent = currentEmoji || '🧔🏻‍♂️'; 
     document.getElementById('editProfileModal')?.classList.add('active'); 
 };
 
@@ -716,21 +716,42 @@ window.goBack = () => {
     }
 };
 
-// ==================== القسم 13: الصورة الرمزية ====================
-window.selectAvatar = t => { 
-    const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; 
-    const e = m[t] || '👤'; 
-    const profileAvatar = document.getElementById('profileAvatarEmoji'), currentAvatar = document.getElementById('currentAvatarEmoji'); 
-    if (profileAvatar) profileAvatar.textContent = e; 
-    if (currentAvatar) currentAvatar.textContent = e; 
-    if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ avatarType: t }).then(() => closeModal()).catch(() => {}); 
+// ==================== القسم 13: الصورة الرمزية (معدل) ====================
+// ✅ دالة selectAvatar الجديدة - خيارين فقط مع 3 ألوان لكل منهما
+window.selectAvatar = function(type) {
+    const emojiMap = {
+        'man_light': '🧔🏻‍♂️',
+        'man_medium': '🧔🏼‍♂️',
+        'man_dark': '🧔🏽‍♂️',
+        'woman_light': '👩🏻',
+        'woman_medium': '👩🏼',
+        'woman_dark': '👩🏽'
+    };
+    const emoji = emojiMap[type] || '🧔🏻‍♂️';
+    const profileAvatar = document.getElementById('profileAvatarEmoji');
+    const currentAvatar = document.getElementById('currentAvatarEmoji');
+    if (profileAvatar) profileAvatar.textContent = emoji;
+    if (currentAvatar) currentAvatar.textContent = emoji;
+    if (auth?.currentUser) {
+        db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
+            .then(() => closeModal())
+            .catch(() => {});
+    }
 };
 
 window.openAvatarModal = () => document.getElementById('avatarModal')?.classList.add('active');
 
-window.getEmojiForUser = u => { 
-    const m = { male:'👨', female:'👩', boy:'🧒', girl:'👧', father:'👨‍🦳', mother:'👩‍🦳', grandfather:'👴', grandmother:'👵' }; 
-    return m[u?.avatarType] || '👤'; 
+// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
+window.getEmojiForUser = function(userData) {
+    const emojiMap = {
+        'man_light': '🧔🏻‍♂️',
+        'man_medium': '🧔🏼‍♂️',
+        'man_dark': '🧔🏽‍♂️',
+        'woman_light': '👩🏻',
+        'woman_medium': '👩🏼',
+        'woman_dark': '👩🏽'
+    };
+    return emojiMap[userData?.avatarType] || '🧔🏻‍♂️';
 };
 
 // ==================== القسم 14: دوال إغلاق المعاينات ====================
