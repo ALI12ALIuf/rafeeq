@@ -253,10 +253,19 @@ window.sendMessage = () => {
 window.handleMessageKeyPress = e => { 
     if (e.key === 'Enter' && !e.shiftKey) { 
         e.preventDefault(); 
-        if (typeof window.handleActionButton === 'function') {
-            window.handleActionButton();
-        } else {
-            window.sendMessage();
+        // ✅ لا إرسال، فقط سطر جديد
+        const input = document.getElementById('messageInput');
+        if (input) {
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            const value = input.value;
+            input.value = value.substring(0, start) + '\n' + value.substring(end);
+            input.selectionStart = input.selectionEnd = start + 1;
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 300) + 'px';
+            if (typeof window.toggleSendButton === 'function') {
+                window.toggleSendButton();
+            }
         }
     } 
 };
