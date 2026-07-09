@@ -1425,28 +1425,34 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
-/* 🔹 مدخل الرسائل (معدل - حجم أكبر) */
+/* 🔹 مدخل الرسائل (معدل - حجم أكبر + تمدد) */
 .message-input-container {
-    padding: 6px 10px !important;  /* ✅ زيادة المسافة */
+    padding: 6px 10px !important;
 }
 
 .message-input-wrapper {
-    padding: 2px 6px !important;   /* ✅ زيادة بسيطة */
-    border-radius: 25px !important; /* ✅ زيادة التقريب */
+    padding: 2px 6px !important;
+    border-radius: 25px !important;
+    align-items: flex-start !important;  /* ✅ محاذاة للأعلى */
 }
 
 #messageInput {
-    padding: 10px 8px !important;   /* ✅ تكبير الحشو الداخلي */
-    font-size: 1rem !important;     /* ✅ تكبير الخط */
-    min-height: 40px !important;    /* ✅ ارتفاع مناسب للكتابة */
-    max-height: 120px !important;   /* ✅ ارتفاع أقصى للأسطر المتعددة */
+    padding: 10px 8px !important;
+    font-size: 1rem !important;
+    min-height: 40px !important;
+    max-height: 300px !important;        /* ✅ زيادة من 120px إلى 300px */
+    line-height: 1.6 !important;         /* ✅ تباعد أسطر مريح */
+    overflow-y: auto !important;         /* ✅ شريط تمرير عند الامتلاء */
+    white-space: pre-wrap !important;    /* ✅ الحفاظ على الأسطر الجديدة */
+    word-wrap: break-word !important;    /* ✅ كسر الكلمات الطويلة */
+    resize: none !important;             /* ✅ منع تغيير الحجم يدوياً */
 }
 
 .attach-btn,
 #actionBtn {
-    width: 36px !important;         /* ✅ تكبير الزر قليلاً */
-    height: 36px !important;        /* ✅ تكبير الزر قليلاً */
-    font-size: 1.1rem !important;   /* ✅ تكبير الأيقونة */
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.1rem !important;
 }
 
 /* 🔹 زر الإعدادات في الملف الشخصي */
