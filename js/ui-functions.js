@@ -250,15 +250,13 @@ window.sendMessage = () => {
     }
 };
 
-window.handleMessageKeyPress = e => { 
-    if (e.key === 'Enter' && !e.shiftKey) { 
-        e.preventDefault(); 
-        if (typeof window.handleActionButton === 'function') {
-            window.handleActionButton();
-        } else {
-            window.sendMessage();
-        }
-    } 
+// ✅ معدل: منع إرسال الرسالة عند الضغط على Enter
+window.handleMessageKeyPress = function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        // لا يرسل الرسالة، فقط يمنع إضافة سطر جديد
+        // الإرسال يكون فقط من خلال زر الإرسال
+    }
 };
 
 // ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
