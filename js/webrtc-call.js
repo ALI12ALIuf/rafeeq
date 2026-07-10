@@ -514,194 +514,214 @@ async createDataChannelOnly(calleeId) {
     },
     
     
-    // ========== 8. شاشة المكالمة الواردة (معدلة - تستخدم عناصر ثابتة) ==========
+    // ========== 8. شاشة المكالمة الواردة (معدلة - تعرض الإيموجي الصحيح) ==========
 
-    showIncomingCall(callerId, callData) {
-        if (callData.type === 'datachannel') {
-            console.log('📡 استلام طلب فتح Data Channel - لا حاجة لعرض شاشة');
-            this.handleSignaling(callData);
-            return;
-        }
-        
-        console.log('🔔 عرض شاشة المكالمة الواردة...');
-        this.currentCallId = callerId;
-        
-        const overlay = document.getElementById('incomingCall');
-        const avatar = document.getElementById('incomingCallAvatar');
-        const name = document.getElementById('incomingCallName');
-        const leftThumb = document.getElementById('leftThumb');
-        const rightThumb = document.getElementById('rightThumb');
-        const swipeButton = document.getElementById('swipeButton');
-        
-        // تحديث أيقونة القبول حسب نوع المكالمة
-        const callType = callData.type === 'video' ? 'video' : 'audio';
-        const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
-        leftThumb.innerHTML = `<i class="fas ${acceptIcon}"></i>`;
-        
-        // جلب اسم المستخدم
-        const fetchUserName = async () => {
-            try {
-                const userDoc = await window.db.collection('users').doc(callerId).get();
-                if (userDoc.exists) {
-                    return userDoc.data().name || 'مستخدم';
-                }
-            } catch (e) {}
-            return 'مستخدم';
-        };
-        
-        const fetchUserAvatar = async () => {
-            try {
-                const userDoc = await window.db.collection('users').doc(callerId).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    const emojiMap = { 'male': '👨', 'female': '👩', 'boy': '🧒', 'girl': '👧' };
-                    return emojiMap[userData.avatarType] || '👤';
-                }
-            } catch (e) {}
-            return '👤';
-        };
-        
-        Promise.all([fetchUserName(), fetchUserAvatar()]).then(([contactName, contactAvatar]) => {
-            name.textContent = contactName;
-            avatar.textContent = contactAvatar;
-            
-            // إظهار الشاشة
-            overlay.style.display = 'flex';
-            
-            // إعداد السحب
-            this.setupIncomingCallSwipe(callerId, callData);
-        });
-        
-        // مؤقت 30 ثانية
-        if (this._incomingCallTimeout) clearTimeout(this._incomingCallTimeout);
-        this._incomingCallTimeout = setTimeout(() => {
-            overlay.style.display = 'none';
-            this.sendSignal(callerId, { type: 'reject' });
-        }, 30000);
-    },
+showIncomingCall(callerId, callData) {
+    if (callData.type === 'datachannel') {
+        console.log('📡 استلام طلب فتح Data Channel - لا حاجة لعرض شاشة');
+        this.handleSignaling(callData);
+        return;
+    }
     
-    setupIncomingCallSwipe(callerId, callData) {
-        const overlay = document.getElementById('incomingCall');
-        const leftThumb = document.getElementById('leftThumb');
-        const rightThumb = document.getElementById('rightThumb');
-        const button = document.getElementById('swipeButton');
-        
-        if (!button || !leftThumb || !rightThumb) return;
-        
-        let isDraggingLeft = false;
-        let isDraggingRight = false;
-        let leftStartX = 0;
-        let rightStartX = 0;
-        let leftCurrentPos = 8;
-        let rightCurrentPos = 8;
-        const buttonWidth = button.clientWidth;
-        const centerPos = buttonWidth / 2;
-        const maxLeftMove = centerPos - 40;
-        const maxRightMove = centerPos - 40;
-        
-        const onLeftStart = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            isDraggingLeft = true;
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            const rect = leftThumb.getBoundingClientRect();
-            leftStartX = clientX - (rect.left - button.getBoundingClientRect().left);
-            leftThumb.style.transition = 'none';
-        };
-        
-        const onLeftMove = (e) => {
-            if (!isDraggingLeft) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
-            newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
-            leftCurrentPos = newLeft;
-            leftThumb.style.left = newLeft + 'px';
-        };
-        
-        const onLeftEnd = () => {
-            if (!isDraggingLeft) return;
-            isDraggingLeft = false;
-            leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-            
-            if (leftCurrentPos >= maxLeftMove - 10) {
-                leftThumb.style.left = maxLeftMove + 'px';
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                    this.receiveCall(callerId, callData);
-                }, 200);
+    console.log('🔔 عرض شاشة المكالمة الواردة...');
+    this.currentCallId = callerId;
+    
+    const overlay = document.getElementById('incomingCall');
+    const avatar = document.getElementById('incomingCallAvatar');
+    const name = document.getElementById('incomingCallName');
+    const leftThumb = document.getElementById('leftThumb');
+    const rightThumb = document.getElementById('rightThumb');
+    const swipeButton = document.getElementById('swipeButton');
+    
+    // تحديث أيقونة القبول حسب نوع المكالمة
+    const callType = callData.type === 'video' ? 'video' : 'audio';
+    const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
+    leftThumb.innerHTML = `<i class="fas ${acceptIcon}"></i>`;
+    
+    // جلب اسم المستخدم والإيموجي معاً
+    const fetchUserData = async () => {
+        try {
+            const userDoc = await window.db.collection('users').doc(callerId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                const userName = userData.name || 'مستخدم';
+                
+                // جلب الإيموجي باستخدام الدالة العامة أو الخريطة الجديدة
+                let userEmoji = '👤';
+                if (typeof window.getEmojiForUser === 'function') {
+                    userEmoji = window.getEmojiForUser(userData);
+                } else {
+                    // خريطة الإيموجي الجديدة (fallback)
+                    const emojiMap = {
+                        'man_light': '🧔🏻‍♂️',
+                        'man_medium': '🧔🏼‍♂️',
+                        'man_dark': '🧔🏽‍♂️',
+                        'woman_light': '👩🏻',
+                        'woman_medium': '👩🏼',
+                        'woman_dark': '👩🏽'
+                    };
+                    // دعم التوافق مع المستخدمين القدامى
+                    if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
+                        userEmoji = '🧔🏻‍♂️';
+                    } else {
+                        userEmoji = emojiMap[userData.avatarType] || '👤';
+                    }
+                }
+                
+                name.textContent = userName;
+                avatar.textContent = userEmoji;
+                
+                console.log(`📞 متصل: ${userName} (${userEmoji})`);
             } else {
-                leftThumb.style.left = '8px';
+                name.textContent = 'مستخدم';
+                avatar.textContent = '👤';
             }
-        };
+        } catch (e) {
+            console.error('❌ خطأ في جلب بيانات المستخدم:', e);
+            name.textContent = 'مستخدم';
+            avatar.textContent = '👤';
+        }
+    };
+    
+    // تنفيذ جلب البيانات
+    fetchUserData();
+    
+    // إظهار الشاشة
+    overlay.style.display = 'flex';
+    
+    // إعداد السحب
+    this.setupIncomingCallSwipe(callerId, callData);
+    
+    // مؤقت 30 ثانية
+    if (this._incomingCallTimeout) clearTimeout(this._incomingCallTimeout);
+    this._incomingCallTimeout = setTimeout(() => {
+        overlay.style.display = 'none';
+        this.sendSignal(callerId, { type: 'reject' });
+    }, 30000);
+},
+
+setupIncomingCallSwipe(callerId, callData) {
+    const overlay = document.getElementById('incomingCall');
+    const leftThumb = document.getElementById('leftThumb');
+    const rightThumb = document.getElementById('rightThumb');
+    const button = document.getElementById('swipeButton');
+    
+    if (!button || !leftThumb || !rightThumb) return;
+    
+    let isDraggingLeft = false;
+    let isDraggingRight = false;
+    let leftStartX = 0;
+    let rightStartX = 0;
+    let leftCurrentPos = 8;
+    let rightCurrentPos = 8;
+    const buttonWidth = button.clientWidth;
+    const centerPos = buttonWidth / 2;
+    const maxLeftMove = centerPos - 40;
+    const maxRightMove = centerPos - 40;
+    
+    const onLeftStart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isDraggingLeft = true;
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = leftThumb.getBoundingClientRect();
+        leftStartX = clientX - (rect.left - button.getBoundingClientRect().left);
+        leftThumb.style.transition = 'none';
+    };
+    
+    const onLeftMove = (e) => {
+        if (!isDraggingLeft) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        let newLeft = clientX - leftStartX - button.getBoundingClientRect().left;
+        newLeft = Math.max(8, Math.min(newLeft, maxLeftMove));
+        leftCurrentPos = newLeft;
+        leftThumb.style.left = newLeft + 'px';
+    };
+    
+    const onLeftEnd = () => {
+        if (!isDraggingLeft) return;
+        isDraggingLeft = false;
+        leftThumb.style.transition = 'left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
         
-        const onRightStart = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            isDraggingRight = true;
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            const rect = rightThumb.getBoundingClientRect();
-            rightStartX = (rect.right - clientX);
-            rightThumb.style.transition = 'none';
-        };
+        if (leftCurrentPos >= maxLeftMove - 10) {
+            leftThumb.style.left = maxLeftMove + 'px';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                this.receiveCall(callerId, callData);
+            }, 200);
+        } else {
+            leftThumb.style.left = '8px';
+        }
+    };
+    
+    const onRightStart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isDraggingRight = true;
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = rightThumb.getBoundingClientRect();
+        rightStartX = (rect.right - clientX);
+        rightThumb.style.transition = 'none';
+    };
+    
+    const onRightMove = (e) => {
+        if (!isDraggingRight) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const containerRect = button.getBoundingClientRect();
+        let newRight = (containerRect.right - clientX) - rightStartX;
+        newRight = Math.max(8, Math.min(newRight, maxRightMove));
+        rightCurrentPos = newRight;
+        rightThumb.style.right = newRight + 'px';
+    };
+    
+    const onRightEnd = () => {
+        if (!isDraggingRight) return;
+        isDraggingRight = false;
+        rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
         
-        const onRightMove = (e) => {
-            if (!isDraggingRight) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            const containerRect = button.getBoundingClientRect();
-            let newRight = (containerRect.right - clientX) - rightStartX;
-            newRight = Math.max(8, Math.min(newRight, maxRightMove));
-            rightCurrentPos = newRight;
-            rightThumb.style.right = newRight + 'px';
-        };
-        
-        const onRightEnd = () => {
-            if (!isDraggingRight) return;
-            isDraggingRight = false;
-            rightThumb.style.transition = 'right 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-            
-            if (rightCurrentPos >= maxRightMove - 10) {
-                rightThumb.style.right = maxRightMove + 'px';
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                    this.sendSignal(callerId, { type: 'reject' });
-                }, 200);
-            } else {
-                rightThumb.style.right = '8px';
-            }
-        };
-        
-        // إزالة المستمعات القديمة
-        leftThumb._cleanup && leftThumb._cleanup();
-        rightThumb._cleanup && rightThumb._cleanup();
-        
-        leftThumb.addEventListener('mousedown', onLeftStart);
-        leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
-        
-        rightThumb.addEventListener('mousedown', onRightStart);
-        rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
-        
-        const moveHandler = (e) => {
-            onLeftMove(e);
-            onRightMove(e);
-        };
-        const endHandler = () => {
-            onLeftEnd();
-            onRightEnd();
-        };
-        
-        document.addEventListener('mousemove', moveHandler);
-        document.addEventListener('mouseup', endHandler);
-        document.addEventListener('touchmove', moveHandler, { passive: false });
-        document.addEventListener('touchend', endHandler);
-        
-        // حفظ دالة التنظيف
-        leftThumb._cleanup = () => { document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', endHandler); document.removeEventListener('touchmove', moveHandler); document.removeEventListener('touchend', endHandler); };
-        rightThumb._cleanup = leftThumb._cleanup;
-    },
+        if (rightCurrentPos >= maxRightMove - 10) {
+            rightThumb.style.right = maxRightMove + 'px';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                this.sendSignal(callerId, { type: 'reject' });
+            }, 200);
+        } else {
+            rightThumb.style.right = '8px';
+        }
+    };
+    
+    // إزالة المستمعات القديمة
+    leftThumb._cleanup && leftThumb._cleanup();
+    rightThumb._cleanup && rightThumb._cleanup();
+    
+    leftThumb.addEventListener('mousedown', onLeftStart);
+    leftThumb.addEventListener('touchstart', onLeftStart, { passive: false });
+    
+    rightThumb.addEventListener('mousedown', onRightStart);
+    rightThumb.addEventListener('touchstart', onRightStart, { passive: false });
+    
+    const moveHandler = (e) => {
+        onLeftMove(e);
+        onRightMove(e);
+    };
+    const endHandler = () => {
+        onLeftEnd();
+        onRightEnd();
+    };
+    
+    document.addEventListener('mousemove', moveHandler);
+    document.addEventListener('mouseup', endHandler);
+    document.addEventListener('touchmove', moveHandler, { passive: false });
+    document.addEventListener('touchend', endHandler);
+    
+    // حفظ دالة التنظيف
+    leftThumb._cleanup = () => { document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', endHandler); document.removeEventListener('touchmove', moveHandler); document.removeEventListener('touchend', endHandler); };
+    rightThumb._cleanup = leftThumb._cleanup;
+},
 
     // ==================== 9. Data Channel وإدارة الاتصال ====================
 
