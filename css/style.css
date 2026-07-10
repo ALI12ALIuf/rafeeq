@@ -1441,7 +1441,7 @@ input:checked + .toggle-slider:before {
 .input-area {
     flex: 1 !important;
     display: flex !important;
-    align-items: flex-start !important; /* محاذاة من الأعلى */
+    align-items: flex-start !important;
     min-width: 0 !important;
     overflow: hidden !important;
     padding: 2px 0 !important;
@@ -1466,6 +1466,8 @@ input:checked + .toggle-slider:before {
     outline: none !important;
     color: var(--text) !important;
     overflow-y: auto !important;
+    display: block !important;
+    box-sizing: border-box !important;
 }
 
 .attach-btn,
