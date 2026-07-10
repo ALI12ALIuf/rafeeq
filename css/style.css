@@ -1424,28 +1424,54 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
-/* 🔹 مدخل الرسائل (معدل - حجم أكبر) */
+/* 🔹 مدخل الرسائل (معدل - مع دعم الكتابة بالطول) */
 .message-input-container {
-    padding: 6px 10px !important;  /* ✅ زيادة المسافة */
+    padding: 6px 10px !important;
 }
 
 .message-input-wrapper {
-    padding: 2px 6px !important;   /* ✅ زيادة بسيطة */
-    border-radius: 25px !important; /* ✅ زيادة التقريب */
+    padding: 2px 6px !important;
+    border-radius: 25px !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+}
+
+.input-area {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
 }
 
 #messageInput {
-    padding: 10px 8px !important;   /* ✅ تكبير الحشو الداخلي */
-    font-size: 1rem !important;     /* ✅ تكبير الخط */
-    min-height: 40px !important;    /* ✅ ارتفاع مناسب للكتابة */
-    max-height: 120px !important;   /* ✅ ارتفاع أقصى للأسطر المتعددة */
+    padding: 10px 8px !important;
+    font-size: 1rem !important;
+    min-height: 40px !important;
+    max-height: 120px !important;
+    width: 100% !important;
+    resize: none !important;
+    word-wrap: break-word !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    line-height: 1.5 !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    color: var(--text) !important;
 }
 
 .attach-btn,
 #actionBtn {
-    width: 36px !important;         /* ✅ تكبير الزر قليلاً */
-    height: 36px !important;        /* ✅ تكبير الزر قليلاً */
-    font-size: 1.1rem !important;   /* ✅ تكبير الأيقونة */
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.1rem !important;
+    flex-shrink: 0 !important;
 }
 
 /* 🔹 زر الإعدادات في الملف الشخصي */
