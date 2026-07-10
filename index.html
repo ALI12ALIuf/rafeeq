@@ -182,7 +182,7 @@
     <div class="message-input-wrapper">
         <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
         <div class="input-area">
-            <textarea id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
+            <textarea id="messageInput" placeholder="اكتب رسالتك..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="4" style="resize: none; overflow-y: auto; min-height: 80px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
             
             <!-- ===== واجهة تسجيل البصمة ===== -->
             <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
@@ -211,7 +211,7 @@
         </button>
     </div>
     
-    <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
+    <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات ===== -->
     <div class="attachment-menu" id="attachmentMenu" style="display: none;">
         <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
         <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
