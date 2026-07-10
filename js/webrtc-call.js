@@ -514,7 +514,7 @@ async createDataChannelOnly(calleeId) {
     },
     
     
-    // ========== 8. شاشة المكالمة الواردة (معدلة - تعرض الإيموجي الصحيح) ==========
+    // ========== 8. شاشة المكالمة الواردة (معدلة - تستخدم بيانات المحادثة الموجودة) ==========
 
 showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
@@ -538,56 +538,16 @@ showIncomingCall(callerId, callData) {
     const acceptIcon = callType === 'video' ? 'fa-video' : 'fa-phone';
     leftThumb.innerHTML = `<i class="fas ${acceptIcon}"></i>`;
     
-    // جلب اسم المستخدم والإيموجي معاً
-    const fetchUserData = async () => {
-        try {
-            const userDoc = await window.db.collection('users').doc(callerId).get();
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-                const userName = userData.name || 'مستخدم';
-                
-                // جلب الإيموجي باستخدام الدالة العامة أو الخريطة الجديدة
-                let userEmoji = '👤';
-                if (typeof window.getEmojiForUser === 'function') {
-                    userEmoji = window.getEmojiForUser(userData);
-                } else {
-                    // خريطة الإيموجي الجديدة (fallback)
-                    const emojiMap = {
-                        'man_light': '🧔🏻‍♂️',
-                        'man_medium': '🧔🏼‍♂️',
-                        'man_dark': '🧔🏽‍♂️',
-                        'woman_light': '👩🏻',
-                        'woman_medium': '👩🏼',
-                        'woman_dark': '👩🏽'
-                    };
-                    // دعم التوافق مع المستخدمين القدامى
-                    if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
-                        userEmoji = '🧔🏻‍♂️';
-                    } else {
-                        userEmoji = emojiMap[userData.avatarType] || '👤';
-                    }
-                }
-                
-                name.textContent = userName;
-                avatar.textContent = userEmoji;
-                
-                console.log(`📞 متصل: ${userName} (${userEmoji})`);
-            } else {
-                name.textContent = 'مستخدم';
-                avatar.textContent = '👤';
-            }
-        } catch (e) {
-            console.error('❌ خطأ في جلب بيانات المستخدم:', e);
-            name.textContent = 'مستخدم';
-            avatar.textContent = '👤';
-        }
-    };
+    // ✅ استخدم البيانات الموجودة في واجهة المحادثة (بدون جلب من السيرفر)
+    const contactName = document.getElementById('conversationName')?.textContent || 'مستخدم';
+    const contactAvatar = document.getElementById('conversationAvatar')?.textContent || '👤';
     
-    // تنفيذ جلب البيانات
-    fetchUserData();
-    
-    // إظهار الشاشة
+    // ✅ عرض الشاشة فوراً مع البيانات الموجودة
+    name.textContent = contactName;
+    avatar.textContent = contactAvatar;
     overlay.style.display = 'flex';
+    
+    console.log(`📞 مكالمة واردة من: ${contactName} (${contactAvatar})`);
     
     // إعداد السحب
     this.setupIncomingCallSwipe(callerId, callData);
