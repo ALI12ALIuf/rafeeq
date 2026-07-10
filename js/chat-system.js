@@ -700,69 +700,110 @@ async sendOfferResponse(toId, action, data = null) {
     }
 },
 
-// ==================== القسم 9: acceptFeatureRequest ====================
-async acceptFeatureRequest() {
-    console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
+// ==================== القسم 8: handleFeatureRequest ====================
+async handleFeatureRequest(fromId, encryptedData) {
+    console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
-    // ✅ منع التنفيذ المتزامن
-    if (this._featureLock) {
-        console.log('⏳ عملية تفعيل قيد التنفيذ، انتظر...');
+    let requestData;
+    try {
+        const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+        const senderPublicKey = await SecureChatSystem.getReceiverPublicKey(fromId);
+        if (!myPrivateKey || !senderPublicKey) return;
+        const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, senderPublicKey);
+        const decrypted = await SecureChatSystem.decryptData(encryptedData, sharedKey);
+        requestData = JSON.parse(decrypted);
+    } catch(e) {
+        console.error('❌ فشل فك تشفير الطلب:', e);
         return;
     }
-    this._featureLock = true;
     
-    try {
-        if (!this.featureRequestReceived && !this.featureRequestPending) {
-            console.log('⚠️ لا يوجد طلب معلق');
-            return;
-        }
+    // ✅ إذا كانت الميزات مفعلة بالفعل
+    if (this.featuresEnabled) {
+        console.log('⚠️ الميزات مفعلة بالفعل، تجاهل الطلب');
+        return;
+    }
+    
+    // ✅ إذا كان هناك طلب معلق من طرفنا، نلغي طلبنا ونقبل طلب الآخر
+    if (this.featureRequestPending) {
+        console.log('⚠️ يوجد طلب معلق من طرفنا، إلغاؤه وقبول طلب الطرف الآخر');
         
+        // ✅ إلغاء طلبنا بالكامل
         this.featureRequestPending = false;
-        this.featureRequestReceived = false;
         
-        if (this.currentChat) {
-            console.log('✅ تم تجهيز المحادثة، في انتظار تفعيل الميزات بعد نجاح القناة');
-        }
-        
+        // ✅ إيقاف البلينك
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
             this.featureBlinkInterval = null;
         }
-        
         const switchLabel = document.getElementById('featureSwitchLabel');
         if (switchLabel) switchLabel.classList.remove('blinking');
         
-        if (this._pendingOffer && this._pendingOffer[this.currentChat] && this._pendingOffer[this.currentChat].sdp) {
-            console.log('📡 يوجد Offer معلق، جاري قبوله...');
-            await this.acceptOffer(this.currentChat, this._pendingOffer[this.currentChat]);
-            delete this._pendingOffer[this.currentChat];
-        } else {
-            console.log('⚠️ لا يوجد Offer معلق');
-            
-            if (this.currentChat) {
-                CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
-                    console.log('✅ تم فتح Data Channel في الخلفية');
-                    this.featuresEnabled = true;
-                    this.friendInConversation = true;
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = true;
-                    this.updateAllButtons();
-                    console.log('✅ تم تفعيل الميزات بعد فتح القناة');
-                }).catch(e => {
-                    console.error('❌ خطأ في فتح Data Channel:', e);
-                });
-            }
+        // ✅ إغلاق الـ PeerConnection الخاص بنا (إلغاء الـ Offer)
+        if (CallSystem.pc) {
+            try {
+                CallSystem.pc.close();
+                CallSystem.pc = null;
+            } catch(e) {}
+        }
+        if (CallSystem.dc) {
+            try {
+                CallSystem.dc.close();
+                CallSystem.dc = null;
+            } catch(e) {}
         }
         
-        console.log('✅ تم تجهيز القناة، في انتظار تفعيل الميزات بعد نجاح الاتصال');
-    } catch (e) {
-        console.error('❌ خطأ في acceptFeatureRequest:', e);
-    } finally {
-        // ✅ إلغاء القفل بعد الانتهاء
-        this._featureLock = false;
+        // ✅ إلغاء المؤقتات
+        if (this._batchTimer) {
+            clearTimeout(this._batchTimer);
+            this._batchTimer = null;
+        }
+        this._pendingIceCandidates = [];
+        
+        console.log('✅ تم إلغاء طلبنا بالكامل، جاري قبول طلب الطرف الآخر');
+        // نكمل معالجة الطلب الوارد
+    }
+    
+    if (requestData.action === 'offer_batch' && requestData.sdp) {
+        console.log('📡 استلام دفعة (Offer + ICE candidates) من', fromId);
+        console.log(`📦 عدد ICE candidates في الدفعة: ${requestData.iceCandidates?.length || 0}`);
+        
+        if (!requestData.sdp.type || requestData.sdp.type !== 'offer') {
+            console.error('❌ SDP غير صالح - type:', requestData.sdp.type);
+            return;
+        }
+        
+        if (!requestData.sdp.sdp || requestData.sdp.sdp.length < 10) {
+            console.error('❌ SDP فارغ أو غير مكتمل');
+            return;
+        }
+        
+        if (!this._pendingOffer) this._pendingOffer = {};
+        this._pendingOffer[fromId] = {
+            sdp: new RTCSessionDescription({
+                type: requestData.sdp.type,
+                sdp: requestData.sdp.sdp
+            }),
+            iceCandidates: requestData.iceCandidates || [],
+            timestamp: Date.now()
+        };
+        
+        this.featureRequestReceived = true;
+        this.startFeatureBlink();
+        console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
+    }
+    else if (requestData.action === 'ice' && requestData.candidate) {
+        console.log('📡 استلام ICE candidate منفرد (دعم خلفي)');
+        if (CallSystem.pc) {
+            try {
+                await CallSystem.pc.addIceCandidate(new RTCIceCandidate(requestData.candidate.candidate));
+            } catch(e) {
+                console.warn('فشل إضافة ICE candidate:', e);
+            }
+        } else if (this._pendingOffer && this._pendingOffer[fromId]) {
+            this._pendingOffer[fromId].iceCandidates.push(requestData.candidate);
+        }
     }
 },
-    
     
     // ==================== القسم 10: handleFeatureResponse ====================
 async handleFeatureResponse(fromId, action) {
