@@ -10,6 +10,9 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
+    // ✅ قفل لمنع التضارب
+    _featureLock: false,
+    
     // ✅ قالب عنصر المحادثة (ثابت)
     chatItemTemplate: null,
     
@@ -305,6 +308,20 @@ async requestEnableFeatures() {
         return;
     }
     
+    // ✅ منع التفعيل إذا كان الطرف الآخر يرسل طلباً أيضاً
+    if (this.featureRequestReceived) {
+        console.log('⚠️ يوجد طلب واردة من الطرف الآخر، جاري قبوله بدلاً من إرسال طلب جديد');
+        this.acceptFeatureRequest();
+        return;
+    }
+    
+    // ✅ منع التنفيذ المتزامن
+    if (this._featureLock) {
+        console.log('⏳ عملية تفعيل قيد التنفيذ، انتظر...');
+        return;
+    }
+    this._featureLock = true;
+    
     this.featureRequestPending = true;
     this.startFeatureBlink();
     
@@ -427,6 +444,9 @@ async requestEnableFeatures() {
         this.startFeatureBlink();
         console.log('❌ فشل إرسال الطلب:', e);
         alert('فشل إرسال طلب التفعيل: ' + (e.message || 'خطأ غير معروف'));
+    } finally {
+        // ✅ إلغاء القفل بعد الانتهاء
+        this._featureLock = false;
     }
 },
 
@@ -445,6 +465,19 @@ async handleFeatureRequest(fromId, encryptedData) {
     } catch(e) {
         console.error('❌ فشل فك تشفير الطلب:', e);
         return;
+    }
+    
+    // ✅ إذا كانت الميزات مفعلة بالفعل
+    if (this.featuresEnabled) {
+        console.log('⚠️ الميزات مفعلة بالفعل، تجاهل الطلب');
+        return;
+    }
+    
+    // ✅ إذا كان هناك طلب معلق من طرفنا، نلغي طلبنا ونقبل طلب الآخر
+    if (this.featureRequestPending) {
+        console.log('⚠️ يوجد طلب معلق من طرفنا، إلغاؤه وقبول طلب الطرف الآخر');
+        this.featureRequestPending = false;
+        // نكمل معالجة الطلب الوارد
     }
     
     if (requestData.action === 'offer_batch' && requestData.sdp) {
@@ -671,49 +704,63 @@ async sendOfferResponse(toId, action, data = null) {
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
     
-    if (!this.featureRequestReceived && !this.featureRequestPending) {
-        console.log('⚠️ لا يوجد طلب معلق');
+    // ✅ منع التنفيذ المتزامن
+    if (this._featureLock) {
+        console.log('⏳ عملية تفعيل قيد التنفيذ، انتظر...');
         return;
     }
+    this._featureLock = true;
     
-    this.featureRequestPending = false;
-    this.featureRequestReceived = false;
-    
-    if (this.currentChat) {
-        console.log('✅ تم تجهيز المحادثة، في انتظار تفعيل الميزات بعد نجاح القناة');
-    }
-    
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-        this.featureBlinkInterval = null;
-    }
-    
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    if (switchLabel) switchLabel.classList.remove('blinking');
-    
-    if (this._pendingOffer && this._pendingOffer[this.currentChat] && this._pendingOffer[this.currentChat].sdp) {
-        console.log('📡 يوجد Offer معلق، جاري قبوله...');
-        await this.acceptOffer(this.currentChat, this._pendingOffer[this.currentChat]);
-        delete this._pendingOffer[this.currentChat];
-    } else {
-        console.log('⚠️ لا يوجد Offer معلق');
+    try {
+        if (!this.featureRequestReceived && !this.featureRequestPending) {
+            console.log('⚠️ لا يوجد طلب معلق');
+            return;
+        }
+        
+        this.featureRequestPending = false;
+        this.featureRequestReceived = false;
         
         if (this.currentChat) {
-            CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
-                console.log('✅ تم فتح Data Channel في الخلفية');
-                this.featuresEnabled = true;
-                this.friendInConversation = true;
-                const toggleInput = document.getElementById('featureToggleInput');
-                if (toggleInput) toggleInput.checked = true;
-                this.updateAllButtons();
-                console.log('✅ تم تفعيل الميزات بعد فتح القناة');
-            }).catch(e => {
-                console.error('❌ خطأ في فتح Data Channel:', e);
-            });
+            console.log('✅ تم تجهيز المحادثة، في انتظار تفعيل الميزات بعد نجاح القناة');
         }
+        
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        
+        const switchLabel = document.getElementById('featureSwitchLabel');
+        if (switchLabel) switchLabel.classList.remove('blinking');
+        
+        if (this._pendingOffer && this._pendingOffer[this.currentChat] && this._pendingOffer[this.currentChat].sdp) {
+            console.log('📡 يوجد Offer معلق، جاري قبوله...');
+            await this.acceptOffer(this.currentChat, this._pendingOffer[this.currentChat]);
+            delete this._pendingOffer[this.currentChat];
+        } else {
+            console.log('⚠️ لا يوجد Offer معلق');
+            
+            if (this.currentChat) {
+                CallSystem.ensureDataChannelOnly(this.currentChat).then(() => {
+                    console.log('✅ تم فتح Data Channel في الخلفية');
+                    this.featuresEnabled = true;
+                    this.friendInConversation = true;
+                    const toggleInput = document.getElementById('featureToggleInput');
+                    if (toggleInput) toggleInput.checked = true;
+                    this.updateAllButtons();
+                    console.log('✅ تم تفعيل الميزات بعد فتح القناة');
+                }).catch(e => {
+                    console.error('❌ خطأ في فتح Data Channel:', e);
+                });
+            }
+        }
+        
+        console.log('✅ تم تجهيز القناة، في انتظار تفعيل الميزات بعد نجاح الاتصال');
+    } catch (e) {
+        console.error('❌ خطأ في acceptFeatureRequest:', e);
+    } finally {
+        // ✅ إلغاء القفل بعد الانتهاء
+        this._featureLock = false;
     }
-    
-    console.log('✅ تم تجهيز القناة، في انتظار تفعيل الميزات بعد نجاح الاتصال');
 },
     
     
