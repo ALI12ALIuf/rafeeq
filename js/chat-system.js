@@ -473,13 +473,63 @@ async handleFeatureRequest(fromId, encryptedData) {
         return;
     }
     
-    // ✅ إذا كان هناك طلب معلق من طرفنا، نلغي طلبنا ونقبل طلب الآخر
+    // ✅ إذا كان هناك طلب معلق من طرفنا
     if (this.featureRequestPending) {
         console.log('⚠️ يوجد طلب معلق من طرفنا، إلغاؤه وقبول طلب الطرف الآخر');
+        
+        // ✅ إلغاء طلبنا بالكامل
         this.featureRequestPending = false;
-        // نكمل معالجة الطلب الوارد
+        
+        // ✅ إيقاف البلينك
+        if (this.featureBlinkInterval) {
+            clearInterval(this.featureBlinkInterval);
+            this.featureBlinkInterval = null;
+        }
+        const switchLabel = document.getElementById('featureSwitchLabel');
+        if (switchLabel) switchLabel.classList.remove('blinking');
+        
+        // ✅ إغلاق الـ PeerConnection الخاص بنا
+        if (CallSystem.pc) {
+            try { CallSystem.pc.close(); } catch(e) {}
+            CallSystem.pc = null;
+        }
+        if (CallSystem.dc) {
+            try { CallSystem.dc.close(); } catch(e) {}
+            CallSystem.dc = null;
+        }
+        if (this._batchTimer) {
+            clearTimeout(this._batchTimer);
+            this._batchTimer = null;
+        }
+        this._pendingIceCandidates = [];
+        
+        console.log('✅ تم إلغاء طلبنا بالكامل');
+        
+        // ✅ **نقبل طلب الآخر تلقائياً (بدون انتظار ضغطة)**
+        if (requestData.action === 'offer_batch' && requestData.sdp) {
+            console.log('📡 قبول Offer تلقائياً من', fromId);
+            
+            // تخزين الـ Offer
+            if (!this._pendingOffer) this._pendingOffer = {};
+            this._pendingOffer[fromId] = {
+                sdp: new RTCSessionDescription({
+                    type: requestData.sdp.type,
+                    sdp: requestData.sdp.sdp
+                }),
+                iceCandidates: requestData.iceCandidates || [],
+                timestamp: Date.now()
+            };
+            
+            // ✅ قبول الـ Offer تلقائياً
+            await this.acceptOffer(fromId, this._pendingOffer[fromId]);
+            delete this._pendingOffer[fromId];
+            
+            console.log('✅ تم قبول طلب الطرف الآخر تلقائياً');
+            return;
+        }
     }
     
+    // ✅ معالجة طلب جديد (لا يوجد طلب معلق من طرفنا)
     if (requestData.action === 'offer_batch' && requestData.sdp) {
         console.log('📡 استلام دفعة (Offer + ICE candidates) من', fromId);
         console.log(`📦 عدد ICE candidates في الدفعة: ${requestData.iceCandidates?.length || 0}`);
