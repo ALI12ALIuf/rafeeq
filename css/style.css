@@ -1424,7 +1424,7 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
-/* 🔹 مدخل الرسائل (معدل - مع دعم الكتابة بالطول) */
+/* 🔹 مدخل الرسائل (معدل - الكتابة تنزل للأسفل مثل واتساب) */
 .message-input-container {
     padding: 6px 10px !important;
 }
@@ -1441,9 +1441,10 @@ input:checked + .toggle-slider:before {
 .input-area {
     flex: 1 !important;
     display: flex !important;
-    align-items: center !important;
+    align-items: flex-start !important; /* محاذاة من الأعلى */
     min-width: 0 !important;
     overflow: hidden !important;
+    padding: 2px 0 !important;
 }
 
 #messageInput {
@@ -1464,6 +1465,7 @@ input:checked + .toggle-slider:before {
     border: none !important;
     outline: none !important;
     color: var(--text) !important;
+    overflow-y: auto !important;
 }
 
 .attach-btn,
