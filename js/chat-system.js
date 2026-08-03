@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة المعدلة (مع نظام الطلبات الذكي) ==========
+// ========== chat-system.js - النسخة المعدلة (قوالب ثابتة + setupVoiceControls) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 const ChatSystem = {
@@ -10,10 +10,10 @@ const ChatSystem = {
     featureRequestReceived: false,
     featureBlinkInterval: null,
     
-    // ✅ متغيرات نظام الطلبات الذكي
-    _isInitiator: false,           // هل أنا من بدأ الطلب؟
-    _isWaitingForResponse: false,  // هل أنتظر رد من الطرف الآخر؟
-    _hasPendingRequest: false,     // هل يوجد طلب وارد من الطرف الآخر؟
+    // ✅ متغيرات لمنع التضارب وقفل الزر
+    _isInitiator: false,
+    _isProcessingOffer: false,
+    _isLocked: false,
     
     // ✅ قالب عنصر المحادثة (ثابت)
     chatItemTemplate: null,
@@ -33,86 +33,6 @@ updateFeatureToggleUI() {
     }
     
     console.log(`🎛️ تحديث زر التفعيل: checked=${this.featuresEnabled}, disabled=false`);
-},
-
-// ==================== القسم 2.5.1: دالة التحكم بحالة الزر ====================
-setFeatureButtonState(state) {
-    const toggleInput = document.getElementById('featureToggleInput');
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    const toggleContainer = document.getElementById('featureToggleContainer');
-    
-    if (!toggleInput) return;
-    
-    // إزالة جميع الحالات السابقة
-    if (switchLabel) {
-        switchLabel.classList.remove('pulsing', 'waiting');
-    }
-    
-    switch(state) {
-        case 'waiting':
-            // ✅ انتظار رد (شفاف/مقفل)
-            toggleInput.disabled = true;
-            toggleInput.style.opacity = '0.4';
-            toggleInput.style.cursor = 'not-allowed';
-            if (switchLabel) {
-                switchLabel.style.opacity = '0.4';
-                switchLabel.title = '⏳ جاري انتظار رد الطرف الآخر...';
-                switchLabel.classList.add('waiting');
-            }
-            if (toggleContainer) {
-                toggleContainer.title = '⏳ جاري انتظار رد الطرف الآخر...';
-            }
-            console.log('🎛️ حالة الزر: waiting (مقفل)');
-            break;
-            
-        case 'pending':
-            // ✅ يوجد طلب وارد (يتوهج للقبول)
-            toggleInput.disabled = false;
-            toggleInput.style.opacity = '1';
-            toggleInput.style.cursor = 'pointer';
-            if (switchLabel) {
-                switchLabel.style.opacity = '1';
-                switchLabel.title = '👆 اضغط لقبول طلب التفعيل';
-                switchLabel.classList.add('pulsing');
-            }
-            if (toggleContainer) {
-                toggleContainer.title = '👆 اضغط لقبول طلب التفعيل';
-            }
-            console.log('🎛️ حالة الزر: pending (يتوهج للقبول)');
-            break;
-            
-        case 'idle':
-            // ✅ الوضع الطبيعي (غير مفعل)
-            toggleInput.disabled = false;
-            toggleInput.style.opacity = '1';
-            toggleInput.style.cursor = 'pointer';
-            if (switchLabel) {
-                switchLabel.style.opacity = '1';
-                switchLabel.title = 'اضغط لتفعيل الميزات';
-                switchLabel.classList.remove('pulsing', 'waiting');
-            }
-            if (toggleContainer) {
-                toggleContainer.title = '';
-            }
-            console.log('🎛️ حالة الزر: idle');
-            break;
-            
-        case 'active':
-            // ✅ الميزات مفعلة
-            toggleInput.disabled = false;
-            toggleInput.style.opacity = '1';
-            toggleInput.style.cursor = 'pointer';
-            if (switchLabel) {
-                switchLabel.style.opacity = '1';
-                switchLabel.title = '✅ الميزات مفعلة (اضغط لإلغاء)';
-                switchLabel.classList.remove('pulsing', 'waiting');
-            }
-            if (toggleContainer) {
-                toggleContainer.title = '✅ الميزات مفعلة';
-            }
-            console.log('🎛️ حالة الزر: active');
-            break;
-    }
 },
 
 // ==================== القسم 2.6: دالة جلب اسم المستخدم ====================
@@ -217,21 +137,8 @@ setupFeatureButton() {
                 50% { background-color: #2196F3; }
                 100% { background-color: #f44336; }
             }
-            @keyframes pulseGlow {
-                0% { box-shadow: 0 0 5px rgba(33, 150, 243, 0.2); }
-                50% { box-shadow: 0 0 25px rgba(33, 150, 243, 0.8); }
-                100% { box-shadow: 0 0 5px rgba(33, 150, 243, 0.2); }
-            }
             .feature-switch.blinking .feature-slider {
                 animation: featureBlink 0.8s ease-in-out infinite;
-            }
-            .feature-switch.pulsing .feature-slider {
-                animation: pulseGlow 1s ease-in-out infinite;
-                background-color: #2196F3 !important;
-            }
-            .feature-switch.waiting .feature-slider {
-                opacity: 0.4;
-                cursor: not-allowed;
             }
             .kick-btn {
                 background: none;
@@ -272,28 +179,25 @@ setupFeatureButton() {
     toggleInput.onclick = (e) => {
         console.log('🔘 تم الضغط على زر التفعيل');
         
-        // ✅ إذا كانت الميزات مفعلة → إلغاء التفعيل
+        // ✅ إذا كان الزر مقفلاً، لا تفعل شيئاً
+        if (this._isLocked) {
+            console.log('⚠️ الزر مقفل مؤقتاً، انتظر حتى الانتهاء');
+            return;
+        }
+        
         if (this.featuresEnabled) {
             console.log('⚠️ الميزات مفعلة، جاري إلغاء التفعيل');
             this.disableFeatures();
             return;
         }
         
-        // ✅ إذا كان هناك طلب وارد → قبوله
-        if (this._hasPendingRequest || this.featureRequestReceived) {
-            console.log('📥 يوجد طلب وارد، جاري القبول...');
+        if (this.featureRequestReceived) {
             this.acceptFeatureRequest();
-            return;
+        } else if (this.featureRequestPending) {
+            alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
+        } else {
+            this.requestEnableFeatures();
         }
-        
-        // ✅ إذا كنت أنتظر رد → لا تفعل شيء
-        if (this._isWaitingForResponse) {
-            console.log('⏳ جاري انتظار رد الطرف الآخر...');
-            return;
-        }
-        
-        // ✅ إرسال طلب جديد
-        this.requestEnableFeatures();
     };
     
     if (kickBtn) {
@@ -310,7 +214,6 @@ setupFeatureButton() {
     
     this.updateKickButtonState();
     this.updateFeatureToggleUI();
-    this.setFeatureButtonState('idle');
     
     console.log('✅ تم تهيئة أزرار التفعيل والطرد');
 },
@@ -386,14 +289,17 @@ startFeatureBlink() {
             this.featureRequestPending = false;
             this.featureRequestReceived = false;
             this._isInitiator = false;
-            this._isWaitingForResponse = false;
-            this._hasPendingRequest = false;
+            this._isLocked = false;
             switchLabel.classList.remove('blinking');
             
             const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
+            if (toggleInput) {
+                toggleInput.checked = false;
+                toggleInput.disabled = false;
+                toggleInput.style.opacity = '1';
+                toggleInput.style.cursor = 'pointer';
+            }
             
-            this.setFeatureButtonState('idle');
             this.updateAllButtons();
             
             console.log('⏰ انتهت مهلة الانتظار (60 ثانية)، تم إلغاء الطلب');
@@ -412,23 +318,29 @@ async requestEnableFeatures() {
         alert('الميزات مفعلة بالفعل');
         return;
     }
-    if (this._isWaitingForResponse) {
-        console.log('⏳ جاري انتظار رد الطرف الآخر...');
+    if (this.featureRequestPending) {
+        alert('تم إرسال طلب سابق، انتظر رد الطرف الآخر');
         return;
     }
-    if (this._hasPendingRequest || this.featureRequestReceived) {
-        console.log('📥 يوجد طلب وارد من الطرف الآخر، اضغط على الزر لقبوله');
+    if (this.featureRequestReceived) {
+        console.log('⚠️ يوجد طلب وارد من الطرف الآخر، لا يمكن إرسال طلب جديد');
+        alert('يوجد طلب من الطرف الآخر، اضغط على الزر لقبوله');
         return;
     }
     
-    // ✅ تعيين البادئ
+    // ✅ تعيين أن هذا المستخدم هو البادئ
     this._isInitiator = true;
-    this._isWaitingForResponse = true;
+    this._isLocked = true;
     this.featureRequestPending = true;
-    
-    // ✅ جعل الزر شفاف/مقفل
-    this.setFeatureButtonState('waiting');
     this.startFeatureBlink();
+    
+    // ✅ قفل الزر مؤقتاً
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (toggleInput) {
+        toggleInput.disabled = true;
+        toggleInput.style.opacity = '0.5';
+        toggleInput.style.cursor = 'not-allowed';
+    }
     
     this._pendingIceCandidates = [];
     this._batchTimer = null;
@@ -544,25 +456,26 @@ async requestEnableFeatures() {
         this._pendingIceCandidates = [];
         this._batchTimer = null;
         
+        // ✅ بعد إرسال الطلب، فتح الزر
+        this._isLocked = false;
+        if (toggleInput) {
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
+        }
+        
     } catch(e) {
         this.featureRequestPending = false;
         this._isInitiator = false;
-        this._isWaitingForResponse = false;
-        this.setFeatureButtonState('idle');
-        this.stopFeatureBlink();
+        this._isLocked = false;
+        if (toggleInput) {
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
+        }
+        this.startFeatureBlink();
         console.log('❌ فشل إرسال الطلب:', e);
         alert('فشل إرسال طلب التفعيل: ' + (e.message || 'خطأ غير معروف'));
-    }
-},
-
-stopFeatureBlink() {
-    if (this.featureBlinkInterval) {
-        clearInterval(this.featureBlinkInterval);
-        this.featureBlinkInterval = null;
-    }
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
     }
 },
 
@@ -570,20 +483,14 @@ stopFeatureBlink() {
 async handleFeatureRequest(fromId, encryptedData) {
     console.log('🔔 handleFeatureRequest - استلام طلب من:', fromId);
     
-    // ✅ إذا كنت أنا البادئ أو أنتظر رد → تجاهل وأرسل رفض
-    if (this._isInitiator || this._isWaitingForResponse) {
+    // ✅ إذا كنت قد أرسلت طلباً بالفعل، تجاهل الطلب الوارد وأرسل رفض
+    if (this.featureRequestPending) {
         console.log('⚠️ لدي طلب معلق، تجاهل الطلب الوارد من:', fromId);
         await this.sendOfferResponse(fromId, 'rejected');
         return;
     }
     
-    // ✅ إذا كان هناك طلب وارد بالفعل
-    if (this._hasPendingRequest) {
-        console.log('⚠️ يوجد طلب وارد بالفعل، تجاهل');
-        return;
-    }
-    
-    // ✅ إذا كانت المحادثة مختلفة
+    // ✅ إذا كنت في محادثة مع شخص آخر، تجاهل
     if (this.currentChat !== fromId) {
         console.log('⚠️ طلب من شخص ليس في المحادثة الحالية، تجاهل');
         return;
@@ -603,6 +510,13 @@ async handleFeatureRequest(fromId, encryptedData) {
     }
     
     if (requestData.action === 'offer_batch' && requestData.sdp) {
+        // ✅ إذا كان الطرف الآخر يريد التفعيل وأنا لدي طلب معلق، أرفض
+        if (this.featureRequestPending) {
+            console.log('⚠️ لدي طلب معلق، أرفض طلب الآخر');
+            await this.sendOfferResponse(fromId, 'rejected');
+            return;
+        }
+        
         console.log('📡 استلام دفعة (Offer + ICE candidates) من', fromId);
         console.log(`📦 عدد ICE candidates في الدفعة: ${requestData.iceCandidates?.length || 0}`);
         
@@ -616,6 +530,17 @@ async handleFeatureRequest(fromId, encryptedData) {
             return;
         }
         
+        // ✅ قفل الزر عند استلام الطلب
+        this._isLocked = true;
+        this._isInitiator = false;
+        
+        const toggleInput = document.getElementById('featureToggleInput');
+        if (toggleInput) {
+            toggleInput.disabled = true;
+            toggleInput.style.opacity = '0.5';
+            toggleInput.style.cursor = 'not-allowed';
+        }
+        
         if (!this._pendingOffer) this._pendingOffer = {};
         this._pendingOffer[fromId] = {
             sdp: new RTCSessionDescription({
@@ -626,15 +551,9 @@ async handleFeatureRequest(fromId, encryptedData) {
             timestamp: Date.now()
         };
         
-        // ✅ تعيين أن هناك طلب وارد
-        this._hasPendingRequest = true;
         this.featureRequestReceived = true;
-        
-        // ✅ جعل الزر يتوهج للقبول
-        this.setFeatureButtonState('pending');
         this.startFeatureBlink();
-        
-        console.log('📞 شخص يريد تفعيل الميزات - الزر يتوهج للقبول');
+        console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء لقبول');
     }
     else if (requestData.action === 'ice' && requestData.candidate) {
         console.log('📡 استلام ICE candidate منفرد (دعم خلفي)');
@@ -750,15 +669,18 @@ async acceptOffer(fromId, offerData) {
         this.featuresEnabled = true;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
-        this._hasPendingRequest = false;
-        this._isInitiator = false;
-        this._isWaitingForResponse = false;
         this.friendInConversation = true;
+        this._isInitiator = false;
+        this._isLocked = false;
         
         const toggleInput = document.getElementById('featureToggleInput');
-        if (toggleInput) toggleInput.checked = true;
+        if (toggleInput) {
+            toggleInput.checked = true;
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
+        }
         
-        this.setFeatureButtonState('active');
         this.updateAllButtons();
         console.log('✅ تم فتح القناة وتفعيل الميزات بنجاح');
         
@@ -769,11 +691,14 @@ async acceptOffer(fromId, offerData) {
         console.error('❌ فشل قبول الـ Offer:', e);
         alert('فشل فتح قناة الاتصال: ' + (e.message || 'خطأ غير معروف'));
         this.featureRequestReceived = false;
-        this._hasPendingRequest = false;
-        this._isInitiator = false;
+        this._isLocked = false;
         const toggleInput = document.getElementById('featureToggleInput');
-        if (toggleInput) toggleInput.checked = false;
-        this.setFeatureButtonState('idle');
+        if (toggleInput) {
+            toggleInput.checked = false;
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
+        }
     }
 },
 
@@ -839,22 +764,19 @@ async sendOfferResponse(toId, action, data = null) {
 async acceptFeatureRequest() {
     console.log('🔍 acceptFeatureRequest - بدء التنفيذ');
     
-    // ✅ فقط إذا كان هناك طلب وارد
-    if (!this._hasPendingRequest || !this.featureRequestReceived) {
-        console.log('⚠️ لا يوجد طلب وارد للقبول');
+    if (!this.featureRequestReceived && !this.featureRequestPending) {
+        console.log('⚠️ لا يوجد طلب معلق');
         return;
     }
     
-    // ✅ إذا كنت أنا البادئ، لا تقبل
+    // ✅ إذا كنت أنا البادئ، لا تقبل طلباً وارداً
     if (this._isInitiator) {
         console.log('⚠️ أنا البادئ بالطلب، لا يمكن قبول طلب آخر');
         return;
     }
     
-    // ✅ قبول الطلب
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
-    this._hasPendingRequest = false;
     
     if (this.currentChat) {
         console.log('✅ تم تجهيز المحادثة، في انتظار تفعيل الميزات بعد نجاح القناة');
@@ -868,9 +790,6 @@ async acceptFeatureRequest() {
     const switchLabel = document.getElementById('featureSwitchLabel');
     if (switchLabel) switchLabel.classList.remove('blinking');
     
-    // ✅ تغيير حالة الزر إلى انتظار
-    this.setFeatureButtonState('waiting');
-    
     if (this._pendingOffer && this._pendingOffer[this.currentChat] && this._pendingOffer[this.currentChat].sdp) {
         console.log('📡 يوجد Offer معلق، جاري قبوله...');
         await this.acceptOffer(this.currentChat, this._pendingOffer[this.currentChat]);
@@ -883,19 +802,36 @@ async acceptFeatureRequest() {
                 console.log('✅ تم فتح Data Channel في الخلفية');
                 this.featuresEnabled = true;
                 this.friendInConversation = true;
-                this._isInitiator = false;
-                this._isWaitingForResponse = false;
-                this._hasPendingRequest = false;
+                this._isLocked = false;
                 const toggleInput = document.getElementById('featureToggleInput');
-                if (toggleInput) toggleInput.checked = true;
-                this.setFeatureButtonState('active');
+                if (toggleInput) {
+                    toggleInput.checked = true;
+                    toggleInput.disabled = false;
+                    toggleInput.style.opacity = '1';
+                    toggleInput.style.cursor = 'pointer';
+                }
                 this.updateAllButtons();
                 console.log('✅ تم تفعيل الميزات بعد فتح القناة');
             }).catch(e => {
                 console.error('❌ خطأ في فتح Data Channel:', e);
-                this.setFeatureButtonState('idle');
+                this._isLocked = false;
+                const toggleInput = document.getElementById('featureToggleInput');
+                if (toggleInput) {
+                    toggleInput.disabled = false;
+                    toggleInput.style.opacity = '1';
+                    toggleInput.style.cursor = 'pointer';
+                }
             });
         }
+    }
+    
+    // ✅ فتح الزر بعد معالجة الطلب
+    this._isLocked = false;
+    const toggleInput = document.getElementById('featureToggleInput');
+    if (toggleInput) {
+        toggleInput.disabled = false;
+        toggleInput.style.opacity = '1';
+        toggleInput.style.cursor = 'pointer';
     }
     
     console.log('✅ تم تجهيز القناة، في انتظار تفعيل الميزات بعد نجاح الاتصال');
@@ -911,8 +847,7 @@ async handleFeatureResponse(fromId, action) {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         this._isInitiator = false;
-        this._isWaitingForResponse = false;
-        this._hasPendingRequest = false;
+        this._isLocked = false;
         
         if (this.currentChat === fromId) {
             this.friendInConversation = true;
@@ -927,10 +862,13 @@ async handleFeatureResponse(fromId, action) {
         const toggleInput = document.getElementById('featureToggleInput');
         const switchLabel = document.getElementById('featureSwitchLabel');
         
-        if (toggleInput) toggleInput.checked = true;
+        if (toggleInput) {
+            toggleInput.checked = true;
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
+        }
         if (switchLabel) switchLabel.classList.remove('blinking');
-        
-        this.setFeatureButtonState('active');
         
         if (this.currentChat) {
             try {
@@ -948,31 +886,27 @@ async handleFeatureResponse(fromId, action) {
     } else if (action === 'rejected') {
         console.log('❌ تم رفض طلب التفعيل من:', fromId);
         
-        // ✅ إعادة تعيين حالة الطلب للمرسل
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         this._isInitiator = false;
-        this._isWaitingForResponse = false;
-        this._hasPendingRequest = false;
+        this._isLocked = false;
         
-        // ✅ إيقاف الوميض
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
             this.featureBlinkInterval = null;
         }
         
-        // ✅ إعادة تعيين واجهة المستخدم
         const toggleInput = document.getElementById('featureToggleInput');
         const switchLabel = document.getElementById('featureSwitchLabel');
         
-        if (toggleInput) toggleInput.checked = false;
-        if (switchLabel) {
-            switchLabel.classList.remove('blinking');
-            switchLabel.classList.remove('pulsing');
-            switchLabel.classList.remove('waiting');
+        if (toggleInput) {
+            toggleInput.checked = false;
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
         }
+        if (switchLabel) switchLabel.classList.remove('blinking');
         
-        // ✅ إغلاق أي اتصال قائم
         if (CallSystem.dc) {
             try { CallSystem.dc.close(); } catch(e) {}
             CallSystem.dc = null;
@@ -982,13 +916,10 @@ async handleFeatureResponse(fromId, action) {
             CallSystem.pc = null;
         }
         
-        // ✅ إعادة الزر للحالة الطبيعية
-        this.setFeatureButtonState('idle');
         this.updateAllButtons();
+        alert('❌ تم رفض طلب تفعيل الميزات من الطرف الآخر');
         
-        // ❌ تم إزالة alert نهائياً
-        
-        console.log('✅ تم إعادة تعيين الزر بعد الرفض (بدون رسالة)');
+        console.log('✅ تم إعادة تعيين الزر بعد الرفض');
         
     } else if (action === 'disable') {
         console.log('🔴 استلام إشارة إيقاف من الطرف الآخر');
@@ -997,8 +928,7 @@ async handleFeatureResponse(fromId, action) {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         this._isInitiator = false;
-        this._isWaitingForResponse = false;
-        this._hasPendingRequest = false;
+        this._isLocked = false;
         
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
@@ -1008,12 +938,13 @@ async handleFeatureResponse(fromId, action) {
         const toggleInput = document.getElementById('featureToggleInput');
         const switchLabel = document.getElementById('featureSwitchLabel');
         
-        if (toggleInput) toggleInput.checked = false;
-        if (switchLabel) {
-            switchLabel.classList.remove('blinking');
-            switchLabel.classList.remove('pulsing');
-            switchLabel.classList.remove('waiting');
+        if (toggleInput) {
+            toggleInput.checked = false;
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
         }
+        if (switchLabel) switchLabel.classList.remove('blinking');
         
         if (CallSystem.dc) {
             try { CallSystem.dc.close(); } catch(e) {}
@@ -1024,7 +955,6 @@ async handleFeatureResponse(fromId, action) {
             CallSystem.pc = null;
         }
         
-        this.setFeatureButtonState('idle');
         this.updateAllButtons();
         console.log('✅ تم إلغاء تفعيل الميزات بناءً على طلب الطرف الآخر');
     }
@@ -1038,8 +968,8 @@ async disableFeatures() {
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
     this._isInitiator = false;
-    this._isWaitingForResponse = false;
-    this._hasPendingRequest = false;
+    this._isProcessingOffer = false;
+    this._isLocked = false;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -1049,12 +979,13 @@ async disableFeatures() {
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (toggleInput) toggleInput.checked = false;
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-        switchLabel.classList.remove('pulsing');
-        switchLabel.classList.remove('waiting');
+    if (toggleInput) {
+        toggleInput.checked = false;
+        toggleInput.disabled = false;
+        toggleInput.style.opacity = '1';
+        toggleInput.style.cursor = 'pointer';
     }
+    if (switchLabel) switchLabel.classList.remove('blinking');
     
     if (CallSystem.dc) {
         try { CallSystem.dc.close(); } catch(e) {}
@@ -1065,7 +996,6 @@ async disableFeatures() {
         CallSystem.pc = null;
     }
     
-    this.setFeatureButtonState('idle');
     this.updateAllButtons();
     
     // ✅ تحديث زر الإجراء (بصمة/إرسال)
@@ -1086,29 +1016,28 @@ resetFeatures() {
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
     this._isInitiator = false;
-    this._isWaitingForResponse = false;
-    this._hasPendingRequest = false;
+    this._isProcessingOffer = false;
+    this._isLocked = false;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
-        this.featureBlinkInterval = null;
     }
     
     const toggleInput = document.getElementById('featureToggleInput');
     const switchLabel = document.getElementById('featureSwitchLabel');
     
-    if (toggleInput) toggleInput.checked = false;
-    if (switchLabel) {
-        switchLabel.classList.remove('blinking');
-        switchLabel.classList.remove('pulsing');
-        switchLabel.classList.remove('waiting');
+    if (toggleInput) {
+        toggleInput.checked = false;
+        toggleInput.disabled = false;
+        toggleInput.style.opacity = '1';
+        toggleInput.style.cursor = 'pointer';
     }
+    if (switchLabel) switchLabel.classList.remove('blinking');
     
     if (chatId) {
         console.log('📤 تم إلغاء الميزات محلياً');
     }
     
-    this.setFeatureButtonState('idle');
     this.updateAllButtons();
     
     // ✅ تحديث زر الإجراء (بصمة/إرسال)
@@ -1191,9 +1120,6 @@ closeConversation() {
 
     this.currentChat = null;
     this.friendInConversation = false;
-    this._isInitiator = false;
-    this._isWaitingForResponse = false;
-    this._hasPendingRequest = false;
     
     const conversationPage = document.querySelector('.conversation-page');
     if (conversationPage) conversationPage.style.display = 'none';
@@ -1206,13 +1132,8 @@ closeConversation() {
         this.featureBlinkInterval = null;
     }
     const featureSwitch = document.querySelector('.feature-switch');
-    if (featureSwitch) {
-        featureSwitch.classList.remove('blinking');
-        featureSwitch.classList.remove('pulsing');
-        featureSwitch.classList.remove('waiting');
-    }
+    if (featureSwitch) featureSwitch.classList.remove('blinking');
     
-    this.setFeatureButtonState('idle');
     this.updateFeatureToggleUI();
     
     const bottomNav = document.querySelector('.bottom-nav');
@@ -1270,8 +1191,8 @@ openChat(friendId, friendName, friendAvatar) {
     this.currentChat = friendId;
     this.friendInConversation = false;
     this._isInitiator = false;
-    this._isWaitingForResponse = false;
-    this._hasPendingRequest = false;
+    this._isProcessingOffer = false;
+    this._isLocked = false;
     
     this.resetFeatures();
     document.body.classList.add('conversation-open');
@@ -1290,7 +1211,6 @@ openChat(friendId, friendName, friendAvatar) {
     if (toggleContainer) toggleContainer.style.display = 'flex';
     if (kickBtn) kickBtn.style.display = 'flex';
     
-    this.setFeatureButtonState('idle');
     this.updateAllButtons();
     
     setTimeout(() => {
@@ -1300,13 +1220,16 @@ openChat(friendId, friendName, friendAvatar) {
             this.featureRequestPending = false;
             this.featureRequestReceived = false;
             this._isInitiator = false;
-            this._isWaitingForResponse = false;
-            this._hasPendingRequest = false;
+            this._isLocked = false;
             
             const toggleInput = document.getElementById('featureToggleInput');
-            if (toggleInput) toggleInput.checked = false;
+            if (toggleInput) {
+                toggleInput.checked = false;
+                toggleInput.disabled = false;
+                toggleInput.style.opacity = '1';
+                toggleInput.style.cursor = 'pointer';
+            }
             
-            this.setFeatureButtonState('idle');
             this.updateAllButtons();
             console.log('✅ تم إعادة تعيين الميزات (القناة كانت مغلقة)');
         }
@@ -2444,8 +2367,8 @@ closeChat() {
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
     this._isInitiator = false;
-    this._isWaitingForResponse = false;
-    this._hasPendingRequest = false;
+    this._isProcessingOffer = false;
+    this._isLocked = false;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -2457,7 +2380,6 @@ closeChat() {
     if (toggleContainer) toggleContainer.style.display = 'none';
     if (kickBtn) kickBtn.style.display = 'none';
     
-    this.setFeatureButtonState('idle');
     this.updateAllButtons();
     
     document.body.classList.remove('conversation-open');
