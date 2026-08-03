@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة المعدلة (مع إشارة أولية + تعطيل الزر بعد التفعيل) ==========
+// ========== chat-system.js - النسخة المعدلة (مع إشارة أولية + تعطيل الزر بعد التفعيل + مؤقت) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 const ChatSystem = {
@@ -13,6 +13,7 @@ const ChatSystem = {
     // ✅ متغيرات الإشارة الأولية
     initialSignalReceived: false,
     initialSignalSender: null,
+    initialSignalTimer: null,  // ✅ مؤقت الإشارة الأولية
     
     // ✅ قالب عنصر المحادثة (ثابت)
     chatItemTemplate: null,
@@ -557,7 +558,44 @@ async handleFeatureRequest(fromId, encryptedData) {
             switchLabel.style.pointerEvents = 'none';
         }
         
-        console.log('🔒 تم تعطيل زر التفعيل مؤقتاً - في انتظار الـ Offer');
+        // ✅ إلغاء المؤقت السابق إذا كان موجوداً
+        if (this.initialSignalTimer) {
+            clearTimeout(this.initialSignalTimer);
+            this.initialSignalTimer = null;
+        }
+        
+        // ✅ بدء مؤقت جديد (10 ثواني)
+        this.initialSignalTimer = setTimeout(() => {
+            console.log('⏰ انتهت مهلة الإشارة الأولية (10 ثواني) - إعادة تفعيل الزر');
+            
+            // ✅ إعادة تفعيل الزر (إذا لم تكن الميزات مفعلة)
+            if (!this.featuresEnabled) {
+                this.initialSignalReceived = false;
+                this.initialSignalSender = null;
+                this.initialSignalTimer = null;
+                
+                const toggleInput2 = document.getElementById('featureToggleInput');
+                const switchLabel2 = document.getElementById('featureSwitchLabel');
+                
+                if (toggleInput2) {
+                    toggleInput2.disabled = false;
+                    toggleInput2.style.opacity = '1';
+                    toggleInput2.style.cursor = 'pointer';
+                    toggleInput2.checked = false;
+                }
+                
+                if (switchLabel2) {
+                    switchLabel2.style.opacity = '1';
+                    switchLabel2.style.pointerEvents = 'auto';
+                }
+                
+                console.log('✅ تم إعادة تفعيل زر التفعيل (انتهت مهلة الإشارة الأولية)');
+            } else {
+                console.log('⚠️ الميزات مفعلة بالفعل، لا حاجة لإعادة تفعيل الزر');
+            }
+        }, 10000); // 10 ثواني
+        
+        console.log('🔒 تم تعطيل زر التفعيل مؤقتاً - في انتظار الـ Offer (10 ثواني)');
         return;
     }
     
@@ -565,6 +603,12 @@ async handleFeatureRequest(fromId, encryptedData) {
     if (requestData.action === 'offer_batch' && requestData.sdp) {
         console.log('📡 استلام دفعة (Offer + ICE) من', fromId);
         console.log(`📦 عدد ICE: ${requestData.iceCandidates?.length || 0}`);
+        
+        // ✅ إلغاء مؤقت الإشارة الأولية
+        if (this.initialSignalTimer) {
+            clearTimeout(this.initialSignalTimer);
+            this.initialSignalTimer = null;
+        }
         
         // ✅ إعادة تفعيل الزر (الآن أصبح قابل للضغط - ما لم تكن الميزات مفعلة)
         this.initialSignalReceived = false;
@@ -933,6 +977,14 @@ async handleFeatureResponse(fromId, action) {
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
         
+        // ✅ إلغاء مؤقت الإشارة الأولية
+        if (this.initialSignalTimer) {
+            clearTimeout(this.initialSignalTimer);
+            this.initialSignalTimer = null;
+        }
+        this.initialSignalReceived = false;
+        this.initialSignalSender = null;
+        
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
             this.featureBlinkInterval = null;
@@ -961,6 +1013,14 @@ async handleFeatureResponse(fromId, action) {
         this.featuresEnabled = false;
         this.featureRequestPending = false;
         this.featureRequestReceived = false;
+        
+        // ✅ إلغاء مؤقت الإشارة الأولية
+        if (this.initialSignalTimer) {
+            clearTimeout(this.initialSignalTimer);
+            this.initialSignalTimer = null;
+        }
+        this.initialSignalReceived = false;
+        this.initialSignalSender = null;
         
         if (this.featureBlinkInterval) {
             clearInterval(this.featureBlinkInterval);
@@ -1004,6 +1064,14 @@ async disableFeatures() {
     this.featuresEnabled = false;
     this.featureRequestPending = false;
     this.featureRequestReceived = false;
+    
+    // ✅ إلغاء مؤقت الإشارة الأولية
+    if (this.initialSignalTimer) {
+        clearTimeout(this.initialSignalTimer);
+        this.initialSignalTimer = null;
+    }
+    this.initialSignalReceived = false;
+    this.initialSignalSender = null;
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -1056,6 +1124,12 @@ resetFeatures() {
     this.featureRequestReceived = false;
     this.initialSignalReceived = false;
     this.initialSignalSender = null;
+    
+    // ✅ إلغاء مؤقت الإشارة الأولية
+    if (this.initialSignalTimer) {
+        clearTimeout(this.initialSignalTimer);
+        this.initialSignalTimer = null;
+    }
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
@@ -1166,6 +1240,12 @@ closeConversation() {
     this.initialSignalReceived = false;
     this.initialSignalSender = null;
     
+    // ✅ إلغاء مؤقت الإشارة الأولية
+    if (this.initialSignalTimer) {
+        clearTimeout(this.initialSignalTimer);
+        this.initialSignalTimer = null;
+    }
+    
     const conversationPage = document.querySelector('.conversation-page');
     if (conversationPage) conversationPage.style.display = 'none';
     
@@ -1237,6 +1317,12 @@ openChat(friendId, friendName, friendAvatar) {
     this.friendInConversation = false;
     this.initialSignalReceived = false;
     this.initialSignalSender = null;
+    
+    // ✅ إلغاء مؤقت الإشارة الأولية
+    if (this.initialSignalTimer) {
+        clearTimeout(this.initialSignalTimer);
+        this.initialSignalTimer = null;
+    }
     
     this.resetFeatures();
     document.body.classList.add('conversation-open');
@@ -2410,6 +2496,12 @@ closeChat() {
     this.featureRequestReceived = false;
     this.initialSignalReceived = false;
     this.initialSignalSender = null;
+    
+    // ✅ إلغاء مؤقت الإشارة الأولية
+    if (this.initialSignalTimer) {
+        clearTimeout(this.initialSignalTimer);
+        this.initialSignalTimer = null;
+    }
     
     if (this.featureBlinkInterval) {
         clearInterval(this.featureBlinkInterval);
