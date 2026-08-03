@@ -345,24 +345,12 @@ async requestEnableFeatures() {
         return;
     }
     
-    // ✅ قفل الزر وتعطيله (شفاف)
+    // ✅ قفل العملية (وليس الزر) - المبادر يبقى قابلاً للضغط
     this._isFeatureLocked = true;
     this._featureInitiated = true;
     this.featureRequestPending = true;
     
-    // ✅ تعطيل الزر وجعله شفافاً
-    const toggleInput = document.getElementById('featureToggleInput');
-    const switchLabel = document.getElementById('featureSwitchLabel');
-    if (toggleInput) {
-        toggleInput.disabled = true;
-        toggleInput.style.opacity = '0.4';
-        toggleInput.style.cursor = 'default';
-    }
-    if (switchLabel) {
-        switchLabel.style.opacity = '0.4';
-        switchLabel.style.pointerEvents = 'none';
-    }
-    
+    // ✅ لا نعطل الزر - المبادر يبقى قابلاً للضغط
     this.startFeatureBlink();
     
     this._pendingIceCandidates = [];
@@ -485,16 +473,6 @@ async requestEnableFeatures() {
         this._featureInitiated = false;
         this.featureRequestPending = false;
         
-        if (toggleInput) {
-            toggleInput.disabled = false;
-            toggleInput.style.opacity = '1';
-            toggleInput.style.cursor = 'pointer';
-        }
-        if (switchLabel) {
-            switchLabel.style.opacity = '1';
-            switchLabel.style.pointerEvents = 'auto';
-        }
-        
         this.startFeatureBlink();
         console.log('❌ فشل إرسال الطلب:', e);
         alert('فشل إرسال طلب التفعيل: ' + (e.message || 'خطأ غير معروف'));
@@ -517,16 +495,52 @@ async handleFeatureRequest(fromId, encryptedData) {
         return;
     }
     
+    // ✅ فور استلام الإشارة الأولية، نعطل الزر (شفاف) - المستلم فقط
+    const toggleInput = document.getElementById('featureToggleInput');
+    const switchLabel = document.getElementById('featureSwitchLabel');
+    if (toggleInput) {
+        toggleInput.disabled = true;
+        toggleInput.style.opacity = '0.4';
+        toggleInput.style.cursor = 'default';
+    }
+    if (switchLabel) {
+        switchLabel.style.opacity = '0.4';
+        switchLabel.style.pointerEvents = 'none';
+    }
+    console.log('⏳ الزر معطل مؤقتاً لحين استلام البكج كاملاً');
+    
     let requestData;
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const senderPublicKey = await SecureChatSystem.getReceiverPublicKey(fromId);
-        if (!myPrivateKey || !senderPublicKey) return;
+        if (!myPrivateKey || !senderPublicKey) {
+            // ✅ في حالة فشل جلب المفاتيح، نعيد تفعيل الزر
+            if (toggleInput) {
+                toggleInput.disabled = false;
+                toggleInput.style.opacity = '1';
+                toggleInput.style.cursor = 'pointer';
+            }
+            if (switchLabel) {
+                switchLabel.style.opacity = '1';
+                switchLabel.style.pointerEvents = 'auto';
+            }
+            return;
+        }
         const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, senderPublicKey);
         const decrypted = await SecureChatSystem.decryptData(encryptedData, sharedKey);
         requestData = JSON.parse(decrypted);
     } catch(e) {
         console.error('❌ فشل فك تشفير الطلب:', e);
+        // ✅ في حالة فشل فك التشفير، نعيد تفعيل الزر
+        if (toggleInput) {
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
+        }
+        if (switchLabel) {
+            switchLabel.style.opacity = '1';
+            switchLabel.style.pointerEvents = 'auto';
+        }
         return;
     }
     
@@ -536,13 +550,45 @@ async handleFeatureRequest(fromId, encryptedData) {
         
         if (!requestData.sdp.type || requestData.sdp.type !== 'offer') {
             console.error('❌ SDP غير صالح - type:', requestData.sdp.type);
+            // ✅ في حالة SDP غير صالح، نعيد تفعيل الزر
+            if (toggleInput) {
+                toggleInput.disabled = false;
+                toggleInput.style.opacity = '1';
+                toggleInput.style.cursor = 'pointer';
+            }
+            if (switchLabel) {
+                switchLabel.style.opacity = '1';
+                switchLabel.style.pointerEvents = 'auto';
+            }
             return;
         }
         
         if (!requestData.sdp.sdp || requestData.sdp.sdp.length < 10) {
             console.error('❌ SDP فارغ أو غير مكتمل');
+            // ✅ في حالة SDP فارغ، نعيد تفعيل الزر
+            if (toggleInput) {
+                toggleInput.disabled = false;
+                toggleInput.style.opacity = '1';
+                toggleInput.style.cursor = 'pointer';
+            }
+            if (switchLabel) {
+                switchLabel.style.opacity = '1';
+                switchLabel.style.pointerEvents = 'auto';
+            }
             return;
         }
+        
+        // ✅ تم استلام البكج كاملاً، نعيد تفعيل الزر (المستلم فقط)
+        if (toggleInput) {
+            toggleInput.disabled = false;
+            toggleInput.style.opacity = '1';
+            toggleInput.style.cursor = 'pointer';
+        }
+        if (switchLabel) {
+            switchLabel.style.opacity = '1';
+            switchLabel.style.pointerEvents = 'auto';
+        }
+        console.log('✅ تم استلام البكج كاملاً، الزر عاد للعمل');
         
         if (!this._pendingOffer) this._pendingOffer = {};
         this._pendingOffer[fromId] = {
@@ -554,23 +600,9 @@ async handleFeatureRequest(fromId, encryptedData) {
             timestamp: Date.now()
         };
         
-        // ✅ الآن فقط نفعّل الزر ونظهر الطلب
         this.featureRequestReceived = true;
-        this._isFeatureLocked = false;  // ✅ فتح القفل (الزر يعود للعمل)
+        this._isFeatureLocked = false;
         this._receivedOffer = true;
-        
-        // ✅ إعادة تفعيل الزر (يعود طبيعي)
-        const toggleInput = document.getElementById('featureToggleInput');
-        const switchLabel = document.getElementById('featureSwitchLabel');
-        if (toggleInput) {
-            toggleInput.disabled = false;
-            toggleInput.style.opacity = '1';
-            toggleInput.style.cursor = 'pointer';
-        }
-        if (switchLabel) {
-            switchLabel.style.opacity = '1';
-            switchLabel.style.pointerEvents = 'auto';
-        }
         
         this.startFeatureBlink();
         console.log('📞 شخص يريد تفعيل الميزات - اضغط على الدائرة الحمراء');
