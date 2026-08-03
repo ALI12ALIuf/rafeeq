@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة المعدلة (مع إشارة أولية + تعطيل الزر بعد التفعيل + مؤقت) ==========
+// ========== chat-system.js - النسخة المعدلة (مع إشارة أولية فورية + تعطيل الزر بعد التفعيل + مؤقت 15 ثانية) ==========
 // نظام الدردشة E2EE + نظام الحضور Presence
 
 const ChatSystem = {
@@ -13,7 +13,7 @@ const ChatSystem = {
     // ✅ متغيرات الإشارة الأولية
     initialSignalReceived: false,
     initialSignalSender: null,
-    initialSignalTimer: null,  // ✅ مؤقت الإشارة الأولية
+    initialSignalTimer: null,  // ✅ مؤقت الإشارة الأولية (15 ثانية)
     
     // ✅ قالب عنصر المحادثة (ثابت)
     chatItemTemplate: null,
@@ -352,7 +352,7 @@ startFeatureBlink() {
 },  
     
 
-// ==================== القسم 7: requestEnableFeatures ====================
+// ==================== القسم 7: requestEnableFeatures (معدل - إشارة فورية) ====================
 async requestEnableFeatures() {
     if (!this.currentChat) {
         alert('الرجاء اختيار محادثة أولاً');
@@ -367,7 +367,7 @@ async requestEnableFeatures() {
         return;
     }
     
-    // ✅ 1. إرسال إشارة أولية (تنبيه) إلى الطرف الآخر
+    // ✅ 1. إرسال إشارة أولية فوراً (بدون تأخير)
     try {
         const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
         const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
@@ -384,7 +384,7 @@ async requestEnableFeatures() {
                 data: encrypted,
                 timestamp: Date.now()
             });
-            console.log('📨 تم إرسال الإشارة الأولية إلى:', this.currentChat);
+            console.log('📨 تم إرسال الإشارة الأولية فوراً إلى:', this.currentChat);
         }
     } catch(e) {
         console.warn('⚠️ فشل إرسال الإشارة الأولية:', e);
@@ -535,9 +535,9 @@ async handleFeatureRequest(fromId, encryptedData) {
         return;
     }
     
-    // ✅ معالجة الإشارة الأولية
+    // ✅ معالجة الإشارة الأولية (فورية)
     if (requestData.action === 'initial_signal') {
-        console.log('📡 استلام إشارة أولية من:', fromId);
+        console.log('📡 استلام إشارة أولية فورية من:', fromId);
         
         // ✅ تعطيل زر التفعيل (شفاف وغير قابل للضغط)
         this.initialSignalReceived = true;
@@ -564,9 +564,9 @@ async handleFeatureRequest(fromId, encryptedData) {
             this.initialSignalTimer = null;
         }
         
-        // ✅ بدء مؤقت جديد (10 ثواني)
+        // ✅ بدء مؤقت جديد (15 ثانية)
         this.initialSignalTimer = setTimeout(() => {
-            console.log('⏰ انتهت مهلة الإشارة الأولية (10 ثواني) - إعادة تفعيل الزر');
+            console.log('⏰ انتهت مهلة الإشارة الأولية (15 ثانية) - إعادة تفعيل الزر');
             
             // ✅ إعادة تفعيل الزر (إذا لم تكن الميزات مفعلة)
             if (!this.featuresEnabled) {
@@ -593,9 +593,9 @@ async handleFeatureRequest(fromId, encryptedData) {
             } else {
                 console.log('⚠️ الميزات مفعلة بالفعل، لا حاجة لإعادة تفعيل الزر');
             }
-        }, 10000); // 10 ثواني
+        }, 15000); // ✅ 15 ثانية
         
-        console.log('🔒 تم تعطيل زر التفعيل مؤقتاً - في انتظار الـ Offer (10 ثواني)');
+        console.log('🔒 تم تعطيل زر التفعيل مؤقتاً - في انتظار الـ Offer (15 ثانية)');
         return;
     }
     
