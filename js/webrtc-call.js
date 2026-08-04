@@ -1,5 +1,5 @@
 // ========== webrtc-call.js - النسخة المعدلة (مكالمات صوتية فقط) ==========
-// جميع ميزات الصوت + إرسال الملفات (تم إزالة الفيديو)
+// جميع ميزات الصوت + إرسال الملفات (تم إزالة الفيديو نهائياً)
 
 const CallSystem = {
     pc: null, dc: null,           // ✅ خاصة بالميزات (دردشة، ملفات، موقع)
@@ -380,7 +380,7 @@ async createDataChannelOnly(calleeId) {
     },
     
     
-    // ========== 7. شاشة المكالمة الواردة (معدلة - تستخدم بيانات المحادثة الموجودة) ==========
+    // ========== 7. شاشة المكالمة الواردة (معدلة - صوت فقط) ==========
 
 showIncomingCall(callerId, callData) {
     if (callData.type === 'datachannel') {
@@ -835,11 +835,9 @@ async sendSignal(calleeId, data) {
     // ==================== 9. واجهة المستخدم (معدلة - صوت فقط) ====================
 
 showCallUI(type) {
-    // إخفاء جميع واجهات المكالمات أولاً
+    // ✅ إخفاء واجهة المكالمة الصوتية أولاً
     const audioUI = document.getElementById('audioCallUI');
-    const videoUI = document.getElementById('videoCallUI');
     if (audioUI) audioUI.style.display = 'none';
-    if (videoUI) videoUI.style.display = 'none';
     
     document.body.classList.add('in-call');
     
@@ -1082,7 +1080,7 @@ compressImage(file) {
     });
 },
 
-// ==================== 13. إنهاء المكالمة ====================
+// ==================== 13. إنهاء المكالمة (معدل - صوت فقط) ====================
     
     endCall() {
         console.log('📞 إنهاء المكالمة...');
@@ -1133,10 +1131,15 @@ compressImage(file) {
             this.pcCall = null;
         }
         
-        // إخفاء جميع واجهات المكالمات
-        document.getElementById('audioCallUI').style.display = 'none';
-        document.getElementById('videoCallUI').style.display = 'none';
+        // ✅ إخفاء واجهة المكالمة الصوتية فقط
+        const audioUI = document.getElementById('audioCallUI');
+        if (audioUI) audioUI.style.display = 'none';
         
+        // ✅ إخفاء شاشة المكالمة الواردة
+        const incomingCall = document.getElementById('incomingCall');
+        if (incomingCall) incomingCall.style.display = 'none';
+        
+        // ✅ تنظيف العناصر الديناميكية
         this.cleanupDynamicElements();
         
         this.incomingChunks = {};
@@ -1160,13 +1163,13 @@ compressImage(file) {
         console.log('✅ تم إنهاء المكالمة');
     },
     
-    // ==================== 14. تنظيف العناصر الديناميكية ====================
+    // ==================== 14. تنظيف العناصر الديناميكية (معدل - صوت فقط) ====================
     
     cleanupDynamicElements() {
         console.log('🧹 بدء تنظيف العناصر الديناميكية...');
         
-        // إخفاء العناصر الثابتة
-        const elements = ['incomingCall', 'audioCallUI', 'videoCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
+        // ✅ إخفاء العناصر المطلوبة فقط (بدون فيديو)
+        const elements = ['incomingCall', 'audioCallUI', 'locationSwipeModal', 'imagePreviewModal'];
         elements.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -1175,22 +1178,17 @@ compressImage(file) {
                     const img = document.getElementById('previewImage');
                     if (img) img.src = '';
                 }
-                if (id === 'videoPreviewModal') {
-                    const video = document.getElementById('previewVideo');
-                    if (video) { video.pause(); video.src = ''; }
-                }
                 if (id === 'incomingCall') {
                     const leftThumb = document.getElementById('leftThumb');
                     const rightThumb = document.getElementById('rightThumb');
-                    if (leftThumb) { leftThumb.style.left = '8px'; leftThumb.style.transition = 'none'; }
-                    if (rightThumb) { rightThumb.style.right = '8px'; rightThumb.style.transition = 'none'; }
-                }
-                if (id === 'audioCallUI' || id === 'videoCallUI') {
-                    // إعادة تعيين الفيديو البعيد
-                    const rv = document.getElementById('remoteVideo');
-                    if (rv) rv.srcObject = null;
-                    const lv = document.getElementById('localVideo');
-                    if (lv) lv.srcObject = null;
+                    if (leftThumb) { 
+                        leftThumb.style.left = '8px'; 
+                        leftThumb.style.transition = 'none'; 
+                    }
+                    if (rightThumb) { 
+                        rightThumb.style.right = '8px'; 
+                        rightThumb.style.transition = 'none'; 
+                    }
                 }
             }
         });
@@ -1212,7 +1210,7 @@ compressImage(file) {
         this._callIceCandidates = [];
         this._answerIceCandidates = [];
         
-        console.log('✅ تم تنظيف جميع العناصر الثابتة');
+        console.log('✅ تم تنظيف جميع العناصر');
     }
 };
        
