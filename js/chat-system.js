@@ -1188,11 +1188,6 @@ updateAllButtons() {
                          document.querySelector('#audioCallBtn') ||
                          document.querySelector('button[data-call="audio"]');
     
-    const videoCallBtn = document.querySelector('[onclick="startVideoCall()"]') || 
-                         document.querySelector('.video-call-btn') ||
-                         document.querySelector('#videoCallBtn') ||
-                         document.querySelector('button[data-call="video"]');
-    
     if (audioCallBtn) {
         if (canUse) {
             audioCallBtn.style.opacity = '1';
@@ -1205,17 +1200,7 @@ updateAllButtons() {
         }
     }
     
-    if (videoCallBtn) {
-        if (canUse) {
-            videoCallBtn.style.opacity = '1';
-            videoCallBtn.style.pointerEvents = 'auto';
-            videoCallBtn.title = 'مكالمة فيديو';
-        } else {
-            videoCallBtn.style.opacity = '0.5';
-            videoCallBtn.style.pointerEvents = 'none';
-            videoCallBtn.title = this.featuresEnabled ? 'غير متاح - الطرف الآخر ليس في المحادثة' : 'غير متاح - الميزات غير مفعلة';
-        }
-    }
+    // ✅ تم حذف videoCallBtn بالكامل
     
     this.updateFeatureToggleUI();
     this.updateKickButtonState();
