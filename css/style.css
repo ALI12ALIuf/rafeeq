@@ -1293,3 +1293,61 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
+
+
+
+/* ===== نظام الضغط المطول للصور والفيديو ===== */
+
+/* تأثير الضغط المطول */
+.message-image-wrapper.long-press-active img,
+.video-thumbnail.long-press-active {
+    transform: scale(0.95) !important;
+    transition: transform 0.1s;
+    box-shadow: 0 0 30px rgba(33, 150, 243, 0.3);
+}
+
+/* قائمة السياق المخصصة */
+#customContextMenu {
+    animation: contextMenuFade 0.2s ease;
+}
+
+@keyframes contextMenuFade {
+    from { 
+        opacity: 0; 
+        transform: scale(0.95) translateY(-10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: scale(1) translateY(0); 
+    }
+}
+
+#customContextMenu button:hover {
+    background: var(--light);
+}
+
+#customContextMenu button:active {
+    transform: scale(0.98);
+}
+
+/* ✅ Toast الإشعارات */
+#toastMessage {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    z-index: 999999;
+    max-width: 90%;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+}
+
