@@ -156,7 +156,7 @@ async function loadChats(force = false) {
                             else if (l.type === 'image') lm = '📷 صورة'; 
                             else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; 
                             else if (l.type === 'video') lm = '🎥 فيديو'; 
-                            else if (l.type === 'file') lm = '📎 ملف'; 
+                            // ❌ إزالة معالجة الملفات
                             lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
                         } 
                     } catch (e) {} 
@@ -580,7 +580,7 @@ window.showAttachmentMenu = () => {
     }
 };
 
-// ==================== القسم 7: إرسال الملفات ====================
+// ==================== القسم 7: إرسال الصور والفيديو فقط (تم إزالة الملفات) ====================
 window.sendImage = () => { 
     const i = document.createElement('input'); 
     i.type = 'file'; 
@@ -605,17 +605,7 @@ window.sendVideo = () => {
     document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
-window.sendFile = () => { 
-    const i = document.createElement('input'); 
-    i.type = 'file'; 
-    i.accept = '*/*'; 
-    i.onchange = e => { 
-        const f = e.target.files[0]; 
-        if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); 
-    }; 
-    i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
+// ❌ تم إزالة دالة sendFile نهائياً
 
 // ==================== القسم 8: مشاركة الموقع ====================
 window.shareLocation = () => { 
