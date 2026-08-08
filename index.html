@@ -347,10 +347,7 @@
     </div>
 </div>
 
-<!-- 4.3: واجهة المكالمة المرئية (تم إزالتها بالكامل - يمنع استخدامها) -->
-<!-- تم حذف videoCallUI بالكامل -->
-
-<!-- 4.4: معاينة الصورة -->
+<!-- 4.3: معاينة الصورة (تم إزالة زر التحميل - ضغط مطول للتحميل) -->
 <div id="imagePreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10050;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-x pan-y;">
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10051;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
     <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;border-radius:16px;">
@@ -360,16 +357,38 @@
         <button onclick="closeImagePreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
             <i class="fas fa-arrow-right"></i>
         </button>
-        <button onclick="downloadPreviewImage()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
-            <i class="fas fa-download"></i>
-        </button>
+        <!-- ✅ تم إزالة زر التحميل - استخدم الضغط المطول على الصورة للتحميل -->
+        <!-- <button onclick="downloadPreviewImage()" ... > <i class="fas fa-download"></i> </button> -->
     </div>
 </div>
 
-<!-- 4.5: معاينة الفيديو (تم إزالتها بالكامل) -->
-<!-- تم حذف videoPreviewModal بالكامل -->
+<!-- 4.4: معاينة الفيديو (تم إزالة زر التحميل - ضغط مطول للتحميل) -->
+<div id="videoPreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10050;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10051;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
+    <div style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+        <video id="previewVideo" style="max-width:100%;max-height:80%;object-fit:contain;background:#000;border-radius:12px;cursor:default;" playsinline></video>
+        <div id="videoCustomControls" style="display:none;position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);border-radius:30px;padding:10px 20px;display:flex;align-items:center;gap:15px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);min-width:280px;justify-content:center;">
+            <button id="videoPlayBtn" onclick="ChatSystem.toggleVideoPlay()" style="background:transparent;border:none;color:white;font-size:1.2rem;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-play"></i>
+            </button>
+            <span id="videoCurrentTime" style="color:white;font-size:0.8rem;font-family:monospace;min-width:40px;direction:ltr;text-align:center;">0:00</span>
+            <input type="range" id="videoProgress" min="0" max="100" value="0" oninput="ChatSystem.seekVideo(this.value)" style="flex:1;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;outline:none;cursor:pointer;direction:ltr;">
+            <span id="videoDuration" style="color:white;font-size:0.8rem;font-family:monospace;min-width:40px;direction:ltr;text-align:center;">0:00</span>
+            <button id="videoMuteBtn" onclick="ChatSystem.toggleVideoMute()" style="background:transparent;border:none;color:white;font-size:1rem;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-volume-up"></i>
+            </button>
+        </div>
+    </div>
+    <div style="position:absolute;top:30px;left:0;right:0;display:flex;justify-content:space-between;padding:0 30px;pointer-events:none;z-index:10052;">
+        <button onclick="ChatSystem.closeVideoPreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-arrow-right"></i>
+        </button>
+        <!-- ✅ تم إزالة زر التحميل - استخدم الضغط المطول على الفيديو للتحميل -->
+        <!-- <button onclick="ChatSystem.downloadPreviewVideo()" ... > <i class="fas fa-download"></i> </button> -->
+    </div>
+</div>
 
-<!-- 4.6: مشاركة الموقع -->
+<!-- 4.5: مشاركة الموقع -->
 <div id="locationSwipeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10003;align-items:center;justify-content:center;backdrop-filter:blur(5px);font-family:system-ui,sans-serif;">
     <div style="background:#0a0e27;border-radius:40px;width:340px;max-width:90%;padding:30px 20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4);">
         <div style="font-size:3rem;margin-bottom:10px;">🗺️</div>
@@ -415,13 +434,13 @@
     </div>
 </div>
 
-<!-- 4.7: شريط التقدم -->
+<!-- 4.6: شريط التقدم -->
 <div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
     <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
     <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
 </div>
 
-<!-- 4.8: شاشة تسجيل الدخول -->
+<!-- 4.7: شاشة تسجيل الدخول -->
 <div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
     <div style="text-align:center;padding:20px;max-width:350px;">
         <div style="font-size:5rem;">🛡️</div>
@@ -447,7 +466,7 @@
     </div>
 </template>
 
-<!-- 5.2: قالب الفيديو -->
+<!-- 5.2: قالب الفيديو (معدل - إزالة زر التحميل، ضغط مطول) -->
 <template id="videoMessageTemplate">
     <div class="message-content video-thumbnail">
         <video class="video-thumbnail-content" preload="metadata" playsinline>
@@ -481,16 +500,15 @@
     </div>
 </template>
 
-<!-- 5.4: قالب الملف -->
+<!-- 5.4: قالب الملف (معدل - إزالة زر التحميل، ضغط مطول) -->
 <template id="fileMessageTemplate">
     <div class="message-content file-card">
         <div class="file-icon">📄</div>
         <div class="file-info">
             <div class="file-name"></div>
         </div>
-        <button class="download-file-btn">
-            <i class="fas fa-download"></i>
-        </button>
+        <!-- ✅ تم إزالة زر التحميل - استخدم الضغط المطول على البطاقة للتحميل -->
+        <!-- <button class="download-file-btn"> <i class="fas fa-download"></i> </button> -->
     </div>
 </template>
 
