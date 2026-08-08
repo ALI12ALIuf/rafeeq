@@ -1,3 +1,4 @@
+
 /* ==================== القسم 1: إعادة تعيين الأنماط العامة ==================== */
 * {
     margin: 0;
@@ -1293,3 +1294,40 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
+
+/* ==================== القسم 21: دعم الضغط المطول للصور والفيديوهات للتحميل ==================== */
+
+/* السماح بالضغط المطول للصور والفيديوهات (لظهور قائمة المتصفح) */
+.message-image-content,
+.video-thumbnail-content,
+#previewImage,
+#previewVideo,
+.file-card {
+    -webkit-touch-callout: default !important;
+    -webkit-user-select: auto !important;
+    user-select: auto !important;
+    pointer-events: auto !important;
+    touch-action: auto !important;
+}
+
+/* منع السحب فقط مع الاحتفاظ بالضغط المطول */
+.message-image-content,
+.video-thumbnail-content {
+    -webkit-user-drag: none !important;
+    user-drag: none !important;
+}
+
+/* مؤشر عند تمرير الماوس */
+.message-image-content:hover,
+.video-thumbnail-content:hover,
+.file-card:hover {
+    cursor: pointer;
+}
+
+/* تأثير بسيط عند الضغط */
+.message-image-content:active,
+.video-thumbnail-content:active,
+.file-card:active {
+    opacity: 0.85;
+    transition: opacity 0.1s;
+}
