@@ -1293,3 +1293,49 @@ input:checked + .toggle-slider:before {
     font-size: 1rem !important;
 }
 
+
+
+
+/* ==================== مؤشر الضغط المطول ==================== */
+.message-image-wrapper,
+.video-thumbnail,
+.file-card {
+    cursor: pointer;
+    -webkit-touch-callout: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    transition: transform 0.1s ease;
+}
+
+.message-image-wrapper:active,
+.video-thumbnail:active,
+.file-card:active {
+    transform: scale(0.97);
+}
+
+/* منع قائمة المتصفح عند الضغط المطول */
+.message-image-wrapper img,
+.video-thumbnail video,
+.file-card {
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    pointer-events: auto !important;
+}
+
+/* تلميح للضغط المطول */
+.long-press-hint {
+    font-size: 0.6rem;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    margin-top: 4px;
+    direction: ltr;
+    opacity: 0.7;
+}
+
+/* إضافة تأثير عند الضغط المطول */
+.long-press-active {
+    transform: scale(0.95) !important;
+    transition: transform 0.05s ease !important;
+}
+
