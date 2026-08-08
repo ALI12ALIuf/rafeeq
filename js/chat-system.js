@@ -1449,7 +1449,7 @@ setupVoiceControls(clone, audioEl) {
     };
 },
 
- // ==================== القسم 26: displayMessage (معدل بالكامل - استخدام القوالب الثابتة) ====================
+ // ==================== القسم 26: displayMessage (معدل - دعم الضغط المطول للتحميل) ====================
 displayMessage(msg) {
     const c = document.getElementById('messagesContainer'); 
     if (!c) return;
@@ -1484,7 +1484,7 @@ displayMessage(msg) {
     div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
     div.id = `msg-${msg.id}`;
     
-    // ==================== معالجة الرسائل النصية (معدل - استخدام القالب الثابت) ====================
+    // ==================== معالجة الرسائل النصية ====================
     if (msg.type === 'text') {
         const textTemplate = document.getElementById('textMessageTemplate');
         if (textTemplate) {
@@ -1580,7 +1580,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الصورة ====================
+    // ==================== معالجة الصورة (معدل - دعم الضغط المطول للتحميل) ====================
     else if (msg.type === 'image') {
         const templateImg = document.getElementById('imageMessageTemplate');
         if (templateImg) {
@@ -1591,14 +1591,53 @@ displayMessage(msg) {
                 const img = wrapper.querySelector('.message-image-content');
                 if (img) {
                     img.src = msg.data;
+                    // ✅ تفعيل الضغط المطول للتحميل عبر قائمة المتصفح
+                    img.style.webkitTouchCallout = 'default';
+                    img.style.userSelect = 'auto';
+                    img.style.webkitUserSelect = 'auto';
+                    img.style.pointerEvents = 'auto';
+                    img.style.cursor = 'pointer';
+                    // نقر عادي = معاينة مكبرة
                     img.onclick = () => this.showImagePreview(msg.data);
-                    img.oncontextmenu = (e) => e.preventDefault();
+                    // السماح بقائمة السياق (الضغط المطول)
+                    img.oncontextmenu = (e) => e.stopPropagation();
                     img.ondragstart = (e) => e.preventDefault();
                 }
             }
             div.appendChild(clone);
         } else {
             console.warn('⚠️ قالب imageMessageTemplate غير موجود');
+        }
+    }
+    
+    // ==================== معالجة الفيديو (معدل - دعم الضغط المطول للتحميل) ====================
+    else if (msg.type === 'video') {
+        const templateVideo = document.getElementById('videoMessageTemplate');
+        if (templateVideo) {
+            const clone = templateVideo.content.cloneNode(true);
+            const thumbnail = clone.querySelector('.video-thumbnail');
+            if (thumbnail) {
+                thumbnail.style.border = `2px solid ${borderColor}`;
+                const video = thumbnail.querySelector('.video-thumbnail-content');
+                const source = video?.querySelector('source');
+                if (source && msg.data) {
+                    source.src = msg.data;
+                    video.load();
+                }
+                // ✅ تفعيل الضغط المطول للتحميل عبر قائمة المتصفح
+                video.style.webkitTouchCallout = 'default';
+                video.style.userSelect = 'auto';
+                video.style.webkitUserSelect = 'auto';
+                video.style.pointerEvents = 'auto';
+                video.style.cursor = 'pointer';
+                thumbnail.onclick = (e) => {
+                    e.stopPropagation();
+                    this.showVideoPreview(msg.data);
+                };
+            }
+            div.appendChild(clone);
+        } else {
+            console.warn('⚠️ قالب videoMessageTemplate غير موجود');
         }
     }
     
@@ -1623,32 +1662,7 @@ displayMessage(msg) {
         }
     }
     
-    // ==================== معالجة الفيديو ====================
-    else if (msg.type === 'video') {
-        const templateVideo = document.getElementById('videoMessageTemplate');
-        if (templateVideo) {
-            const clone = templateVideo.content.cloneNode(true);
-            const thumbnail = clone.querySelector('.video-thumbnail');
-            if (thumbnail) {
-                thumbnail.style.border = `2px solid ${borderColor}`;
-                const video = thumbnail.querySelector('.video-thumbnail-content');
-                const source = video?.querySelector('source');
-                if (source && msg.data) {
-                    source.src = msg.data;
-                    video.load();
-                }
-                thumbnail.onclick = (e) => {
-                    e.stopPropagation();
-                    this.showVideoPreview(msg.data);
-                };
-            }
-            div.appendChild(clone);
-        } else {
-            console.warn('⚠️ قالب videoMessageTemplate غير موجود');
-        }
-    }
-    
-    // ==================== معالجة الملف ====================
+    // ==================== معالجة الملف (معدل - دعم الضغط المطول والتحميل بالنقر) ====================
     else if (msg.type === 'file') {
         const templateFile = document.getElementById('fileMessageTemplate');
         if (templateFile) {
@@ -1657,20 +1671,26 @@ displayMessage(msg) {
             if (fileCard) {
                 fileCard.style.background = '#4CAF50';
                 fileCard.style.border = `1.5px solid ${borderColor}`;
+                fileCard.style.cursor = 'pointer';
                 const fileNameEl = fileCard.querySelector('.file-name');
                 if (fileNameEl) {
                     fileNameEl.textContent = msg.fileName || 'ملف';
                 }
-                const downloadBtn = fileCard.querySelector('.download-file-btn');
-                if (downloadBtn && msg.data) {
-                    downloadBtn.onclick = (e) => {
-                        e.stopPropagation();
+                // ✅ نقر عادي = تحميل الملف
+                fileCard.onclick = (e) => {
+                    e.stopPropagation();
+                    if (msg.data) {
                         const link = document.createElement('a');
                         link.href = msg.data;
                         link.download = msg.fileName || 'ملف';
                         link.click();
-                    };
-                }
+                    }
+                };
+                // ✅ دعم الضغط المطول (تظهر قائمة المتصفح أيضاً)
+                fileCard.ondragstart = (e) => e.preventDefault();
+                fileCard.style.webkitTouchCallout = 'default';
+                fileCard.style.userSelect = 'auto';
+                fileCard.style.webkitUserSelect = 'auto';
             }
             div.appendChild(clone);
         } else {
@@ -1691,6 +1711,12 @@ showImagePreview(imageSrc) {
     
     img.src = imageSrc;
     modal.style.display = 'flex';
+    
+    // ✅ تفعيل الضغط المطول للتحميل في المعاينة
+    img.style.webkitTouchCallout = 'default';
+    img.style.userSelect = 'auto';
+    img.style.webkitUserSelect = 'auto';
+    img.style.pointerEvents = 'auto';
     
     this.setupImageZoom(modal, img);
 },
@@ -1786,7 +1812,7 @@ setupImageZoom(modal, img) {
 },
 
 
-// ==================== القسم 26.2: showVideoPreview (معدل - تحكم مخصص) ====================
+// ==================== القسم 26.2: showVideoPreview (معدل - دعم الضغط المطول للتحميل) ====================
 showVideoPreview(videoSrc) {
     const modal = document.getElementById('videoPreviewModal');
     const video = document.getElementById('previewVideo');
@@ -1797,6 +1823,12 @@ showVideoPreview(videoSrc) {
     
     video.src = videoSrc;
     modal.style.display = 'flex';
+    
+    // ✅ تفعيل الضغط المطول للتحميل في المعاينة
+    video.style.webkitTouchCallout = 'default';
+    video.style.userSelect = 'auto';
+    video.style.webkitUserSelect = 'auto';
+    video.style.pointerEvents = 'auto';
     
     // إظهار عناصر التحكم المخصصة
     const controls = document.getElementById('videoCustomControls');
@@ -1813,7 +1845,6 @@ showVideoPreview(videoSrc) {
     if (muteBtn) muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
     if (progress) {
         progress.value = 0;
-        // ✅ إجبار الاتجاه من اليسار إلى اليمين
         progress.style.direction = 'ltr';
         progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 0%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.2) 100%)`;
     }
@@ -1833,7 +1864,6 @@ showVideoPreview(videoSrc) {
         if (progress) {
             progress.max = video.duration;
             progress.value = 0;
-            // ✅ إجبار الاتجاه من اليسار إلى اليمين مرة أخرى
             progress.style.direction = 'ltr';
         }
     };
@@ -1842,7 +1872,6 @@ showVideoPreview(videoSrc) {
     video.ontimeupdate = function() {
         if (progress) {
             progress.value = video.currentTime;
-            // ✅ تحديث لون شريط التقدم من اليسار إلى اليمين
             const percent = (video.currentTime / video.duration) * 100;
             progress.style.background = `linear-gradient(to right, #4CAF50 0%, #4CAF50 ${percent}%, rgba(255,255,255,0.2) ${percent}%, rgba(255,255,255,0.2) 100%)`;
         }
@@ -1930,17 +1959,6 @@ closeVideoPreview() {
     if (duration) duration.textContent = '0:00';
 },
 
-// ==================== القسم 26.2.5: downloadPreviewVideo (يبقى كما هو) ====================
-downloadPreviewVideo() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-},
-
-
 // ==================== القسم 26.3: دوال إغلاق المعاينات ====================
 closeImagePreview() {
     const modal = document.getElementById('imagePreviewModal');
@@ -1949,33 +1967,7 @@ closeImagePreview() {
     if (img) { img.src = ''; img.style.transform = 'none'; }
 },
 
-closeVideoPreview() {
-    const modal = document.getElementById('videoPreviewModal');
-    const video = document.getElementById('previewVideo');
-    if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
-},
-
-downloadPreviewImage() {
-    const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
-},
-
-downloadPreviewVideo() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-},  
-    
-
-    // ==================== القسم 27: sendMessage ====================
+// ==================== القسم 27: sendMessage ====================
 async sendMessage(text) { 
     if (!this.currentChat || !text.trim()) return false; 
     const mid = Date.now().toString(); 
@@ -2600,7 +2592,7 @@ function performGlobalCleanup() {
         }
     });
     
-    const modals = ['incomingCall', 'audioCallUI', 'videoCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
+    const modals = ['incomingCall', 'audioCallUI', 'locationSwipeModal', 'imagePreviewModal', 'videoPreviewModal'];
     modals.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -2613,7 +2605,7 @@ function performGlobalCleanup() {
                 const video = document.getElementById('previewVideo');
                 if (video) { video.pause(); video.src = ''; }
             }
-            if (id === 'audioCallUI' || id === 'videoCallUI') {
+            if (id === 'audioCallUI') {
                 const rv = document.getElementById('remoteVideo');
                 if (rv) rv.srcObject = null;
                 const lv = document.getElementById('localVideo');
