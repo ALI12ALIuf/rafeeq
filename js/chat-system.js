@@ -1,16 +1,11 @@
-// ========== chat-system.js - النسخة المعدلة (بدون WebRTC) ==========
+// ========== chat-system.js - النسخة المعدلة (بدون عداد + تصحيح الصور) ==========
 // نظام الدردشة E2EE + إرسال الصور والبصمات عبر السيرفر
 
 const ChatSystem = {
     currentChat: null, messages: {},
-    friendInConversation: false,
+    friendInConversation: true,
     
-    // ✅ متغيرات الإشارة الأولية
-    initialSignalReceived: false,
-    initialSignalSender: null,
-    initialSignalTimer: null,
-    
-    // ✅ قالب عنصر المحادثة (ثابت)
+    // ✅ قالب عنصر المحادثة
     chatItemTemplate: null,
     
     // ==================== القسم 1: init ====================
@@ -35,35 +30,10 @@ const ChatSystem = {
         } 
     },
     
-    // ==================== القسم 3: showProgressBar ====================
-    showProgressBar(message, percent) {
-        const bar = document.getElementById('progressBar');
-        if (!bar) return;
-        bar.style.display = 'flex';
-        const fill = document.getElementById('progressFill');
-        const perc = document.getElementById('progressPercent');
-        if (fill) fill.style.width = '0%';
-        if (perc) perc.textContent = '0%';
-    },
-    
-    // ==================== القسم 4: updateProgressBar ====================
-    updateProgressBar(percent, message) {
-        const fill = document.getElementById('progressFill');
-        const perc = document.getElementById('progressPercent');
-        if (fill) fill.style.width = Math.min(percent, 100) + '%';
-        if (perc) perc.textContent = Math.round(percent) + '%';
-    },
-    
-    // ==================== القسم 5: hideProgressBar ====================
-    hideProgressBar() { 
-        const bar = document.getElementById('progressBar'); 
-        if (bar) bar.style.display = 'none'; 
-    },
-    
-    // ==================== القسم 6: openChat ====================
+    // ==================== القسم 3: openChat ====================
     openChat(friendId, friendName, friendAvatar) {
         if (this.currentChat && this.currentChat !== friendId) {
-            console.log('🧹 تنظيف المحادثة السابقة قبل فتح محادثة جديدة:', this.currentChat);
+            console.log('🧹 تنظيف المحادثة السابقة:', this.currentChat);
             this.cleanConversationData(this.currentChat, false);
         }
         
@@ -81,13 +51,12 @@ const ChatSystem = {
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
         
-        // تحديث زر الإجراء (بصمة/إرسال)
         if (typeof window.toggleSendButton === 'function') {
             setTimeout(() => window.toggleSendButton(), 100);
         }
     },
     
-    // ==================== القسم 7: displayMessages ====================
+    // ==================== القسم 4: displayMessages ====================
     displayMessages(friendId) { 
         const c = document.getElementById('messagesContainer'); 
         if (!c) return; 
@@ -103,7 +72,7 @@ const ChatSystem = {
         c.scrollTop = c.scrollHeight;
     },
     
-    // ==================== القسم 8: displayMessage ====================
+    // ==================== القسم 5: displayMessage ====================
     displayMessage(msg) {
         const c = document.getElementById('messagesContainer'); 
         if (!c) return;
@@ -152,20 +121,6 @@ const ChatSystem = {
                 }
                 
                 div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب textMessageTemplate غير موجود');
-            }
-            
-            // إضافة فاصل زمني كل 10 رسائل
-            const existingTextMessages = c.querySelectorAll('.message.sent, .message.received');
-            const currentMessageCount = existingTextMessages.length;
-            
-            if (currentMessageCount % 10 === 0) {
-                const timeSeparator = document.createElement('div');
-                timeSeparator.className = 'time-separator';
-                timeSeparator.style.cssText = 'text-align: center; margin: 15px 0; font-size: 0.7rem; color: var(--text-light); opacity: 0.7; direction: ltr;';
-                timeSeparator.textContent = dateTime;
-                c.appendChild(timeSeparator);
             }
         }
         
@@ -186,8 +141,6 @@ const ChatSystem = {
                     }
                 }
                 div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب imageMessageTemplate غير موجود');
             }
         }
         
@@ -207,8 +160,6 @@ const ChatSystem = {
                     }
                 }
                 div.appendChild(clone);
-            } else {
-                console.warn('⚠️ قالب voiceMessageTemplate غير موجود');
             }
         }
         
@@ -216,7 +167,7 @@ const ChatSystem = {
         c.scrollTop = c.scrollHeight;
     },
     
-    // ==================== القسم 9: setupVoiceControls ====================
+    // ==================== القسم 6: setupVoiceControls ====================
     setupVoiceControls(clone, audioEl) {
         const playBtn = clone.querySelector('.voice-play-btn');
         const replayBtn = clone.querySelector('.voice-replay-btn');
@@ -298,7 +249,7 @@ const ChatSystem = {
         };
     },
     
-    // ==================== القسم 10: showImagePreview ====================
+    // ==================== القسم 7: showImagePreview ====================
     showImagePreview(imageSrc) {
         const modal = document.getElementById('imagePreviewModal');
         const img = document.getElementById('previewImage');
@@ -399,7 +350,7 @@ const ChatSystem = {
         };
     },
     
-    // ==================== القسم 11: closeImagePreview ====================
+    // ==================== القسم 8: closeImagePreview ====================
     closeImagePreview() {
         const modal = document.getElementById('imagePreviewModal');
         const img = document.getElementById('previewImage');
@@ -416,7 +367,7 @@ const ChatSystem = {
         link.click();
     },
     
-    // ==================== القسم 12: sendMessage ====================
+    // ==================== القسم 9: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         const mid = Date.now().toString(); 
@@ -428,7 +379,7 @@ const ChatSystem = {
             await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
             this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
             this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            console.log('✅ تم إرسال النص عبر Firebase (تشفير E2EE)');
+            console.log('✅ تم إرسال النص عبر Firebase');
             return true; 
         } catch (e) { 
             console.error('❌ فشل إرسال النص:', e);
@@ -436,10 +387,9 @@ const ChatSystem = {
         } 
     },
     
-    // ==================== القسم 13: sendImage ====================
+    // ==================== القسم 10: sendImage ====================
     async sendImage(file) { 
         if (!this.currentChat) return;
-        this.showProgressBar('جاري تحضير الصورة...', 0);
         
         try {
             const compressedBlob = await SecureChatSystem.compressImage(file);
@@ -450,37 +400,43 @@ const ChatSystem = {
                     const base64Data = e.target.result;
                     const pr = await SecureChatSystem.getMyPrivateKey();
                     const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-                    if (!pr || !pu) { this.hideProgressBar(); return; }
+                    if (!pr || !pu) return;
                     const sk = await SecureChatSystem.deriveSharedKey(pr, pu);
                     
-                    // تقسيم الصورة إلى أجزاء صغيرة
                     const chunkSize = 50000;
                     const totalChunks = Math.ceil(base64Data.length / chunkSize);
                     const msgId = Date.now().toString();
+                    
+                    // ✅ استخدام معرف موحد لجميع الأجزاء
+                    const packageId = msgId + '_' + Date.now();
                     
                     for (let i = 0; i < totalChunks; i++) {
                         const start = i * chunkSize;
                         const end = Math.min(start + chunkSize, base64Data.length);
                         const chunk = base64Data.substring(start, end);
-                        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({
+                        
+                        // ✅ تشفير البيانات كاملة مع معلومات القطعة
+                        const chunkData = {
                             chunk: i,
                             total: totalChunks,
                             data: chunk,
-                            fileName: file.name || 'صورة'
-                        }), sk);
+                            fileName: file.name || 'صورة',
+                            packageId: packageId
+                        };
+                        
+                        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(chunkData), sk);
                         
                         await SecureChatSystem.sendToServer(this.currentChat, {
-                            id: msgId + '_' + i,
+                            id: packageId + '_' + i,
                             type: 'image_chunk',
                             data: encrypted,
                             timestamp: Date.now()
                         });
                         
-                        const progress = ((i + 1) / totalChunks) * 100;
-                        this.updateProgressBar(progress, `جاري إرسال الصورة...`);
+                        console.log(`📤 إرسال قطعة ${i+1}/${totalChunks}`);
                     }
                     
-                    // رسالة مؤقتة تظهر أثناء التحميل
+                    // ✅ عرض الصورة مؤقتاً في الواجهة
                     const tempUrl = URL.createObjectURL(compressedBlob);
                     this.saveMessage(this.currentChat, { 
                         id: msgId, 
@@ -503,11 +459,9 @@ const ChatSystem = {
                         _blobUrl: tempUrl
                     });
                     
-                    this.hideProgressBar();
                     console.log('✅ تم إرسال الصورة بنجاح');
                 } catch (err) {
                     console.error('❌ فشل إرسال الصورة:', err);
-                    this.hideProgressBar();
                     alert('فشل إرسال الصورة');
                 }
             };
@@ -515,15 +469,13 @@ const ChatSystem = {
             reader.readAsDataURL(compressedBlob);
         } catch (err) {
             console.error('❌ فشل ضغط الصورة:', err);
-            this.hideProgressBar();
             alert('فشل معالجة الصورة');
         }
     },
     
-    // ==================== القسم 14: sendVoiceNote ====================
+    // ==================== القسم 11: sendVoiceNote ====================
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) return;
-        this.showProgressBar('جاري تحضير البصمة...', 0);
         
         try {
             const reader = new FileReader();
@@ -532,32 +484,36 @@ const ChatSystem = {
                     const base64Data = e.target.result;
                     const pr = await SecureChatSystem.getMyPrivateKey();
                     const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-                    if (!pr || !pu) { this.hideProgressBar(); return; }
+                    if (!pr || !pu) return;
                     const sk = await SecureChatSystem.deriveSharedKey(pr, pu);
                     
                     const chunkSize = 50000;
                     const totalChunks = Math.ceil(base64Data.length / chunkSize);
                     const msgId = Date.now().toString();
+                    const packageId = msgId + '_' + Date.now();
                     
                     for (let i = 0; i < totalChunks; i++) {
                         const start = i * chunkSize;
                         const end = Math.min(start + chunkSize, base64Data.length);
                         const chunk = base64Data.substring(start, end);
-                        const encrypted = await SecureChatSystem.encryptData(JSON.stringify({
+                        
+                        const chunkData = {
                             chunk: i,
                             total: totalChunks,
-                            data: chunk
-                        }), sk);
+                            data: chunk,
+                            packageId: packageId
+                        };
+                        
+                        const encrypted = await SecureChatSystem.encryptData(JSON.stringify(chunkData), sk);
                         
                         await SecureChatSystem.sendToServer(this.currentChat, {
-                            id: msgId + '_' + i,
+                            id: packageId + '_' + i,
                             type: 'voice_chunk',
                             data: encrypted,
                             timestamp: Date.now()
                         });
                         
-                        const progress = ((i + 1) / totalChunks) * 100;
-                        this.updateProgressBar(progress, `جاري إرسال البصمة...`);
+                        console.log(`📤 إرسال قطعة صوت ${i+1}/${totalChunks}`);
                     }
                     
                     const tempUrl = URL.createObjectURL(audioBlob);
@@ -580,23 +536,20 @@ const ChatSystem = {
                         _blobUrl: tempUrl
                     });
                     
-                    this.hideProgressBar();
                     console.log('✅ تم إرسال البصمة الصوتية بنجاح');
                 } catch (err) {
                     console.error('❌ فشل إرسال البصمة:', err);
-                    this.hideProgressBar();
                     alert('فشل إرسال البصمة الصوتية');
                 }
             };
             reader.readAsDataURL(audioBlob);
         } catch (err) {
             console.error('❌ فشل معالجة البصمة:', err);
-            this.hideProgressBar();
             alert('فشل معالجة البصمة الصوتية');
         }
     },
     
-    // ==================== القسم 15: saveMessage ====================
+    // ==================== القسم 12: saveMessage ====================
     saveMessage(friendId, message) { 
         if (message.type !== 'text' && message.type !== 'image' && message.type !== 'voice') {
             return;
@@ -616,7 +569,6 @@ const ChatSystem = {
             const excessCount = messages.length - 100;
             const removeCount = excessCount + 50;
             messages = messages.slice(removeCount);
-            console.log(`🧹 تم حذف ${removeCount} رسالة قديمة (الحد الأقصى 100 رسالة)`);
         }
         
         try { 
@@ -626,12 +578,10 @@ const ChatSystem = {
             messages = messages.slice(removeCount);
             try { 
                 localStorage.setItem(key, JSON.stringify(messages)); 
-                console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة قديمة`);
             } catch (e2) { 
                 messages = messages.slice(-50);
                 try { 
                     localStorage.setItem(key, JSON.stringify(messages)); 
-                    console.log(`🧹 مساحة غير كافية - تم الاحتفاظ بآخر 50 رسالة فقط`);
                 } catch (e3) {}
             }
         }
@@ -639,14 +589,13 @@ const ChatSystem = {
         this.messages[friendId] = messages; 
     },
     
-    // ==================== القسم 16: closeChat ====================
+    // ==================== القسم 13: closeChat ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         
         const chatId = this.currentChat;
         
         if (chatId) {
-            console.log('📤 إغلاق المحادثة - سيتم تنظيف البيانات محلياً');
             this.cleanConversationData(chatId, false);
         }
         
@@ -660,7 +609,7 @@ const ChatSystem = {
         console.log('✅ closeChat - انتهى');
     },
     
-    // ==================== القسم 17: cleanConversationData ====================
+    // ==================== القسم 14: cleanConversationData ====================
     cleanConversationData(chatId, cleanAll = false) {
         console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
         
@@ -668,13 +617,11 @@ const ChatSystem = {
         if (cleanAll) {
             localStorage.removeItem(key);
             delete this.messages[chatId];
-            console.log('✅ تم مسح localStorage بالكامل');
         } else {
             const messages = this.messages[chatId] || [];
             const textMessages = messages.filter(msg => msg.type === 'text' || msg.type === 'image' || msg.type === 'voice').slice(-100);
             this.messages[chatId] = textMessages;
             localStorage.setItem(key, JSON.stringify(textMessages));
-            console.log('✅ تم الاحتفاظ بآخر 100 رسالة فقط');
         }
         
         document.querySelectorAll('img, video, audio').forEach(el => {
@@ -690,18 +637,16 @@ const ChatSystem = {
                 messagesContainer.innerHTML = '';
             }
         }
-        
-        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
     },
     
-    // ==================== القسم 18: escapeHtml ====================
+    // ==================== القسم 15: escapeHtml ====================
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 
-// ==================== القسم 19: تشغيل النظام ====================
+// ==================== القسم 16: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 20: دوال عامة ====================
+// ==================== القسم 17: دوال عامة ====================
 window.sendImage = () => { 
     const i = document.createElement('input'); 
     i.type = 'file'; 
@@ -714,10 +659,8 @@ window.sendImage = () => {
     document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
-// ==================== القسم 21: التنظيف الشامل ====================
+// ==================== القسم 18: التنظيف الشامل ====================
 function performGlobalCleanup() {
-    console.log('🧹 بدء التنظيف الشامل للموقع...');
-    
     document.querySelectorAll('img, video, audio').forEach(el => {
         if (el.src && el.src.startsWith('blob:')) {
             URL.revokeObjectURL(el.src);
@@ -739,8 +682,6 @@ function performGlobalCleanup() {
     
     const attachmentMenu = document.getElementById('attachmentMenu');
     if (attachmentMenu) attachmentMenu.style.display = 'none';
-    
-    console.log('✅ اكتمل التنظيف الشامل للموقع');
 }
 
 if (document.readyState === 'loading') {
@@ -804,4 +745,4 @@ document.addEventListener('touchend', function (e) {
     lastTouchEnd = now;
 }, { passive: false });
 
-console.log('✅ ChatSystem جاهز (بدون WebRTC)');
+console.log('✅ ChatSystem جاهز (بدون عداد + تصحيح الصور)');
