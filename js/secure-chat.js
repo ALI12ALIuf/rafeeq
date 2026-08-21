@@ -1,4 +1,4 @@
-// ========== secure-chat.js - النسخة المعدلة (مع دعم الصور والبصمات) ==========
+// ========== secure-chat.js - النسخة المعدلة (تصحيح تجميع الصور) ==========
 // نظام التشفير E2EE + ضغط الصور + إرسال مباشر + حذف 24 ساعة
 
 const SecureChatSystem = {
@@ -179,7 +179,6 @@ const SecureChatSystem = {
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
         
         let expiryHours = 24;
-        
         let expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
         
         try {
@@ -223,110 +222,102 @@ const SecureChatSystem = {
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
-                ChatSystem.updateLastMessage(msg.from, decryptedText); 
             }
             else if (msg.package.type === 'image_chunk') {
-                // تجميع أجزاء الصورة
-                if (!this._imageChunks) this._imageChunks = {};
-                if (!this._imageChunks[msg.package.id]) {
+                // ✅ تصحيح: استخدام packageId من البيانات المشفرة
+                try {
                     const decrypted = await this.decryptData(msg.package.data, sharedKey);
                     const chunkData = JSON.parse(decrypted);
-                    this._imageChunks[msg.package.id] = {
-                        total: chunkData.total,
-                        chunks: [],
-                        fileName: chunkData.fileName || 'صورة',
-                        received: 0
-                    };
-                    this._imageChunks[msg.package.id].chunks[chunkData.chunk] = chunkData.data;
-                    this._imageChunks[msg.package.id].received++;
-                } else {
-                    const decrypted = await this.decryptData(msg.package.data, sharedKey);
-                    const chunkData = JSON.parse(decrypted);
-                    this._imageChunks[msg.package.id].chunks[chunkData.chunk] = chunkData.data;
-                    this._imageChunks[msg.package.id].received++;
-                }
-                
-                const info = this._imageChunks[msg.package.id];
-                const progress = (info.received / info.total) * 100;
-                ChatSystem.updateProgressBar(progress, 'جاري استلام الصورة...');
-                
-                if (info.received === info.total) {
-                    let fullData = '';
-                    for (let i = 0; i < info.total; i++) {
-                        fullData += info.chunks[i] || '';
+                    
+                    // ✅ استخدام packageId لتجميع الأجزاء
+                    const packageId = chunkData.packageId || msg.package.id.split('_')[0];
+                    
+                    if (!this._imageChunks) this._imageChunks = {};
+                    if (!this._imageChunks[packageId]) {
+                        this._imageChunks[packageId] = {
+                            total: chunkData.total,
+                            chunks: [],
+                            fileName: chunkData.fileName || 'صورة',
+                            received: 0
+                        };
                     }
                     
-                    // عرض الصورة
-                    const msgId = msg.package.id.split('_')[0];
-                    const tempUrl = fullData; // data:image/jpeg;base64,...
+                    this._imageChunks[packageId].chunks[chunkData.chunk] = chunkData.data;
+                    this._imageChunks[packageId].received++;
                     
-                    ChatSystem.saveMessage(msg.from, { 
-                        id: msgId, 
-                        type: 'image', 
-                        data: tempUrl, 
-                        fileName: info.fileName || 'صورة',
-                        sender: 'friend', 
-                        time: new Date().toISOString(),
-                        _blobUrl: tempUrl
-                    });
-                    if (ChatSystem.currentChat === msg.from) {
-                        ChatSystem.displayMessage({ 
+                    console.log(`📥 استلام قطعة صورة ${this._imageChunks[packageId].received}/${this._imageChunks[packageId].total}`);
+                    
+                    if (this._imageChunks[packageId].received === this._imageChunks[packageId].total) {
+                        let fullData = '';
+                        const total = this._imageChunks[packageId].total;
+                        for (let i = 0; i < total; i++) {
+                            fullData += this._imageChunks[packageId].chunks[i] || '';
+                        }
+                        
+                        const msgId = packageId.split('_')[0];
+                        const tempUrl = fullData;
+                        
+                        ChatSystem.saveMessage(msg.from, { 
                             id: msgId, 
                             type: 'image', 
                             data: tempUrl, 
-                            fileName: info.fileName || 'صورة',
+                            fileName: this._imageChunks[packageId].fileName || 'صورة',
                             sender: 'friend', 
                             time: new Date().toISOString(),
                             _blobUrl: tempUrl
                         });
+                        if (ChatSystem.currentChat === msg.from) {
+                            ChatSystem.displayMessage({ 
+                                id: msgId, 
+                                type: 'image', 
+                                data: tempUrl, 
+                                fileName: this._imageChunks[packageId].fileName || 'صورة',
+                                sender: 'friend', 
+                                time: new Date().toISOString(),
+                                _blobUrl: tempUrl
+                            });
+                        }
+                        
+                        console.log('✅ تم تجميع الصورة بنجاح');
+                        delete this._imageChunks[packageId];
                     }
-                    ChatSystem.hideProgressBar();
-                    delete this._imageChunks[msg.package.id];
+                } catch (e) {
+                    console.error('❌ خطأ في معالجة قطعة الصورة:', e);
                 }
             }
             else if (msg.package.type === 'voice_chunk') {
-                // تجميع أجزاء البصمة الصوتية
-                if (!this._voiceChunks) this._voiceChunks = {};
-                if (!this._voiceChunks[msg.package.id]) {
+                // ✅ تصحيح: استخدام packageId من البيانات المشفرة
+                try {
                     const decrypted = await this.decryptData(msg.package.data, sharedKey);
                     const chunkData = JSON.parse(decrypted);
-                    this._voiceChunks[msg.package.id] = {
-                        total: chunkData.total,
-                        chunks: [],
-                        received: 0
-                    };
-                    this._voiceChunks[msg.package.id].chunks[chunkData.chunk] = chunkData.data;
-                    this._voiceChunks[msg.package.id].received++;
-                } else {
-                    const decrypted = await this.decryptData(msg.package.data, sharedKey);
-                    const chunkData = JSON.parse(decrypted);
-                    this._voiceChunks[msg.package.id].chunks[chunkData.chunk] = chunkData.data;
-                    this._voiceChunks[msg.package.id].received++;
-                }
-                
-                const info = this._voiceChunks[msg.package.id];
-                const progress = (info.received / info.total) * 100;
-                ChatSystem.updateProgressBar(progress, 'جاري استلام البصمة...');
-                
-                if (info.received === info.total) {
-                    let fullData = '';
-                    for (let i = 0; i < info.total; i++) {
-                        fullData += info.chunks[i] || '';
+                    
+                    const packageId = chunkData.packageId || msg.package.id.split('_')[0];
+                    
+                    if (!this._voiceChunks) this._voiceChunks = {};
+                    if (!this._voiceChunks[packageId]) {
+                        this._voiceChunks[packageId] = {
+                            total: chunkData.total,
+                            chunks: [],
+                            received: 0
+                        };
                     }
                     
-                    const msgId = msg.package.id.split('_')[0];
-                    const tempUrl = fullData; // data:audio/webm;base64,...
+                    this._voiceChunks[packageId].chunks[chunkData.chunk] = chunkData.data;
+                    this._voiceChunks[packageId].received++;
                     
-                    ChatSystem.saveMessage(msg.from, { 
-                        id: msgId, 
-                        type: 'voice', 
-                        data: tempUrl, 
-                        sender: 'friend', 
-                        time: new Date().toISOString(),
-                        _blobUrl: tempUrl
-                    });
-                    if (ChatSystem.currentChat === msg.from) {
-                        ChatSystem.displayMessage({ 
+                    console.log(`📥 استلام قطعة صوت ${this._voiceChunks[packageId].received}/${this._voiceChunks[packageId].total}`);
+                    
+                    if (this._voiceChunks[packageId].received === this._voiceChunks[packageId].total) {
+                        let fullData = '';
+                        const total = this._voiceChunks[packageId].total;
+                        for (let i = 0; i < total; i++) {
+                            fullData += this._voiceChunks[packageId].chunks[i] || '';
+                        }
+                        
+                        const msgId = packageId.split('_')[0];
+                        const tempUrl = fullData;
+                        
+                        ChatSystem.saveMessage(msg.from, { 
                             id: msgId, 
                             type: 'voice', 
                             data: tempUrl, 
@@ -334,9 +325,22 @@ const SecureChatSystem = {
                             time: new Date().toISOString(),
                             _blobUrl: tempUrl
                         });
+                        if (ChatSystem.currentChat === msg.from) {
+                            ChatSystem.displayMessage({ 
+                                id: msgId, 
+                                type: 'voice', 
+                                data: tempUrl, 
+                                sender: 'friend', 
+                                time: new Date().toISOString(),
+                                _blobUrl: tempUrl
+                            });
+                        }
+                        
+                        console.log('✅ تم تجميع البصمة الصوتية بنجاح');
+                        delete this._voiceChunks[packageId];
                     }
-                    ChatSystem.hideProgressBar();
-                    delete this._voiceChunks[msg.package.id];
+                } catch (e) {
+                    console.error('❌ خطأ في معالجة قطعة الصوت:', e);
                 }
             }
             
