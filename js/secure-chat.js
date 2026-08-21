@@ -1,14 +1,10 @@
-// ========== secure-chat.js ==========
-// نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
+// ========== secure-chat.js - النسخة المعدلة (مع دعم الصور والبصمات) ==========
+// نظام التشفير E2EE + ضغط الصور + إرسال مباشر + حذف 24 ساعة
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
     keyCache: new Map(),
     sharedKeyCache: new Map(),
-    
-    VIDEO_MAX_DURATION: 180,
-    VIDEO_WARNING_DURATION: 170,
-    VIDEO_MAX_INPUT_SIZE: 250 * 1024 * 1024,
     
     // ==================== القسم 1: init ====================
     async init() {
@@ -143,111 +139,79 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
-    // ==================== القسم 5: معالجة الملفات ====================
+    // ==================== القسم 5: ضغط الصور ====================
     async compressImage(file) { 
         return new Promise((resolve, reject) => { 
-            const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+            const img = new Image(); 
+            const canvas = document.createElement('canvas'); 
+            const ctx = canvas.getContext('2d');
             const url = URL.createObjectURL(file);
             img.onload = () => { 
                 URL.revokeObjectURL(url);
                 let w = img.width, h = img.height; 
-                if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } 
-                canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); 
-                canvas.toBlob((blob) => { if (blob) resolve(blob); else reject(new Error('فشل ضغط الصورة')); }, 'image/jpeg', 0.8); 
+                if (w > 1200 || h > 1200) { 
+                    if (w > h) { 
+                        h *= 1200 / w; 
+                        w = 1200; 
+                    } else { 
+                        w *= 1200 / h; 
+                        h = 1200; 
+                    } 
+                } 
+                canvas.width = w; 
+                canvas.height = h; 
+                ctx.drawImage(img, 0, 0, w, h); 
+                canvas.toBlob((blob) => { 
+                    if (blob) resolve(blob); 
+                    else reject(new Error('فشل ضغط الصورة')); 
+                }, 'image/jpeg', 0.8); 
             };
-            img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('فشل تحميل الصورة')); };
+            img.onerror = () => { 
+                URL.revokeObjectURL(url); 
+                reject(new Error('فشل تحميل الصورة')); 
+            };
             img.src = url;
         }); 
     },
     
-    getVideoDuration(file) {
-        return new Promise((resolve, reject) => {
-            const video = document.createElement('video');
-            const url = URL.createObjectURL(file);
-            const timeout = setTimeout(() => { URL.revokeObjectURL(url); reject(new Error('انتهت مهلة قراءة الفيديو')); }, 10000);
-            video.onloadedmetadata = () => { clearTimeout(timeout); URL.revokeObjectURL(url); resolve(video.duration); };
-            video.onerror = () => { clearTimeout(timeout); URL.revokeObjectURL(url); reject(new Error('فشل تحميل الفيديو')); };
-            video.preload = 'metadata';
-            video.src = url;
-        });
-    },
-    
-    validateVideo(file) {
-        return this.getVideoDuration(file).then(duration => {
-            const durationSec = Math.floor(duration);
-            const mins = Math.floor(durationSec / 60);
-            const secs = durationSec % 60;
-            
-            if (duration > this.VIDEO_MAX_DURATION) {
-                const warnMins = Math.floor(this.VIDEO_WARNING_DURATION / 60);
-                const warnSecs = this.VIDEO_WARNING_DURATION % 60;
-                throw new Error(
-                    `❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\n` +
-                    `الحد الأقصى: ${warnMins}:${warnSecs.toString().padStart(2, '0')} دقائق\n` +
-                    `💡 قم بقص الفيديو قبل الإرسال`
-                );
-            }
-            
-            if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
-                const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
-                throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
-            }
-            
-            console.log(`⚡ فيديو جاهز للإرسال المباشر: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
-            return file;
-        });
-    },
-    
     // ==================== القسم 6: إرسال واستقبال الرسائل ====================
-async sendToServer(receiverId, encryptedPackage) { 
-    if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
-    
-    let expiryHours = 24;
-    let expirySeconds = null;
-    
-    if (encryptedPackage.type === 'feature_request' || 
-        encryptedPackage.type === 'feature_response') {
-        expirySeconds = 60;
-    }
-    
-    let expiresAt;
-    if (expirySeconds) {
-        expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expirySeconds * 1000));
-    } else {
-        expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
-    }
-    
-    try {
-        await window.db.collection('secure_messages').add({ 
-            to: receiverId, 
-            from: window.auth.currentUser.uid, 
-            package: encryptedPackage, 
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
-            expiresAt: expiresAt
-        });
-    } catch (error) { throw error; }
-},
+    async sendToServer(receiverId, encryptedPackage) { 
+        if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
+        
+        let expiryHours = 24;
+        
+        let expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
+        
+        try {
+            await window.db.collection('secure_messages').add({ 
+                to: receiverId, 
+                from: window.auth.currentUser.uid, 
+                package: encryptedPackage, 
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
+                expiresAt: expiresAt
+            });
+        } catch (error) { throw error; }
+    },
 
-// ==================== القسم 6.1: استقبال الرسائل ====================
-startReceiving() { 
-    if (!window.auth?.currentUser) return null;
-    const uid = window.auth.currentUser.uid;
-    return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
-        for (const change of snapshot.docChanges()) { 
-            if (change.type === 'added') { 
-                const msg = { id: change.doc.id, ...change.doc.data() }; 
-                await this.processReceivedMessage(msg); 
-                try { await change.doc.ref.delete(); } catch (deleteError) {}
+    // ==================== القسم 6.1: استقبال الرسائل ====================
+    startReceiving() { 
+        if (!window.auth?.currentUser) return null;
+        const uid = window.auth.currentUser.uid;
+        return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
+            for (const change of snapshot.docChanges()) { 
+                if (change.type === 'added') { 
+                    const msg = { id: change.doc.id, ...change.doc.data() }; 
+                    await this.processReceivedMessage(msg); 
+                    try { await change.doc.ref.delete(); } catch (deleteError) {}
+                } 
             } 
-        } 
-    }, error => { 
-        console.warn('خطأ في الاستماع للرسائل:', error);
-        setTimeout(() => this.startReceiving(), 5000); 
-    }); 
-},
+        }, error => { 
+            console.warn('خطأ في الاستماع للرسائل:', error);
+            setTimeout(() => this.startReceiving(), 5000); 
+        }); 
+    },
 
-
-   // ==================== القسم 7: معالجة الرسائل المستلمة ====================
+    // ==================== القسم 7: معالجة الرسائل المستلمة ====================
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -260,191 +224,120 @@ startReceiving() {
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } 
-            else if (msg.package.type === 'webrtc') { 
-                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
-                        featuresEnabled: ChatSystem.featuresEnabled,
-                        friendInConversation: ChatSystem.friendInConversation,
-                        currentChat: ChatSystem.currentChat,
-                        sender: msg.from
+            }
+            else if (msg.package.type === 'image_chunk') {
+                // تجميع أجزاء الصورة
+                if (!this._imageChunks) this._imageChunks = {};
+                if (!this._imageChunks[msg.package.id]) {
+                    const decrypted = await this.decryptData(msg.package.data, sharedKey);
+                    const chunkData = JSON.parse(decrypted);
+                    this._imageChunks[msg.package.id] = {
+                        total: chunkData.total,
+                        chunks: [],
+                        fileName: chunkData.fileName || 'صورة',
+                        received: 0
+                    };
+                    this._imageChunks[msg.package.id].chunks[chunkData.chunk] = chunkData.data;
+                    this._imageChunks[msg.package.id].received++;
+                } else {
+                    const decrypted = await this.decryptData(msg.package.data, sharedKey);
+                    const chunkData = JSON.parse(decrypted);
+                    this._imageChunks[msg.package.id].chunks[chunkData.chunk] = chunkData.data;
+                    this._imageChunks[msg.package.id].received++;
+                }
+                
+                const info = this._imageChunks[msg.package.id];
+                const progress = (info.received / info.total) * 100;
+                ChatSystem.updateProgressBar(progress, 'جاري استلام الصورة...');
+                
+                if (info.received === info.total) {
+                    let fullData = '';
+                    for (let i = 0; i < info.total; i++) {
+                        fullData += info.chunks[i] || '';
+                    }
+                    
+                    // عرض الصورة
+                    const msgId = msg.package.id.split('_')[0];
+                    const tempUrl = fullData; // data:image/jpeg;base64,...
+                    
+                    ChatSystem.saveMessage(msg.from, { 
+                        id: msgId, 
+                        type: 'image', 
+                        data: tempUrl, 
+                        fileName: info.fileName || 'صورة',
+                        sender: 'friend', 
+                        time: new Date().toISOString(),
+                        _blobUrl: tempUrl
                     });
-                    return;
-                }
-                
-                const signalData = await this.decryptData(msg.package.data, sharedKey);
-                const parsedData = JSON.parse(signalData);
-                
-                console.log('📞 استلام إشارة WebRTC من:', msg.from);
-                console.log('📞 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
-                
-                if (parsedData.sdp && parsedData.sdp.type === 'offer') {
-                    console.log('📞 مكالمة واردة جديدة من:', msg.from, 'نوع:', parsedData.type || 'audio');
-                    if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
-                        CallSystem.showIncomingCall(msg.from, parsedData);
-                    } else {
-                        console.error('❌ CallSystem.showIncomingCall غير موجود');
+                    if (ChatSystem.currentChat === msg.from) {
+                        ChatSystem.displayMessage({ 
+                            id: msgId, 
+                            type: 'image', 
+                            data: tempUrl, 
+                            fileName: info.fileName || 'صورة',
+                            sender: 'friend', 
+                            time: new Date().toISOString(),
+                            _blobUrl: tempUrl
+                        });
                     }
-                } 
-                else {
-                    if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
-                        CallSystem.handleSignaling(parsedData);
-                    }
+                    ChatSystem.hideProgressBar();
+                    delete this._imageChunks[msg.package.id];
                 }
             }
-            else if (msg.package.type === 'feature_request') {
-                console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
-                    ChatSystem.handleFeatureRequest(msg.from, msg.package.data);
+            else if (msg.package.type === 'voice_chunk') {
+                // تجميع أجزاء البصمة الصوتية
+                if (!this._voiceChunks) this._voiceChunks = {};
+                if (!this._voiceChunks[msg.package.id]) {
+                    const decrypted = await this.decryptData(msg.package.data, sharedKey);
+                    const chunkData = JSON.parse(decrypted);
+                    this._voiceChunks[msg.package.id] = {
+                        total: chunkData.total,
+                        chunks: [],
+                        received: 0
+                    };
+                    this._voiceChunks[msg.package.id].chunks[chunkData.chunk] = chunkData.data;
+                    this._voiceChunks[msg.package.id].received++;
+                } else {
+                    const decrypted = await this.decryptData(msg.package.data, sharedKey);
+                    const chunkData = JSON.parse(decrypted);
+                    this._voiceChunks[msg.package.id].chunks[chunkData.chunk] = chunkData.data;
+                    this._voiceChunks[msg.package.id].received++;
                 }
-            }
-            else if (msg.package.type === 'feature_response') {
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                const responseData = JSON.parse(decryptedData);
-                console.log('🔓 استلام رد على طلب التفعيل من:', msg.from, '| الحالة:', responseData.action);
                 
-                if (responseData.action === 'answer_batch' && responseData.sdp) {
-                    console.log(`📦 استلام دفعة الرد (Answer + ${responseData.iceCandidates?.length || 0} ICE candidates) من:`, msg.from);
-                    
-                    if (typeof ChatSystem !== 'undefined') {
-                        ChatSystem.featureRequestPending = false;
-                        ChatSystem.featureRequestReceived = false;
-                        if (ChatSystem.featureBlinkInterval) {
-                            clearInterval(ChatSystem.featureBlinkInterval);
-                            ChatSystem.featureBlinkInterval = null;
-                        }
-                        const switchLabel = document.getElementById('featureSwitchLabel');
-                        if (switchLabel) switchLabel.classList.remove('blinking');
-                        ChatSystem.featuresEnabled = true;
-                        if (ChatSystem.currentChat === msg.from) {
-                            ChatSystem.friendInConversation = true;
-                        }
-                        const toggleInput = document.getElementById('featureToggleInput');
-                        if (toggleInput) toggleInput.checked = true;
-                        ChatSystem.updateAllButtons();
-                        console.log('✅ تم تحديث حالة المرسل بعد استلام answer_batch');
-                    }
-                    
-                    if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
-                        try {
-                            const answerSdp = new RTCSessionDescription({
-                                type: responseData.sdp.type,
-                                sdp: responseData.sdp.sdp
-                            });
-                            await CallSystem.pc.setRemoteDescription(answerSdp);
-                            console.log('✅ تم تعيين Answer SDP');
-                            
-                            for (const ice of (responseData.iceCandidates || [])) {
-                                try {
-                                    await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
-                                    console.log('✅ تم إضافة ICE candidate من الدفعة');
-                                } catch(e) {
-                                    console.warn('فشل إضافة ICE candidate:', e);
-                                }
-                            }
-                            console.log('✅ تم معالجة دفعة الرد بنجاح');
-                        } catch(e) {
-                            console.error('❌ فشل معالجة دفعة الرد:', e);
-                        }
-                    }
-                }
-                else if (responseData.action === 'answer' && responseData.sdp) {
-                    console.log('📞 استلام Answer منفرد (دعم خلفي)');
-                    
-                    if (typeof ChatSystem !== 'undefined') {
-                        ChatSystem.featureRequestPending = false;
-                        ChatSystem.featureRequestReceived = false;
-                        if (ChatSystem.featureBlinkInterval) {
-                            clearInterval(ChatSystem.featureBlinkInterval);
-                            ChatSystem.featureBlinkInterval = null;
-                        }
-                        const switchLabel = document.getElementById('featureSwitchLabel');
-                        if (switchLabel) switchLabel.classList.remove('blinking');
-                        ChatSystem.featuresEnabled = true;
-                        if (ChatSystem.currentChat === msg.from) {
-                            ChatSystem.friendInConversation = true;
-                        }
-                        const toggleInput = document.getElementById('featureToggleInput');
-                        if (toggleInput) toggleInput.checked = true;
-                        ChatSystem.updateAllButtons();
-                    }
-                    
-                    if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
-                        try {
-                            const answerSdp = new RTCSessionDescription({
-                                type: responseData.sdp.type,
-                                sdp: responseData.sdp.sdp
-                            });
-                            await CallSystem.pc.setRemoteDescription(answerSdp);
-                            console.log('✅ تم تعيين Answer SDP');
-                        } catch(e) {
-                            console.error('❌ فشل تعيين Answer:', e);
-                        }
-                    }
-                }
-                else if (responseData.action === 'ice' && responseData.candidate) {
-                    console.log('📞 استلام ICE candidate منفرد (دعم خلفي)');
-                    if (typeof CallSystem !== 'undefined' && CallSystem.pc) {
-                        try {
-                            await CallSystem.pc.addIceCandidate(new RTCIceCandidate(responseData.candidate.candidate));
-                            console.log('✅ تم إضافة ICE candidate منفرد');
-                        } catch(e) {
-                            console.warn('فشل إضافة ICE candidate:', e);
-                        }
-                    }
-                }
-                else if (responseData.action === 'accepted') {
-                    console.log('✅ تم قبول طلب التفعيل من:', msg.from);
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                    }
-                }
-                else if (responseData.action === 'rejected') {
-                    console.log('❌ تم رفض طلب التفعيل من:', msg.from);
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                    }
-                }
-                else if (responseData.action === 'disable') {
-                    console.log('🔴 استلام إشارة إيقاف من:', msg.from);
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                    }
-                }
-                else {
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                    }
-                }
-            }
-            else if (msg.package.type === 'force_disable_features') {
-                console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
+                const info = this._voiceChunks[msg.package.id];
+                const progress = (info.received / info.total) * 100;
+                ChatSystem.updateProgressBar(progress, 'جاري استلام البصمة...');
                 
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
-                    
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
+                if (info.received === info.total) {
+                    let fullData = '';
+                    for (let i = 0; i < info.total; i++) {
+                        fullData += info.chunks[i] || '';
                     }
                     
-                    ChatSystem.updateAllButtons();
+                    const msgId = msg.package.id.split('_')[0];
+                    const tempUrl = fullData; // data:audio/webm;base64,...
+                    
+                    ChatSystem.saveMessage(msg.from, { 
+                        id: msgId, 
+                        type: 'voice', 
+                        data: tempUrl, 
+                        sender: 'friend', 
+                        time: new Date().toISOString(),
+                        _blobUrl: tempUrl
+                    });
+                    if (ChatSystem.currentChat === msg.from) {
+                        ChatSystem.displayMessage({ 
+                            id: msgId, 
+                            type: 'voice', 
+                            data: tempUrl, 
+                            sender: 'friend', 
+                            time: new Date().toISOString(),
+                            _blobUrl: tempUrl
+                        });
+                    }
+                    ChatSystem.hideProgressBar();
+                    delete this._voiceChunks[msg.package.id];
                 }
-            }
-            else if (msg.package.type === 'location') {
-                const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
-                const locationData = JSON.parse(decryptedLocation);
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'location', data: locationData, sender: 'friend', time: new Date().toISOString() });
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
             }
             
             if (typeof loadChats === 'function') loadChats();
@@ -454,8 +347,7 @@ startReceiving() {
     }
 };
 
-// ==================== التنظيف الموحد (كل 24 ساعة) ====================
-
+// ==================== التنظيف الموحد ====================
 async function cleanAllExpiredData() {
     try {
         const now = new Date();
@@ -471,27 +363,14 @@ async function cleanAllExpiredData() {
             totalDeleted++;
         });
         
-        const requestsSnapshot = await window.db.collection('friendRequests')
-            .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
-            .get();
-        
-        requestsSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
-            totalDeleted++;
-        });
-        
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const signalsSnapshot = await window.db.collection('secure_messages')
             .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(oneDayAgo))
             .get();
         
         signalsSnapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.package?.type === 'feature_request' || 
-                data.package?.type === 'feature_response') {
-                batch.delete(doc.ref);
-                totalDeleted++;
-            }
+            batch.delete(doc.ref);
+            totalDeleted++;
         });
         
         if (totalDeleted > 0) {
