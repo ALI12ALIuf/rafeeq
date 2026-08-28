@@ -90,6 +90,7 @@ const ChatSystem = {
             console.log('✅ تم الاحتفاظ بآخر 100 رسالة نصية فقط');
         }
         
+        // تنظيف الـ Blob URLs
         document.querySelectorAll('img, audio').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
                 URL.revokeObjectURL(el.src);
@@ -114,6 +115,7 @@ const ChatSystem = {
         c.innerHTML = ''; 
         const messages = this.messages[friendId] || [];
         
+        // عرض الرسائل النصية فقط (الصور والبصمات تظهر مؤقتاً)
         messages.forEach(msg => {
             this.displayMessage(msg);
         });
@@ -121,24 +123,11 @@ const ChatSystem = {
         c.scrollTop = c.scrollHeight;
     },
     
-    // ==================== القسم 7: displayMessage ====================
+    // ==================== القسم 7: displayMessage (المصحح) ====================
     displayMessage(msg) {
         const c = document.getElementById('messagesContainer'); 
         if (!c) return;
         
-        const formatDateTime = (dateObj) => {
-            const year = dateObj.getFullYear();
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            let hours = dateObj.getHours();
-            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            const formattedHours = String(hours).padStart(2, '0');
-            return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
-        };
-        
-        const dateTime = formatDateTime(new Date(msg.time));
         const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
         
         const template = document.getElementById('messageWrapperTemplate');
@@ -188,6 +177,17 @@ const ChatSystem = {
                         img.onclick = () => this.showImagePreview(msg.data);
                         img.oncontextmenu = (e) => e.preventDefault();
                         img.ondragstart = (e) => e.preventDefault();
+                        img.onerror = () => {
+                            console.warn('⚠️ فشل تحميل الصورة:', msg.data);
+                            img.alt = 'فشل تحميل الصورة';
+                            img.src = '';
+                            img.style.backgroundColor = '#333';
+                            img.style.minHeight = '100px';
+                            img.style.display = 'flex';
+                            img.style.alignItems = 'center';
+                            img.style.justifyContent = 'center';
+                            img.style.color = '#999';
+                        };
                     }
                 }
                 div.appendChild(clone);
@@ -206,7 +206,10 @@ const ChatSystem = {
                     const audioEl = voiceMsg.querySelector('.voice-audio-element');
                     if (audioEl && msg.data) {
                         audioEl.src = msg.data;
+                        console.log('🎤 تعيين مصدر الصوت:', msg.data);
                         this.setupVoiceControls(clone, audioEl);
+                    } else {
+                        console.warn('⚠️ فشل تعيين مصدر الصوت');
                     }
                 }
                 div.appendChild(clone);
@@ -225,16 +228,26 @@ const ChatSystem = {
         const timeSpan = clone.querySelector('.voice-current-time');
         const durationSpan = clone.querySelector('.voice-duration');
         
-        if (!audioEl || !audioEl.src) return;
+        if (!audioEl || !audioEl.src) {
+            console.warn('⚠️ لا يوجد مصدر صوت');
+            return;
+        }
         
+        console.log('🎤 تهيئة عناصر التحكم الصوتية');
+        
+        // الحصول على المدة
         const tempAudio = new Audio(audioEl.src);
         tempAudio.addEventListener('loadedmetadata', () => {
             const duration = tempAudio.duration;
-            if (durationSpan && !isNaN(duration)) {
+            if (durationSpan && !isNaN(duration) && isFinite(duration)) {
                 const minutes = Math.floor(duration / 60);
                 const seconds = Math.floor(duration % 60);
                 durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                console.log('🎤 مدة الصوت:', durationSpan.textContent);
             }
+        });
+        tempAudio.addEventListener('error', () => {
+            console.warn('⚠️ فشل تحميل مدة الصوت');
         });
         
         let isPlaying = false;
@@ -247,7 +260,9 @@ const ChatSystem = {
                     playBtn.innerHTML = '<i class="fas fa-play"></i>';
                     isPlaying = false;
                 } else {
-                    audioEl.play();
+                    audioEl.play().catch(err => {
+                        console.warn('⚠️ فشل تشغيل الصوت:', err);
+                    });
                     playBtn.innerHTML = '<i class="fas fa-pause"></i>';
                     isPlaying = true;
                 }
@@ -262,7 +277,9 @@ const ChatSystem = {
                 if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
                 isPlaying = false;
                 if (timeSpan) timeSpan.textContent = '0:00';
-                audioEl.play();
+                audioEl.play().catch(err => {
+                    console.warn('⚠️ فشل إعادة التشغيل:', err);
+                });
                 if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
                 isPlaying = true;
             };
@@ -296,6 +313,12 @@ const ChatSystem = {
             if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
             isPlaying = false;
             if (timeSpan) timeSpan.textContent = '0:00';
+        };
+        
+        audioEl.onerror = () => {
+            console.warn('⚠️ خطأ في تشغيل الصوت');
+            if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            isPlaying = false;
         };
     },
     
@@ -406,12 +429,33 @@ const ChatSystem = {
         const mid = Date.now().toString(); 
         
         try { 
-            const pr = await SecureChatSystem.getMyPrivateKey(), pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
+            const pr = await SecureChatSystem.getMyPrivateKey(); 
+            const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
             if (!pr || !pu) return false;
-            const sk = await SecureChatSystem.deriveSharedKey(pr, pu), enc = await SecureChatSystem.encryptData(text.trim(), sk); 
-            await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
-            this.saveMessage(this.currentChat, { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
-            this.displayMessage({ id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' }); 
+            const sk = await SecureChatSystem.deriveSharedKey(pr, pu); 
+            const enc = await SecureChatSystem.encryptData(text.trim(), sk); 
+            await SecureChatSystem.sendToServer(this.currentChat, { 
+                id: mid, 
+                type: 'text', 
+                data: enc, 
+                timestamp: Date.now() 
+            }); 
+            this.saveMessage(this.currentChat, { 
+                id: mid, 
+                type: 'text', 
+                text: text.trim(), 
+                sender: 'me', 
+                time: new Date().toISOString(), 
+                status: 'sent' 
+            }); 
+            this.displayMessage({ 
+                id: mid, 
+                type: 'text', 
+                text: text.trim(), 
+                sender: 'me', 
+                time: new Date().toISOString(), 
+                status: 'sent' 
+            }); 
             console.log('✅ تم إرسال النص عبر Firebase (تشفير E2EE)');
             return true; 
         } catch (e) { 
@@ -422,8 +466,12 @@ const ChatSystem = {
     
     // ==================== القسم 12: sendImage ====================
     async sendImage(file) { 
-        if (!this.currentChat) return;
+        if (!this.currentChat) {
+            console.error('❌ لا توجد محادثة نشطة');
+            return;
+        }
         
+        console.log('📷 بدء إرسال الصورة');
         ChatSystem.showProgressBar('جاري ضغط الصورة...', 0);
         
         try {
@@ -461,8 +509,12 @@ const ChatSystem = {
     
     // ==================== القسم 13: sendVoiceNote ====================
     async sendVoiceNote(audioBlob) { 
-        if (!this.currentChat) return;
+        if (!this.currentChat) {
+            console.error('❌ لا توجد محادثة نشطة');
+            return;
+        }
         
+        console.log('🎤 بدء إرسال البصمة الصوتية');
         ChatSystem.showProgressBar('جاري تجهيز البصمة الصوتية...', 0);
         
         try {
@@ -527,6 +579,7 @@ const ChatSystem = {
     
     // ==================== القسم 17: saveMessage ====================
     saveMessage(friendId, message) { 
+        // لا نحفظ الصور والبصمات في localStorage (تبقى مؤقتة)
         if (message.type !== 'text') {
             console.log(`📝 الوسائط (${message.type}) لن تُحفظ - تعرض فقط أثناء المحادثة`);
             return;
@@ -591,7 +644,11 @@ const ChatSystem = {
     },
     
     // ==================== القسم 20: escapeHtml ====================
-    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    escapeHtml(text) { 
+        const div = document.createElement('div'); 
+        div.textContent = text; 
+        return div.innerHTML; 
+    }
 };
 
 // ==================== القسم 21: تشغيل النظام ====================
@@ -632,7 +689,7 @@ if (document.readyState === 'loading') {
     performGlobalCleanup();
 }
 
-// ✅ الحل النهائي للمتصفحات والهواتف
+// ==================== إصلاح مشكلة الكيبورد ====================
 const initVisualViewportFix = () => {
     if (!window.visualViewport) return;
 
@@ -661,7 +718,7 @@ if (document.readyState === 'loading') {
     initVisualViewportFix();
 }
 
-// منع سحب الواجهة بالخطأ
+// ==================== منع التمرير الخاطئ ====================
 document.addEventListener('touchmove', function(e) {
     if (document.body.classList.contains('conversation-open')) {
         const isMessagesContainer = e.target.closest('.messages-container');
@@ -671,7 +728,7 @@ document.addEventListener('touchmove', function(e) {
     }
 }, { passive: false });
 
-// منع تكبير الموقع
+// ==================== منع التكبير ====================
 document.addEventListener('touchstart', function (e) {
     if (e.touches.length > 1) {
         e.preventDefault();
@@ -686,3 +743,5 @@ document.addEventListener('touchend', function (e) {
     }
     lastTouchEnd = now;
 }, { passive: false });
+
+console.log('✅ ChatSystem جاهز');
