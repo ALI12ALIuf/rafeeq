@@ -68,7 +68,7 @@
             <div class="search-container">
                 <div class="search-box">
                     <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
-                    <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder">
+                    <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" placeholder="ابحث برقم ID">
                 </div>
                 <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
                 
@@ -154,7 +154,7 @@
                 <div class="message-input-wrapper">
                     <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
                     <div class="input-area">
-                        <textarea id="messageInput" placeholder="" onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
+                        <textarea id="messageInput" placeholder="اكتب رسالة..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
                         
                         <!-- ===== واجهة تسجيل البصمة ===== -->
                         <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
@@ -184,10 +184,9 @@
                 </div>
             </div>
             
-            <!-- ===== قائمة المرفقات (تم إزالة الفيديو والملفات) ===== -->
+            <!-- ===== قائمة المرفقات (صورة فقط) ===== -->
             <div class="attachment-menu" id="attachmentMenu" style="display: none;">
                 <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
-                <!-- تم إزالة زر الفيديو والملفات -->
             </div>
         </div>
 
@@ -459,6 +458,18 @@ window.addEventListener('load', function() {
 });
 
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
+
+// ==================== منع القائمة المنبثقة ====================
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+});
+
+document.addEventListener('dragstart', function(e) {
+    e.preventDefault();
+    return false;
+});
 </script>
+
 </body>
 </html>
