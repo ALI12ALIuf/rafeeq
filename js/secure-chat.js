@@ -68,14 +68,30 @@ const SecureChatSystem = {
     },
     
     // ==================== القسم 3: دوال المفاتيح ====================
-    async generateKeyPair() { return await window.crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']); },
-    async exportPublicKey(key) { const raw = await window.crypto.subtle.exportKey('raw', key); return btoa(String.fromCharCode(...new Uint8Array(raw))); },
+    async generateKeyPair() { 
+        return await window.crypto.subtle.generateKey(
+            { name: 'ECDH', namedCurve: 'P-256' }, 
+            true, 
+            ['deriveKey']
+        ); 
+    },
+    
+    async exportPublicKey(key) { 
+        const raw = await window.crypto.subtle.exportKey('raw', key); 
+        return btoa(String.fromCharCode(...new Uint8Array(raw))); 
+    },
     
     async importPublicKey(base64Key) { 
         if (!base64Key) throw new Error('المفتاح العام فارغ');
         try {
             const binary = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
-            return await window.crypto.subtle.importKey('raw', binary, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+            return await window.crypto.subtle.importKey(
+                'raw', 
+                binary, 
+                { name: 'ECDH', namedCurve: 'P-256' }, 
+                true, 
+                []
+            );
         } catch (error) { throw error; }
     },
     
@@ -89,7 +105,13 @@ const SecureChatSystem = {
         
         try {
             const binary = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
-            const key = await window.crypto.subtle.importKey('pkcs8', binary, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']);
+            const key = await window.crypto.subtle.importKey(
+                'pkcs8', 
+                binary, 
+                { name: 'ECDH', namedCurve: 'P-256' }, 
+                false, 
+                ['deriveKey']
+            );
             this.keyCache.set(uid, key);
             return key;
         } catch (error) { return null; }
@@ -109,7 +131,13 @@ const SecureChatSystem = {
         if (this.sharedKeyCache.has(cacheKey)) return this.sharedKeyCache.get(cacheKey);
         
         try {
-            const sharedKey = await window.crypto.subtle.deriveKey({ name: 'ECDH', public: publicKey }, privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+            const sharedKey = await window.crypto.subtle.deriveKey(
+                { name: 'ECDH', public: publicKey }, 
+                privateKey, 
+                { name: 'AES-GCM', length: 256 }, 
+                false, 
+                ['encrypt', 'decrypt']
+            );
             this.sharedKeyCache.set(cacheKey, sharedKey);
             setTimeout(() => this.sharedKeyCache.delete(cacheKey), 300000);
             return sharedKey;
@@ -121,7 +149,11 @@ const SecureChatSystem = {
         const encoder = new TextEncoder();
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
         try {
-            const encrypted = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, typeof data === 'string' ? encoder.encode(data) : data);
+            const encrypted = await window.crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, 
+                sharedKey, 
+                typeof data === 'string' ? encoder.encode(data) : data
+            );
             const combined = new Uint8Array(iv.length + encrypted.byteLength);
             combined.set(iv);
             combined.set(new Uint8Array(encrypted), iv.length);
@@ -135,12 +167,16 @@ const SecureChatSystem = {
             const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
             const iv = combined.slice(0, 12);
             const data = combined.slice(12);
-            const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, data);
+            const decrypted = await window.crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, 
+                sharedKey, 
+                data
+            );
             return new TextDecoder().decode(decrypted);
         } catch (error) { throw error; }
     },
     
-    // ==================== القسم 5: تشفير وفك تشفير الملفات (للصور والبصمات فقط) ====================
+    // ==================== القسم 5: تشفير وفك تشفير الملفات ====================
     async encryptFile(arrayBuffer, sharedKey) {
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
         const encoder = new TextEncoder();
@@ -175,16 +211,36 @@ const SecureChatSystem = {
     // ==================== القسم 6: ضغط الصور ====================
     async compressImage(file) { 
         return new Promise((resolve, reject) => { 
-            const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+            const img = new Image(); 
+            const canvas = document.createElement('canvas'); 
+            const ctx = canvas.getContext('2d');
             const url = URL.createObjectURL(file);
+            
             img.onload = () => { 
                 URL.revokeObjectURL(url);
                 let w = img.width, h = img.height; 
-                if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } 
-                canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); 
-                canvas.toBlob((blob) => { if (blob) resolve(blob); else reject(new Error('فشل ضغط الصورة')); }, 'image/jpeg', 0.8); 
+                const maxSize = 1200;
+                if (w > maxSize || h > maxSize) { 
+                    if (w > h) { 
+                        h = Math.round(h * maxSize / w); 
+                        w = maxSize; 
+                    } else { 
+                        w = Math.round(w * maxSize / h); 
+                        h = maxSize; 
+                    } 
+                } 
+                canvas.width = w; 
+                canvas.height = h; 
+                ctx.drawImage(img, 0, 0, w, h); 
+                canvas.toBlob((blob) => { 
+                    if (blob) resolve(blob); 
+                    else reject(new Error('فشل ضغط الصورة')); 
+                }, 'image/jpeg', 0.8); 
             };
-            img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('فشل تحميل الصورة')); };
+            img.onerror = () => { 
+                URL.revokeObjectURL(url); 
+                reject(new Error('فشل تحميل الصورة')); 
+            };
             img.src = url;
         }); 
     },
@@ -204,116 +260,186 @@ const SecureChatSystem = {
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
                 expiresAt: expiresAt
             });
-        } catch (error) { throw error; }
+            console.log(`📨 تم إرسال ${encryptedPackage.type} إلى ${receiverId}`);
+        } catch (error) { 
+            console.error('❌ فشل إرسال إلى السيرفر:', error);
+            throw error; 
+        }
     },
 
     // ==================== القسم 7.1: استقبال الرسائل ====================
     startReceiving() { 
         if (!window.auth?.currentUser) return null;
         const uid = window.auth.currentUser.uid;
-        return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
-            for (const change of snapshot.docChanges()) { 
-                if (change.type === 'added') { 
-                    const msg = { id: change.doc.id, ...change.doc.data() }; 
-                    await this.processReceivedMessage(msg); 
-                    try { await change.doc.ref.delete(); } catch (deleteError) {}
+        
+        console.log('👂 بدء الاستماع للرسائل...');
+        
+        return window.db.collection('secure_messages')
+            .where('to', '==', uid)
+            .onSnapshot(async snapshot => { 
+                console.log(`📬 استلام ${snapshot.docChanges().length} تغيير`);
+                for (const change of snapshot.docChanges()) { 
+                    if (change.type === 'added') { 
+                        const msg = { id: change.doc.id, ...change.doc.data() }; 
+                        console.log(`📩 رسالة جديدة من ${msg.from} نوع ${msg.package?.type}`);
+                        await this.processReceivedMessage(msg); 
+                        try { 
+                            await change.doc.ref.delete(); 
+                            console.log(`🗑️ تم حذف الرسالة ${msg.id} بعد المعالجة`);
+                        } catch (deleteError) {
+                            console.warn('⚠️ فشل حذف الرسالة:', deleteError);
+                        }
+                    } 
                 } 
-            } 
-        }, error => { 
-            console.warn('خطأ في الاستماع للرسائل:', error);
-            setTimeout(() => this.startReceiving(), 5000); 
-        }); 
+            }, error => { 
+                console.warn('⚠️ خطأ في الاستماع للرسائل:', error);
+                setTimeout(() => this.startReceiving(), 5000); 
+            }); 
     },
 
-    // ==================== القسم 7.2: معالجة الرسائل المستلمة ====================
+    // ==================== القسم 7.2: معالجة الرسائل المستلمة (المصححة) ====================
     async processReceivedMessage(msg) {
         try {
+            console.log(`🔍 معالجة رسالة من ${msg.from} نوع ${msg.package?.type}`);
+            
             const myPrivateKey = await this.getMyPrivateKey(); 
             const senderPublicKey = await this.getReceiverPublicKey(msg.from);
-            if (!myPrivateKey || !senderPublicKey) return;
+            if (!myPrivateKey || !senderPublicKey) {
+                console.error('❌ فشل الحصول على المفاتيح');
+                return;
+            }
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
             // ===== النصوص =====
             if (msg.package.type === 'text') { 
+                console.log('📝 معالجة رسالة نصية');
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                console.log('📝 النص المفكوك:', decryptedText);
+                ChatSystem.saveMessage(msg.from, { 
+                    id: msg.package.id, 
+                    type: 'text', 
+                    text: decryptedText, 
+                    sender: 'friend', 
+                    time: new Date().toISOString() 
+                }); 
+                if (ChatSystem.currentChat === msg.from) {
+                    ChatSystem.displayMessages(msg.from);
+                }
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             }
             
             // ===== الصور =====
             else if (msg.package.type === 'image') {
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                const imageData = JSON.parse(decryptedData);
-                
-                const fileBuffer = await this.decryptFile(imageData.encryptedFile, sharedKey);
-                const blob = new Blob([fileBuffer], { type: imageData.mimeType || 'image/jpeg' });
-                const objectUrl = URL.createObjectURL(blob);
-                
-                ChatSystem.saveMessage(msg.from, { 
-                    id: msg.package.id, 
-                    type: 'image', 
-                    data: objectUrl, 
-                    fileName: imageData.fileName || 'صورة',
-                    sender: 'friend', 
-                    time: new Date().toISOString(),
-                    _blobUrl: objectUrl
-                });
-                
-                if (ChatSystem.currentChat === msg.from) {
-                    ChatSystem.displayMessages(msg.from);
+                console.log('📷 معالجة صورة');
+                try {
+                    const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                    const imageData = JSON.parse(decryptedData);
+                    console.log('📷 تم فك تشفير بيانات الصورة، الحجم:', imageData.size);
+                    
+                    const fileBuffer = await this.decryptFile(imageData.encryptedFile, sharedKey);
+                    console.log('📷 تم فك تشفير الملف، الحجم:', fileBuffer.byteLength);
+                    
+                    const blob = new Blob([fileBuffer], { type: imageData.mimeType || 'image/jpeg' });
+                    const objectUrl = URL.createObjectURL(blob);
+                    console.log('📷 تم إنشاء URL للصورة:', objectUrl);
+                    
+                    // حفظ في localStorage
+                    ChatSystem.saveMessage(msg.from, { 
+                        id: msg.package.id, 
+                        type: 'image', 
+                        data: objectUrl, 
+                        fileName: imageData.fileName || 'صورة',
+                        sender: 'friend', 
+                        time: new Date().toISOString(),
+                        _blobUrl: objectUrl
+                    });
+                    
+                    if (ChatSystem.currentChat === msg.from) {
+                        ChatSystem.displayMessages(msg.from);
+                    }
+                    ChatSystem.updateLastMessage(msg.from, '📷 صورة');
+                    console.log('✅ تم استلام الصورة المشفرة وعرضها');
+                } catch (error) {
+                    console.error('❌ فشل معالجة الصورة:', error);
                 }
-                ChatSystem.updateLastMessage(msg.from, '📷 صورة');
-                console.log('✅ تم استلام الصورة المشفرة');
             }
             
             // ===== البصمات الصوتية =====
             else if (msg.package.type === 'voice') {
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                const voiceData = JSON.parse(decryptedData);
-                
-                const fileBuffer = await this.decryptFile(voiceData.encryptedFile, sharedKey);
-                const blob = new Blob([fileBuffer], { type: 'audio/webm' });
-                const objectUrl = URL.createObjectURL(blob);
-                
-                ChatSystem.saveMessage(msg.from, { 
-                    id: msg.package.id, 
-                    type: 'voice', 
-                    data: objectUrl, 
-                    sender: 'friend', 
-                    time: new Date().toISOString(),
-                    _blobUrl: objectUrl
-                });
-                
-                if (ChatSystem.currentChat === msg.from) {
-                    ChatSystem.displayMessages(msg.from);
+                console.log('🎤 معالجة بصمة صوتية');
+                try {
+                    const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                    const voiceData = JSON.parse(decryptedData);
+                    console.log('🎤 تم فك تشفير بيانات البصمة، الحجم:', voiceData.size);
+                    
+                    const fileBuffer = await this.decryptFile(voiceData.encryptedFile, sharedKey);
+                    console.log('🎤 تم فك تشفير الملف، الحجم:', fileBuffer.byteLength);
+                    
+                    const blob = new Blob([fileBuffer], { type: 'audio/webm' });
+                    const objectUrl = URL.createObjectURL(blob);
+                    console.log('🎤 تم إنشاء URL للبصمة:', objectUrl);
+                    
+                    ChatSystem.saveMessage(msg.from, { 
+                        id: msg.package.id, 
+                        type: 'voice', 
+                        data: objectUrl, 
+                        sender: 'friend', 
+                        time: new Date().toISOString(),
+                        _blobUrl: objectUrl
+                    });
+                    
+                    if (ChatSystem.currentChat === msg.from) {
+                        ChatSystem.displayMessages(msg.from);
+                    }
+                    ChatSystem.updateLastMessage(msg.from, '🎤 بصمة صوتية');
+                    console.log('✅ تم استلام البصمة الصوتية المشفرة وعرضها');
+                } catch (error) {
+                    console.error('❌ فشل معالجة البصمة الصوتية:', error);
                 }
-                ChatSystem.updateLastMessage(msg.from, '🎤 بصمة صوتية');
-                console.log('✅ تم استلام البصمة الصوتية المشفرة');
+            }
+            
+            // ===== أي نوع غير معروف =====
+            else {
+                console.warn('⚠️ نوع رسالة غير معروف:', msg.package.type);
             }
             
             if (typeof loadChats === 'function') loadChats();
+            
         } catch (error) {
             console.error('❌ خطأ في معالجة الرسالة:', error);
         }
     },
     
-    // ==================== القسم 8: إرسال الملفات المشفرة (للصور والبصمات فقط) ====================
+    // ==================== القسم 8: إرسال الملفات المشفرة ====================
     async sendEncryptedFile(receiverId, file, type, fileName) {
         try {
+            console.log(`📤 بدء إرسال ${type} إلى ${receiverId}`);
+            
             const myPrivateKey = await this.getMyPrivateKey();
             const receiverPublicKey = await this.getReceiverPublicKey(receiverId);
-            if (!myPrivateKey || !receiverPublicKey) return false;
+            if (!myPrivateKey || !receiverPublicKey) {
+                console.error('❌ فشل الحصول على المفاتيح');
+                return false;
+            }
             const sharedKey = await this.deriveSharedKey(myPrivateKey, receiverPublicKey);
             
+            // ضغط الصور
             let fileToSend = file;
             if (type === 'image') {
+                console.log('📷 جاري ضغط الصورة...');
                 fileToSend = await this.compressImage(file);
+                console.log('📷 تم ضغط الصورة، الحجم الجديد:', fileToSend.size);
             }
             
+            // قراءة الملف
             const arrayBuffer = await fileToSend.arrayBuffer();
-            const encryptedFile = await this.encryptFile(arrayBuffer, sharedKey);
+            console.log(`📤 حجم الملف الخام: ${arrayBuffer.byteLength} بايت`);
             
+            // تشفير الملف
+            const encryptedFile = await this.encryptFile(arrayBuffer, sharedKey);
+            console.log(`📤 حجم الملف المشفر: ${encryptedFile.length} حرف`);
+            
+            // تحضير البيانات
             const fileData = {
                 encryptedFile: encryptedFile,
                 fileName: fileName || file.name,
@@ -323,7 +449,9 @@ const SecureChatSystem = {
             };
             
             const encryptedData = await this.encryptData(JSON.stringify(fileData), sharedKey);
+            console.log(`📤 تم تشفير بيانات ${type}`);
             
+            // إرسال إلى السيرفر
             await this.sendToServer(receiverId, {
                 id: Date.now().toString(),
                 type: type,
@@ -349,6 +477,7 @@ async function cleanAllExpiredData() {
         const batch = window.db.batch();
         let totalDeleted = 0;
         
+        // حذف الرسائل منتهية الصلاحية
         const messagesSnapshot = await window.db.collection('secure_messages')
             .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
             .get();
@@ -358,6 +487,7 @@ async function cleanAllExpiredData() {
             totalDeleted++;
         });
         
+        // حذف طلبات الصداقة منتهية الصلاحية
         const requestsSnapshot = await window.db.collection('friendRequests')
             .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
             .get();
@@ -384,3 +514,5 @@ function startUnifiedCleanup() {
     cleanAllExpiredData();
     setInterval(cleanAllExpiredData, 24 * 60 * 60 * 1000);
 }
+
+console.log('✅ SecureChatSystem جاهز');
