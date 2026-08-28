@@ -1,7 +1,6 @@
-// ========== auth.js - النسخة المعدلة (نظام الإيموجي الجديد) ==========
+// ========== auth.js ==========
 // Firebase Auth الأساسي
 
-// ==================== القسم 1: دوال مساعدة ====================
 function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
@@ -14,7 +13,6 @@ function generateShareableId() {
     return id;
 }
 
-// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
 function getEmojiForUser(userData) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -24,7 +22,6 @@ function getEmojiForUser(userData) {
         'woman_medium': '👩🏼',
         'woman_dark': '👩🏽'
     };
-    // دعم التوافق مع المستخدمين القدامى
     if (!userData?.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
         return '🧔🏻‍♂️';
     }
@@ -33,7 +30,6 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
-// ==================== القسم 2: showApp ====================
 function showApp() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     const loginScreen = document.getElementById('loginScreen');
@@ -42,13 +38,11 @@ function showApp() {
     if (app) { app.style.display = 'flex'; }
 }
 
-// ==================== القسم 3: showLoginScreen ====================
 function showLoginScreen() {
     const loginScreen = document.getElementById('loginScreen');
     if (loginScreen) loginScreen.style.display = 'flex';
 }
 
-// ==================== القسم 4: startGoogleLogin ====================
 async function startGoogleLogin() {
     try {
         if (!window.auth || !window.googleProvider) {
@@ -73,7 +67,6 @@ async function startGoogleLogin() {
     }
 }
 
-// ==================== القسم 5: saveUserAndEnter ====================
 async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
@@ -81,7 +74,7 @@ async function saveUserAndEnter(user) {
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
                 email: user.email || '', shareableId: generateShareableId(),
-                bio: '', avatarType: 'man_light', // ✅ القيمة الافتراضية الجديدة
+                bio: '', avatarType: 'man_light',
                 friends: [], blocked: [], createdAt: new Date()
             });
         } else {
@@ -89,7 +82,6 @@ async function saveUserAndEnter(user) {
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
-            // ✅ دعم التوافق مع المستخدمين القدامى - تعيين قيمة افتراضية إذا كانت القيمة القديمة
             if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
                 updates.avatarType = 'man_light';
             }
@@ -105,7 +97,6 @@ async function saveUserAndEnter(user) {
     }
 }
 
-// ==================== القسم 6: دوال إضافية ====================
 async function signInWithGoogle() { await startGoogleLogin(); }
 
 function updateUserUI() { 
@@ -119,23 +110,7 @@ function updateUserUI() {
     } 
 }
 
-// ==================== القسم 7: logout (معدل - إضافة تنظيف شامل) ====================
 async function logout() { 
-    if (typeof CallSystem !== 'undefined' && CallSystem.cleanupDynamicElements) {
-        console.log('🧹 تنظيف العناصر الديناميكية قبل تسجيل الخروج');
-        CallSystem.cleanupDynamicElements();
-    }
-    
-    if (typeof ChatSystem !== 'undefined') {
-        if (ChatSystem.featureBlinkInterval) {
-            clearInterval(ChatSystem.featureBlinkInterval);
-            ChatSystem.featureBlinkInterval = null;
-        }
-        ChatSystem.featuresEnabled = false;
-        ChatSystem.featureRequestPending = false;
-        ChatSystem.featureRequestReceived = false;
-    }
-    
     try {
         if (window.auth?.currentUser) {
             await window.db.collection('users').doc(window.auth.currentUser.uid).update({
@@ -149,7 +124,6 @@ async function logout() {
     window.location.reload(); 
 }
 
-// ==================== القسم 8: loadUserData ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
@@ -169,7 +143,6 @@ async function loadUserData(uid) {
     }
 }
 
-// ==================== القسم 9: مراقب حالة تسجيل الدخول ====================
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
@@ -191,7 +164,6 @@ if (typeof window.auth !== 'undefined') {
     });
 }
 
-// ==================== القسم 10: copyId ====================
 function copyId() { 
     const el = document.getElementById('shareableId'); 
     if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ')); 
