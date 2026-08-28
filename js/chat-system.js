@@ -1,14 +1,11 @@
 // ========== chat-system.js - النسخة النهائية المصححة ==========
-// نظام الدردشة E2EE + إرسال الصور والبصمات عبر السيرفر
+// نظام الدردشة E2EE + إرسال الصور والبصمات عبر السيرفر مع عرض فوري
 
 const ChatSystem = {
     currentChat: null, 
     messages: {},
     friendInConversation: false,
     chatItemTemplate: null,
-    
-    // ✅ تخزين مؤقت للصور والبصمات (في الذاكرة)
-    _tempMedia: {},
     
     // ==================== القسم 1: init ====================
     init() { 
@@ -80,9 +77,6 @@ const ChatSystem = {
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
         
-        // ✅ تنظيف الوسائط المؤقتة
-        this._cleanupTempMedia();
-        
         this.currentChat = null;
         this.friendInConversation = false;
         console.log('✅ closeChat - انتهى');
@@ -99,22 +93,18 @@ const ChatSystem = {
             console.log('✅ تم مسح localStorage بالكامل');
         } else {
             const messages = this.messages[chatId] || [];
-            // ✅ الاحتفاظ بجميع أنواع الرسائل (نصوص + صور + بصمات)
-            // ولكن نحذف الـ blob URLs القديمة
             const validMessages = messages.filter(msg => {
                 if (msg.type === 'image' || msg.type === 'voice') {
-                    // نتأكد من وجود data
                     return msg.data && msg.data.startsWith('blob:');
                 }
                 return true;
-            }).slice(-150); // زيادة الحد إلى 150 رسالة
+            }).slice(-150);
         
             this.messages[chatId] = validMessages;
             localStorage.setItem(key, JSON.stringify(validMessages));
             console.log('✅ تم الاحتفاظ بآخر 150 رسالة');
         }
         
-        // تنظيف الـ Blob URLs
         document.querySelectorAll('img, audio').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
                 URL.revokeObjectURL(el.src);
@@ -132,17 +122,7 @@ const ChatSystem = {
         console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
     },
     
-    // ==================== القسم 6: _cleanupTempMedia ====================
-    _cleanupTempMedia() {
-        for (const key in this._tempMedia) {
-            if (this._tempMedia[key] && this._tempMedia[key].startsWith('blob:')) {
-                URL.revokeObjectURL(this._tempMedia[key]);
-            }
-        }
-        this._tempMedia = {};
-    },
-    
-    // ==================== القسم 7: displayMessages ====================
+    // ==================== القسم 6: displayMessages ====================
     displayMessages(friendId) { 
         const c = document.getElementById('messagesContainer'); 
         if (!c) return; 
@@ -156,7 +136,7 @@ const ChatSystem = {
         c.scrollTop = c.scrollHeight;
     },
     
-    // ==================== القسم 8: displayMessage (المصحح) ====================
+    // ==================== القسم 7: displayMessage ====================
     displayMessage(msg) {
         const c = document.getElementById('messagesContainer'); 
         if (!c) return;
@@ -211,7 +191,7 @@ const ChatSystem = {
                         img.oncontextmenu = (e) => e.preventDefault();
                         img.ondragstart = (e) => e.preventDefault();
                         img.onerror = () => {
-                            console.warn('⚠️ فشل تحميل الصورة:', msg.data);
+                            console.warn('⚠️ فشل تحميل الصورة');
                             img.alt = 'فشل تحميل الصورة';
                             img.src = '';
                             img.style.backgroundColor = '#333';
@@ -240,10 +220,7 @@ const ChatSystem = {
                     const audioEl = voiceMsg.querySelector('.voice-audio-element');
                     if (audioEl && msg.data) {
                         audioEl.src = msg.data;
-                        console.log('🎤 تعيين مصدر الصوت:', msg.data.substring(0, 50) + '...');
                         this.setupVoiceControls(clone, audioEl);
-                    } else {
-                        console.warn('⚠️ فشل تعيين مصدر الصوت - لا يوجد data');
                     }
                 }
                 div.appendChild(clone);
@@ -254,7 +231,7 @@ const ChatSystem = {
         c.scrollTop = c.scrollHeight;
     },
     
-    // ==================== القسم 9: setupVoiceControls (المصحح) ====================
+    // ==================== القسم 8: setupVoiceControls ====================
     setupVoiceControls(clone, audioEl) {
         const playBtn = clone.querySelector('.voice-play-btn');
         const replayBtn = clone.querySelector('.voice-replay-btn');
@@ -267,9 +244,6 @@ const ChatSystem = {
             return;
         }
         
-        console.log('🎤 تهيئة عناصر التحكم الصوتية');
-        
-        // الحصول على المدة
         const tempAudio = new Audio(audioEl.src);
         tempAudio.addEventListener('loadedmetadata', () => {
             const duration = tempAudio.duration;
@@ -277,7 +251,6 @@ const ChatSystem = {
                 const minutes = Math.floor(duration / 60);
                 const seconds = Math.floor(duration % 60);
                 durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                console.log('🎤 مدة الصوت:', durationSpan.textContent);
             }
         });
         tempAudio.addEventListener('error', () => {
@@ -356,7 +329,7 @@ const ChatSystem = {
         };
     },
     
-    // ==================== القسم 10: showImagePreview ====================
+    // ==================== القسم 9: showImagePreview ====================
     showImagePreview(imageSrc) {
         const modal = document.getElementById('imagePreviewModal');
         const img = document.getElementById('previewImage');
@@ -367,7 +340,7 @@ const ChatSystem = {
         this.setupImageZoom(modal, img);
     },
     
-    // ==================== القسم 11: setupImageZoom ====================
+    // ==================== القسم 10: setupImageZoom ====================
     setupImageZoom(modal, img) {
         if (img._zoomCleanup) {
             img._zoomCleanup();
@@ -457,10 +430,22 @@ const ChatSystem = {
         };
     },
     
-    // ==================== القسم 12: sendMessage ====================
+    // ==================== القسم 11: sendMessage (نص) ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         const mid = Date.now().toString(); 
+        
+        // ✅ عرض فوري
+        const msg = { 
+            id: mid, 
+            type: 'text', 
+            text: text.trim(), 
+            sender: 'me', 
+            time: new Date().toISOString(), 
+            status: 'sending' 
+        };
+        this.displayMessage(msg);
+        this.saveMessage(this.currentChat, msg);
         
         try { 
             const pr = await SecureChatSystem.getMyPrivateKey(); 
@@ -475,25 +460,18 @@ const ChatSystem = {
                 timestamp: Date.now() 
             }); 
             
-            const msg = { 
-                id: mid, 
-                type: 'text', 
-                text: text.trim(), 
-                sender: 'me', 
-                time: new Date().toISOString(), 
-                status: 'sent' 
-            };
-            this.saveMessage(this.currentChat, msg); 
-            this.displayMessage(msg); 
+            // ✅ تحديث الحالة
+            this.updateMessageStatus(mid, 'sent');
             console.log('✅ تم إرسال النص عبر Firebase');
             return true; 
         } catch (e) { 
             console.error('❌ فشل إرسال النص:', e);
+            this.updateMessageStatus(mid, 'failed');
             return false; 
         } 
     },
     
-    // ==================== القسم 13: sendImage ====================
+    // ==================== القسم 12: sendImage (مع عرض فوري) ====================
     async sendImage(file) { 
         if (!this.currentChat) {
             console.error('❌ لا توجد محادثة نشطة');
@@ -501,6 +479,24 @@ const ChatSystem = {
         }
         
         console.log('📷 بدء إرسال الصورة');
+        
+        // ✅ عرض فوري للصورة (مع حالة pending)
+        const msgId = Date.now().toString();
+        const tempUrl = URL.createObjectURL(file);
+        const msg = { 
+            id: msgId, 
+            type: 'image', 
+            data: tempUrl, 
+            fileName: file.name,
+            sender: 'me', 
+            time: new Date().toISOString(), 
+            status: 'sending',
+            _blobUrl: tempUrl 
+        };
+        this.displayMessage(msg);
+        this.saveMessage(this.currentChat, msg);
+        
+        // ✅ إظهار شريط التقدم
         ChatSystem.showProgressBar('جاري ضغط الصورة...', 0);
         
         try {
@@ -512,34 +508,23 @@ const ChatSystem = {
             );
             
             if (success) {
-                const msgId = Date.now().toString();
-                const tempUrl = URL.createObjectURL(file);
-                const msg = { 
-                    id: msgId, 
-                    type: 'image', 
-                    data: tempUrl, 
-                    fileName: file.name,
-                    sender: 'me', 
-                    time: new Date().toISOString(), 
-                    status: 'sent',
-                    _blobUrl: tempUrl 
-                };
-                // ✅ حفظ الصورة في localStorage
-                this.saveMessage(this.currentChat, msg);
-                this.displayMessage(msg);
-                console.log('✅ تم إرسال الصورة وعرضها');
+                // ✅ تحديث الحالة إلى sent
+                this.updateMessageStatus(msgId, 'sent');
+                console.log('✅ تم إرسال الصورة');
             } else {
+                this.updateMessageStatus(msgId, 'failed');
                 alert('فشل إرسال الصورة');
             }
         } catch (error) {
             console.error('❌ فشل إرسال الصورة:', error);
+            this.updateMessageStatus(msgId, 'failed');
             alert('فشل إرسال الصورة: ' + error.message);
         } finally {
             ChatSystem.hideProgressBar();
         }
     },
     
-    // ==================== القسم 14: sendVoiceNote ====================
+    // ==================== القسم 13: sendVoiceNote (مع عرض فوري) ====================
     async sendVoiceNote(audioBlob) { 
         if (!this.currentChat) {
             console.error('❌ لا توجد محادثة نشطة');
@@ -547,6 +532,23 @@ const ChatSystem = {
         }
         
         console.log('🎤 بدء إرسال البصمة الصوتية');
+        
+        // ✅ عرض فوري للبصمة (مع حالة pending)
+        const msgId = Date.now().toString();
+        const tempUrl = URL.createObjectURL(audioBlob);
+        const msg = { 
+            id: msgId, 
+            type: 'voice', 
+            data: tempUrl, 
+            sender: 'me', 
+            time: new Date().toISOString(), 
+            status: 'sending',
+            _blobUrl: tempUrl 
+        };
+        this.displayMessage(msg);
+        this.saveMessage(this.currentChat, msg);
+        
+        // ✅ إظهار شريط التقدم
         ChatSystem.showProgressBar('جاري تجهيز البصمة الصوتية...', 0);
         
         try {
@@ -561,33 +563,58 @@ const ChatSystem = {
             );
             
             if (success) {
-                const msgId = Date.now().toString();
-                const tempUrl = URL.createObjectURL(audioBlob);
-                const msg = { 
-                    id: msgId, 
-                    type: 'voice', 
-                    data: tempUrl, 
-                    sender: 'me', 
-                    time: new Date().toISOString(), 
-                    status: 'sent',
-                    _blobUrl: tempUrl 
-                };
-                // ✅ حفظ البصمة في localStorage
-                this.saveMessage(this.currentChat, msg);
-                this.displayMessage(msg);
-                console.log('✅ تم إرسال البصمة الصوتية وعرضها');
+                // ✅ تحديث الحالة إلى sent
+                this.updateMessageStatus(msgId, 'sent');
+                console.log('✅ تم إرسال البصمة الصوتية');
             } else {
+                this.updateMessageStatus(msgId, 'failed');
                 alert('فشل إرسال البصمة الصوتية');
             }
         } catch (error) {
             console.error('❌ فشل إرسال البصمة الصوتية:', error);
+            this.updateMessageStatus(msgId, 'failed');
             alert('فشل إرسال البصمة الصوتية: ' + error.message);
         } finally {
             ChatSystem.hideProgressBar();
         }
     },
     
-    // ==================== القسم 15: saveMessage (المصحح - يحفظ كل شيء) ====================
+    // ==================== القسم 14: updateMessageStatus ====================
+    updateMessageStatus(msgId, status) {
+        const messages = this.messages[this.currentChat] || [];
+        const index = messages.findIndex(m => m.id === msgId);
+        if (index !== -1) {
+            messages[index].status = status;
+            this.messages[this.currentChat] = messages;
+            localStorage.setItem(`chat_${this.currentChat}`, JSON.stringify(messages));
+        }
+        
+        // ✅ تحديث واجهة الرسالة (إظهار علامة ✓)
+        const msgElement = document.getElementById(`msg-${msgId}`);
+        if (msgElement) {
+            const statusEl = msgElement.querySelector('.message-status');
+            if (statusEl) {
+                if (status === 'sent') {
+                    statusEl.innerHTML = '<i class="fas fa-check" style="color: #4CAF50;"></i>';
+                } else if (status === 'sending') {
+                    statusEl.innerHTML = '<i class="fas fa-spinner fa-spin" style="color: #FFC107;"></i>';
+                } else if (status === 'failed') {
+                    statusEl.innerHTML = '<i class="fas fa-exclamation-circle" style="color: #f44336;"></i>';
+                }
+            } else if (status === 'sent') {
+                // إضافة عنصر الحالة إذا لم يكن موجوداً
+                const infoDiv = msgElement.querySelector('.message-info') || msgElement.querySelector('.message-content');
+                if (infoDiv) {
+                    const statusSpan = document.createElement('span');
+                    statusSpan.className = 'message-status';
+                    statusSpan.innerHTML = '<i class="fas fa-check" style="color: #4CAF50;"></i>';
+                    infoDiv.appendChild(statusSpan);
+                }
+            }
+        }
+    },
+    
+    // ==================== القسم 15: saveMessage ====================
     saveMessage(friendId, message) { 
         const key = `chat_${friendId}`; 
         let messages = []; 
@@ -600,10 +627,9 @@ const ChatSystem = {
         // ✅ نضيف الرسالة مهما كان نوعها
         messages.push(message); 
         
-        // ✅ حد أقصى 150 رسالة (نحذف الأقدم)
+        // ✅ حد أقصى 150 رسالة
         if (messages.length > 150) {
             const removeCount = messages.length - 150;
-            // نحذف الرسائل القديمة مع تنظيف الـ Blob URLs
             for (let i = 0; i < removeCount; i++) {
                 const oldMsg = messages[i];
                 if (oldMsg._blobUrl && oldMsg._blobUrl.startsWith('blob:')) {
@@ -611,13 +637,12 @@ const ChatSystem = {
                 }
             }
             messages = messages.slice(removeCount);
-            console.log(`🧹 تم حذف ${removeCount} رسالة قديمة (الحد الأقصى 150 رسالة)`);
+            console.log(`🧹 تم حذف ${removeCount} رسالة قديمة`);
         }
         
         try { 
             localStorage.setItem(key, JSON.stringify(messages)); 
         } catch (e) {
-            // إذا كانت المساحة غير كافية، نحذف 50 رسالة
             const removeCount = Math.min(50, messages.length);
             for (let i = 0; i < removeCount; i++) {
                 const oldMsg = messages[i];
@@ -628,12 +653,12 @@ const ChatSystem = {
             messages = messages.slice(removeCount);
             try { 
                 localStorage.setItem(key, JSON.stringify(messages)); 
-                console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة قديمة`);
+                console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة`);
             } catch (e2) { 
                 messages = messages.slice(-50);
                 try { 
                     localStorage.setItem(key, JSON.stringify(messages)); 
-                    console.log(`🧹 مساحة غير كافية - تم الاحتفاظ بآخر 50 رسالة فقط`);
+                    console.log(`🧹 تم الاحتفاظ بآخر 50 رسالة فقط`);
                 } catch (e3) {}
             }
         }
