@@ -1,7 +1,5 @@
-// ========== ui-functions.js - النسخة المعدلة (مع نظام الإيموجي الجديد + التحديد) ==========
-// وظائف الواجهة العامة
+// ========== ui-functions.js - النسخة المعدلة (بدون فيديو وبدون ملفات) ==========
 
-// ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
 window._pageStack = [];
 
 function pushPage(pageType, pageId) {
@@ -19,7 +17,7 @@ function clearStack() {
     window._pageStack = [];
 }
 
-// ==================== القسم 2: تحميل المحادثات (معدل - يدعم طلبات الصداقة) ====================
+// ==================== تحميل المحادثات ====================
 let chatsLoaded = false;
 let isLoadingChats = false;
 
@@ -59,7 +57,7 @@ async function loadChats(force = false) {
         
         list.innerHTML = '';
         
-        // ===== القسم 2.1: عرض طلبات الصداقة في الأعلى =====
+        // عرض طلبات الصداقة
         if (requestTemplate) {
             const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
             const addedRequestIds = new Set();
@@ -125,7 +123,7 @@ async function loadChats(force = false) {
             }
         }
         
-        // ===== القسم 2.2: عرض قائمة الأصدقاء =====
+        // عرض قائمة الأصدقاء
         if (!friends.length) { 
             if (list.children.length === 0) {
                 list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
@@ -155,8 +153,6 @@ async function loadChats(force = false) {
                             if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
                             else if (l.type === 'image') lm = '📷 صورة'; 
                             else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; 
-                            else if (l.type === 'video') lm = '🎥 فيديو'; 
-                            else if (l.type === 'file') lm = '📎 ملف'; 
                             lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
                         } 
                     } catch (e) {} 
@@ -203,7 +199,7 @@ function refreshChats() {
     loadChats(true);
 }
 
-// ==================== القسم 3: إعداد مستمعي الواجهة ====================
+// ==================== إعداد مستمعي الواجهة ====================
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
         const m = document.getElementById('attachmentMenu'); 
@@ -214,7 +210,7 @@ function setupChatListeners() {
     }); 
 }
 
-// ==================== القسم 4: فتح محادثة ====================
+// ==================== فتح محادثة ====================
 window.openChat = friendId => {
     if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
         pushPage('subpage', 'friendsPage');
@@ -234,7 +230,7 @@ window.openChat = friendId => {
     }).catch(() => {});
 };
 
-// ==================== القسم 5: وظائف إرسال الرسائل ====================
+// ==================== وظائف إرسال الرسائل ====================
 window.sendMessage = () => { 
     const inp = document.getElementById('messageInput'); 
     if (inp && inp.value.trim()) {
@@ -250,16 +246,13 @@ window.sendMessage = () => {
     }
 };
 
-// ✅ معدل: منع إرسال الرسالة عند الضغط على Enter
 window.handleMessageKeyPress = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        // لا يرسل الرسالة، فقط يمنع إضافة سطر جديد
-        // الإرسال يكون فقط من خلال زر الإرسال
     }
 };
 
-// ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
+// ==================== زر الإجراء (بصمة/إرسال) ====================
 
 let _recordingTimer = null;
 let _recordingSeconds = 0;
@@ -281,16 +274,6 @@ window.toggleSendButton = function() {
     
     if (recordingUI && recordingUI.style.display === 'flex') {
         btn.style.display = 'none';
-        return;
-    }
-    
-    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
-    
-    if (!featuresEnabled) {
-        btn.className = 'send-mode';
-        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
-        btn.title = 'إرسال';
-        btn.style.display = 'flex';
         return;
     }
     
@@ -316,23 +299,16 @@ window.handleActionButton = function() {
     const recordingUI = document.getElementById('voiceRecordingUI');
     if (recordingUI && recordingUI.style.display === 'flex') return;
     
-    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
         window.sendMessage();
-    } else if (featuresEnabled) {
+    } else {
         window.startVoiceRecording();
     }
 };
 
 window.startVoiceRecording = function() {
-    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
-    if (!featuresEnabled) {
-        alert('الميزات غير مفعلة');
-        return;
-    }
-    
     if (!navigator.mediaDevices?.getUserMedia) {
         alert('المتصفح لا يدعم تسجيل الصوت');
         return;
@@ -572,7 +548,7 @@ function resetVoiceUI() {
     window.toggleSendButton();
 }
 
-// ==================== القسم 6: قائمة المرفقات ====================
+// ==================== قائمة المرفقات ====================
 window.showAttachmentMenu = () => { 
     const m = document.getElementById('attachmentMenu'); 
     if (m) {
@@ -580,7 +556,7 @@ window.showAttachmentMenu = () => {
     }
 };
 
-// ==================== القسم 7: إرسال الملفات ====================
+// ==================== إرسال الصور فقط ====================
 window.sendImage = () => { 
     const i = document.createElement('input'); 
     i.type = 'file'; 
@@ -593,39 +569,8 @@ window.sendImage = () => {
     document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
-window.sendVideo = () => { 
-    const i = document.createElement('input'); 
-    i.type = 'file'; 
-    i.accept = 'video/*'; 
-    i.onchange = e => { 
-        const f = e.target.files[0]; 
-        if (f && ChatSystem.currentChat) ChatSystem.sendVideoFile(f); 
-    }; 
-    i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
-
-window.sendFile = () => { 
-    const i = document.createElement('input'); 
-    i.type = 'file'; 
-    i.accept = '*/*'; 
-    i.onchange = e => { 
-        const f = e.target.files[0]; 
-        if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); 
-    }; 
-    i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
-
-// ==================== القسم 8: مشاركة الموقع ====================
-window.shareLocation = () => { 
-    ChatSystem.shareLocationDirect(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
-
-// ==================== القسم 9: إغلاق المحادثة ====================
+// ==================== إغلاق المحادثة ====================
 window.closeConversation = () => { 
-    CallSystem.endCall(); 
     ChatSystem.closeChat();
     
     if (typeof window.hideSearchResults === 'function') {
@@ -659,7 +604,7 @@ window.closeConversation = () => {
     }, 200);
 };
 
-// ==================== القسم 10: تعديل الملف الشخصي ====================
+// ==================== تعديل الملف الشخصي ====================
 window.openEditProfileModal = () => { 
     const nameInput = document.getElementById('editName'); 
     const currentName = document.getElementById('profileName')?.textContent; 
@@ -683,7 +628,7 @@ window.saveProfile = () => {
     }).catch(() => alert('فشل حفظ التغييرات')); 
 };
 
-// ==================== القسم 11: الصفحات الفرعية ====================
+// ==================== الصفحات الفرعية ====================
 window.showUserTrips = () => {
     pushPage('page', 'profile');
     document.body.classList.add('profile-subpage-open');
@@ -698,7 +643,7 @@ window.showFriendsList = () => {
     document.getElementById('friendsPage').style.display = 'block';
 };
 
-// ==================== القسم 12: الرجوع من صفحة فرعية ====================
+// ==================== الرجوع من صفحة فرعية ====================
 window.goBack = () => {
     const lastPage = popPage();
     
@@ -714,9 +659,7 @@ window.goBack = () => {
     }
 };
 
-// ==================== القسم 13: الصورة الرمزية (معدل - مع التحديد بالدائرة الزرقاء) ====================
-
-// ✅ دالة selectAvatar الجديدة - مع تحديث واجهة الاختيار
+// ==================== الصورة الرمزية ====================
 window.selectAvatar = function(type) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -732,7 +675,6 @@ window.selectAvatar = function(type) {
     if (profileAvatar) profileAvatar.textContent = emoji;
     if (currentAvatar) currentAvatar.textContent = emoji;
     
-    // ✅ تحديث واجهة الاختيار - إضافة الدائرة الزرقاء حول المحدد
     document.querySelectorAll('.avatar-option-btn').forEach(btn => {
         btn.style.borderColor = 'transparent';
         btn.style.background = 'var(--light)';
@@ -749,7 +691,6 @@ window.selectAvatar = function(type) {
     if (auth?.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
             .then(() => {
-                // نغلق النافذة بعد 500ms ليعطي انطباع بالاختيار
                 setTimeout(() => closeModal(), 500);
             })
             .catch(() => {});
@@ -760,11 +701,8 @@ window.openAvatarModal = function() {
     const modal = document.getElementById('avatarModal');
     if (modal) modal.classList.add('active');
     
-    // ✅ عند فتح النافذة، نحدد الإيموجي الحالي
     const currentAvatar = document.getElementById('profileAvatarEmoji')?.textContent;
-    const currentType = auth?.currentUser ? null : null;
     
-    // نبحث عن الزر المطابق للإيموجي الحالي
     document.querySelectorAll('.avatar-option-btn').forEach(btn => {
         const emojiSpan = btn.querySelector('span');
         if (emojiSpan && emojiSpan.textContent === currentAvatar) {
@@ -779,7 +717,6 @@ window.openAvatarModal = function() {
     });
 };
 
-// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
 window.getEmojiForUser = function(userData) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -789,26 +726,18 @@ window.getEmojiForUser = function(userData) {
         'woman_medium': '👩🏼',
         'woman_dark': '👩🏽'
     };
-    // دعم التوافق مع المستخدمين القدامى
     if (!userData?.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
         return '🧔🏻‍♂️';
     }
     return emojiMap[userData.avatarType] || '🧔🏻‍♂️';
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
+// ==================== دوال إغلاق المعاينات ====================
 window.closeImagePreview = function() {
     const modal = document.getElementById('imagePreviewModal');
     const img = document.getElementById('previewImage');
     if (modal) modal.style.display = 'none';
     if (img) { img.src = ''; img.style.transform = 'none'; }
-};
-
-window.closeVideoPreview = function() {
-    const modal = document.getElementById('videoPreviewModal');
-    const video = document.getElementById('previewVideo');
-    if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
 };
 
 window.downloadPreviewImage = function() {
@@ -820,16 +749,7 @@ window.downloadPreviewImage = function() {
     link.click();
 };
 
-window.downloadPreviewVideo = function() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-};
-
-// ==================== القسم 15: دوال مساعدة ====================
+// ==================== دوال مساعدة ====================
 function formatNumber(num) { 
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; 
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; 
@@ -876,7 +796,6 @@ function setupNavigation() {
             window.hideSearchResults();
         }
         
-        // ✅ تحديث عنوان الصفحة في رأس التطبيق
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) {
             const titles = {
@@ -909,7 +828,7 @@ function setupModals() {
     }); 
 }
 
-// ==================== القسم 16: أحداث الصفحة ====================
+// ==================== أحداث الصفحة ====================
 document.addEventListener('DOMContentLoaded', () => { 
     ensureSinglePage(); 
     setupNavigation(); 
