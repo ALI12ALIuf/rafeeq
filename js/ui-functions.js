@@ -1,4 +1,5 @@
-// ========== ui-functions.js - النسخة المعدلة (بدون فيديو وبدون ملفات) ==========
+// ========== ui-functions.js - النسخة النهائية ==========
+// وظائف الواجهة العامة
 
 window._pageStack = [];
 
@@ -230,25 +231,35 @@ window.openChat = friendId => {
     }).catch(() => {});
 };
 
-// ==================== وظائف إرسال الرسائل ====================
+// ==================== وظائف إرسال الرسائل (المعدلة) ====================
+
+// ✅ المعدل: مسح الحقل فوراً قبل الإرسال
 window.sendMessage = () => { 
     const inp = document.getElementById('messageInput'); 
     if (inp && inp.value.trim()) {
-        ChatSystem.sendMessage(inp.value.trim()).then(s => { 
-            if (s) { 
-                inp.value = ''; 
-                inp.style.height = 'auto';
-                if (typeof window.toggleSendButton === 'function') {
-                    window.toggleSendButton();
-                }
-            } 
-        }); 
+        const text = inp.value.trim();
+        
+        // ✅ مسح الحقل فوراً (قبل الإرسال)
+        inp.value = '';
+        inp.style.height = 'auto';
+        if (typeof window.toggleSendButton === 'function') {
+            window.toggleSendButton();
+        }
+        
+        // ✅ ثم إرسال الرسالة
+        ChatSystem.sendMessage(text).then(s => { 
+            if (!s) {
+                console.warn('⚠️ فشل إرسال الرسالة');
+            }
+        });
     }
 };
 
+// ✅ المعدل: منع إرسال الرسالة عند الضغط على Enter
 window.handleMessageKeyPress = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
+        window.sendMessage();
     }
 };
 
