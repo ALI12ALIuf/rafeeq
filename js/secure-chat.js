@@ -314,18 +314,28 @@ const SecureChatSystem = {
             if (msg.package.type === 'text') { 
                 console.log('📝 معالجة رسالة نصية');
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
-                console.log('📝 النص المفكوك:', decryptedText);
-                ChatSystem.saveMessage(msg.from, { 
+                console.log('📝 النص المفكوك:', decryptedText.substring(0, 50) + (decryptedText.length > 50 ? '...' : ''));
+                
+                const msgData = { 
                     id: msg.package.id, 
                     type: 'text', 
                     text: decryptedText, 
                     sender: 'friend', 
                     time: new Date().toISOString() 
-                }); 
-                if (ChatSystem.currentChat === msg.from) {
+                };
+                
+                // ✅ حفظ في localStorage
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
+                    ChatSystem.saveMessage(msg.from, msgData);
+                }
+                
+                // ✅ عرض فوري إذا كانت المحادثة مفتوحة
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
                     ChatSystem.displayMessages(msg.from);
                 }
-                ChatSystem.updateLastMessage(msg.from, decryptedText); 
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.updateLastMessage) {
+                    ChatSystem.updateLastMessage(msg.from, decryptedText);
+                }
             }
             
             // ===== الصور =====
@@ -341,10 +351,9 @@ const SecureChatSystem = {
                     
                     const blob = new Blob([fileBuffer], { type: imageData.mimeType || 'image/jpeg' });
                     const objectUrl = URL.createObjectURL(blob);
-                    console.log('📷 تم إنشاء URL للصورة:', objectUrl);
+                    console.log('📷 تم إنشاء URL للصورة');
                     
-                    // حفظ في localStorage
-                    ChatSystem.saveMessage(msg.from, { 
+                    const msgData = { 
                         id: msg.package.id, 
                         type: 'image', 
                         data: objectUrl, 
@@ -352,13 +361,21 @@ const SecureChatSystem = {
                         sender: 'friend', 
                         time: new Date().toISOString(),
                         _blobUrl: objectUrl
-                    });
+                    };
                     
-                    if (ChatSystem.currentChat === msg.from) {
+                    // ✅ حفظ في localStorage
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
+                        ChatSystem.saveMessage(msg.from, msgData);
+                    }
+                    
+                    // ✅ عرض فوري
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
                         ChatSystem.displayMessages(msg.from);
                     }
-                    ChatSystem.updateLastMessage(msg.from, '📷 صورة');
-                    console.log('✅ تم استلام الصورة المشفرة وعرضها');
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.updateLastMessage) {
+                        ChatSystem.updateLastMessage(msg.from, '📷 صورة');
+                    }
+                    console.log('✅ تم استلام الصورة وعرضها');
                 } catch (error) {
                     console.error('❌ فشل معالجة الصورة:', error);
                 }
@@ -377,22 +394,30 @@ const SecureChatSystem = {
                     
                     const blob = new Blob([fileBuffer], { type: 'audio/webm' });
                     const objectUrl = URL.createObjectURL(blob);
-                    console.log('🎤 تم إنشاء URL للبصمة:', objectUrl);
+                    console.log('🎤 تم إنشاء URL للبصمة');
                     
-                    ChatSystem.saveMessage(msg.from, { 
+                    const msgData = { 
                         id: msg.package.id, 
                         type: 'voice', 
                         data: objectUrl, 
                         sender: 'friend', 
                         time: new Date().toISOString(),
                         _blobUrl: objectUrl
-                    });
+                    };
                     
-                    if (ChatSystem.currentChat === msg.from) {
+                    // ✅ حفظ في localStorage
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
+                        ChatSystem.saveMessage(msg.from, msgData);
+                    }
+                    
+                    // ✅ عرض فوري
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
                         ChatSystem.displayMessages(msg.from);
                     }
-                    ChatSystem.updateLastMessage(msg.from, '🎤 بصمة صوتية');
-                    console.log('✅ تم استلام البصمة الصوتية المشفرة وعرضها');
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.updateLastMessage) {
+                        ChatSystem.updateLastMessage(msg.from, '🎤 بصمة صوتية');
+                    }
+                    console.log('✅ تم استلام البصمة الصوتية وعرضها');
                 } catch (error) {
                     console.error('❌ فشل معالجة البصمة الصوتية:', error);
                 }
