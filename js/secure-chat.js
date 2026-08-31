@@ -1,6 +1,7 @@
 // ========== secure-chat.js ==========
-// نظام التشفير E2EE + ضغط الصور + بصمة صوتية + حذف 24 ساعة
-// تم إزالة الفيديو والملفات نهائياً
+// نظام التشفير E2EE + ضغط الصور + حذف 24 ساعة
+// تم إزالة البصمة الصوتية والفيديو والملفات نهائياً
+// مع تحسينات: استخدام وقت السيرفر + تحديث فوري
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -176,7 +177,7 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
-    // ==================== القسم 5: تشفير وفك تشفير الملفات ====================
+    // ==================== القسم 5: تشفير وفك تشفير الملفات (للصور فقط) ====================
     async encryptFile(arrayBuffer, sharedKey) {
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
         const encoder = new TextEncoder();
@@ -297,7 +298,7 @@ const SecureChatSystem = {
             }); 
     },
 
-    // ==================== القسم 7.2: معالجة الرسائل المستلمة (المصححة) ====================
+    // ==================== القسم 7.2: معالجة الرسائل المستلمة (المعدلة مع التحسينات) ====================
     async processReceivedMessage(msg) {
         try {
             console.log(`🔍 معالجة رسالة من ${msg.from} نوع ${msg.package?.type}`);
@@ -310,10 +311,14 @@ const SecureChatSystem = {
             }
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
+            // ✅ استخدام وقت السيرفر (timestamp)
+            const serverTime = msg.timestamp?.toDate?.() || new Date();
+            const formattedTime = serverTime.toISOString();
+            
             // ===== النصوص =====
             if (msg.package.type === 'text') { 
                 console.log('📝 معالجة رسالة نصية');
-                const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
+                const decryptedText = await this.decryptData(msg.package.data, sharedKey);
                 console.log('📝 النص المفكوك:', decryptedText.substring(0, 50) + (decryptedText.length > 50 ? '...' : ''));
                 
                 const msgData = { 
@@ -321,7 +326,7 @@ const SecureChatSystem = {
                     type: 'text', 
                     text: decryptedText, 
                     sender: 'friend', 
-                    time: new Date().toISOString() 
+                    time: formattedTime  // ✅ استخدام وقت السيرفر
                 };
                 
                 // ✅ حفظ في localStorage
@@ -329,13 +334,17 @@ const SecureChatSystem = {
                     ChatSystem.saveMessage(msg.from, msgData);
                 }
                 
-                // ✅ عرض فوري إذا كانت المحادثة مفتوحة
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    ChatSystem.displayMessages(msg.from);
+                // ✅ تحديث واجهة المحادثة فوراً
+                if (typeof ChatSystem !== 'undefined') {
+                    if (ChatSystem.currentChat === msg.from) {
+                        ChatSystem.displayMessages(msg.from);
+                        ChatSystem.scrollToBottom();
+                    }
+                    if (ChatSystem.updateLastMessage) {
+                        ChatSystem.updateLastMessage(msg.from, decryptedText);
+                    }
                 }
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.updateLastMessage) {
-                    ChatSystem.updateLastMessage(msg.from, decryptedText);
-                }
+                console.log('✅ تم استلام النص وعرضه فوراً');
             }
             
             // ===== الصور =====
@@ -359,67 +368,26 @@ const SecureChatSystem = {
                         data: objectUrl, 
                         fileName: imageData.fileName || 'صورة',
                         sender: 'friend', 
-                        time: new Date().toISOString(),
+                        time: formattedTime,  // ✅ استخدام وقت السيرفر
                         _blobUrl: objectUrl
                     };
                     
-                    // ✅ حفظ في localStorage
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
                         ChatSystem.saveMessage(msg.from, msgData);
                     }
                     
-                    // ✅ عرض فوري
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                        ChatSystem.displayMessages(msg.from);
+                    if (typeof ChatSystem !== 'undefined') {
+                        if (ChatSystem.currentChat === msg.from) {
+                            ChatSystem.displayMessages(msg.from);
+                            ChatSystem.scrollToBottom();
+                        }
+                        if (ChatSystem.updateLastMessage) {
+                            ChatSystem.updateLastMessage(msg.from, '📷 صورة');
+                        }
                     }
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.updateLastMessage) {
-                        ChatSystem.updateLastMessage(msg.from, '📷 صورة');
-                    }
-                    console.log('✅ تم استلام الصورة وعرضها');
+                    console.log('✅ تم استلام الصورة وعرضها فوراً');
                 } catch (error) {
                     console.error('❌ فشل معالجة الصورة:', error);
-                }
-            }
-            
-            // ===== البصمات الصوتية =====
-            else if (msg.package.type === 'voice') {
-                console.log('🎤 معالجة بصمة صوتية');
-                try {
-                    const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                    const voiceData = JSON.parse(decryptedData);
-                    console.log('🎤 تم فك تشفير بيانات البصمة، الحجم:', voiceData.size);
-                    
-                    const fileBuffer = await this.decryptFile(voiceData.encryptedFile, sharedKey);
-                    console.log('🎤 تم فك تشفير الملف، الحجم:', fileBuffer.byteLength);
-                    
-                    const blob = new Blob([fileBuffer], { type: 'audio/webm' });
-                    const objectUrl = URL.createObjectURL(blob);
-                    console.log('🎤 تم إنشاء URL للبصمة');
-                    
-                    const msgData = { 
-                        id: msg.package.id, 
-                        type: 'voice', 
-                        data: objectUrl, 
-                        sender: 'friend', 
-                        time: new Date().toISOString(),
-                        _blobUrl: objectUrl
-                    };
-                    
-                    // ✅ حفظ في localStorage
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
-                        ChatSystem.saveMessage(msg.from, msgData);
-                    }
-                    
-                    // ✅ عرض فوري
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                        ChatSystem.displayMessages(msg.from);
-                    }
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.updateLastMessage) {
-                        ChatSystem.updateLastMessage(msg.from, '🎤 بصمة صوتية');
-                    }
-                    console.log('✅ تم استلام البصمة الصوتية وعرضها');
-                } catch (error) {
-                    console.error('❌ فشل معالجة البصمة الصوتية:', error);
                 }
             }
             
@@ -435,7 +403,7 @@ const SecureChatSystem = {
         }
     },
     
-    // ==================== القسم 8: إرسال الملفات المشفرة ====================
+    // ==================== القسم 8: إرسال الملفات المشفرة (للصور فقط) ====================
     async sendEncryptedFile(receiverId, file, type, fileName) {
         try {
             console.log(`📤 بدء إرسال ${type} إلى ${receiverId}`);
@@ -448,7 +416,7 @@ const SecureChatSystem = {
             }
             const sharedKey = await this.deriveSharedKey(myPrivateKey, receiverPublicKey);
             
-            // ضغط الصور
+            // ضغط الصور فقط
             let fileToSend = file;
             if (type === 'image') {
                 console.log('📷 جاري ضغط الصورة...');
@@ -456,19 +424,16 @@ const SecureChatSystem = {
                 console.log('📷 تم ضغط الصورة، الحجم الجديد:', fileToSend.size);
             }
             
-            // قراءة الملف
             const arrayBuffer = await fileToSend.arrayBuffer();
             console.log(`📤 حجم الملف الخام: ${arrayBuffer.byteLength} بايت`);
             
-            // تشفير الملف
             const encryptedFile = await this.encryptFile(arrayBuffer, sharedKey);
             console.log(`📤 حجم الملف المشفر: ${encryptedFile.length} حرف`);
             
-            // تحضير البيانات
             const fileData = {
                 encryptedFile: encryptedFile,
                 fileName: fileName || file.name,
-                mimeType: file.type || (type === 'image' ? 'image/jpeg' : 'audio/webm'),
+                mimeType: file.type || 'image/jpeg',
                 size: file.size,
                 type: type
             };
@@ -476,7 +441,6 @@ const SecureChatSystem = {
             const encryptedData = await this.encryptData(JSON.stringify(fileData), sharedKey);
             console.log(`📤 تم تشفير بيانات ${type}`);
             
-            // إرسال إلى السيرفر
             await this.sendToServer(receiverId, {
                 id: Date.now().toString(),
                 type: type,
@@ -502,7 +466,6 @@ async function cleanAllExpiredData() {
         const batch = window.db.batch();
         let totalDeleted = 0;
         
-        // حذف الرسائل منتهية الصلاحية
         const messagesSnapshot = await window.db.collection('secure_messages')
             .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
             .get();
@@ -512,7 +475,6 @@ async function cleanAllExpiredData() {
             totalDeleted++;
         });
         
-        // حذف طلبات الصداقة منتهية الصلاحية
         const requestsSnapshot = await window.db.collection('friendRequests')
             .where('expiresAt', '<', firebase.firestore.Timestamp.fromDate(now))
             .get();
@@ -540,4 +502,4 @@ function startUnifiedCleanup() {
     setInterval(cleanAllExpiredData, 24 * 60 * 60 * 1000);
 }
 
-console.log('✅ SecureChatSystem جاهز');
+console.log('✅ SecureChatSystem جاهز (مع تحسينات التوقيت)');
