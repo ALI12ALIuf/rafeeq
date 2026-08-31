@@ -149,37 +149,17 @@
             <!-- ===== حاوية الرسائل ===== -->
             <div class="messages-container" id="messagesContainer"></div>
 
-            <!-- ===== مدخل الرسائل ===== -->
+            <!-- ===== مدخل الرسائل (بدون بصمة صوتية) ===== -->
             <div class="message-input-container">
                 <div class="message-input-wrapper">
                     <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
                     <div class="input-area">
                         <textarea id="messageInput" placeholder="اكتب رسالة..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
-                        
-                        <!-- ===== واجهة تسجيل البصمة ===== -->
-                        <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
-                            <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; position:relative; overflow:hidden;">
-                                <div id="voiceProgressFill" style="width:0%; height:100%; background:var(--primary); border-radius:2px; transition:width 0.3s;"></div>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-family:monospace; direction:ltr; min-width:100px; justify-content:center;">
-                                <span id="voiceCurrentTime" style="color:var(--primary); font-weight:bold;">0:00</span>
-                                <span id="voiceSeparator" style="color:var(--primary);">/</span>
-                                <span id="voiceMaxTime" style="color:var(--primary);">5:00</span>
-                            </div>
-                            <button id="voicePlayBtn" style="display:none; width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:var(--primary); cursor:pointer; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s;">
-                                <i class="fas fa-play"></i>
-                            </button>
-                            <button id="voiceCancelBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#ff4444; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
-                                <i class="fas fa-times"></i>
-                            </button>
-                            <button id="voiceSendBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:var(--primary); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
-                                <i class="fas fa-check"></i>
-                            </button>
-                        </div>
                     </div>
                     
-                    <button id="actionBtn" class="voice-btn" onclick="handleActionButton()">
-                        <i class="fas fa-microphone"></i>
+                    <!-- ✅ زر الإرسال فقط (بدون بصمة) -->
+                    <button id="sendBtn" class="send-mode" onclick="sendMessage()" style="width:38px;height:38px;border-radius:50%;border:none;background:var(--primary);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;transition:all 0.3s ease;">
+                        <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
             </div>
@@ -326,27 +306,6 @@
     </div>
 </template>
 
-<template id="voiceMessageTemplate">
-    <div class="message-content voice-message">
-        <div class="voice-controls">
-            <button class="voice-play-btn">
-                <i class="fas fa-play"></i>
-            </button>
-            <button class="voice-replay-btn">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-            <div class="voice-timer">
-                <span class="voice-current-time">0:00</span>
-                <span class="voice-duration">0:00</span>
-            </div>
-            <button class="voice-mute-btn">
-                <i class="fas fa-volume-up"></i>
-            </button>
-        </div>
-        <audio class="voice-audio-element" style="display:none;"></audio>
-    </div>
-</template>
-
 <!-- ==================== القسم 6: النوافذ المنبثقة (Modals) ==================== -->
 
 <!-- 6.1: نافذة تعديل الملف الشخصي -->
@@ -423,11 +382,11 @@
 <!-- ==================== القسم 8: ملفات الجافاسكريبت ==================== -->
 <script src="js/i18n.js?v=2"></script>
 <script src="js/theme.js?v=2"></script>
-<script src="js/secure-chat.js?v=5"></script>
-<script src="js/chat-system.js?v=5"></script>
-<script src="js/ui-functions.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
-<script src="js/friends.js?v=5"></script>
+<script src="js/secure-chat.js?v=6"></script>
+<script src="js/chat-system.js?v=6"></script>
+<script src="js/ui-functions.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
+<script src="js/friends.js?v=6"></script>
 
 <!-- ==================== القسم 9: كود التشغيل ==================== -->
 <script>
