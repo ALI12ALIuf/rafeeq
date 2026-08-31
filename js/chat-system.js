@@ -1,6 +1,6 @@
-// ========== chat-system.js - النسخة النهائية (بدون أيقونات حالة) ==========
-// نظام الدردشة E2EE + إرسال الصور والبصمات عبر السيرفر
-// تم إخفاء أيقونات حالة الإرسال تماماً عن المستخدم
+// ========== chat-system.js - النسخة النهائية (بدون بصمة صوتية) ==========
+// نظام الدردشة E2EE + إرسال الصور عبر السيرفر
+// تم إزالة البصمة الصوتية نهائياً
 
 const ChatSystem = {
     currentChat: null, 
@@ -61,8 +61,6 @@ const ChatSystem = {
             const c = document.getElementById('messagesContainer'); 
             if (c) c.scrollTop = c.scrollHeight; 
         }, 100);
-        
-        this.updateAllButtons();
     },
     
     // ==================== القسم 4: closeChat ====================
@@ -95,7 +93,7 @@ const ChatSystem = {
         } else {
             const messages = this.messages[chatId] || [];
             const validMessages = messages.filter(msg => {
-                if (msg.type === 'image' || msg.type === 'voice') {
+                if (msg.type === 'image') {
                     return msg.data && msg.data.startsWith('blob:');
                 }
                 return true;
@@ -106,7 +104,7 @@ const ChatSystem = {
             console.log('✅ تم الاحتفاظ بآخر 150 رسالة');
         }
         
-        document.querySelectorAll('img, audio').forEach(el => {
+        document.querySelectorAll('img').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
                 URL.revokeObjectURL(el.src);
                 el.src = '';
@@ -137,7 +135,7 @@ const ChatSystem = {
         c.scrollTop = c.scrollHeight;
     },
     
-    // ==================== القسم 7: displayMessage (بدون أيقونات حالة) ====================
+    // ==================== القسم 7: displayMessage ====================
     displayMessage(msg) {
         const c = document.getElementById('messagesContainer'); 
         if (!c) return;
@@ -209,130 +207,11 @@ const ChatSystem = {
             }
         }
         
-        // ===== البصمات الصوتية =====
-        else if (msg.type === 'voice') {
-            const templateVoice = document.getElementById('voiceMessageTemplate');
-            if (templateVoice) {
-                const clone = templateVoice.content.cloneNode(true);
-                const voiceMsg = clone.querySelector('.voice-message');
-                if (voiceMsg) {
-                    voiceMsg.style.background = '#4CAF50';
-                    voiceMsg.style.border = `1.5px solid ${borderColor}`;
-                    const audioEl = voiceMsg.querySelector('.voice-audio-element');
-                    if (audioEl && msg.data) {
-                        audioEl.src = msg.data;
-                        this.setupVoiceControls(clone, audioEl);
-                    }
-                }
-                div.appendChild(clone);
-            }
-        }
-        
-        // ❌ تم إزالة أيقونات الحالة (status) تماماً
-        
         c.appendChild(div); 
         c.scrollTop = c.scrollHeight;
     },
     
-    // ==================== القسم 8: setupVoiceControls ====================
-    setupVoiceControls(clone, audioEl) {
-        const playBtn = clone.querySelector('.voice-play-btn');
-        const replayBtn = clone.querySelector('.voice-replay-btn');
-        const muteBtn = clone.querySelector('.voice-mute-btn');
-        const timeSpan = clone.querySelector('.voice-current-time');
-        const durationSpan = clone.querySelector('.voice-duration');
-        
-        if (!audioEl || !audioEl.src) {
-            console.warn('⚠️ لا يوجد مصدر صوت');
-            return;
-        }
-        
-        const tempAudio = new Audio(audioEl.src);
-        tempAudio.addEventListener('loadedmetadata', () => {
-            const duration = tempAudio.duration;
-            if (durationSpan && !isNaN(duration) && isFinite(duration)) {
-                const minutes = Math.floor(duration / 60);
-                const seconds = Math.floor(duration % 60);
-                durationSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            }
-        });
-        tempAudio.addEventListener('error', () => {
-            console.warn('⚠️ فشل تحميل مدة الصوت');
-        });
-        
-        let isPlaying = false;
-        
-        if (playBtn) {
-            playBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (isPlaying) {
-                    audioEl.pause();
-                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    isPlaying = false;
-                } else {
-                    audioEl.play().catch(err => {
-                        console.warn('⚠️ فشل تشغيل الصوت:', err);
-                    });
-                    playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                    isPlaying = true;
-                }
-            };
-        }
-        
-        if (replayBtn) {
-            replayBtn.onclick = (e) => {
-                e.stopPropagation();
-                audioEl.pause();
-                audioEl.currentTime = 0;
-                if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                isPlaying = false;
-                if (timeSpan) timeSpan.textContent = '0:00';
-                audioEl.play().catch(err => {
-                    console.warn('⚠️ فشل إعادة التشغيل:', err);
-                });
-                if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                isPlaying = true;
-            };
-        }
-        
-        let isMuted = false;
-        if (muteBtn) {
-            muteBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (isMuted) {
-                    audioEl.muted = false;
-                    muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                    isMuted = false;
-                } else {
-                    audioEl.muted = true;
-                    muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-                    isMuted = true;
-                }
-            };
-        }
-        
-        audioEl.ontimeupdate = () => {
-            const minutes = Math.floor(audioEl.currentTime / 60);
-            const seconds = Math.floor(audioEl.currentTime % 60);
-            if (timeSpan) {
-                timeSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            }
-        };
-        
-        audioEl.onended = () => {
-            if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-            isPlaying = false;
-            if (timeSpan) timeSpan.textContent = '0:00';
-        };
-        
-        audioEl.onerror = () => {
-            console.warn('⚠️ خطأ في تشغيل الصوت');
-            if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
-            isPlaying = false;
-        };
-    },
-    
-    // ==================== القسم 9: showImagePreview ====================
+    // ==================== القسم 8: showImagePreview ====================
     showImagePreview(imageSrc) {
         const modal = document.getElementById('imagePreviewModal');
         const img = document.getElementById('previewImage');
@@ -343,7 +222,7 @@ const ChatSystem = {
         this.setupImageZoom(modal, img);
     },
     
-    // ==================== القسم 10: setupImageZoom ====================
+    // ==================== القسم 9: setupImageZoom ====================
     setupImageZoom(modal, img) {
         if (img._zoomCleanup) {
             img._zoomCleanup();
@@ -433,12 +312,11 @@ const ChatSystem = {
         };
     },
     
-    // ==================== القسم 11: sendMessage (نص) ====================
+    // ==================== القسم 10: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         const mid = Date.now().toString(); 
         
-        // ✅ عرض فوري (بدون أيقونات حالة)
         const msg = { 
             id: mid, 
             type: 'text', 
@@ -470,7 +348,7 @@ const ChatSystem = {
         } 
     },
     
-    // ==================== القسم 12: sendImage (مع عرض فوري - بدون أيقونات) ====================
+    // ==================== القسم 11: sendImage ====================
     async sendImage(file) { 
         if (!this.currentChat) {
             console.error('❌ لا توجد محادثة نشطة');
@@ -479,7 +357,6 @@ const ChatSystem = {
         
         console.log('📷 بدء إرسال الصورة');
         
-        // ✅ عرض فوري للصورة (بدون أيقونات حالة)
         const msgId = Date.now().toString();
         const tempUrl = URL.createObjectURL(file);
         const msg = { 
@@ -494,7 +371,6 @@ const ChatSystem = {
         this.displayMessage(msg);
         this.saveMessage(this.currentChat, msg);
         
-        // ✅ إظهار شريط التقدم (يظهر فقط للمستخدم أثناء الضغط)
         ChatSystem.showProgressBar('جاري ضغط الصورة...', 0);
         
         try {
@@ -517,56 +393,7 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 13: sendVoiceNote (مع عرض فوري - بدون أيقونات) ====================
-    async sendVoiceNote(audioBlob) { 
-        if (!this.currentChat) {
-            console.error('❌ لا توجد محادثة نشطة');
-            return;
-        }
-        
-        console.log('🎤 بدء إرسال البصمة الصوتية');
-        
-        // ✅ عرض فوري للبصمة (بدون أيقونات حالة)
-        const msgId = Date.now().toString();
-        const tempUrl = URL.createObjectURL(audioBlob);
-        const msg = { 
-            id: msgId, 
-            type: 'voice', 
-            data: tempUrl, 
-            sender: 'me', 
-            time: new Date().toISOString(),
-            _blobUrl: tempUrl 
-        };
-        this.displayMessage(msg);
-        this.saveMessage(this.currentChat, msg);
-        
-        // ✅ إظهار شريط التقدم
-        ChatSystem.showProgressBar('جاري تجهيز البصمة الصوتية...', 0);
-        
-        try {
-            const fileName = `voice_${Date.now()}.webm`;
-            const file = new File([audioBlob], fileName, { type: 'audio/webm' });
-            
-            const success = await SecureChatSystem.sendEncryptedFile(
-                this.currentChat, 
-                file, 
-                'voice', 
-                fileName
-            );
-            
-            if (success) {
-                console.log('✅ تم إرسال البصمة الصوتية');
-            } else {
-                console.error('❌ فشل إرسال البصمة الصوتية');
-            }
-        } catch (error) {
-            console.error('❌ فشل إرسال البصمة الصوتية:', error);
-        } finally {
-            ChatSystem.hideProgressBar();
-        }
-    },
-    
-    // ==================== القسم 14: saveMessage ====================
+    // ==================== القسم 12: saveMessage ====================
     saveMessage(friendId, message) { 
         const key = `chat_${friendId}`; 
         let messages = []; 
@@ -616,7 +443,7 @@ const ChatSystem = {
         this.messages[friendId] = messages; 
     },
     
-    // ==================== القسم 15: updateLastMessage ====================
+    // ==================== القسم 13: updateLastMessage ====================
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
             if (item.getAttribute('onclick')?.includes(friendId)) { 
@@ -628,17 +455,7 @@ const ChatSystem = {
         }); 
     },
     
-    // ==================== القسم 16: updateAllButtons ====================
-    updateAllButtons() {
-        const btns = document.querySelectorAll('#attachmentMenu .attach-option');
-        btns.forEach(btn => { 
-            btn.style.opacity = '1';
-            btn.style.pointerEvents = 'auto';
-            btn.title = '';
-        });
-    },
-    
-    // ==================== القسم 17: showProgressBar ====================
+    // ==================== القسم 14: showProgressBar ====================
     showProgressBar(message, percent) {
         const bar = document.getElementById('progressBar');
         if (!bar) return;
@@ -649,7 +466,7 @@ const ChatSystem = {
         if (perc) perc.textContent = '0%';
     },
     
-    // ==================== القسم 18: updateProgressBar ====================
+    // ==================== القسم 15: updateProgressBar ====================
     updateProgressBar(percent, message) {
         const fill = document.getElementById('progressFill');
         const perc = document.getElementById('progressPercent');
@@ -657,13 +474,13 @@ const ChatSystem = {
         if (perc) perc.textContent = Math.round(percent) + '%';
     },
     
-    // ==================== القسم 19: hideProgressBar ====================
+    // ==================== القسم 16: hideProgressBar ====================
     hideProgressBar() { 
         const bar = document.getElementById('progressBar'); 
         if (bar) bar.style.display = 'none'; 
     },
     
-    // ==================== القسم 20: escapeHtml ====================
+    // ==================== القسم 17: escapeHtml ====================
     escapeHtml(text) { 
         const div = document.createElement('div'); 
         div.textContent = text; 
@@ -671,14 +488,14 @@ const ChatSystem = {
     }
 };
 
-// ==================== القسم 21: تشغيل النظام ====================
+// ==================== القسم 18: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 22: التنظيف الشامل ====================
+// ==================== القسم 19: التنظيف الشامل ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
-    document.querySelectorAll('img, audio').forEach(el => {
+    document.querySelectorAll('img').forEach(el => {
         if (el.src && el.src.startsWith('blob:')) {
             URL.revokeObjectURL(el.src);
             el.src = '';
@@ -764,4 +581,4 @@ document.addEventListener('touchend', function (e) {
     lastTouchEnd = now;
 }, { passive: false });
 
-console.log('✅ ChatSystem جاهز (بدون أيقونات حالة)');
+console.log('✅ ChatSystem جاهز (بدون بصمة صوتية)');
