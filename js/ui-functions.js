@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية ==========
+// ========== ui-functions.js - النسخة النهائية (بدون بصمة صوتية) ==========
 // وظائف الواجهة العامة
 
 window._pageStack = [];
@@ -153,7 +153,6 @@ async function loadChats(force = false) {
                             const l = h[h.length - 1]; 
                             if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
                             else if (l.type === 'image') lm = '📷 صورة'; 
-                            else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; 
                             lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
                         } 
                     } catch (e) {} 
@@ -231,9 +230,9 @@ window.openChat = friendId => {
     }).catch(() => {});
 };
 
-// ==================== وظائف إرسال الرسائل (المعدلة) ====================
+// ==================== وظائف إرسال الرسائل ====================
 
-// ✅ المعدل: مسح الحقل فوراً قبل الإرسال
+// ✅ مسح الحقل فوراً قبل الإرسال
 window.sendMessage = () => { 
     const inp = document.getElementById('messageInput'); 
     if (inp && inp.value.trim()) {
@@ -242,11 +241,8 @@ window.sendMessage = () => {
         // ✅ مسح الحقل فوراً (قبل الإرسال)
         inp.value = '';
         inp.style.height = 'auto';
-        if (typeof window.toggleSendButton === 'function') {
-            window.toggleSendButton();
-        }
         
-        // ✅ ثم إرسال الرسالة
+        // ✅ إرسال الرسالة
         ChatSystem.sendMessage(text).then(s => { 
             if (!s) {
                 console.warn('⚠️ فشل إرسال الرسالة');
@@ -255,309 +251,13 @@ window.sendMessage = () => {
     }
 };
 
-// ✅ المعدل: منع إرسال الرسالة عند الضغط على Enter
+// ✅ منع إرسال الرسالة عند الضغط على Enter (يتم الإرسال يدوياً)
 window.handleMessageKeyPress = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         window.sendMessage();
     }
 };
-
-// ==================== زر الإجراء (بصمة/إرسال) ====================
-
-let _recordingTimer = null;
-let _recordingSeconds = 0;
-let _recordingChunks = [];
-let _mediaRecorder = null;
-let _recordingBlob = null;
-let _isRecording = false;
-let _audioUrl = null;
-let _audioElement = null;
-
-const MAX_RECORDING_SECONDS = 300;
-const WARNING_THRESHOLD = 280;
-
-window.toggleSendButton = function() {
-    const input = document.getElementById('messageInput');
-    const btn = document.getElementById('actionBtn');
-    const recordingUI = document.getElementById('voiceRecordingUI');
-    if (!input || !btn) return;
-    
-    if (recordingUI && recordingUI.style.display === 'flex') {
-        btn.style.display = 'none';
-        return;
-    }
-    
-    const hasText = input.value.trim().length > 0;
-    
-    if (hasText) {
-        btn.className = 'send-mode';
-        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
-        btn.title = 'إرسال';
-    } else {
-        btn.className = 'voice-btn';
-        btn.innerHTML = '<i class="fas fa-microphone"></i>';
-        btn.title = 'بصمة صوتية';
-    }
-    btn.style.display = 'flex';
-};
-
-window.handleActionButton = function() {
-    const input = document.getElementById('messageInput');
-    const btn = document.getElementById('actionBtn');
-    if (!input || !btn) return;
-    
-    const recordingUI = document.getElementById('voiceRecordingUI');
-    if (recordingUI && recordingUI.style.display === 'flex') return;
-    
-    const hasText = input.value.trim().length > 0;
-    
-    if (hasText) {
-        window.sendMessage();
-    } else {
-        window.startVoiceRecording();
-    }
-};
-
-window.startVoiceRecording = function() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-        alert('المتصفح لا يدعم تسجيل الصوت');
-        return;
-    }
-    
-    const input = document.getElementById('messageInput');
-    const btn = document.getElementById('actionBtn');
-    const recordingUI = document.getElementById('voiceRecordingUI');
-    const progressFill = document.getElementById('voiceProgressFill');
-    const currentTimeEl = document.getElementById('voiceCurrentTime');
-    const maxTimeEl = document.getElementById('voiceMaxTime');
-    const cancelBtn = document.getElementById('voiceCancelBtn');
-    const sendBtn = document.getElementById('voiceSendBtn');
-    const playBtn = document.getElementById('voicePlayBtn');
-    
-    if (!recordingUI || !progressFill || !currentTimeEl) return;
-    
-    if (_audioUrl) { URL.revokeObjectURL(_audioUrl); _audioUrl = null; }
-    if (_audioElement) { _audioElement = null; }
-    
-    input.style.display = 'none';
-    recordingUI.style.display = 'flex';
-    recordingUI.classList.remove('warning');
-    btn.style.display = 'none';
-    playBtn.style.display = 'none';
-    sendBtn.style.display = 'none';
-    cancelBtn.style.display = 'flex';
-    
-    btn.style.display = 'flex';
-    btn.classList.add('recording');
-    btn.innerHTML = '<i class="fas fa-stop"></i>';
-    btn.title = 'إيقاف التسجيل';
-    
-    _recordingSeconds = 0;
-    _recordingChunks = [];
-    _recordingBlob = null;
-    _isRecording = true;
-    currentTimeEl.textContent = '0:00';
-    maxTimeEl.textContent = '5:00';
-    progressFill.style.width = '0%';
-    
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-            _mediaRecorder = new MediaRecorder(stream);
-            
-            _mediaRecorder.ondataavailable = e => {
-                if (e.data.size > 0) _recordingChunks.push(e.data);
-            };
-            
-            _mediaRecorder.onstop = () => {
-                stream.getTracks().forEach(t => t.stop());
-                _isRecording = false;
-                
-                _recordingBlob = new Blob(_recordingChunks, { type: 'audio/webm' });
-                
-                if (_audioUrl) URL.revokeObjectURL(_audioUrl);
-                _audioUrl = URL.createObjectURL(_recordingBlob);
-                
-                playBtn.style.display = 'flex';
-                playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                sendBtn.style.display = 'flex';
-                btn.style.display = 'none';
-                btn.classList.remove('recording');
-                
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
-            };
-            
-            _mediaRecorder.start();
-            
-            btn.onclick = function() {
-                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                    _mediaRecorder.stop();
-                    btn.onclick = window.handleActionButton;
-                    playBtn.style.display = 'flex';
-                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    sendBtn.style.display = 'flex';
-                    btn.style.display = 'none';
-                }
-            };
-            
-            if (_recordingTimer) clearInterval(_recordingTimer);
-            _recordingTimer = setInterval(() => {
-                if (!_isRecording) return;
-                
-                _recordingSeconds++;
-                const mins = Math.floor(_recordingSeconds / 60);
-                const secs = _recordingSeconds % 60;
-                currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-                
-                const percent = (_recordingSeconds / MAX_RECORDING_SECONDS) * 100;
-                progressFill.style.width = Math.min(percent, 100) + '%';
-                
-                if (_recordingSeconds >= WARNING_THRESHOLD) {
-                    recordingUI.classList.add('warning');
-                }
-                
-                if (_recordingSeconds >= MAX_RECORDING_SECONDS) {
-                    if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                        _mediaRecorder.stop();
-                        btn.onclick = window.handleActionButton;
-                        btn.style.display = 'none';
-                        playBtn.style.display = 'flex';
-                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                        sendBtn.style.display = 'flex';
-                    }
-                }
-            }, 1000);
-            
-            cancelBtn.onclick = () => {
-                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                    _mediaRecorder.stop();
-                }
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
-                resetVoiceUI();
-            };
-            
-            let isPlaying = false;
-            playBtn.onclick = () => {
-                if (!_recordingBlob) return;
-                
-                if (isPlaying) {
-                    if (_audioElement) {
-                        _audioElement.pause();
-                        _audioElement.currentTime = 0;
-                    }
-                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    isPlaying = false;
-                    return;
-                }
-                
-                if (!_audioElement) {
-                    _audioElement = new Audio(_audioUrl);
-                    _audioElement.onended = () => {
-                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                        isPlaying = false;
-                    };
-                }
-                
-                _audioElement.play();
-                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                isPlaying = true;
-            };
-            
-            sendBtn.onclick = () => {
-                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                    _mediaRecorder.stop();
-                }
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
-                
-                if (_recordingBlob && _recordingBlob.size > 0) {
-                    ChatSystem.sendVoiceNote(_recordingBlob);
-                }
-                resetVoiceUI();
-            };
-            
-            const cleanup = () => {
-                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                    _mediaRecorder.stop();
-                }
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
-                if (_audioElement) {
-                    _audioElement.pause();
-                    _audioElement = null;
-                }
-                if (_audioUrl) {
-                    URL.revokeObjectURL(_audioUrl);
-                    _audioUrl = null;
-                }
-                resetVoiceUI();
-            };
-            window._voiceCleanup = cleanup;
-            window.addEventListener('beforeunload', cleanup);
-        })
-        .catch(() => {
-            alert('يرجى السماح بالوصول إلى الميكروفون');
-            resetVoiceUI();
-        });
-};
-
-function resetVoiceUI() {
-    const input = document.getElementById('messageInput');
-    const btn = document.getElementById('actionBtn');
-    const recordingUI = document.getElementById('voiceRecordingUI');
-    const playBtn = document.getElementById('voicePlayBtn');
-    
-    if (input) input.style.display = 'block';
-    if (recordingUI) {
-        recordingUI.style.display = 'none';
-        recordingUI.classList.remove('warning');
-    }
-    if (btn) {
-        btn.style.display = 'flex';
-        btn.classList.remove('recording');
-        btn.onclick = window.handleActionButton;
-    }
-    if (playBtn) {
-        playBtn.style.display = 'none';
-        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-    }
-    
-    if (_recordingTimer) {
-        clearInterval(_recordingTimer);
-        _recordingTimer = null;
-    }
-    
-    if (_audioElement) {
-        _audioElement.pause();
-        _audioElement = null;
-    }
-    if (_audioUrl) {
-        URL.revokeObjectURL(_audioUrl);
-        _audioUrl = null;
-    }
-    
-    _recordingBlob = null;
-    _mediaRecorder = null;
-    _recordingChunks = [];
-    _isRecording = false;
-    
-    if (window._voiceCleanup) {
-        window.removeEventListener('beforeunload', window._voiceCleanup);
-        window._voiceCleanup = null;
-    }
-    
-    window.toggleSendButton();
-}
 
 // ==================== قائمة المرفقات ====================
 window.showAttachmentMenu = () => { 
