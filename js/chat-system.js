@@ -1,6 +1,6 @@
-// ========== chat-system.js - النسخة النهائية (بدون بصمة صوتية) ==========
+// ========== chat-system.js - النسخة النهائية مع التحسينات ==========
 // نظام الدردشة E2EE + إرسال الصور عبر السيرفر
-// تم إزالة البصمة الصوتية نهائياً
+// مع تحسينات: التمرير التلقائي + تحديث فوري
 
 const ChatSystem = {
     currentChat: null, 
@@ -58,8 +58,7 @@ const ChatSystem = {
             if (inp) inp.focus(); 
         }, 300);
         setTimeout(() => { 
-            const c = document.getElementById('messagesContainer'); 
-            if (c) c.scrollTop = c.scrollHeight; 
+            this.scrollToBottom();
         }, 100);
     },
     
@@ -132,7 +131,7 @@ const ChatSystem = {
             this.displayMessage(msg);
         });
         
-        c.scrollTop = c.scrollHeight;
+        this.scrollToBottom();
     },
     
     // ==================== القسم 7: displayMessage ====================
@@ -208,10 +207,20 @@ const ChatSystem = {
         }
         
         c.appendChild(div); 
-        c.scrollTop = c.scrollHeight;
+        this.scrollToBottom();
     },
     
-    // ==================== القسم 8: showImagePreview ====================
+    // ==================== القسم 8: scrollToBottom (جديد) ====================
+    scrollToBottom() {
+        const c = document.getElementById('messagesContainer');
+        if (c) {
+            setTimeout(() => {
+                c.scrollTop = c.scrollHeight;
+            }, 50);
+        }
+    },
+    
+    // ==================== القسم 9: showImagePreview ====================
     showImagePreview(imageSrc) {
         const modal = document.getElementById('imagePreviewModal');
         const img = document.getElementById('previewImage');
@@ -222,7 +231,7 @@ const ChatSystem = {
         this.setupImageZoom(modal, img);
     },
     
-    // ==================== القسم 9: setupImageZoom ====================
+    // ==================== القسم 10: setupImageZoom ====================
     setupImageZoom(modal, img) {
         if (img._zoomCleanup) {
             img._zoomCleanup();
@@ -312,7 +321,7 @@ const ChatSystem = {
         };
     },
     
-    // ==================== القسم 10: sendMessage ====================
+    // ==================== القسم 11: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         const mid = Date.now().toString(); 
@@ -348,7 +357,7 @@ const ChatSystem = {
         } 
     },
     
-    // ==================== القسم 11: sendImage ====================
+    // ==================== القسم 12: sendImage ====================
     async sendImage(file) { 
         if (!this.currentChat) {
             console.error('❌ لا توجد محادثة نشطة');
@@ -393,7 +402,7 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 12: saveMessage ====================
+    // ==================== القسم 13: saveMessage ====================
     saveMessage(friendId, message) { 
         const key = `chat_${friendId}`; 
         let messages = []; 
@@ -443,7 +452,7 @@ const ChatSystem = {
         this.messages[friendId] = messages; 
     },
     
-    // ==================== القسم 13: updateLastMessage ====================
+    // ==================== القسم 14: updateLastMessage ====================
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
             if (item.getAttribute('onclick')?.includes(friendId)) { 
@@ -455,7 +464,7 @@ const ChatSystem = {
         }); 
     },
     
-    // ==================== القسم 14: showProgressBar ====================
+    // ==================== القسم 15: showProgressBar ====================
     showProgressBar(message, percent) {
         const bar = document.getElementById('progressBar');
         if (!bar) return;
@@ -466,7 +475,7 @@ const ChatSystem = {
         if (perc) perc.textContent = '0%';
     },
     
-    // ==================== القسم 15: updateProgressBar ====================
+    // ==================== القسم 16: updateProgressBar ====================
     updateProgressBar(percent, message) {
         const fill = document.getElementById('progressFill');
         const perc = document.getElementById('progressPercent');
@@ -474,13 +483,13 @@ const ChatSystem = {
         if (perc) perc.textContent = Math.round(percent) + '%';
     },
     
-    // ==================== القسم 16: hideProgressBar ====================
+    // ==================== القسم 17: hideProgressBar ====================
     hideProgressBar() { 
         const bar = document.getElementById('progressBar'); 
         if (bar) bar.style.display = 'none'; 
     },
     
-    // ==================== القسم 17: escapeHtml ====================
+    // ==================== القسم 18: escapeHtml ====================
     escapeHtml(text) { 
         const div = document.createElement('div'); 
         div.textContent = text; 
@@ -488,10 +497,10 @@ const ChatSystem = {
     }
 };
 
-// ==================== القسم 18: تشغيل النظام ====================
+// ==================== القسم 19: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 19: التنظيف الشامل ====================
+// ==================== القسم 20: التنظيف الشامل ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
@@ -581,4 +590,4 @@ document.addEventListener('touchend', function (e) {
     lastTouchEnd = now;
 }, { passive: false });
 
-console.log('✅ ChatSystem جاهز (بدون بصمة صوتية)');
+console.log('✅ ChatSystem جاهز (مع تحسينات التحديث الفوري)');
