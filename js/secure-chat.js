@@ -1,7 +1,6 @@
 // ========== secure-chat.js ==========
 // نظام التشفير E2EE + ضغط الصور + حذف 24 ساعة
 // تم إزالة البصمة الصوتية والفيديو والملفات نهائياً
-// مع تحسينات: استخدام وقت السيرفر + تحديث فوري
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -298,7 +297,7 @@ const SecureChatSystem = {
             }); 
     },
 
-    // ==================== القسم 7.2: معالجة الرسائل المستلمة (المعدلة مع التحسينات) ====================
+    // ==================== القسم 7.2: معالجة الرسائل المستلمة ====================
     async processReceivedMessage(msg) {
         try {
             console.log(`🔍 معالجة رسالة من ${msg.from} نوع ${msg.package?.type}`);
@@ -311,14 +310,10 @@ const SecureChatSystem = {
             }
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
-            // ✅ استخدام وقت السيرفر (timestamp)
-            const serverTime = msg.timestamp?.toDate?.() || new Date();
-            const formattedTime = serverTime.toISOString();
-            
             // ===== النصوص =====
             if (msg.package.type === 'text') { 
                 console.log('📝 معالجة رسالة نصية');
-                const decryptedText = await this.decryptData(msg.package.data, sharedKey);
+                const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 console.log('📝 النص المفكوك:', decryptedText.substring(0, 50) + (decryptedText.length > 50 ? '...' : ''));
                 
                 const msgData = { 
@@ -326,25 +321,19 @@ const SecureChatSystem = {
                     type: 'text', 
                     text: decryptedText, 
                     sender: 'friend', 
-                    time: formattedTime  // ✅ استخدام وقت السيرفر
+                    time: new Date().toISOString() 
                 };
                 
-                // ✅ حفظ في localStorage
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
                     ChatSystem.saveMessage(msg.from, msgData);
                 }
                 
-                // ✅ تحديث واجهة المحادثة فوراً
-                if (typeof ChatSystem !== 'undefined') {
-                    if (ChatSystem.currentChat === msg.from) {
-                        ChatSystem.displayMessages(msg.from);
-                        ChatSystem.scrollToBottom();
-                    }
-                    if (ChatSystem.updateLastMessage) {
-                        ChatSystem.updateLastMessage(msg.from, decryptedText);
-                    }
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
+                    ChatSystem.displayMessages(msg.from);
                 }
-                console.log('✅ تم استلام النص وعرضه فوراً');
+                if (typeof ChatSystem !== 'undefined' && ChatSystem.updateLastMessage) {
+                    ChatSystem.updateLastMessage(msg.from, decryptedText);
+                }
             }
             
             // ===== الصور =====
@@ -368,7 +357,7 @@ const SecureChatSystem = {
                         data: objectUrl, 
                         fileName: imageData.fileName || 'صورة',
                         sender: 'friend', 
-                        time: formattedTime,  // ✅ استخدام وقت السيرفر
+                        time: new Date().toISOString(),
                         _blobUrl: objectUrl
                     };
                     
@@ -376,16 +365,13 @@ const SecureChatSystem = {
                         ChatSystem.saveMessage(msg.from, msgData);
                     }
                     
-                    if (typeof ChatSystem !== 'undefined') {
-                        if (ChatSystem.currentChat === msg.from) {
-                            ChatSystem.displayMessages(msg.from);
-                            ChatSystem.scrollToBottom();
-                        }
-                        if (ChatSystem.updateLastMessage) {
-                            ChatSystem.updateLastMessage(msg.from, '📷 صورة');
-                        }
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
+                        ChatSystem.displayMessages(msg.from);
                     }
-                    console.log('✅ تم استلام الصورة وعرضها فوراً');
+                    if (typeof ChatSystem !== 'undefined' && ChatSystem.updateLastMessage) {
+                        ChatSystem.updateLastMessage(msg.from, '📷 صورة');
+                    }
+                    console.log('✅ تم استلام الصورة وعرضها');
                 } catch (error) {
                     console.error('❌ فشل معالجة الصورة:', error);
                 }
@@ -502,4 +488,4 @@ function startUnifiedCleanup() {
     setInterval(cleanAllExpiredData, 24 * 60 * 60 * 1000);
 }
 
-console.log('✅ SecureChatSystem جاهز (مع تحسينات التوقيت)');
+console.log('✅ SecureChatSystem جاهز (بدون بصمة صوتية)');
