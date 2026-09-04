@@ -68,7 +68,7 @@
             <div class="search-container">
                 <div class="search-box">
                     <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
-                    <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" placeholder="ابحث برقم ID">
+                    <input type="text" id="searchInput" placeholder="ابحث برقم ID">
                 </div>
                 <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
                 
@@ -133,15 +133,15 @@
         <!-- ===== صفحة المحادثة (Conversation) ===== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
             
-            <!-- ===== رأس المحادثة ===== -->
+            <!-- ===== رأس المحادثة (مع اسم المستخدم) ===== -->
             <div class="conversation-header">
                 <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
                 
-                <div class="conversation-user-info" style="gap:0;">
+                <div class="conversation-user-info" style="gap:0; flex:1;">
                     <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
                     <div class="conversation-user-details">
-                        <h3 id="conversationName" style="display:none;"></h3>
-                        <span class="conversation-status" id="conversationStatus" style="font-size:0.85rem;"></span>
+                        <h3 id="conversationName" style="display:block; font-size:1rem; font-weight:600;"></h3>
+                        <span class="conversation-status" id="conversationStatus" style="font-size:0.75rem; color:var(--text-light);"></span>
                     </div>
                 </div>
             </div>
@@ -149,22 +149,22 @@
             <!-- ===== حاوية الرسائل ===== -->
             <div class="messages-container" id="messagesContainer"></div>
 
-            <!-- ===== مدخل الرسائل (بدون بصمة صوتية) ===== -->
+            <!-- ===== مدخل الرسائل (بدون placeholder) ===== -->
             <div class="message-input-container">
                 <div class="message-input-wrapper">
                     <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
                     <div class="input-area">
-                        <textarea id="messageInput" placeholder="اكتب رسالة..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
+                        <textarea id="messageInput" onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="autoResize()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
                     </div>
                     
-                    <!-- ✅ زر الإرسال فقط (بدون بصمة) -->
-                    <button id="sendBtn" class="send-mode" onclick="sendMessage()" style="width:38px;height:38px;border-radius:50%;border:none;background:var(--primary);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;transition:all 0.3s ease;">
+                    <!-- ✅ زر الإرسال دائري + أيقونة فقط -->
+                    <button id="sendBtn" onclick="sendMessage()" style="width:40px;height:40px;border-radius:50%;border:none;background:var(--primary);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;transition:all 0.3s ease;">
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
             </div>
             
-            <!-- ===== قائمة المرفقات (صورة فقط) ===== -->
+            <!-- ===== قائمة المرفقات ===== -->
             <div class="attachment-menu" id="attachmentMenu" style="display: none;">
                 <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
             </div>
@@ -312,7 +312,7 @@
 <div class="modal" id="editProfileModal">
     <div class="modal-content">
         <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
-        <div class="edit-field"><label data-i18n="name">الاسم</label><div class="input-wrapper"><input type="text" id="editName" maxlength="25"><span class="char-counter" id="charCounter">0/25</span></div></div>
+        <div class="edit-field"><label data-i18n="name">الاسم</label><div class="input-wrapper"><input type="text" id="editName" maxlength="14"><span class="char-counter" id="charCounter">0/14</span></div></div>
         <div class="edit-field"><label data-i18n="avatar">صورتك الرمزية</label><div class="current-avatar" id="currentAvatarEmoji">👤</div><button class="change-avatar-btn" onclick="openAvatarModal()"><i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span></button></div>
         <div class="modal-actions"><button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button><button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button></div>
         <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
@@ -382,11 +382,11 @@
 <!-- ==================== القسم 8: ملفات الجافاسكريبت ==================== -->
 <script src="js/i18n.js?v=2"></script>
 <script src="js/theme.js?v=2"></script>
-<script src="js/secure-chat.js?v=6"></script>
-<script src="js/chat-system.js?v=6"></script>
-<script src="js/ui-functions.js?v=6"></script>
-<script src="js/auth.js?v=6"></script>
-<script src="js/friends.js?v=6"></script>
+<script src="js/secure-chat.js?v=7"></script>
+<script src="js/chat-system.js?v=7"></script>
+<script src="js/ui-functions.js?v=7"></script>
+<script src="js/auth.js?v=7"></script>
+<script src="js/friends.js?v=7"></script>
 
 <!-- ==================== القسم 9: كود التشغيل ==================== -->
 <script>
@@ -403,12 +403,12 @@ window.addEventListener('load', function() {
     const nameInput = document.getElementById('editName');
     const charCounter = document.getElementById('charCounter');
     if (nameInput && charCounter) {
-        charCounter.textContent = '0/25';
+        charCounter.textContent = '0/14';
         nameInput.addEventListener('input', function(e) {
             let value = this.value;
-            if (value.length > 25) this.value = value.slice(0, 25);
-            charCounter.textContent = this.value.length + '/25';
-            charCounter.classList.toggle('full', this.value.length >= 25);
+            if (value.length > 14) this.value = value.slice(0, 14);
+            charCounter.textContent = this.value.length + '/14';
+            charCounter.classList.toggle('full', this.value.length >= 14);
         });
     }
     
@@ -428,6 +428,15 @@ document.addEventListener('dragstart', function(e) {
     e.preventDefault();
     return false;
 });
+
+// ==================== autoResize للحقل ====================
+function autoResize() {
+    const el = document.getElementById('messageInput');
+    if (el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+}
 </script>
 
 </body>
