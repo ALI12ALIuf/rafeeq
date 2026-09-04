@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (بدون بصمة صوتية) ==========
+// ========== ui-functions.js - النسخة النهائية ==========
 // وظائف الواجهة العامة
 
 window._pageStack = [];
@@ -251,7 +251,7 @@ window.sendMessage = () => {
     }
 };
 
-// ✅ منع إرسال الرسالة عند الضغط على Enter (يتم الإرسال يدوياً)
+// ✅ منع إرسال الرسالة عند الضغط على Enter
 window.handleMessageKeyPress = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -328,8 +328,8 @@ window.openEditProfileModal = () => {
 
 window.saveProfile = () => { 
     const n = document.getElementById('editName')?.value?.trim(); 
-    if (!n || n.length > 25) { 
-        alert('الاسم مطلوب ولا يزيد عن 25 حرف'); 
+    if (!n || n.length > 14) { 
+        alert('الاسم مطلوب ولا يزيد عن 14 حرف'); 
         return; 
     } 
     if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { 
