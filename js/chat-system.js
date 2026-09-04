@@ -1,6 +1,6 @@
-// ========== chat-system.js - النسخة النهائية (بدون بصمة صوتية) ==========
+// ========== chat-system.js - النسخة النهائية (بدون حفظ محلي) ==========
 // نظام الدردشة E2EE + إرسال الصور عبر السيرفر
-// تم إزالة البصمة الصوتية نهائياً
+// ❌ لا يتم حفظ أي شيء في localStorage (نصوص ولا صور)
 
 const ChatSystem = {
     currentChat: null, 
@@ -10,7 +10,6 @@ const ChatSystem = {
     
     // ==================== القسم 1: init ====================
     init() { 
-        this.loadAllChats(); 
         this.chatItemTemplate = document.getElementById('chatItemTemplate');
         if (!this.chatItemTemplate) {
             console.warn('⚠️ قالب chatItemTemplate غير موجود في HTML');
@@ -19,30 +18,22 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 2: loadAllChats ====================
+    // ==================== القسم 2: loadAllChats (لا يتم تحميل أي شيء) ====================
     loadAllChats() { 
-        for (let i = 0; i < localStorage.length; i++) { 
-            const k = localStorage.key(i); 
-            if (k && k.startsWith('chat_')) { 
-                const fid = k.replace('chat_', ''); 
-                try { 
-                    this.messages[fid] = JSON.parse(localStorage.getItem(k)) || []; 
-                } catch (e) { 
-                    this.messages[fid] = []; 
-                } 
-            } 
-        } 
+        // ❌ لا يتم تحميل أي رسائل من localStorage
+        this.messages = {};
     },
     
     // ==================== القسم 3: openChat ====================
     openChat(friendId, friendName, friendAvatar) {
         if (this.currentChat && this.currentChat !== friendId) {
             console.log('🧹 تنظيف المحادثة السابقة:', this.currentChat);
-            this.cleanConversationData(this.currentChat, false);
+            this.cleanConversationData(this.currentChat);
         }
         
         this.currentChat = friendId;
         this.friendInConversation = true;
+        this.messages[friendId] = [];
         
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName');
@@ -51,6 +42,8 @@ const ChatSystem = {
         if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
         document.querySelector('.chat-page').style.display = 'none'; 
         document.getElementById('conversationPage').style.display = 'flex';
+        
+        // ✅ عرض الرسائل (فارغة في البداية)
         this.displayMessages(friendId);
         
         setTimeout(() => { 
@@ -69,7 +62,8 @@ const ChatSystem = {
         const chatId = this.currentChat;
         
         if (chatId) {
-            this.cleanConversationData(chatId, false);
+            // ✅ حذف جميع البيانات (نصوص وصور)
+            this.cleanConversationData(chatId);
         }
         
         document.body.classList.remove('conversation-open');
@@ -81,29 +75,16 @@ const ChatSystem = {
         console.log('✅ closeChat - انتهى');
     },
     
-    // ==================== القسم 5: cleanConversationData ====================
-    cleanConversationData(chatId, cleanAll = false) {
-        console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
+    // ==================== القسم 5: cleanConversationData (حذف نهائي) ====================
+    cleanConversationData(chatId) {
+        console.log('🧹 حذف جميع بيانات المحادثة:', chatId);
         
+        // ❌ حذف من localStorage
         const key = `chat_${chatId}`;
-        if (cleanAll) {
-            localStorage.removeItem(key);
-            delete this.messages[chatId];
-            console.log('✅ تم مسح localStorage بالكامل');
-        } else {
-            const messages = this.messages[chatId] || [];
-            const validMessages = messages.filter(msg => {
-                if (msg.type === 'image') {
-                    return msg.data && msg.data.startsWith('blob:');
-                }
-                return true;
-            }).slice(-150);
+        localStorage.removeItem(key);
+        delete this.messages[chatId];
         
-            this.messages[chatId] = validMessages;
-            localStorage.setItem(key, JSON.stringify(validMessages));
-            console.log('✅ تم الاحتفاظ بآخر 150 رسالة');
-        }
-        
+        // ✅ تنظيف الـ Blob URLs
         document.querySelectorAll('img').forEach(el => {
             if (el.src && el.src.startsWith('blob:')) {
                 URL.revokeObjectURL(el.src);
@@ -111,14 +92,13 @@ const ChatSystem = {
             }
         });
         
-        if (this.currentChat === chatId) {
-            const messagesContainer = document.getElementById('messagesContainer');
-            if (messagesContainer) {
-                messagesContainer.innerHTML = '';
-            }
+        // ✅ تنظيف حاوية الرسائل
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
         }
         
-        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
+        console.log('✅ تم حذف جميع بيانات المحادثة نهائياً:', chatId);
     },
     
     // ==================== القسم 6: displayMessages ====================
@@ -317,6 +297,7 @@ const ChatSystem = {
         if (!this.currentChat || !text.trim()) return false; 
         const mid = Date.now().toString(); 
         
+        // ✅ عرض فوري (بدون حفظ في localStorage)
         const msg = { 
             id: mid, 
             type: 'text', 
@@ -325,7 +306,9 @@ const ChatSystem = {
             time: new Date().toISOString()
         };
         this.displayMessage(msg);
-        this.saveMessage(this.currentChat, msg);
+        // ❌ لا يتم حفظ في localStorage
+        if (!this.messages[this.currentChat]) this.messages[this.currentChat] = [];
+        this.messages[this.currentChat].push(msg);
         
         try { 
             const pr = await SecureChatSystem.getMyPrivateKey(); 
@@ -369,7 +352,9 @@ const ChatSystem = {
             _blobUrl: tempUrl 
         };
         this.displayMessage(msg);
-        this.saveMessage(this.currentChat, msg);
+        // ❌ لا يتم حفظ في localStorage
+        if (!this.messages[this.currentChat]) this.messages[this.currentChat] = [];
+        this.messages[this.currentChat].push(msg);
         
         ChatSystem.showProgressBar('جاري ضغط الصورة...', 0);
         
@@ -393,57 +378,7 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 12: saveMessage ====================
-    saveMessage(friendId, message) { 
-        const key = `chat_${friendId}`; 
-        let messages = []; 
-        try { 
-            messages = JSON.parse(localStorage.getItem(key)) || []; 
-        } catch (e) { 
-            messages = []; 
-        }
-        
-        messages.push(message); 
-        
-        if (messages.length > 150) {
-            const removeCount = messages.length - 150;
-            for (let i = 0; i < removeCount; i++) {
-                const oldMsg = messages[i];
-                if (oldMsg._blobUrl && oldMsg._blobUrl.startsWith('blob:')) {
-                    URL.revokeObjectURL(oldMsg._blobUrl);
-                }
-            }
-            messages = messages.slice(removeCount);
-            console.log(`🧹 تم حذف ${removeCount} رسالة قديمة`);
-        }
-        
-        try { 
-            localStorage.setItem(key, JSON.stringify(messages)); 
-        } catch (e) {
-            const removeCount = Math.min(50, messages.length);
-            for (let i = 0; i < removeCount; i++) {
-                const oldMsg = messages[i];
-                if (oldMsg._blobUrl && oldMsg._blobUrl.startsWith('blob:')) {
-                    URL.revokeObjectURL(oldMsg._blobUrl);
-                }
-            }
-            messages = messages.slice(removeCount);
-            try { 
-                localStorage.setItem(key, JSON.stringify(messages)); 
-                console.log(`🧹 مساحة غير كافية - تم حذف ${removeCount} رسالة`);
-            } catch (e2) { 
-                messages = messages.slice(-50);
-                try { 
-                    localStorage.setItem(key, JSON.stringify(messages)); 
-                    console.log(`🧹 تم الاحتفاظ بآخر 50 رسالة فقط`);
-                } catch (e3) {}
-            }
-        }
-        
-        this.messages[friendId] = messages; 
-    },
-    
-    // ==================== القسم 13: updateLastMessage ====================
+    // ==================== القسم 12: updateLastMessage ====================
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
             if (item.getAttribute('onclick')?.includes(friendId)) { 
@@ -455,7 +390,7 @@ const ChatSystem = {
         }); 
     },
     
-    // ==================== القسم 14: showProgressBar ====================
+    // ==================== القسم 13: showProgressBar ====================
     showProgressBar(message, percent) {
         const bar = document.getElementById('progressBar');
         if (!bar) return;
@@ -466,7 +401,7 @@ const ChatSystem = {
         if (perc) perc.textContent = '0%';
     },
     
-    // ==================== القسم 15: updateProgressBar ====================
+    // ==================== القسم 14: updateProgressBar ====================
     updateProgressBar(percent, message) {
         const fill = document.getElementById('progressFill');
         const perc = document.getElementById('progressPercent');
@@ -474,13 +409,13 @@ const ChatSystem = {
         if (perc) perc.textContent = Math.round(percent) + '%';
     },
     
-    // ==================== القسم 16: hideProgressBar ====================
+    // ==================== القسم 15: hideProgressBar ====================
     hideProgressBar() { 
         const bar = document.getElementById('progressBar'); 
         if (bar) bar.style.display = 'none'; 
     },
     
-    // ==================== القسم 17: escapeHtml ====================
+    // ==================== القسم 16: escapeHtml ====================
     escapeHtml(text) { 
         const div = document.createElement('div'); 
         div.textContent = text; 
@@ -488,10 +423,10 @@ const ChatSystem = {
     }
 };
 
-// ==================== القسم 18: تشغيل النظام ====================
+// ==================== القسم 17: تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 19: التنظيف الشامل ====================
+// ==================== القسم 18: التنظيف الشامل ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
@@ -581,4 +516,4 @@ document.addEventListener('touchend', function (e) {
     lastTouchEnd = now;
 }, { passive: false });
 
-console.log('✅ ChatSystem جاهز (بدون بصمة صوتية)');
+console.log('✅ ChatSystem جاهز (بدون حفظ محلي)');
