@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rafeeq - رفيق</title>
+    
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" id="theme-color" content="#1a1a1a">
+</head>
+<body class="theme-dark" data-page="home">
+
+<!-- ==================== القسم 1: شاشة البداية (Splash Screen) ==================== -->
+<div class="splash-screen" id="splash">
+    <div class="splash-content">
+        <div class="app-icon">🛡️</div>
+        <h1>رفيق</h1>
+        <p>رفيقك الآمن في كل رحلة</p>
+        <div class="spinner"></div>
+    </div>
+</div>
+
+<!-- ==================== القسم 2: الحاوية الرئيسية ==================== -->
+<div class="app-container" id="app" style="display: none;">
+    
+    <!-- ==================== القسم 2.1: رأس التطبيق ==================== -->
+    <header class="app-header">
+        <div class="header-left"></div>
+        <div class="header-title"><h1 id="pageTitle" data-i18n="home">الرئيسية</h1></div>
+        <div class="header-right"></div>
+    </header>
+
+    <!-- ==================== القسم 2.2: المحتوى الرئيسي ==================== -->
+    <main class="app-content" id="mainContent">
+        
+        <!-- ===== صفحة الرئيسية (Home) ===== -->
+        <div class="page home-page active">
+            <div class="posts-section">
+                <div class="posts-container" id="postsContainer">
+                    <div class="post-card">
+                        <div class="post-header">
+                            <div class="post-avatar-emoji" id="postAvatarEmoji">👤</div>
+                            <div class="post-user"><h4>أحمد</h4><span class="post-time">منذ ساعتين</span></div>
+                            <button class="post-menu"><i class="fas fa-ellipsis-v"></i></button>
+                        </div>
+                        <div class="post-content">
+                            <div class="post-location"><i class="fas fa-map-marker-alt"></i><span>بغداد - أربيل</span></div>
+                            <div class="post-map-placeholder"><i class="fas fa-map"></i><span data-i18n="location_sharing">مشاركة الموقع</span></div>
+                        </div>
+                        <div class="post-actions">
+                            <button class="post-action"><i class="far fa-heart"></i> 24</button>
+                            <button class="post-action"><i class="far fa-comment"></i> 5</button>
+                            <button class="post-action"><i class="far fa-share-square"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== صفحة الدردشة (Chat) ===== -->
+        <div class="page chat-page">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search" onclick="performSearch()" style="cursor: pointer;"></i>
+                    <input type="text" id="searchInput" data-i18n-placeholder="search_placeholder" placeholder="ابحث برقم ID">
+                </div>
+                <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
+                
+                <template id="searchResultTemplate">
+                    <div class="search-result-item" style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--card-bg);border-radius:var(--radius);margin-bottom:4px;">
+                        <div class="search-result-avatar" style="width:40px;height:40px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;"></div>
+                        <div class="search-result-info" style="flex:1;">
+                            <h4 style="margin:0;font-size:0.95rem;"></h4>
+                            <p style="margin:0;color:var(--text-light);font-size:0.8rem;"></p>
+                        </div>
+                        <div class="search-result-action">
+                            <button class="search-action-btn" style="padding:6px 14px;border:none;border-radius:20px;background:var(--primary);color:white;cursor:pointer;font-size:0.85rem;"></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div class="chats-list" id="chatsList"></div>
+            
+            <template id="chatItemTemplate">
+                <div class="chat-item" onclick="">
+                    <div class="chat-avatar-emoji"></div>
+                    <div class="chat-info">
+                        <h4></h4>
+                        <p class="last-message"></p>
+                    </div>
+                    <div class="chat-meta">
+                        <span class="chat-time"></span>
+                    </div>
+                </div>
+            </template>
+            
+            <template id="friendRequestChatTemplate">
+                <div class="chat-item friend-request-item" style="border: 2px solid var(--primary); background: var(--card-bg); border-radius: var(--radius); margin-bottom: 8px; padding: 0.75rem; display: flex; align-items: center; gap: 1rem;">
+                    <div class="chat-avatar-emoji" style="width: 50px; height: 50px; min-width: 50px; min-height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; line-height: 1; flex-shrink: 0;"></div>
+                    <div class="chat-info" style="flex: 1; min-width: 0;">
+                        <h4 style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text);">
+                            <span class="friend-request-name"></span>
+                        </h4>
+                        <p style="margin: 2px 0 0; color: var(--text-light); font-size: 0.75rem; display: flex; align-items: center; gap: 4px; justify-content: flex-start;">
+                            <button class="copy-id-btn" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.7rem; display: inline-flex; align-items: center; justify-content: center; padding: 2px; transition: all 0.2s; flex-shrink: 0;" title="نسخ ID">
+                                <i class="fas fa-copy" style="font-size: 0.7rem;"></i>
+                            </button>
+                            <span class="friend-request-id" style="font-size: 0.75rem; font-family: monospace; direction: ltr;"></span>
+                            <span style="color: var(--primary); font-weight: 700; font-size: 0.85rem; font-family: sans-serif;">ID</span>
+                        </p>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0;">
+                        <span style="font-size: 0.6rem; color: #fff; background: var(--primary); padding: 2px 10px; border-radius: 10px; font-weight: 500; white-space: nowrap;">طلب</span>
+                        <div class="friend-request-actions" style="display: flex; gap: 4px;">
+                            <button class="accept-friend-btn" style="background: #4CAF50; border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="reject-friend-btn" style="background: #f44336; border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===== صفحة المحادثة (Conversation) ===== -->
+        <div class="conversation-page" id="conversationPage" style="display: none;">
+            
+            <!-- ===== رأس المحادثة ===== -->
+            <div class="conversation-header">
+                <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
+                
+                <div class="conversation-user-info" style="gap:0;">
+                    <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
+                    <div class="conversation-user-details">
+                        <h3 id="conversationName" style="display:none;"></h3>
+                        <span class="conversation-status" id="conversationStatus" style="font-size:0.85rem;"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== حاوية الرسائل ===== -->
+            <div class="messages-container" id="messagesContainer"></div>
+
+            <!-- ===== مدخل الرسائل (بدون بصمة صوتية) ===== -->
+            <div class="message-input-container">
+                <div class="message-input-wrapper">
+                    <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
+                    <div class="input-area">
+                        <textarea id="messageInput" placeholder="اكتب رسالة..." onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
+                    </div>
+                    
+                    <!-- ✅ زر الإرسال فقط (بدون بصمة) -->
+                    <button id="sendBtn" class="send-mode" onclick="sendMessage()" style="width:38px;height:38px;border-radius:50%;border:none;background:var(--primary);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;transition:all 0.3s ease;">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- ===== قائمة المرفقات (صورة فقط) ===== -->
+            <div class="attachment-menu" id="attachmentMenu" style="display: none;">
+                <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
+            </div>
+        </div>
+
+        <!-- ===== صفحة الملف الشخصي (Profile) ===== -->
+        <div class="page profile-page">
+            <div class="profile-header">
+                <div class="profile-cover">
+                    <div class="profile-avatar-center"><div class="profile-avatar-emoji" id="profileAvatarEmoji">👤</div></div>
+                    <button class="edit-profile-btn-left" onclick="openEditProfileModal()"><i class="fas fa-pen"></i></button>
+                </div>
+                <div class="profile-info-container">
+                    <div class="profile-name-wrapper"><h2 id="profileName"></h2></div>
+                    <div class="profile-id-row">
+                        <button class="copy-btn-left" onclick="copyId()"><i class="far fa-copy"></i></button>
+                        <span id="shareableId" class="id-value-numbers"></span>
+                        <span class="id-label-english">ID</span>
+                    </div>
+                </div>
+                <p class="profile-bio" id="profileBio"></p>
+                <div class="profile-stats">
+                    <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
+                    <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
+                </div>
+            </div>
+            
+            <div class="profile-settings-btn" style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; border: 1px solid var(--border);" onclick="switchPage('settings')">
+                <i class="fas fa-cog" style="color: var(--primary); font-size: 1.2rem;"></i>
+                <span style="color: var(--text); font-size: 0.95rem;" data-i18n="settings">الإعدادات</span>
+                <i class="fas fa-chevron-left" style="color: var(--text-light); margin-right: auto;"></i>
+            </div>
+        </div>
+
+        <!-- ===== الصفحات الفرعية للملف الشخصي ===== -->
+        <div class="profile-pages">
+            <div class="profile-subpage" id="tripsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
+                <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
+            </div>
+            <div class="profile-subpage" id="friendsPage" style="display: none;">
+                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friends">الأصدقاء</h3></div>
+                <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
+            </div>
+            
+            <template id="friendItemTemplate">
+                <div class="user-item">
+                    <div class="user-avatar-emoji"></div>
+                    <div class="user-info">
+                        <h4></h4>
+                        <p></p>
+                    </div>
+                    <div class="user-actions">
+                        <button class="action-btn chat-btn" title="محادثة">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                        <button class="action-btn remove-btn" title="حذف" style="background:var(--danger);color:white;">
+                            <i class="fas fa-user-minus"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===== صفحة الإعدادات (Settings) ===== -->
+        <div class="page settings-page">
+            <div class="settings-list">
+                <div class="settings-item" onclick="openLanguageModal()">
+                    <div class="settings-item-left"><i class="fas fa-globe"></i><span data-i18n="language">اللغة</span></div>
+                    <i class="fas fa-chevron-left"></i>
+                </div>
+                <div class="settings-item" onclick="logout()">
+                    <div class="settings-item-left"><i class="fas fa-sign-out-alt" style="color: var(--danger);"></i><span data-i18n="logout" style="color: var(--danger);">تسجيل الخروج</span></div>
+                    <i class="fas fa-chevron-left" style="color: var(--danger);"></i>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===== شريط التنقل السفلي ===== -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-page="home"><i class="fas fa-home"></i></button>
+        <button class="nav-item" data-page="chat"><i class="fas fa-comment"></i></button>
+        <button class="nav-item" data-page="profile"><i class="fas fa-user"></i></button>
+    </nav>
+</div>
+
+<!-- ==================== القسم 4: العناصر الثابتة ==================== -->
+
+<!-- 4.1: معاينة الصورة -->
+<div id="imagePreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10050;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-x pan-y;">
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10051;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;border-radius:16px;">
+        <img id="previewImage" style="max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.1s;touch-action:none;cursor:default;">
+    </div>
+    <div style="position:absolute;top:30px;left:0;right:0;display:flex;justify-content:space-between;padding:0 30px;pointer-events:none;z-index:10052;">
+        <button onclick="closeImagePreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-arrow-right"></i>
+        </button>
+        <button onclick="downloadPreviewImage()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-download"></i>
+        </button>
+    </div>
+</div>
+
+<!-- 4.2: شريط التقدم -->
+<div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
+    <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
+    <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
+</div>
+
+<!-- 4.3: شاشة تسجيل الدخول -->
+<div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
+    <div style="text-align:center;padding:20px;max-width:350px;">
+        <div style="font-size:5rem;">🛡️</div>
+        <h1 style="font-size:2rem;color:var(--primary);">رفيق</h1>
+        <p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p>
+        <button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;">
+            <i class="fab fa-google"></i> المتابعة بحساب جوجل
+        </button>
+    </div>
+</div>
+
+<!-- ==================== القسم 5: قوالب الرسائل الثابتة ==================== -->
+
+<template id="messageWrapperTemplate">
+    <div class="message"></div>
+</template>
+
+<template id="textMessageTemplate">
+    <div class="message-content" style="border: 1.5px solid var(--border-color); background: var(--bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;">
+        <span style="font-size: 1rem; line-height: 1.4; display: block;"></span>
+    </div>
+</template>
+
+<template id="imageMessageTemplate">
+    <div class="message-image-wrapper">
+        <img class="message-image-content" src="" alt="صورة" loading="lazy">
+    </div>
+</template>
+
+<!-- ==================== القسم 6: النوافذ المنبثقة (Modals) ==================== -->
+
+<!-- 6.1: نافذة تعديل الملف الشخصي -->
+<div class="modal" id="editProfileModal">
+    <div class="modal-content">
+        <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
+        <div class="edit-field"><label data-i18n="name">الاسم</label><div class="input-wrapper"><input type="text" id="editName" maxlength="25"><span class="char-counter" id="charCounter">0/25</span></div></div>
+        <div class="edit-field"><label data-i18n="avatar">صورتك الرمزية</label><div class="current-avatar" id="currentAvatarEmoji">👤</div><button class="change-avatar-btn" onclick="openAvatarModal()"><i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span></button></div>
+        <div class="modal-actions"><button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button><button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button></div>
+        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- 6.2: نافذة اختيار الصورة الرمزية -->
+<div class="modal" id="avatarModal">
+    <div class="modal-content">
+        <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
+        <div class="avatar-options-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:15px 0;">
+            <button class="avatar-option-btn" data-type="man_light" onclick="selectAvatar('man_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">🧔🏻‍♂️</span>
+            </button>
+            <button class="avatar-option-btn" data-type="man_medium" onclick="selectAvatar('man_medium')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">🧔🏼‍♂️</span>
+            </button>
+            <button class="avatar-option-btn" data-type="man_dark" onclick="selectAvatar('man_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">🧔🏽‍♂️</span>
+            </button>
+            <button class="avatar-option-btn" data-type="woman_light" onclick="selectAvatar('woman_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">👩🏻</span>
+            </button>
+            <button class="avatar-option-btn" data-type="woman_medium" onclick="selectAvatar('woman_medium')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">👩🏼</span>
+            </button>
+            <button class="avatar-option-btn" data-type="woman_dark" onclick="selectAvatar('woman_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
+                <span style="font-size:2.8rem;">👩🏽</span>
+            </button>
+        </div>
+        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- 6.3: نافذة اختيار اللغة -->
+<div class="modal" id="languageModal">
+    <div class="modal-content">
+        <h3 data-i18n="select_language">اختر اللغة</h3>
+        <div class="language-options">
+            <button class="language-option" onclick="changeLanguage('ar')"><span class="flag">🇮🇶</span><span data-i18n="arabic">العربية</span></button>
+            <button class="language-option" onclick="changeLanguage('en')"><span class="flag">🇬🇧</span><span data-i18n="english">English</span></button>
+        </div>
+        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- ==================== القسم 7: Firebase ==================== -->
+<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAuyKDI0JhPn-v02c5l7XekiyymNWeFPIQ",
+        authDomain: "rafeeq2-c0aef.firebaseapp.com",
+        projectId: "rafeeq2-c0aef",
+        storageBucket: "rafeeq2-c0aef.firebasestorage.app",
+        messagingSenderId: "1030537082006",
+        appId: "1:1030537082006:web:7eb0a052da85e1441bfeb7"
+    };
+    firebase.initializeApp(firebaseConfig);
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+    window.googleProvider = new firebase.auth.GoogleAuthProvider();
+</script>
+
+<!-- ==================== القسم 8: ملفات الجافاسكريبت ==================== -->
+<script src="js/i18n.js?v=2"></script>
+<script src="js/theme.js?v=2"></script>
+<script src="js/secure-chat.js?v=6"></script>
+<script src="js/chat-system.js?v=6"></script>
+<script src="js/ui-functions.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
+<script src="js/friends.js?v=6"></script>
+
+<!-- ==================== القسم 9: كود التشغيل ==================== -->
+<script>
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        var splash = document.getElementById('splash');
+        var app = document.getElementById('app');
+        if (splash && !splash.classList.contains('hide')) {
+            splash.classList.add('hide');
+            setTimeout(function() { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500);
+        }
+    }, 3000);
+    
+    const nameInput = document.getElementById('editName');
+    const charCounter = document.getElementById('charCounter');
+    if (nameInput && charCounter) {
+        charCounter.textContent = '0/25';
+        nameInput.addEventListener('input', function(e) {
+            let value = this.value;
+            if (value.length > 25) this.value = value.slice(0, 25);
+            charCounter.textContent = this.value.length + '/25';
+            charCounter.classList.toggle('full', this.value.length >= 25);
+        });
+    }
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') performSearch(); });
+});
+
+window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
+
+// ==================== منع القائمة المنبثقة ====================
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+});
+
+document.addEventListener('dragstart', function(e) {
+    e.preventDefault();
+    return false;
+});
+</script>
+
+</body>
+</html>
