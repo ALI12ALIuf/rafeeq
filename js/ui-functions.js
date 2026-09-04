@@ -202,6 +202,7 @@ function refreshChats() {
 // ==================== إعداد مستمعي الواجهة ====================
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
+        // ✅ تم إزالة قائمة المرفقات، ولكن نترك المستمع للتأكد
         const m = document.getElementById('attachmentMenu'); 
         const ab = document.querySelector('.attach-btn'); 
         if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) {
@@ -259,15 +260,7 @@ window.handleMessageKeyPress = function(e) {
     }
 };
 
-// ==================== قائمة المرفقات ====================
-window.showAttachmentMenu = () => { 
-    const m = document.getElementById('attachmentMenu'); 
-    if (m) {
-        m.style.display = m.style.display === 'none' ? 'flex' : 'none'; 
-    }
-};
-
-// ==================== إرسال الصور فقط ====================
+// ==================== إرسال الصور ====================
 window.sendImage = () => { 
     const i = document.createElement('input'); 
     i.type = 'file'; 
@@ -277,7 +270,6 @@ window.sendImage = () => {
         if (f && ChatSystem.currentChat) ChatSystem.sendImage(f); 
     }; 
     i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
 };
 
 // ==================== إغلاق المحادثة ====================
