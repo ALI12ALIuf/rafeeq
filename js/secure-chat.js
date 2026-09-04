@@ -1,5 +1,5 @@
-// ========== secure-chat.js ==========
-// نظام التشفير E2EE + ضغط الصور + فحص الفيديو + إرسال مباشر + حذف 24 ساعة
+// ========== secure-chat.js - النسخة النهائية (بدون WebRTC) ==========
+// نظام التشفير E2EE + ضغط الصور + فحص الفيديو + حذف 24 ساعة
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -193,61 +193,49 @@ const SecureChatSystem = {
                 throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
             }
             
-            console.log(`⚡ فيديو جاهز للإرسال المباشر: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
+            console.log(`⚡ فيديو جاهز للإرسال: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
             return file;
         });
     },
     
     // ==================== القسم 6: إرسال واستقبال الرسائل ====================
-async sendToServer(receiverId, encryptedPackage) { 
-    if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
-    
-    let expiryHours = 24;
-    let expirySeconds = null;
-    
-    if (encryptedPackage.type === 'feature_request' || 
-        encryptedPackage.type === 'feature_response') {
-        expirySeconds = 60;
-    }
-    
-    let expiresAt;
-    if (expirySeconds) {
-        expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expirySeconds * 1000));
-    } else {
-        expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
-    }
-    
-    try {
-        await window.db.collection('secure_messages').add({ 
-            to: receiverId, 
-            from: window.auth.currentUser.uid, 
-            package: encryptedPackage, 
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
-            expiresAt: expiresAt
-        });
-    } catch (error) { throw error; }
-},
+    async sendToServer(receiverId, encryptedPackage) { 
+        if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
+        
+        let expiryHours = 24;
+        
+        let expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
+        
+        try {
+            await window.db.collection('secure_messages').add({ 
+                to: receiverId, 
+                from: window.auth.currentUser.uid, 
+                package: encryptedPackage, 
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(), 
+                expiresAt: expiresAt
+            });
+        } catch (error) { throw error; }
+    },
 
-// ==================== القسم 6.1: استقبال الرسائل ====================
-startReceiving() { 
-    if (!window.auth?.currentUser) return null;
-    const uid = window.auth.currentUser.uid;
-    return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
-        for (const change of snapshot.docChanges()) { 
-            if (change.type === 'added') { 
-                const msg = { id: change.doc.id, ...change.doc.data() }; 
-                await this.processReceivedMessage(msg); 
-                try { await change.doc.ref.delete(); } catch (deleteError) {}
+    // ==================== القسم 7: استقبال الرسائل ====================
+    startReceiving() { 
+        if (!window.auth?.currentUser) return null;
+        const uid = window.auth.currentUser.uid;
+        return window.db.collection('secure_messages').where('to', '==', uid).onSnapshot(async snapshot => { 
+            for (const change of snapshot.docChanges()) { 
+                if (change.type === 'added') { 
+                    const msg = { id: change.doc.id, ...change.doc.data() }; 
+                    await this.processReceivedMessage(msg); 
+                    try { await change.doc.ref.delete(); } catch (deleteError) {}
+                } 
             } 
-        } 
-    }, error => { 
-        console.warn('خطأ في الاستماع للرسائل:', error);
-        setTimeout(() => this.startReceiving(), 5000); 
-    }); 
-},
+        }, error => { 
+            console.warn('خطأ في الاستماع للرسائل:', error);
+            setTimeout(() => this.startReceiving(), 5000); 
+        }); 
+    },
 
-
-   // ==================== القسم 7: معالجة الرسائل المستلمة ====================
+    // ==================== القسم 8: معالجة الرسائل المستلمة ====================
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -255,191 +243,88 @@ startReceiving() {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
+            // ===== معالجة النص =====
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            } 
-            else if (msg.package.type === 'webrtc') { 
-                if (!ChatSystem.featuresEnabled || !ChatSystem.friendInConversation || ChatSystem.currentChat !== msg.from) {
-                    console.log('📞 تجاهل إشارة WebRTC - سبب:', {
-                        featuresEnabled: ChatSystem.featuresEnabled,
-                        friendInConversation: ChatSystem.friendInConversation,
-                        currentChat: ChatSystem.currentChat,
-                        sender: msg.from
-                    });
-                    return;
-                }
-                
-                const signalData = await this.decryptData(msg.package.data, sharedKey);
-                const parsedData = JSON.parse(signalData);
-                
-                console.log('📞 استلام إشارة WebRTC من:', msg.from);
-                console.log('📞 نوع الإشارة:', parsedData.sdp?.type || parsedData.type || 'ICE candidate');
-                
-                if (parsedData.sdp && parsedData.sdp.type === 'offer') {
-                    console.log('📞 مكالمة واردة جديدة من:', msg.from, 'نوع:', parsedData.type || 'audio');
-                    if (typeof CallSystem !== 'undefined' && CallSystem.showIncomingCall) {
-                        CallSystem.showIncomingCall(msg.from, parsedData);
-                    } else {
-                        console.error('❌ CallSystem.showIncomingCall غير موجود');
-                    }
-                } 
-                else {
-                    if (typeof CallSystem !== 'undefined' && CallSystem.handleSignaling) {
-                        CallSystem.handleSignaling(parsedData);
-                    }
-                }
             }
-            else if (msg.package.type === 'feature_request') {
-                console.log('🔓 استلام طلب تفعيل ميزات من:', msg.from);
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureRequest) {
-                    ChatSystem.handleFeatureRequest(msg.from, msg.package.data);
-                }
-            }
-            else if (msg.package.type === 'feature_response') {
+            
+            // ===== معالجة الصورة =====
+            else if (msg.package.type === 'image') {
+                console.log('📸 استلام صورة من:', msg.from);
                 const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                const responseData = JSON.parse(decryptedData);
-                console.log('🔓 استلام رد على طلب التفعيل من:', msg.from, '| الحالة:', responseData.action);
                 
-                if (responseData.action === 'answer_batch' && responseData.sdp) {
-                    console.log(`📦 استلام دفعة الرد (Answer + ${responseData.iceCandidates?.length || 0} ICE candidates) من:`, msg.from);
-                    
-                    if (typeof ChatSystem !== 'undefined') {
-                        ChatSystem.featureRequestPending = false;
-                        ChatSystem.featureRequestReceived = false;
-                        if (ChatSystem.featureBlinkInterval) {
-                            clearInterval(ChatSystem.featureBlinkInterval);
-                            ChatSystem.featureBlinkInterval = null;
-                        }
-                        const switchLabel = document.getElementById('featureSwitchLabel');
-                        if (switchLabel) switchLabel.classList.remove('blinking');
-                        ChatSystem.featuresEnabled = true;
-                        if (ChatSystem.currentChat === msg.from) {
-                            ChatSystem.friendInConversation = true;
-                        }
-                        const toggleInput = document.getElementById('featureToggleInput');
-                        if (toggleInput) toggleInput.checked = true;
-                        ChatSystem.updateAllButtons();
-                        console.log('✅ تم تحديث حالة المرسل بعد استلام answer_batch');
-                    }
-                    
-                    if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
-                        try {
-                            const answerSdp = new RTCSessionDescription({
-                                type: responseData.sdp.type,
-                                sdp: responseData.sdp.sdp
-                            });
-                            await CallSystem.pc.setRemoteDescription(answerSdp);
-                            console.log('✅ تم تعيين Answer SDP');
-                            
-                            for (const ice of (responseData.iceCandidates || [])) {
-                                try {
-                                    await CallSystem.pc.addIceCandidate(new RTCIceCandidate(ice));
-                                    console.log('✅ تم إضافة ICE candidate من الدفعة');
-                                } catch(e) {
-                                    console.warn('فشل إضافة ICE candidate:', e);
-                                }
-                            }
-                            console.log('✅ تم معالجة دفعة الرد بنجاح');
-                        } catch(e) {
-                            console.error('❌ فشل معالجة دفعة الرد:', e);
-                        }
-                    }
+                // تحويل البيانات المشفرة إلى Blob
+                const binaryString = atob(decryptedData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
                 }
-                else if (responseData.action === 'answer' && responseData.sdp) {
-                    console.log('📞 استلام Answer منفرد (دعم خلفي)');
-                    
-                    if (typeof ChatSystem !== 'undefined') {
-                        ChatSystem.featureRequestPending = false;
-                        ChatSystem.featureRequestReceived = false;
-                        if (ChatSystem.featureBlinkInterval) {
-                            clearInterval(ChatSystem.featureBlinkInterval);
-                            ChatSystem.featureBlinkInterval = null;
-                        }
-                        const switchLabel = document.getElementById('featureSwitchLabel');
-                        if (switchLabel) switchLabel.classList.remove('blinking');
-                        ChatSystem.featuresEnabled = true;
-                        if (ChatSystem.currentChat === msg.from) {
-                            ChatSystem.friendInConversation = true;
-                        }
-                        const toggleInput = document.getElementById('featureToggleInput');
-                        if (toggleInput) toggleInput.checked = true;
-                        ChatSystem.updateAllButtons();
-                    }
-                    
-                    if (typeof CallSystem !== 'undefined' && CallSystem.pc && CallSystem.pc.signalingState !== 'closed') {
-                        try {
-                            const answerSdp = new RTCSessionDescription({
-                                type: responseData.sdp.type,
-                                sdp: responseData.sdp.sdp
-                            });
-                            await CallSystem.pc.setRemoteDescription(answerSdp);
-                            console.log('✅ تم تعيين Answer SDP');
-                        } catch(e) {
-                            console.error('❌ فشل تعيين Answer:', e);
-                        }
-                    }
-                }
-                else if (responseData.action === 'ice' && responseData.candidate) {
-                    console.log('📞 استلام ICE candidate منفرد (دعم خلفي)');
-                    if (typeof CallSystem !== 'undefined' && CallSystem.pc) {
-                        try {
-                            await CallSystem.pc.addIceCandidate(new RTCIceCandidate(responseData.candidate.candidate));
-                            console.log('✅ تم إضافة ICE candidate منفرد');
-                        } catch(e) {
-                            console.warn('فشل إضافة ICE candidate:', e);
-                        }
-                    }
-                }
-                else if (responseData.action === 'accepted') {
-                    console.log('✅ تم قبول طلب التفعيل من:', msg.from);
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                    }
-                }
-                else if (responseData.action === 'rejected') {
-                    console.log('❌ تم رفض طلب التفعيل من:', msg.from);
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                    }
-                }
-                else if (responseData.action === 'disable') {
-                    console.log('🔴 استلام إشارة إيقاف من:', msg.from);
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                    }
-                }
-                else {
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.handleFeatureResponse) {
-                        ChatSystem.handleFeatureResponse(msg.from, responseData.action);
-                    }
-                }
-            }
-            else if (msg.package.type === 'force_disable_features') {
-                console.log('🔴 استلام إشارة إلغاء الميزات من:', msg.from);
+                const blob = new Blob([bytes], { type: 'image/jpeg' });
+                const url = URL.createObjectURL(blob);
                 
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
-                    console.log('⚠️ تم إلغاء الميزات بناءً على طلب الطرف الآخر (انتهاء الـ 120 ثانية)');
-                    
-                    ChatSystem.featuresEnabled = false;
-                    ChatSystem.featureRequestPending = false;
-                    ChatSystem.featureRequestReceived = false;
-                    
-                    const toggleInput = document.getElementById('featureToggleInput');
-                    if (toggleInput) toggleInput.checked = false;
-                    
-                    const kickBtn = document.getElementById('kickBtn');
-                    if (kickBtn) {
-                        kickBtn.classList.remove('active');
-                        kickBtn.style.opacity = '0.5';
-                        kickBtn.style.pointerEvents = 'none';
-                    }
-                    
-                    ChatSystem.updateAllButtons();
-                }
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: url, fileName: msg.package.fileName || 'صورة', sender: 'friend', time: new Date().toISOString(), _blobUrl: url });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                console.log('✅ تم استلام الصورة بنجاح');
             }
+            
+            // ===== معالجة الفيديو =====
+            else if (msg.package.type === 'video') {
+                console.log('🎬 استلام فيديو من:', msg.from);
+                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                
+                const binaryString = atob(decryptedData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'video', data: url, fileName: msg.package.fileName || 'فيديو', sender: 'friend', time: new Date().toISOString(), _blobUrl: url });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                console.log('✅ تم استلام الفيديو بنجاح');
+            }
+            
+            // ===== معالجة الملف =====
+            else if (msg.package.type === 'file') {
+                console.log('📄 استلام ملف من:', msg.from);
+                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                
+                const binaryString = atob(decryptedData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes]);
+                const url = URL.createObjectURL(blob);
+                
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'file', data: url, fileName: msg.package.fileName || 'ملف', sender: 'friend', time: new Date().toISOString(), _blobUrl: url });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                console.log('✅ تم استلام الملف بنجاح');
+            }
+            
+            // ===== معالجة البصمة الصوتية =====
+            else if (msg.package.type === 'voice') {
+                console.log('🎤 استلام بصمة صوتية من:', msg.from);
+                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
+                
+                const binaryString = atob(decryptedData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'audio/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'voice', data: url, sender: 'friend', time: new Date().toISOString(), _blobUrl: url });
+                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                console.log('✅ تم استلام البصمة الصوتية بنجاح');
+            }
+            
+            // ===== معالجة الموقع =====
             else if (msg.package.type === 'location') {
                 const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
                 const locationData = JSON.parse(decryptedLocation);
@@ -478,20 +363,6 @@ async function cleanAllExpiredData() {
         requestsSnapshot.forEach(doc => {
             batch.delete(doc.ref);
             totalDeleted++;
-        });
-        
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const signalsSnapshot = await window.db.collection('secure_messages')
-            .where('timestamp', '<', firebase.firestore.Timestamp.fromDate(oneDayAgo))
-            .get();
-        
-        signalsSnapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.package?.type === 'feature_request' || 
-                data.package?.type === 'feature_response') {
-                batch.delete(doc.ref);
-                totalDeleted++;
-            }
         });
         
         if (totalDeleted > 0) {
