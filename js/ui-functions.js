@@ -284,16 +284,6 @@ window.toggleSendButton = function() {
         return;
     }
     
-    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
-    
-    if (!featuresEnabled) {
-        btn.className = 'send-mode';
-        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
-        btn.title = 'إرسال';
-        btn.style.display = 'flex';
-        return;
-    }
-    
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
@@ -316,23 +306,16 @@ window.handleActionButton = function() {
     const recordingUI = document.getElementById('voiceRecordingUI');
     if (recordingUI && recordingUI.style.display === 'flex') return;
     
-    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
     const hasText = input.value.trim().length > 0;
     
     if (hasText) {
         window.sendMessage();
-    } else if (featuresEnabled) {
+    } else {
         window.startVoiceRecording();
     }
 };
 
 window.startVoiceRecording = function() {
-    const featuresEnabled = typeof ChatSystem !== 'undefined' && ChatSystem.featuresEnabled;
-    if (!featuresEnabled) {
-        alert('الميزات غير مفعلة');
-        return;
-    }
-    
     if (!navigator.mediaDevices?.getUserMedia) {
         alert('المتصفح لا يدعم تسجيل الصوت');
         return;
@@ -625,7 +608,6 @@ window.shareLocation = () => {
 
 // ==================== القسم 9: إغلاق المحادثة ====================
 window.closeConversation = () => { 
-    CallSystem.endCall(); 
     ChatSystem.closeChat();
     
     if (typeof window.hideSearchResults === 'function') {
