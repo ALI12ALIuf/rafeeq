@@ -324,8 +324,10 @@ const SecureChatSystem = {
                     time: new Date().toISOString() 
                 };
                 
-                if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
-                    ChatSystem.saveMessage(msg.from, msgData);
+                // ✅ إضافة إلى الذاكرة المؤقتة (وليس localStorage)
+                if (typeof ChatSystem !== 'undefined') {
+                    if (!ChatSystem.messages[msg.from]) ChatSystem.messages[msg.from] = [];
+                    ChatSystem.messages[msg.from].push(msgData);
                 }
                 
                 if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
@@ -361,8 +363,10 @@ const SecureChatSystem = {
                         _blobUrl: objectUrl
                     };
                     
-                    if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
-                        ChatSystem.saveMessage(msg.from, msgData);
+                    // ✅ إضافة إلى الذاكرة المؤقتة (وليس localStorage)
+                    if (typeof ChatSystem !== 'undefined') {
+                        if (!ChatSystem.messages[msg.from]) ChatSystem.messages[msg.from] = [];
+                        ChatSystem.messages[msg.from].push(msgData);
                     }
                     
                     if (typeof ChatSystem !== 'undefined' && ChatSystem.currentChat === msg.from) {
@@ -402,7 +406,6 @@ const SecureChatSystem = {
             }
             const sharedKey = await this.deriveSharedKey(myPrivateKey, receiverPublicKey);
             
-            // ضغط الصور فقط
             let fileToSend = file;
             if (type === 'image') {
                 console.log('📷 جاري ضغط الصورة...');
@@ -488,4 +491,4 @@ function startUnifiedCleanup() {
     setInterval(cleanAllExpiredData, 24 * 60 * 60 * 1000);
 }
 
-console.log('✅ SecureChatSystem جاهز (بدون بصمة صوتية)');
+console.log('✅ SecureChatSystem جاهز');
