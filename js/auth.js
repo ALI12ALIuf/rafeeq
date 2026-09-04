@@ -1,5 +1,5 @@
 // ========== auth.js ==========
-// Firebase Auth الأساسي
+// Firebase Auth الأساسي - حد الاسم 14 حرف
 
 function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
@@ -71,19 +71,31 @@ async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
+            // ✅ حد الاسم 14 حرف
+            let name = (user.displayName || 'مستخدم').substring(0, 14);
             await window.db.collection('users').doc(user.uid).set({
-                uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
-                email: user.email || '', shareableId: generateShareableId(),
-                bio: '', avatarType: 'man_light',
-                friends: [], blocked: [], createdAt: new Date()
+                uid: user.uid, 
+                name: name,
+                email: user.email || '', 
+                shareableId: generateShareableId(),
+                bio: '', 
+                avatarType: 'man_light',
+                friends: [], 
+                blocked: [], 
+                createdAt: new Date()
             });
         } else {
-            const userData = userDoc.data(); const updates = {};
+            const userData = userDoc.data(); 
+            const updates = {};
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
             if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
                 updates.avatarType = 'man_light';
+            }
+            // ✅ تحديث الاسم إلى 14 حرف إذا كان أطول
+            if (userData.name && userData.name.length > 14) {
+                updates.name = userData.name.substring(0, 14);
             }
             if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
         }
@@ -129,12 +141,17 @@ async function loadUserData(uid) {
         const doc = await window.db.collection('users').doc(uid).get();
         if (doc.exists) {
             const d = doc.data();
-            const pn = document.getElementById('profileName'), pa = document.getElementById('profileAvatarEmoji'), pb = document.getElementById('profileBio'), si = document.getElementById('shareableId'), ca = document.getElementById('currentAvatarEmoji');
-            if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 25);
+            const pn = document.getElementById('profileName'), 
+                  pa = document.getElementById('profileAvatarEmoji'), 
+                  pb = document.getElementById('profileBio'), 
+                  si = document.getElementById('shareableId'), 
+                  ca = document.getElementById('currentAvatarEmoji');
+            if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 14);
             if (pb) pb.textContent = d.bio || '';
             if (si) si.textContent = d.shareableId || '0000000000';
             const emoji = getEmojiForUser(d);
-            if (pa) pa.textContent = emoji; if (ca) ca.textContent = emoji;
+            if (pa) pa.textContent = emoji; 
+            if (ca) ca.textContent = emoji;
             const fc = document.getElementById('friendsCount');
             if (fc) fc.textContent = formatNumber((d.friends || []).length);
         }
