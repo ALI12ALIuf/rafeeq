@@ -198,7 +198,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 /* ==================== القسم 13: أنماط المحادثة والهيكل الرئيسي الحصين ==================== */
-body.in-call .app-container, body.in-call .bottom-nav, body.in-call .app-header { display: none !important; }
 body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
 
 .conversation-page { 
@@ -243,14 +242,8 @@ body.conversation-open .conversation-page {
 .conversation-status.online { color: #4CAF50; }
 .conversation-status.offline { color: var(--text-light); }
 
-/* ==================== القسم 13.1: أزرار الاتصال ==================== */
-.call-buttons button { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
-.call-buttons button:hover { background: var(--light); }
-.call-buttons button i { font-size: 1.2rem; }
-
 /* ==================== القسم 13.2: أزرار Mute و Lock ==================== */
 .attachment-menu button.locked { opacity: 0.4; pointer-events: none; }
-
 
 /* ==================== القسم 13.3: صندوق الرسائل ==================== */
 .messages-container { 
@@ -292,7 +285,6 @@ body.conversation-open .conversation-page {
 .message-status { display: flex; align-items: center; gap: 2px; font-size: 0.8rem; }
 .message-image { max-width: 200px; max-height: 200px; border-radius: 12px; cursor: pointer; }
 .message-audio { width: 250px; height: 40px; border-radius: 20px; }
-
 
 /* ==================== القسم 13.4: فوتر الإدخال ==================== */
 .message-input-container { 
@@ -638,110 +630,9 @@ body:not(.conversation-open) .conversation-page {
     border-radius: 10px;
 }
 
-/* ==================== القسم 17: أزرار التفعيل والطرد ==================== */
-.feature-toggle-container {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 5px;
-    direction: ltr;
-}
+/* ==================== القسم 17: ستايلات العناصر الثابتة ==================== */
 
-.feature-toggle-label {
-    font-size: 0.7rem;
-    color: #888;
-}
-
-.feature-switch {
-    position: relative;
-    display: inline-block;
-    width: 52px;
-    height: 26px;
-}
-
-.feature-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.feature-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #f44336;
-    transition: 0.3s;
-    border-radius: 26px;
-}
-
-.feature-slider:before {
-    position: absolute;
-    content: "";
-    height: 20px;
-    width: 20px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: 0.3s;
-    border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
-
-input:checked + .feature-slider {
-    background-color: #4CAF50;
-}
-
-input:checked + .feature-slider:before {
-    transform: translateX(26px);
-}
-
-@keyframes featureBlink {
-    0% { background-color: #f44336; }
-    50% { background-color: #2196F3; }
-    100% { background-color: #f44336; }
-}
-
-.feature-switch.blinking .feature-slider {
-    animation: featureBlink 0.8s ease-in-out infinite;
-}
-
-.kick-btn {
-    background: none;
-    border: none;
-    color: #f44336;
-    font-size: 1.3rem;
-    cursor: pointer;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-.kick-btn.active {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.kick-btn.active:hover {
-    background: rgba(244, 67, 54, 0.1);
-    transform: scale(1.05);
-}
-
-.kick-btn.active:active {
-    transform: scale(0.95);
-}
-
-/* ==================== القسم 18: ستايلات العناصر الثابتة ==================== */
-
-/* ستايلات السلايدر للمكالمات والموقع */
+/* ستايلات السلايدر للموقع */
 .swipe-container {
     width: 100%;
     margin: 20px 0;
@@ -833,28 +724,7 @@ input:checked + .toggle-slider:before {
     border-color: #4CAF50;
 }
 
-/* حركات المكالمات الواردة */
-@keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-15px); }
-}
-
-@keyframes ring {
-    0% { transform: rotate(0deg); }
-    25% { transform: rotate(6deg); }
-    50% { transform: rotate(0deg); }
-    75% { transform: rotate(-6deg); }
-    100% { transform: rotate(0deg); }
-}
-
-/* حركات أزرار المكالمات */
-@keyframes pulse {
-    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-    70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
-    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
-}
-
-/* ==================== القسم 19: ستايلات قوالب الرسائل الثابتة ==================== */
+/* ==================== القسم 18: ستايلات قوالب الرسائل الثابتة ==================== */
 
 /* قالب الصورة */
 .message-image-wrapper {
@@ -1059,38 +929,196 @@ input:checked + .toggle-slider:before {
     transform: scale(0.95);
 }
 
-/* ==================== القسم 20: ستايلات واجهات المكالمات الثابتة ==================== */
+/* ==================== القسم 19: مشغل الفيديو المخصص ==================== */
 
-/* أزرار المكالمات */
-.call-btn {
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    backdrop-filter: blur(10px);
-    background: rgba(30, 30, 40, 0.85) !important;
-    border: 1px solid rgba(255,255,255,0.15) !important;
+/* تخصيص شريط التقدم (input range) - إجبار الاتجاه من اليسار إلى اليمين */
+#videoProgress {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.3s;
+    direction: ltr !important;
 }
 
-.call-btn:active {
-    transform: scale(1.1);
-    background: rgba(50, 50, 60, 0.95) !important;
+/* لون الخلفية عند التحميل */
+#videoProgress::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    transition: background 0.3s;
+    direction: ltr !important;
 }
 
-.end-call-btn {
-    background: linear-gradient(135deg, #f44336, #d32f2f) !important;
-    animation: pulse 1.5s infinite;
+#videoProgress::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    border: none;
+    direction: ltr !important;
 }
 
-.end-call-btn:active {
-    transform: scale(1.1);
-    background: linear-gradient(135deg, #ff6659, #e53935) !important;
+/* الدائرة (المنزلق) */
+#videoProgress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    transition: all 0.15s ease;
+    position: relative;
+    z-index: 2;
+    margin-top: -5px;
 }
 
-/* حركة الأفاتار في المكالمة الصوتية */
-.avatar-animation {
-    animation: float 3s ease-in-out infinite;
+#videoProgress::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
 }
 
+#videoProgress::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
 
-/* ==================== 22تصغير حجم القوائم للهواتف ==================== */
+/* تنسيق أزرار التحكم في الفيديو */
+#videoPlayBtn:hover,
+#videoMuteBtn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.05);
+}
+
+#videoPlayBtn:active,
+#videoMuteBtn:active {
+    transform: scale(0.95);
+}
+
+/* تنسيق أوقات الفيديو */
+#videoCurrentTime,
+#videoDuration {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: #ffffff;
+    min-width: 40px;
+    text-align: center;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* تنسيق حاوية التحكم السفلية */
+#videoCustomControls {
+    display: none;
+    flex-shrink: 0;
+    padding: 12px 20px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+/* عند ظهور عناصر التحكم */
+#videoCustomControls.active {
+    display: flex;
+}
+
+/* تنسيق الإطار الأخضر حول الفيديو */
+#videoPreviewModal .video-frame {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    right: 15px;
+    bottom: 15px;
+    border: 3px solid #4CAF50;
+    border-radius: 20px;
+    pointer-events: none;
+    z-index: 10061;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+}
+
+/* تنسيق حاوية الفيديو الداخلية */
+#videoPreviewModal .video-container {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    right: 15px;
+    bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* تنسيق الفيديو نفسه */
+#previewVideo {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
+}
+
+/* تنسيق شريط التقدم عند التحميل */
+#videoProgress.loading {
+    background: linear-gradient(90deg, #4CAF50 0%, #4CAF50 30%, rgba(255,255,255,0.3) 30%, rgba(255,255,255,0.3) 100%);
+    background-size: 200% 100%;
+    animation: loadingProgress 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingProgress {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* تحسين المظهر على الهواتف */
+@media (max-width: 480px) {
+    #videoCustomControls {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+    
+    #videoPlayBtn,
+    #videoMuteBtn {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    #videoCurrentTime,
+    #videoDuration {
+        font-size: 0.65rem;
+        min-width: 32px;
+    }
+    
+    #videoProgress {
+        height: 4px;
+    }
+    
+    #videoProgress::-webkit-slider-thumb {
+        width: 14px;
+        height: 14px;
+    }
+}
+
+/* ==================== 20: تصغير حجم القوائم للهواتف ==================== */
 
 /* رأس التطبيق */
 .app-header {
@@ -1139,8 +1167,7 @@ input:checked + .toggle-slider:before {
     padding: 0.5rem !important;
 }
 
-
-/* ====================23 تقليل المساحة في الرأس والشريط السفلي ==================== */
+/* ==================== 21: تقليل المساحة في الرأس والشريط السفلي ==================== */
 
 /* 🔹 رأس التطبيق */
 .app-header {
@@ -1221,12 +1248,6 @@ input:checked + .toggle-slider:before {
     font-size: 0.85rem !important;
 }
 
-.conversation-header .call-buttons button {
-    width: 32px !important;
-    height: 32px !important;
-    font-size: 1rem !important;
-}
-
 /* 🔹 مدخل الرسائل (معدل - دعم textarea) */
 .message-input-container {
     padding: 6px 10px !important;
@@ -1292,4 +1313,3 @@ input:checked + .toggle-slider:before {
 .profile-settings-btn i {
     font-size: 1rem !important;
 }
-
