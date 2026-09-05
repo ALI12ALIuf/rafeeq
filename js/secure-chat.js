@@ -1,14 +1,10 @@
-// ========== secure-chat.js - النسخة النهائية (بدون WebRTC) ==========
-// نظام التشفير E2EE + ضغط الصور + فحص الفيديو + حذف 24 ساعة
+// ========== secure-chat.js ==========
+// نظام التشفير E2EE + ضغط الصور
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
     keyCache: new Map(),
     sharedKeyCache: new Map(),
-    
-    VIDEO_MAX_DURATION: 180,
-    VIDEO_WARNING_DURATION: 170,
-    VIDEO_MAX_INPUT_SIZE: 250 * 1024 * 1024,
     
     // ==================== القسم 1: init ====================
     async init() {
@@ -46,23 +42,19 @@ const SecureChatSystem = {
             });
             
             const privateExport = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
-            
             localStorage.setItem(`enc_private_key_${uid}`, btoa(String.fromCharCode(...new Uint8Array(privateExport))));
             this.keyCache.set(uid, keyPair.privateKey);
             console.log('✅ تم إنشاء المفاتيح بنجاح');
         } else {
             const doc = await window.db.collection('users').doc(uid).get();
-            
             if (!doc.exists || !doc.data()?.publicKey) {
                 console.log('⚠️ المفتاح العام مفقود، إعادة إنشاء المفاتيح...');
                 const keyPair = await this.generateKeyPair();
                 const publicKey = await this.exportPublicKey(keyPair.publicKey);
-                
                 await window.db.collection('users').doc(uid).update({ 
                     publicKey,
                     publicKeyCreatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                
                 const privateExport = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
                 localStorage.setItem(`enc_private_key_${uid}`, btoa(String.fromCharCode(...new Uint8Array(privateExport))));
                 this.keyCache.set(uid, keyPair.privateKey);
@@ -86,10 +78,8 @@ const SecureChatSystem = {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return null;
         if (this.keyCache.has(uid)) return this.keyCache.get(uid);
-        
         const stored = localStorage.getItem(`enc_private_key_${uid}`);
         if (!stored) return null;
-        
         try {
             const binary = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
             const key = await window.crypto.subtle.importKey('pkcs8', binary, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']);
@@ -110,7 +100,6 @@ const SecureChatSystem = {
     async deriveSharedKey(privateKey, publicKey) {
         const cacheKey = `${window.auth.currentUser.uid}_${await this.exportPublicKey(publicKey)}`;
         if (this.sharedKeyCache.has(cacheKey)) return this.sharedKeyCache.get(cacheKey);
-        
         try {
             const sharedKey = await window.crypto.subtle.deriveKey({ name: 'ECDH', public: publicKey }, privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
             this.sharedKeyCache.set(cacheKey, sharedKey);
@@ -143,69 +132,37 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
-    // ==================== القسم 5: معالجة الملفات ====================
+    // ==================== القسم 5: ضغط الصور ====================
     async compressImage(file) { 
         return new Promise((resolve, reject) => { 
-            const img = new Image(); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+            const img = new Image(); 
+            const canvas = document.createElement('canvas'); 
+            const ctx = canvas.getContext('2d');
             const url = URL.createObjectURL(file);
             img.onload = () => { 
                 URL.revokeObjectURL(url);
                 let w = img.width, h = img.height; 
-                if (w > 1200 || h > 1200) { if (w > h) { h *= 1200 / w; w = 1200; } else { w *= 1200 / h; h = 1200; } } 
-                canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); 
-                canvas.toBlob((blob) => { if (blob) resolve(blob); else reject(new Error('فشل ضغط الصورة')); }, 'image/jpeg', 0.8); 
+                if (w > 1200 || h > 1200) { 
+                    if (w > h) { h *= 1200 / w; w = 1200; } 
+                    else { w *= 1200 / h; h = 1200; } 
+                } 
+                canvas.width = w; 
+                canvas.height = h; 
+                ctx.drawImage(img, 0, 0, w, h); 
+                canvas.toBlob((blob) => { 
+                    if (blob) resolve(blob); 
+                    else reject(new Error('فشل ضغط الصورة')); 
+                }, 'image/jpeg', 0.8); 
             };
             img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('فشل تحميل الصورة')); };
             img.src = url;
         }); 
     },
     
-    getVideoDuration(file) {
-        return new Promise((resolve, reject) => {
-            const video = document.createElement('video');
-            const url = URL.createObjectURL(file);
-            const timeout = setTimeout(() => { URL.revokeObjectURL(url); reject(new Error('انتهت مهلة قراءة الفيديو')); }, 10000);
-            video.onloadedmetadata = () => { clearTimeout(timeout); URL.revokeObjectURL(url); resolve(video.duration); };
-            video.onerror = () => { clearTimeout(timeout); URL.revokeObjectURL(url); reject(new Error('فشل تحميل الفيديو')); };
-            video.preload = 'metadata';
-            video.src = url;
-        });
-    },
-    
-    validateVideo(file) {
-        return this.getVideoDuration(file).then(duration => {
-            const durationSec = Math.floor(duration);
-            const mins = Math.floor(durationSec / 60);
-            const secs = durationSec % 60;
-            
-            if (duration > this.VIDEO_MAX_DURATION) {
-                const warnMins = Math.floor(this.VIDEO_WARNING_DURATION / 60);
-                const warnSecs = this.VIDEO_WARNING_DURATION % 60;
-                throw new Error(
-                    `❌ الفيديو طويل جداً (${mins}:${secs.toString().padStart(2, '0')})\n` +
-                    `الحد الأقصى: ${warnMins}:${warnSecs.toString().padStart(2, '0')} دقائق\n` +
-                    `💡 قم بقص الفيديو قبل الإرسال`
-                );
-            }
-            
-            if (file.size > this.VIDEO_MAX_INPUT_SIZE) {
-                const sizeMB = (file.size / 1024 / 1024).toFixed(1), maxMB = (this.VIDEO_MAX_INPUT_SIZE / 1024 / 1024).toFixed(0);
-                throw new Error(`❌ حجم الفيديو كبير جداً (${sizeMB}MB)\nالحد الأقصى: ${maxMB}MB`);
-            }
-            
-            console.log(`⚡ فيديو جاهز للإرسال: ${mins}:${secs.toString().padStart(2, '0')} | ${(file.size/1024/1024).toFixed(1)}MB`);
-            return file;
-        });
-    },
-    
     // ==================== القسم 6: إرسال واستقبال الرسائل ====================
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
-        
-        let expiryHours = 24;
-        
-        let expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + expiryHours * 3600000));
-        
+        let expiresAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 3600000));
         try {
             await window.db.collection('secure_messages').add({ 
                 to: receiverId, 
@@ -243,92 +200,22 @@ const SecureChatSystem = {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
-            // ===== معالجة النص =====
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
-            }
-            
-            // ===== معالجة الصورة =====
+            } 
             else if (msg.package.type === 'image') {
-                console.log('📸 استلام صورة من:', msg.from);
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                
-                // تحويل البيانات المشفرة إلى Blob
-                const binaryString = atob(decryptedData);
+                const decryptedBase64 = await this.decryptData(msg.package.data, sharedKey);
+                const binaryString = atob(decryptedBase64);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
                 }
                 const blob = new Blob([bytes], { type: 'image/jpeg' });
-                const url = URL.createObjectURL(blob);
-                
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: url, fileName: msg.package.fileName || 'صورة', sender: 'friend', time: new Date().toISOString(), _blobUrl: url });
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
-                console.log('✅ تم استلام الصورة بنجاح');
-            }
-            
-            // ===== معالجة الفيديو =====
-            else if (msg.package.type === 'video') {
-                console.log('🎬 استلام فيديو من:', msg.from);
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                
-                const binaryString = atob(decryptedData);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: 'video/mp4' });
-                const url = URL.createObjectURL(blob);
-                
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'video', data: url, fileName: msg.package.fileName || 'فيديو', sender: 'friend', time: new Date().toISOString(), _blobUrl: url });
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
-                console.log('✅ تم استلام الفيديو بنجاح');
-            }
-            
-            // ===== معالجة الملف =====
-            else if (msg.package.type === 'file') {
-                console.log('📄 استلام ملف من:', msg.from);
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                
-                const binaryString = atob(decryptedData);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                const blob = new Blob([bytes]);
-                const url = URL.createObjectURL(blob);
-                
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'file', data: url, fileName: msg.package.fileName || 'ملف', sender: 'friend', time: new Date().toISOString(), _blobUrl: url });
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
-                console.log('✅ تم استلام الملف بنجاح');
-            }
-            
-            // ===== معالجة البصمة الصوتية =====
-            else if (msg.package.type === 'voice') {
-                console.log('🎤 استلام بصمة صوتية من:', msg.from);
-                const decryptedData = await this.decryptData(msg.package.data, sharedKey);
-                
-                const binaryString = atob(decryptedData);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: 'audio/webm' });
-                const url = URL.createObjectURL(blob);
-                
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'voice', data: url, sender: 'friend', time: new Date().toISOString(), _blobUrl: url });
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
-                console.log('✅ تم استلام البصمة الصوتية بنجاح');
-            }
-            
-            // ===== معالجة الموقع =====
-            else if (msg.package.type === 'location') {
-                const decryptedLocation = await this.decryptData(msg.package.data, sharedKey);
-                const locationData = JSON.parse(decryptedLocation);
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'location', data: locationData, sender: 'friend', time: new Date().toISOString() });
+                const imageUrl = URL.createObjectURL(blob);
+                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: imageUrl, fileName: msg.package.fileName || 'صورة', sender: 'friend', time: new Date().toISOString(), _blobUrl: imageUrl });
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
             }
             
@@ -339,8 +226,7 @@ const SecureChatSystem = {
     }
 };
 
-// ==================== التنظيف الموحد (كل 24 ساعة) ====================
-
+// ==================== التنظيف الموحد ====================
 async function cleanAllExpiredData() {
     try {
         const now = new Date();
@@ -371,7 +257,6 @@ async function cleanAllExpiredData() {
         }
         
         return totalDeleted;
-        
     } catch (e) {
         console.warn('⚠️ خطأ في التنظيف الموحد:', e);
         return 0;
