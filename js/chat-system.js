@@ -1,11 +1,10 @@
-// ========== chat-system.js - النسخة النهائية المصححة ==========
-// نظام الدردشة E2EE + الصور (مع إصلاح خطأ التكرار)
+// ========== chat-system.js - النسخة النهائية (نصوص وصور فقط) ==========
+// نظام الدردشة E2EE + الصور
 
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
     chatItemTemplate: null,
-    _isDisplaying: false, // ✅ منع التكرار
     
     // ==================== القسم 1: init ====================
     init() { 
@@ -112,42 +111,34 @@ const ChatSystem = {
         console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
     },
     
-    // ==================== القسم 6: displayMessages (مصحح - بدون تكرار) ====================
+    // ==================== القسم 6: displayMessages ====================
     displayMessages(friendId) { 
         const c = document.getElementById('messagesContainer'); 
-        if (!c) return;
-        
-        // ✅ منع التكرار
-        if (this._isDisplaying) {
-            console.log('⏳ جاري عرض الرسائل بالفعل، تخطي...');
-            return;
-        }
-        
-        this._isDisplaying = true;
-        
-        try {
-            c.innerHTML = ''; 
-            const messages = this.messages[friendId] || [];
-            messages.forEach(msg => { 
-                this.displayMessage(msg); 
-            });
-            c.scrollTop = c.scrollHeight;
-        } finally {
-            this._isDisplaying = false;
-        }
+        if (!c) return; 
+        c.innerHTML = ''; 
+        const messages = this.messages[friendId] || [];
+        messages.forEach(msg => { this.displayMessage(msg); });
+        c.scrollTop = c.scrollHeight;
     },
 
-    // ==================== القسم 7: displayMessage (مصحح - بدون تكرار) ====================
+    // ==================== القسم 7: displayMessage ====================
     displayMessage(msg) {
         const c = document.getElementById('messagesContainer'); 
         if (!c) return;
         
-        // ✅ منع عرض رسائل مكررة
-        if (document.getElementById(`msg-${msg.id}`)) {
-            console.log(`⚠️ الرسالة ${msg.id} معروضة بالفعل، تخطي`);
-            return;
-        }
+        const formatDateTime = (dateObj) => {
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            let hours = dateObj.getHours();
+            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            const formattedHours = String(hours).padStart(2, '0');
+            return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
+        };
         
+        const dateTime = formatDateTime(new Date(msg.time));
         const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
         
         const template = document.getElementById('messageWrapperTemplate');
@@ -173,7 +164,7 @@ const ChatSystem = {
                     contentDiv.style.border = `1.5px solid ${borderColor}`;
                 }
                 if (textSpan) {
-                    textSpan.textContent = msg.text || '';
+                    textSpan.innerHTML = this.escapeHtml(msg.text);
                 }
                 div.appendChild(clone);
             }
@@ -188,7 +179,7 @@ const ChatSystem = {
                 if (wrapper) {
                     wrapper.style.border = `2px solid ${borderColor}`;
                     const img = wrapper.querySelector('.message-image-content');
-                    if (img && msg.data) {
+                    if (img) {
                         img.src = msg.data;
                         img.onclick = () => this.showImagePreview(msg.data);
                         img.oncontextmenu = (e) => e.preventDefault();
@@ -335,34 +326,23 @@ const ChatSystem = {
         } 
     },
 
-    // ==================== القسم 13: sendImage (مصحح) ====================
+    // ==================== القسم 13: sendImage ====================
     async sendImage(file) { 
-        if (!this.currentChat) {
-            console.error('❌ لا توجد محادثة نشطة');
-            return;
-        }
+        if (!this.currentChat) return;
         
         try {
-            console.log('📸 بدء ضغط الصورة...');
             const compressedBlob = await SecureChatSystem.compressImage(file);
-            console.log('✅ تم ضغط الصورة');
-            
             const arrayBuffer = await compressedBlob.arrayBuffer();
             const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
             
             const pr = await SecureChatSystem.getMyPrivateKey();
             const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!pr || !pu) {
-                console.error('❌ فشل الحصول على المفاتيح');
-                return;
-            }
+            if (!pr || !pu) return;
             
             const sk = await SecureChatSystem.deriveSharedKey(pr, pu);
             const encrypted = await SecureChatSystem.encryptData(base64Data, sk);
             
             const msgId = Date.now().toString();
-            console.log('📤 إرسال الصورة إلى السيرفر...');
-            
             await SecureChatSystem.sendToServer(this.currentChat, { 
                 id: msgId, 
                 type: 'image', 
@@ -372,24 +352,7 @@ const ChatSystem = {
             });
             
             const tempUrl = URL.createObjectURL(compressedBlob);
-            
-            // ✅ حفظ وعرض الرسالة (مرة واحدة فقط)
-            const msgObj = { 
-                id: msgId, 
-                type: 'image', 
-                data: tempUrl, 
-                fileName: file.name, 
-                sender: 'me', 
-                time: new Date().toISOString(), 
-                status: 'sent', 
-                _blobUrl: tempUrl 
-            };
-            
-            // ✅ حفظ في localStorage
-            this.saveMessage(this.currentChat, msgObj);
-            
-            // ✅ عرض في الواجهة (مرة واحدة فقط)
-            this.displayMessage(msgObj);
+            this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
             
             console.log('✅ تم إرسال الصورة عبر Firebase (تشفير E2EE)');
         } catch (e) {
@@ -398,10 +361,10 @@ const ChatSystem = {
         }
     },
 
-    // ==================== القسم 14: saveMessage (مصحح) ====================
+    // ==================== القسم 14: saveMessage ====================
     saveMessage(friendId, message) { 
         if (message.type !== 'text' && message.type !== 'image') {
-            console.log(`📝 نوع الرسالة (${message.type}) لن يُحفظ`);
+            console.log(`📝 نوع الرسالة (${message.type}) لن يُحفظ - تعرض فقط أثناء المحادثة`);
             return;
         }
         
@@ -411,13 +374,6 @@ const ChatSystem = {
             messages = JSON.parse(localStorage.getItem(key)) || []; 
         } catch (e) { 
             messages = []; 
-        }
-        
-        // ✅ منع التكرار
-        const exists = messages.some(m => m.id === message.id);
-        if (exists) {
-            console.log(`⚠️ الرسالة ${message.id} موجودة بالفعل، تخطي الحفظ`);
-            return;
         }
         
         messages.push(message); 
@@ -546,21 +502,13 @@ window.handleActionButton = function() {
     }
 };
 
-window.sendImage = function() {
-    console.log('📸 فتح نافذة اختيار الصورة');
+window.sendImage = () => { 
     const i = document.createElement('input'); 
     i.type = 'file'; 
     i.accept = 'image/*'; 
-    i.onchange = function(e) { 
+    i.onchange = e => { 
         const f = e.target.files[0]; 
-        if (f) {
-            console.log('📸 تم اختيار صورة:', f.name, f.size);
-            if (ChatSystem.currentChat) {
-                ChatSystem.sendImage(f);
-            } else {
-                alert('الرجاء فتح محادثة أولاً');
-            }
-        }
+        if (f && ChatSystem.currentChat) ChatSystem.sendImage(f); 
     }; 
     i.click(); 
 };
@@ -573,7 +521,55 @@ window.downloadPreviewImage = function() {
     ChatSystem.downloadPreviewImage();
 };
 
-// ==================== القسم 22: التنظيف الشامل ====================
+window.closeConversation = () => { 
+    ChatSystem.closeChat();
+    
+    setTimeout(() => {
+        const lastPage = popPage();
+        document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
+        document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
+        document.body.classList.remove('profile-subpage-open');
+        
+        if (lastPage && lastPage.type === 'subpage') {
+            document.body.classList.add('profile-subpage-open');
+            document.querySelector('.profile-page').style.display = 'none';
+            if (lastPage.id && document.getElementById(lastPage.id)) {
+                document.getElementById(lastPage.id).style.display = 'block';
+            }
+            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
+        } else if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
+            document.querySelector('.profile-page').classList.add('active');
+            document.querySelector('.profile-page').style.display = 'block';
+            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
+        } else {
+            document.querySelector('.chat-page').classList.add('active');
+            document.querySelector('.chat-page').style.display = 'block';
+            if (typeof loadChats === 'function') loadChats();
+            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'chat') n.classList.add('active'); });
+        }
+    }, 200);
+};
+
+window.openChat = friendId => {
+    if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
+        pushPage('subpage', 'friendsPage');
+    } else if (document.getElementById('tripsPage') && document.getElementById('tripsPage').style.display === 'block') {
+        pushPage('subpage', 'tripsPage');
+    } else if (document.querySelector('.profile-page') && getComputedStyle(document.querySelector('.profile-page')).display === 'block') {
+        pushPage('page', 'profile');
+    } else {
+        pushPage('page', 'chat');
+    }
+    
+    window.db.collection('users').doc(friendId).get().then(doc => {
+        if (doc.exists) {
+            const f = doc.data();
+            ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
+        }
+    }).catch(() => {});
+};
+
+// ==================== القسم 22: التنظيف الشامل عند تحميل الصفحة ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
