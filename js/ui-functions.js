@@ -1,7 +1,5 @@
-// ========== ui-functions.js - النسخة المعدلة (مع نظام الإيموجي الجديد + التحديد) ==========
-// وظائف الواجهة العامة
+// ========== ui-functions.js - النسخة النهائية ==========
 
-// ==================== القسم 1: مكدس تتبع الصفحات للرجوع المتسلسل ====================
 window._pageStack = [];
 
 function pushPage(pageType, pageId) {
@@ -19,7 +17,6 @@ function clearStack() {
     window._pageStack = [];
 }
 
-// ==================== القسم 2: تحميل المحادثات (معدل - يدعم طلبات الصداقة) ====================
 let chatsLoaded = false;
 let isLoadingChats = false;
 
@@ -59,7 +56,6 @@ async function loadChats(force = false) {
         
         list.innerHTML = '';
         
-        // ===== القسم 2.1: عرض طلبات الصداقة في الأعلى =====
         if (requestTemplate) {
             const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
             const addedRequestIds = new Set();
@@ -125,7 +121,6 @@ async function loadChats(force = false) {
             }
         }
         
-        // ===== القسم 2.2: عرض قائمة الأصدقاء =====
         if (!friends.length) { 
             if (list.children.length === 0) {
                 list.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>لا توجد محادثات</h3><p>أضف أصدقاء لبدء المحادثة</p></div>`; 
@@ -154,9 +149,6 @@ async function loadChats(force = false) {
                             const l = h[h.length - 1]; 
                             if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
                             else if (l.type === 'image') lm = '📷 صورة'; 
-                            else if (l.type === 'voice') lm = '🎤 بصمة صوتية'; 
-                            else if (l.type === 'video') lm = '🎥 فيديو'; 
-                            else if (l.type === 'file') lm = '📎 ملف'; 
                             lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
                         } 
                     } catch (e) {} 
@@ -203,7 +195,6 @@ function refreshChats() {
     loadChats(true);
 }
 
-// ==================== القسم 3: إعداد مستمعي الواجهة ====================
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
         const m = document.getElementById('attachmentMenu'); 
@@ -214,491 +205,6 @@ function setupChatListeners() {
     }); 
 }
 
-// ==================== القسم 4: فتح محادثة ====================
-window.openChat = friendId => {
-    if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
-        pushPage('subpage', 'friendsPage');
-    } else if (document.getElementById('tripsPage') && document.getElementById('tripsPage').style.display === 'block') {
-        pushPage('subpage', 'tripsPage');
-    } else if (document.querySelector('.profile-page') && getComputedStyle(document.querySelector('.profile-page')).display === 'block') {
-        pushPage('page', 'profile');
-    } else {
-        pushPage('page', 'chat');
-    }
-    
-    window.db.collection('users').doc(friendId).get().then(doc => {
-        if (doc.exists) {
-            const f = doc.data();
-            ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
-        }
-    }).catch(() => {});
-};
-
-// ==================== القسم 5: وظائف إرسال الرسائل ====================
-window.sendMessage = () => { 
-    const inp = document.getElementById('messageInput'); 
-    if (inp && inp.value.trim()) {
-        ChatSystem.sendMessage(inp.value.trim()).then(s => { 
-            if (s) { 
-                inp.value = ''; 
-                inp.style.height = 'auto';
-                if (typeof window.toggleSendButton === 'function') {
-                    window.toggleSendButton();
-                }
-            } 
-        }); 
-    }
-};
-
-// ✅ معدل: منع إرسال الرسالة عند الضغط على Enter
-window.handleMessageKeyPress = function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        // لا يرسل الرسالة، فقط يمنع إضافة سطر جديد
-        // الإرسال يكون فقط من خلال زر الإرسال
-    }
-};
-
-// ==================== القسم 5.1: زر الإجراء (بصمة/إرسال) ====================
-
-let _recordingTimer = null;
-let _recordingSeconds = 0;
-let _recordingChunks = [];
-let _mediaRecorder = null;
-let _recordingBlob = null;
-let _isRecording = false;
-let _audioUrl = null;
-let _audioElement = null;
-
-const MAX_RECORDING_SECONDS = 300;
-const WARNING_THRESHOLD = 280;
-
-window.toggleSendButton = function() {
-    const input = document.getElementById('messageInput');
-    const btn = document.getElementById('actionBtn');
-    const recordingUI = document.getElementById('voiceRecordingUI');
-    if (!input || !btn) return;
-    
-    if (recordingUI && recordingUI.style.display === 'flex') {
-        btn.style.display = 'none';
-        return;
-    }
-    
-    const hasText = input.value.trim().length > 0;
-    
-    if (hasText) {
-        btn.className = 'send-mode';
-        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
-        btn.title = 'إرسال';
-    } else {
-        btn.className = 'voice-btn';
-        btn.innerHTML = '<i class="fas fa-microphone"></i>';
-        btn.title = 'بصمة صوتية';
-    }
-    btn.style.display = 'flex';
-};
-
-window.handleActionButton = function() {
-    const input = document.getElementById('messageInput');
-    const btn = document.getElementById('actionBtn');
-    if (!input || !btn) return;
-    
-    const recordingUI = document.getElementById('voiceRecordingUI');
-    if (recordingUI && recordingUI.style.display === 'flex') return;
-    
-    const hasText = input.value.trim().length > 0;
-    
-    if (hasText) {
-        window.sendMessage();
-    } else {
-        window.startVoiceRecording();
-    }
-};
-
-window.startVoiceRecording = function() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-        alert('المتصفح لا يدعم تسجيل الصوت');
-        return;
-    }
-    
-    const input = document.getElementById('messageInput');
-    const btn = document.getElementById('actionBtn');
-    const recordingUI = document.getElementById('voiceRecordingUI');
-    const progressFill = document.getElementById('voiceProgressFill');
-    const currentTimeEl = document.getElementById('voiceCurrentTime');
-    const maxTimeEl = document.getElementById('voiceMaxTime');
-    const cancelBtn = document.getElementById('voiceCancelBtn');
-    const sendBtn = document.getElementById('voiceSendBtn');
-    const playBtn = document.getElementById('voicePlayBtn');
-    
-    if (!recordingUI || !progressFill || !currentTimeEl) return;
-    
-    if (_audioUrl) { URL.revokeObjectURL(_audioUrl); _audioUrl = null; }
-    if (_audioElement) { _audioElement = null; }
-    
-    input.style.display = 'none';
-    recordingUI.style.display = 'flex';
-    recordingUI.classList.remove('warning');
-    btn.style.display = 'none';
-    playBtn.style.display = 'none';
-    sendBtn.style.display = 'none';
-    cancelBtn.style.display = 'flex';
-    
-    btn.style.display = 'flex';
-    btn.classList.add('recording');
-    btn.innerHTML = '<i class="fas fa-stop"></i>';
-    btn.title = 'إيقاف التسجيل';
-    
-    _recordingSeconds = 0;
-    _recordingChunks = [];
-    _recordingBlob = null;
-    _isRecording = true;
-    currentTimeEl.textContent = '0:00';
-    maxTimeEl.textContent = '5:00';
-    progressFill.style.width = '0%';
-    
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-            _mediaRecorder = new MediaRecorder(stream);
-            
-            _mediaRecorder.ondataavailable = e => {
-                if (e.data.size > 0) _recordingChunks.push(e.data);
-            };
-            
-            _mediaRecorder.onstop = () => {
-                stream.getTracks().forEach(t => t.stop());
-                _isRecording = false;
-                
-                _recordingBlob = new Blob(_recordingChunks, { type: 'audio/webm' });
-                
-                if (_audioUrl) URL.revokeObjectURL(_audioUrl);
-                _audioUrl = URL.createObjectURL(_recordingBlob);
-                
-                playBtn.style.display = 'flex';
-                playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                sendBtn.style.display = 'flex';
-                btn.style.display = 'none';
-                btn.classList.remove('recording');
-                
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
-            };
-            
-            _mediaRecorder.start();
-            
-            btn.onclick = function() {
-                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                    _mediaRecorder.stop();
-                    btn.onclick = window.handleActionButton;
-                    playBtn.style.display = 'flex';
-                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    sendBtn.style.display = 'flex';
-                    btn.style.display = 'none';
-                }
-            };
-            
-            if (_recordingTimer) clearInterval(_recordingTimer);
-            _recordingTimer = setInterval(() => {
-                if (!_isRecording) return;
-                
-                _recordingSeconds++;
-                const mins = Math.floor(_recordingSeconds / 60);
-                const secs = _recordingSeconds % 60;
-                currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-                
-                const percent = (_recordingSeconds / MAX_RECORDING_SECONDS) * 100;
-                progressFill.style.width = Math.min(percent, 100) + '%';
-                
-                if (_recordingSeconds >= WARNING_THRESHOLD) {
-                    recordingUI.classList.add('warning');
-                }
-                
-                if (_recordingSeconds >= MAX_RECORDING_SECONDS) {
-                    if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                        _mediaRecorder.stop();
-                        btn.onclick = window.handleActionButton;
-                        btn.style.display = 'none';
-                        playBtn.style.display = 'flex';
-                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                        sendBtn.style.display = 'flex';
-                    }
-                }
-            }, 1000);
-            
-            cancelBtn.onclick = () => {
-                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                    _mediaRecorder.stop();
-                }
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
-                resetVoiceUI();
-            };
-            
-            let isPlaying = false;
-            playBtn.onclick = () => {
-                if (!_recordingBlob) return;
-                
-                if (isPlaying) {
-                    if (_audioElement) {
-                        _audioElement.pause();
-                        _audioElement.currentTime = 0;
-                    }
-                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    isPlaying = false;
-                    return;
-                }
-                
-                if (!_audioElement) {
-                    _audioElement = new Audio(_audioUrl);
-                    _audioElement.onended = () => {
-                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                        isPlaying = false;
-                    };
-                }
-                
-                _audioElement.play();
-                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                isPlaying = true;
-            };
-            
-            sendBtn.onclick = () => {
-                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                    _mediaRecorder.stop();
-                }
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
-                
-                if (_recordingBlob && _recordingBlob.size > 0) {
-                    ChatSystem.sendVoiceNote(_recordingBlob);
-                }
-                resetVoiceUI();
-            };
-            
-            const cleanup = () => {
-                if (_mediaRecorder && _mediaRecorder.state === 'recording') {
-                    _mediaRecorder.stop();
-                }
-                if (_recordingTimer) {
-                    clearInterval(_recordingTimer);
-                    _recordingTimer = null;
-                }
-                if (_audioElement) {
-                    _audioElement.pause();
-                    _audioElement = null;
-                }
-                if (_audioUrl) {
-                    URL.revokeObjectURL(_audioUrl);
-                    _audioUrl = null;
-                }
-                resetVoiceUI();
-            };
-            window._voiceCleanup = cleanup;
-            window.addEventListener('beforeunload', cleanup);
-        })
-        .catch(() => {
-            alert('يرجى السماح بالوصول إلى الميكروفون');
-            resetVoiceUI();
-        });
-};
-
-function resetVoiceUI() {
-    const input = document.getElementById('messageInput');
-    const btn = document.getElementById('actionBtn');
-    const recordingUI = document.getElementById('voiceRecordingUI');
-    const playBtn = document.getElementById('voicePlayBtn');
-    
-    if (input) input.style.display = 'block';
-    if (recordingUI) {
-        recordingUI.style.display = 'none';
-        recordingUI.classList.remove('warning');
-    }
-    if (btn) {
-        btn.style.display = 'flex';
-        btn.classList.remove('recording');
-        btn.onclick = window.handleActionButton;
-    }
-    if (playBtn) {
-        playBtn.style.display = 'none';
-        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-    }
-    
-    if (_recordingTimer) {
-        clearInterval(_recordingTimer);
-        _recordingTimer = null;
-    }
-    
-    if (_audioElement) {
-        _audioElement.pause();
-        _audioElement = null;
-    }
-    if (_audioUrl) {
-        URL.revokeObjectURL(_audioUrl);
-        _audioUrl = null;
-    }
-    
-    _recordingBlob = null;
-    _mediaRecorder = null;
-    _recordingChunks = [];
-    _isRecording = false;
-    
-    if (window._voiceCleanup) {
-        window.removeEventListener('beforeunload', window._voiceCleanup);
-        window._voiceCleanup = null;
-    }
-    
-    window.toggleSendButton();
-}
-
-// ==================== القسم 6: قائمة المرفقات ====================
-window.showAttachmentMenu = () => { 
-    const m = document.getElementById('attachmentMenu'); 
-    if (m) {
-        m.style.display = m.style.display === 'none' ? 'flex' : 'none'; 
-    }
-};
-
-// ==================== القسم 7: إرسال الملفات ====================
-window.sendImage = () => { 
-    const i = document.createElement('input'); 
-    i.type = 'file'; 
-    i.accept = 'image/*'; 
-    i.onchange = e => { 
-        const f = e.target.files[0]; 
-        if (f && ChatSystem.currentChat) ChatSystem.sendImage(f); 
-    }; 
-    i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
-
-window.sendVideo = () => { 
-    const i = document.createElement('input'); 
-    i.type = 'file'; 
-    i.accept = 'video/*'; 
-    i.onchange = e => { 
-        const f = e.target.files[0]; 
-        if (f && ChatSystem.currentChat) ChatSystem.sendVideoFile(f); 
-    }; 
-    i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
-
-window.sendFile = () => { 
-    const i = document.createElement('input'); 
-    i.type = 'file'; 
-    i.accept = '*/*'; 
-    i.onchange = e => { 
-        const f = e.target.files[0]; 
-        if (f && ChatSystem.currentChat) ChatSystem.sendFile(f); 
-    }; 
-    i.click(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
-
-// ==================== القسم 8: مشاركة الموقع ====================
-window.shareLocation = () => { 
-    ChatSystem.shareLocationDirect(); 
-    document.getElementById('attachmentMenu').style.display = 'none'; 
-};
-
-// ==================== القسم 9: إغلاق المحادثة ====================
-window.closeConversation = () => { 
-    ChatSystem.closeChat();
-    
-    if (typeof window.hideSearchResults === 'function') {
-        window.hideSearchResults();
-    }
-    
-    setTimeout(() => {
-        const lastPage = popPage();
-        
-        document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
-        document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
-        document.body.classList.remove('profile-subpage-open');
-        
-        if (lastPage && lastPage.type === 'subpage') {
-            document.body.classList.add('profile-subpage-open');
-            document.querySelector('.profile-page').style.display = 'none';
-            if (lastPage.id && document.getElementById(lastPage.id)) {
-                document.getElementById(lastPage.id).style.display = 'block';
-            }
-            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
-        } else if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
-            document.querySelector('.profile-page').classList.add('active');
-            document.querySelector('.profile-page').style.display = 'block';
-            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'profile') n.classList.add('active'); });
-        } else {
-            document.querySelector('.chat-page').classList.add('active');
-            document.querySelector('.chat-page').style.display = 'block';
-            loadChats();
-            document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active'); if (n.dataset.page === 'chat') n.classList.add('active'); });
-        }
-    }, 200);
-};
-
-// ==================== القسم 10: تعديل الملف الشخصي ====================
-window.openEditProfileModal = () => { 
-    const nameInput = document.getElementById('editName'); 
-    const currentName = document.getElementById('profileName')?.textContent; 
-    const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent; 
-    if (nameInput) nameInput.value = currentName || ''; 
-    const avatarPreview = document.getElementById('currentAvatarEmoji'); 
-    if (avatarPreview) avatarPreview.textContent = currentEmoji || '🧔🏻‍♂️'; 
-    document.getElementById('editProfileModal')?.classList.add('active'); 
-};
-
-window.saveProfile = () => { 
-    const n = document.getElementById('editName')?.value?.trim(); 
-    if (!n || n.length > 25) { 
-        alert('الاسم مطلوب ولا يزيد عن 25 حرف'); 
-        return; 
-    } 
-    if (auth?.currentUser) db.collection('users').doc(auth.currentUser.uid).update({ name: n }).then(() => { 
-        const nameEl = document.getElementById('profileName'); 
-        if (nameEl) nameEl.textContent = n; 
-        closeModal(); 
-    }).catch(() => alert('فشل حفظ التغييرات')); 
-};
-
-// ==================== القسم 11: الصفحات الفرعية ====================
-window.showUserTrips = () => {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('tripsPage').style.display = 'block';
-};
-
-window.showFriendsList = () => {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('friendsPage').style.display = 'block';
-};
-
-// ==================== القسم 12: الرجوع من صفحة فرعية ====================
-window.goBack = () => {
-    const lastPage = popPage();
-    
-    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
-    document.body.classList.remove('profile-subpage-open');
-    
-    if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
-        document.querySelector('.profile-page').style.display = 'block';
-        document.querySelector('.profile-page').classList.add('active');
-    } else {
-        document.querySelector('.profile-page').style.display = 'block';
-        document.querySelector('.profile-page').classList.add('active');
-    }
-};
-
-// ==================== القسم 13: الصورة الرمزية (معدل - مع التحديد بالدائرة الزرقاء) ====================
-
-// ✅ دالة selectAvatar الجديدة - مع تحديث واجهة الاختيار
 window.selectAvatar = function(type) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -714,7 +220,6 @@ window.selectAvatar = function(type) {
     if (profileAvatar) profileAvatar.textContent = emoji;
     if (currentAvatar) currentAvatar.textContent = emoji;
     
-    // ✅ تحديث واجهة الاختيار - إضافة الدائرة الزرقاء حول المحدد
     document.querySelectorAll('.avatar-option-btn').forEach(btn => {
         btn.style.borderColor = 'transparent';
         btn.style.background = 'var(--light)';
@@ -730,10 +235,7 @@ window.selectAvatar = function(type) {
     
     if (auth?.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
-            .then(() => {
-                // نغلق النافذة بعد 500ms ليعطي انطباع بالاختيار
-                setTimeout(() => closeModal(), 500);
-            })
+            .then(() => { setTimeout(() => closeModal(), 500); })
             .catch(() => {});
     }
 };
@@ -742,11 +244,7 @@ window.openAvatarModal = function() {
     const modal = document.getElementById('avatarModal');
     if (modal) modal.classList.add('active');
     
-    // ✅ عند فتح النافذة، نحدد الإيموجي الحالي
     const currentAvatar = document.getElementById('profileAvatarEmoji')?.textContent;
-    const currentType = auth?.currentUser ? null : null;
-    
-    // نبحث عن الزر المطابق للإيموجي الحالي
     document.querySelectorAll('.avatar-option-btn').forEach(btn => {
         const emojiSpan = btn.querySelector('span');
         if (emojiSpan && emojiSpan.textContent === currentAvatar) {
@@ -761,7 +259,6 @@ window.openAvatarModal = function() {
     });
 };
 
-// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
 window.getEmojiForUser = function(userData) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -771,47 +268,12 @@ window.getEmojiForUser = function(userData) {
         'woman_medium': '👩🏼',
         'woman_dark': '👩🏽'
     };
-    // دعم التوافق مع المستخدمين القدامى
     if (!userData?.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
         return '🧔🏻‍♂️';
     }
     return emojiMap[userData.avatarType] || '🧔🏻‍♂️';
 };
 
-// ==================== القسم 14: دوال إغلاق المعاينات ====================
-window.closeImagePreview = function() {
-    const modal = document.getElementById('imagePreviewModal');
-    const img = document.getElementById('previewImage');
-    if (modal) modal.style.display = 'none';
-    if (img) { img.src = ''; img.style.transform = 'none'; }
-};
-
-window.closeVideoPreview = function() {
-    const modal = document.getElementById('videoPreviewModal');
-    const video = document.getElementById('previewVideo');
-    if (modal) modal.style.display = 'none';
-    if (video) { video.pause(); video.src = ''; }
-};
-
-window.downloadPreviewImage = function() {
-    const img = document.getElementById('previewImage');
-    if (!img || !img.src) return;
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.jpg';
-    link.click();
-};
-
-window.downloadPreviewVideo = function() {
-    const video = document.getElementById('previewVideo');
-    if (!video || !video.src) return;
-    const link = document.createElement('a');
-    link.href = video.src;
-    link.download = 'video.mp4';
-    link.click();
-};
-
-// ==================== القسم 15: دوال مساعدة ====================
 function formatNumber(num) { 
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; 
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; 
@@ -858,7 +320,6 @@ function setupNavigation() {
             window.hideSearchResults();
         }
         
-        // ✅ تحديث عنوان الصفحة في رأس التطبيق
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) {
             const titles = {
@@ -891,7 +352,6 @@ function setupModals() {
     }); 
 }
 
-// ==================== القسم 16: أحداث الصفحة ====================
 document.addEventListener('DOMContentLoaded', () => { 
     ensureSinglePage(); 
     setupNavigation(); 
