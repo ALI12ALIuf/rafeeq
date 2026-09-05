@@ -236,10 +236,6 @@ body.conversation-open .conversation-page {
 .conversation-status.online { color: #4CAF50; }
 .conversation-status.offline { color: var(--text-light); }
 
-.call-buttons button { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
-.call-buttons button:hover { background: var(--light); }
-.call-buttons button i { font-size: 1.2rem; }
-
 /* ==================== القسم 13.3: صندوق الرسائل ==================== */
 .messages-container { 
     flex: 1 !important; 
@@ -305,11 +301,39 @@ body.conversation-open .conversation-page {
     border-color: var(--primary); 
 }
 
+/* ===== أيقونة الصورة داخل الحقل على اليمين ===== */
+.image-btn-inside {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    order: 1;
+}
+
+.image-btn-inside:hover {
+    background: rgba(33, 150, 243, 0.1);
+    transform: scale(1.05);
+}
+
+.image-btn-inside:active {
+    transform: scale(0.95);
+}
+
 .input-area { 
     flex: 1; 
     display: flex; 
     align-items: center; 
-    gap: 4px; 
+    gap: 4px;
+    order: 2;
 }
 
 #messageInput { 
@@ -338,6 +362,7 @@ body.conversation-open .conversation-page {
     font-size: 1.2rem; 
     flex-shrink: 0;
     transition: all 0.3s ease;
+    order: 3;
 }
 
 #actionBtn:hover {
