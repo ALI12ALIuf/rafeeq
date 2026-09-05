@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية ==========
+// ========== ui-functions.js - النسخة النهائية المصححة ==========
 
 window._pageStack = [];
 
@@ -352,25 +352,236 @@ function setupModals() {
     }); 
 }
 
-document.addEventListener('DOMContentLoaded', () => { 
-    ensureSinglePage(); 
-    setupNavigation(); 
-    setupModals(); 
-    loadChats(); 
-    setupChatListeners(); 
-    updateTripsCount(); 
+// ==================== دوال التعديل والرجوع المصححة ====================
+
+// ✅ فتح نافذة تعديل الملف الشخصي
+window.openEditProfileModal = function() {
+    console.log('🔧 فتح نافذة تعديل الملف الشخصي');
+    const modal = document.getElementById('editProfileModal');
+    if (!modal) {
+        console.error('❌ editProfileModal غير موجود في HTML');
+        return;
+    }
+    
+    const nameInput = document.getElementById('editName');
+    const currentName = document.getElementById('profileName')?.textContent;
+    const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent;
+    
+    if (nameInput) nameInput.value = currentName || '';
+    
+    const avatarPreview = document.getElementById('currentAvatarEmoji');
+    if (avatarPreview) avatarPreview.textContent = currentEmoji || '🧔🏻‍♂️';
+    
+    modal.classList.add('active');
+};
+
+// ✅ حفظ الملف الشخصي
+window.saveProfile = function() {
+    const n = document.getElementById('editName')?.value?.trim();
+    if (!n || n.length > 25) {
+        alert('الاسم مطلوب ولا يزيد عن 25 حرف');
+        return;
+    }
+    if (auth?.currentUser) {
+        db.collection('users').doc(auth.currentUser.uid).update({ name: n })
+            .then(() => {
+                const nameEl = document.getElementById('profileName');
+                if (nameEl) nameEl.textContent = n;
+                closeModal();
+            })
+            .catch(() => alert('فشل حفظ التغييرات'));
+    }
+};
+
+// ✅ عرض الرحلات
+window.showUserTrips = function() {
+    pushPage('page', 'profile');
+    document.body.classList.add('profile-subpage-open');
+    document.querySelector('.profile-page').style.display = 'none';
+    document.getElementById('tripsPage').style.display = 'block';
+};
+
+// ✅ عرض قائمة الأصدقاء
+window.showFriendsList = function() {
+    pushPage('page', 'profile');
+    document.body.classList.add('profile-subpage-open');
+    document.querySelector('.profile-page').style.display = 'none';
+    document.getElementById('friendsPage').style.display = 'block';
+    if (typeof loadFriendsList === 'function') loadFriendsList();
+};
+
+// ✅ الرجوع من الصفحات الفرعية (مصحح)
+window.goBack = function() {
+    console.log('🔙 goBack - الرجوع من صفحة فرعية');
+    
+    // إخفاء جميع الصفحات الفرعية
+    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
+    document.body.classList.remove('profile-subpage-open');
+    
+    // إظهار صفحة الملف الشخصي
+    const profilePage = document.querySelector('.profile-page');
+    if (profilePage) {
+        profilePage.style.display = 'block';
+        profilePage.classList.add('active');
+    }
+    
+    // مسح المكدس
+    clearStack();
+    
+    // تحديث التنقل
+    document.querySelectorAll('.nav-item').forEach(n => {
+        n.classList.remove('active');
+        if (n.dataset.page === 'profile') n.classList.add('active');
+    });
+};
+
+// ✅ إغلاق المحادثة (مصحح)
+window.closeConversation = function() {
+    console.log('🚪 إغلاق المحادثة');
+    
+    // إنهاء المكالمة إذا كانت نشطة
+    if (typeof CallSystem !== 'undefined' && CallSystem.endCall) {
+        CallSystem.endCall();
+    }
+    
+    // إغلاق المحادثة في ChatSystem
+    if (typeof ChatSystem !== 'undefined' && ChatSystem.closeChat) {
+        ChatSystem.closeChat();
+    }
+    
+    // إخفاء نتائج البحث
+    if (typeof window.hideSearchResults === 'function') {
+        window.hideSearchResults();
+    }
+    
+    // العودة للصفحة السابقة
+    setTimeout(() => {
+        const lastPage = popPage();
+        
+        // إخفاء جميع الصفحات
+        document.querySelectorAll('.page').forEach(p => {
+            p.classList.remove('active');
+            p.style.display = 'none';
+        });
+        document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none');
+        document.body.classList.remove('profile-subpage-open');
+        
+        if (lastPage && lastPage.type === 'subpage') {
+            // العودة لصفحة فرعية
+            document.body.classList.add('profile-subpage-open');
+            document.querySelector('.profile-page').style.display = 'none';
+            if (lastPage.id && document.getElementById(lastPage.id)) {
+                document.getElementById(lastPage.id).style.display = 'block';
+            }
+            document.querySelectorAll('.nav-item').forEach(n => {
+                n.classList.remove('active');
+                if (n.dataset.page === 'profile') n.classList.add('active');
+            });
+        } else if (lastPage && lastPage.type === 'page' && lastPage.id === 'profile') {
+            // العودة للملف الشخصي
+            const profilePage = document.querySelector('.profile-page');
+            if (profilePage) {
+                profilePage.classList.add('active');
+                profilePage.style.display = 'block';
+            }
+            document.querySelectorAll('.nav-item').forEach(n => {
+                n.classList.remove('active');
+                if (n.dataset.page === 'profile') n.classList.add('active');
+            });
+        } else {
+            // العودة للدردشة
+            const chatPage = document.querySelector('.chat-page');
+            if (chatPage) {
+                chatPage.classList.add('active');
+                chatPage.style.display = 'block';
+            }
+            if (typeof loadChats === 'function') loadChats();
+            document.querySelectorAll('.nav-item').forEach(n => {
+                n.classList.remove('active');
+                if (n.dataset.page === 'chat') n.classList.add('active');
+            });
+        }
+    }, 200);
+};
+
+// ✅ فتح المحادثة
+window.openChat = function(friendId) {
+    if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
+        pushPage('subpage', 'friendsPage');
+    } else if (document.getElementById('tripsPage') && document.getElementById('tripsPage').style.display === 'block') {
+        pushPage('subpage', 'tripsPage');
+    } else if (document.querySelector('.profile-page') && getComputedStyle(document.querySelector('.profile-page')).display === 'block') {
+        pushPage('page', 'profile');
+    } else {
+        pushPage('page', 'chat');
+    }
+    
+    window.db.collection('users').doc(friendId).get().then(doc => {
+        if (doc.exists) {
+            const f = doc.data();
+            if (typeof ChatSystem !== 'undefined' && ChatSystem.openChat) {
+                ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
+            }
+        }
+    }).catch(() => {});
+};
+
+// ✅ دوال معاينة الصورة
+window.closeImagePreview = function() {
+    const modal = document.getElementById('imagePreviewModal');
+    const img = document.getElementById('previewImage');
+    if (modal) modal.style.display = 'none';
+    if (img) { img.src = ''; img.style.transform = 'none'; }
+};
+
+window.downloadPreviewImage = function() {
+    const img = document.getElementById('previewImage');
+    if (!img || !img.src) return;
+    const link = document.createElement('a');
+    link.href = img.src;
+    link.download = 'image.jpg';
+    link.click();
+};
+
+// ✅ إرسال الصورة
+window.sendImage = function() {
+    const i = document.createElement('input');
+    i.type = 'file';
+    i.accept = 'image/*';
+    i.onchange = function(e) {
+        const f = e.target.files[0];
+        if (f && typeof ChatSystem !== 'undefined' && ChatSystem.currentChat) {
+            ChatSystem.sendImage(f);
+        }
+    };
+    i.click();
+};
+
+// ==================== تهيئة الصفحة ====================
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 تهيئة ui-functions...');
+    ensureSinglePage();
+    setupNavigation();
+    setupModals();
+    loadChats();
+    setupChatListeners();
+    updateTripsCount();
 });
 
-window.addEventListener('authReady', async () => { 
-    if (window.auth?.currentUser) await SecureChatSystem.init(); 
+window.addEventListener('authReady', async function() {
+    if (window.auth?.currentUser && typeof SecureChatSystem !== 'undefined') {
+        await SecureChatSystem.init();
+    }
 });
 
-if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+}
 
-window.addEventListener('error', (event) => { 
-    console.error('❌ خطأ عام:', event.error); 
+window.addEventListener('error', function(event) {
+    console.error('❌ خطأ عام:', event.error);
 });
 
-window.addEventListener('unhandledrejection', (event) => { 
-    console.error('❌ خطأ غير معالج:', event.reason); 
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('❌ خطأ غير معالج:', event.reason);
 });
