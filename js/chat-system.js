@@ -1,10 +1,11 @@
-// ========== chat-system.js - النسخة النهائية (نصوص وصور فقط) ==========
+// ========== chat-system.js - النسخة النهائية المصححة (إصلاح خطأ الصور) ==========
 // نظام الدردشة E2EE + الصور
 
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
     chatItemTemplate: null,
+    _isDisplaying: false, // ✅ منع التكرار
     
     // ==================== القسم 1: init ====================
     init() { 
@@ -117,12 +118,20 @@ const ChatSystem = {
         if (!c) return; 
         c.innerHTML = ''; 
         const messages = this.messages[friendId] || [];
-        messages.forEach(msg => { this.displayMessage(msg); });
+        messages.forEach(msg => { 
+            // ✅ منع عرض الصور المكررة
+            if (msg.type === 'image' && msg._displayed) return;
+            this.displayMessage(msg); 
+        });
         c.scrollTop = c.scrollHeight;
     },
 
-    // ==================== القسم 7: displayMessage ====================
+    // ==================== القسم 7: displayMessage (مصحح - منع التكرار) ====================
     displayMessage(msg) {
+        // ✅ منع التكرار
+        if (msg._displayed) return;
+        msg._displayed = true;
+        
         const c = document.getElementById('messagesContainer'); 
         if (!c) return;
         
@@ -138,7 +147,6 @@ const ChatSystem = {
             return `${year}-${month}-${day} ${formattedHours}:${minutes} ${ampm}`;
         };
         
-        const dateTime = formatDateTime(new Date(msg.time));
         const borderColor = msg.sender === 'me' ? '#2196F3' : '#4CAF50';
         
         const template = document.getElementById('messageWrapperTemplate');
@@ -170,35 +178,46 @@ const ChatSystem = {
             }
         }
         
-        // ==================== معالجة الصورة ====================
+        // ==================== معالجة الصورة (مصححة) ====================
         else if (msg.type === 'image') {
             const templateImg = document.getElementById('imageMessageTemplate');
-            if (templateImg) {
+            if (templateImg && msg.data) {
                 const clone = templateImg.content.cloneNode(true);
                 const wrapper = clone.querySelector('.message-image-wrapper');
                 if (wrapper) {
                     wrapper.style.border = `2px solid ${borderColor}`;
                     const img = wrapper.querySelector('.message-image-content');
                     if (img) {
-                        img.src = msg.data;
-                        img.onclick = () => this.showImagePreview(msg.data);
+                        // ✅ استخدام data URL مباشرة أو blob URL
+                        if (msg.data.startsWith('blob:') || msg.data.startsWith('data:')) {
+                            img.src = msg.data;
+                        } else {
+                            // إذا كانت الصورة مشفرة، نعرض placeholder
+                            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23333"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23666" font-size="24" font-family="sans-serif"%3E🖼️%3C/text%3E%3C/svg%3E';
+                        }
+                        img.onclick = () => this.showImagePreview(img.src);
                         img.oncontextmenu = (e) => e.preventDefault();
                         img.ondragstart = (e) => e.preventDefault();
+                        img.setAttribute('loading', 'lazy');
                     }
                 }
                 div.appendChild(clone);
             }
         }
         
-        c.appendChild(div); 
-        c.scrollTop = c.scrollHeight;
+        // ✅ منع إضافة رسائل مكررة
+        const existingMsg = c.querySelector(`#msg-${msg.id}`);
+        if (!existingMsg) {
+            c.appendChild(div); 
+            c.scrollTop = c.scrollHeight;
+        }
     },
     
     // ==================== القسم 8: showImagePreview ====================
     showImagePreview(imageSrc) {
         const modal = document.getElementById('imagePreviewModal');
         const img = document.getElementById('previewImage');
-        if (!modal || !img) return;
+        if (!modal || !img || !imageSrc) return;
         img.src = imageSrc;
         modal.style.display = 'flex';
         this.setupImageZoom(modal, img);
@@ -326,7 +345,7 @@ const ChatSystem = {
         } 
     },
 
-    // ==================== القسم 13: sendImage ====================
+    // ==================== القسم 13: sendImage (مصحح) ====================
     async sendImage(file) { 
         if (!this.currentChat) return;
         
@@ -352,7 +371,19 @@ const ChatSystem = {
             });
             
             const tempUrl = URL.createObjectURL(compressedBlob);
-            this.displayMessage({ id: msgId, type: 'image', data: tempUrl, fileName: file.name, sender: 'me', time: new Date().toISOString(), status: 'sent', _blobUrl: tempUrl });
+            const msg = { 
+                id: msgId, 
+                type: 'image', 
+                data: tempUrl, 
+                fileName: file.name, 
+                sender: 'me', 
+                time: new Date().toISOString(), 
+                status: 'sent', 
+                _blobUrl: tempUrl,
+                _displayed: false 
+            };
+            this.saveMessage(this.currentChat, msg);
+            this.displayMessage(msg);
             
             console.log('✅ تم إرسال الصورة عبر Firebase (تشفير E2EE)');
         } catch (e) {
@@ -375,6 +406,10 @@ const ChatSystem = {
         } catch (e) { 
             messages = []; 
         }
+        
+        // ✅ منع حفظ الرسائل المكررة
+        const exists = messages.some(m => m.id === message.id);
+        if (exists) return;
         
         messages.push(message); 
         
