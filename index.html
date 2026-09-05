@@ -72,7 +72,6 @@
                 </div>
                 <div id="searchResultsContainer" class="search-results-container" style="display: none;"></div>
                 
-                <!-- ✅ قالب نتيجة البحث (ثابت) -->
                 <template id="searchResultTemplate">
                     <div class="search-result-item" style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--card-bg);border-radius:var(--radius);margin-bottom:4px;">
                         <div class="search-result-avatar" style="width:40px;height:40px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;"></div>
@@ -88,7 +87,6 @@
             </div>
             <div class="chats-list" id="chatsList"></div>
             
-            <!-- ✅ قالب عنصر المحادثة (ثابت) -->
             <template id="chatItemTemplate">
                 <div class="chat-item" onclick="">
                     <div class="chat-avatar-emoji"></div>
@@ -102,7 +100,6 @@
                 </div>
             </template>
             
-            <!-- ✅ قالب طلب الصداقة (يظهر في قائمة الدردشة) -->
             <template id="friendRequestChatTemplate">
                 <div class="chat-item friend-request-item" style="border: 2px solid var(--primary); background: var(--card-bg); border-radius: var(--radius); margin-bottom: 8px; padding: 0.75rem; display: flex; align-items: center; gap: 1rem;">
                     <div class="chat-avatar-emoji" style="width: 50px; height: 50px; min-width: 50px; min-height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; line-height: 1; flex-shrink: 0;"></div>
@@ -136,11 +133,9 @@
         <!-- ===== القسم 2.2.3: صفحة المحادثة (Conversation) ===== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
             
-            <!-- ===== القسم 2.2.3.1: رأس المحادثة ===== -->
             <div class="conversation-header">
                 <button class="back-btn" onclick="closeConversation()"><i class="fas fa-arrow-right"></i></button>
                 
-                <!-- ===== القسم 2.2.3.1.1: معلومات المستخدم ===== -->
                 <div class="conversation-user-info" style="gap:0;">
                     <div class="conversation-avatar-emoji" id="conversationAvatar">👤</div>
                     <div class="conversation-user-details">
@@ -148,52 +143,26 @@
                         <span class="conversation-status" id="conversationStatus" style="font-size:0.85rem;"></span>
                     </div>
                 </div>
-            </div>
-
-            <!-- ===== القسم 2.2.3.2: حاوية الرسائل ===== -->
-            <div class="messages-container" id="messagesContainer"></div>
-
-            <!-- ===== القسم 2.2.3.3: مدخل الرسائل ===== -->
-            <div class="message-input-container">
-                <div class="message-input-wrapper">
-                    <button class="attach-btn" onclick="showAttachmentMenu()"><i class="fas fa-plus"></i></button>
-                    <div class="input-area">
-                        <textarea id="messageInput" placeholder="" onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
-                        
-                        <!-- ===== واجهة تسجيل البصمة ===== -->
-                        <div id="voiceRecordingUI" style="display:none; align-items:center; gap:10px; width:100%;">
-                            <div style="flex:1; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; position:relative; overflow:hidden;">
-                                <div id="voiceProgressFill" style="width:0%; height:100%; background:var(--primary); border-radius:2px; transition:width 0.3s;"></div>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-family:monospace; direction:ltr; min-width:100px; justify-content:center;">
-                                <span id="voiceCurrentTime" style="color:var(--primary); font-weight:bold;">0:00</span>
-                                <span id="voiceSeparator" style="color:var(--primary);">/</span>
-                                <span id="voiceMaxTime" style="color:var(--primary);">5:00</span>
-                            </div>
-                            <button id="voicePlayBtn" style="display:none; width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:var(--primary); cursor:pointer; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s;">
-                                <i class="fas fa-play"></i>
-                            </button>
-                            <button id="voiceCancelBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#ff4444; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
-                                <i class="fas fa-times"></i>
-                            </button>
-                            <button id="voiceSendBtn" style="width:32px; height:32px; border-radius:50%; border:none; background:var(--primary); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s;">
-                                <i class="fas fa-check"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <button id="actionBtn" class="voice-btn" onclick="handleActionButton()">
-                        <i class="fas fa-microphone"></i>
+                
+                <div class="call-buttons" style="display:flex;gap:12px;margin-right:auto;">
+                    <button onclick="sendImage()" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;" title="إرسال صورة">
+                        <i class="fas fa-image"></i>
                     </button>
                 </div>
             </div>
-            
-            <!-- ===== القسم 2.2.3.3.1: قائمة المرفقات (معدل - أزرار ثابتة) ===== -->
-            <div class="attachment-menu" id="attachmentMenu" style="display: none;">
-                <button class="attach-option" onclick="sendImage()"><i class="fas fa-image"></i> صورة</button>
-                <button class="attach-option" onclick="sendVideo()"><i class="fas fa-video"></i> فيديو</button>
-                <button class="attach-option" onclick="sendFile()"><i class="fas fa-file"></i> ملف</button>
-                <button class="attach-option" onclick="shareLocation()"><i class="fas fa-map-marker-alt"></i> موقع</button>
+
+            <div class="messages-container" id="messagesContainer"></div>
+
+            <div class="message-input-container">
+                <div class="message-input-wrapper">
+                    <div class="input-area" style="flex:1;display:flex;align-items:center;gap:4px;width:100%;">
+                        <textarea id="messageInput" placeholder="" onkeypress="handleMessageKeyPress(event)" autocomplete="off" oninput="toggleSendButton()" rows="1" style="resize: none; overflow-y: auto; min-height: 40px; max-height: 120px; line-height: 1.5; padding: 10px 8px; font-size: 1rem; background: transparent; border: none; outline: none; color: var(--text); width: 100%; box-sizing: border-box; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; font-family: inherit;"></textarea>
+                    </div>
+                    
+                    <button id="actionBtn" class="send-mode" onclick="handleActionButton()" style="width:38px;height:38px;border-radius:50%;border:none;background:var(--primary);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;transition:all 0.3s ease;">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -219,7 +188,6 @@
                 </div>
             </div>
             
-            <!-- ✅ زر الإعدادات داخل الملف الشخصي -->
             <div class="profile-settings-btn" style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; border: 1px solid var(--border);" onclick="switchPage('settings')">
                 <i class="fas fa-cog" style="color: var(--primary); font-size: 1.2rem;"></i>
                 <span style="color: var(--text); font-size: 0.95rem;" data-i18n="settings">الإعدادات</span>
@@ -238,7 +206,6 @@
                 <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
             </div>
             
-            <!-- ✅ قالب عنصر الصديق (ثابت) -->
             <template id="friendItemTemplate">
                 <div class="user-item">
                     <div class="user-avatar-emoji"></div>
@@ -299,105 +266,13 @@
     </div>
 </div>
 
-<!-- 4.2: معاينة الفيديو (معدل - تحكم مخصص) -->
-<div id="videoPreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10060;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
-    <!-- الإطار الأخضر -->
-    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10061;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
-    
-    <!-- حاوية الفيديو -->
-    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;flex-direction:column;background:#000;border-radius:16px;overflow:hidden;">
-        
-        <!-- الفيديو -->
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;position:relative;">
-            <video id="previewVideo" style="max-width:100%;max-height:100%;object-fit:contain;" playsinline></video>
-        </div>
-        
-        <!-- عناصر التحكم المخصصة (أسفل الفيديو - ثابتة) -->
-        <div id="videoCustomControls" style="display:none;flex-shrink:0;padding:12px 20px;background:rgba(0,0,0,0.7);backdrop-filter:blur(5px);border-top:1px solid rgba(255,255,255,0.1);flex-direction:row;align-items:center;gap:12px;justify-content:space-between;">
-            
-            <!-- زر تشغيل/إيقاف -->
-            <button id="videoPlayBtn" onclick="ChatSystem.toggleVideoPlay()" style="background:none;border:none;color:white;font-size:1.4rem;cursor:pointer;width:40px;height:40px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;border-radius:50%;">
-                <i class="fas fa-play"></i>
-            </button>
-            
-            <!-- شريط التقدم - إضافة dir="ltr" -->
-            <div style="flex:1;display:flex;align-items:center;gap:10px;direction:ltr;">
-                <span id="videoCurrentTime" style="color:white;font-size:0.75rem;font-family:monospace;min-width:40px;">0:00</span>
-                <input type="range" id="videoProgress" min="0" max="100" value="0" step="0.1" oninput="ChatSystem.seekVideo(this.value)" style="flex:1;height:4px;background:rgba(255,255,255,0.3);border-radius:2px;appearance:none;outline:none;cursor:pointer;direction:ltr;">
-                <span id="videoDuration" style="color:white;font-size:0.75rem;font-family:monospace;min-width:40px;">0:00</span>
-            </div>
-            
-            <!-- زر كتم الصوت -->
-            <button id="videoMuteBtn" onclick="ChatSystem.toggleVideoMute()" style="background:none;border:none;color:white;font-size:1.2rem;cursor:pointer;width:40px;height:40px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;border-radius:50%;">
-                <i class="fas fa-volume-up"></i>
-            </button>
-        </div>
-    </div>
-    
-    <!-- أزرار الرجوع والتنزيل (تبقى كما هي) -->
-    <div style="position:absolute;top:30px;left:0;right:0;display:flex;justify-content:space-between;padding:0 35px;pointer-events:none;z-index:10062;">
-        <button onclick="ChatSystem.closeVideoPreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
-            <i class="fas fa-arrow-right"></i>
-        </button>
-        <button onclick="ChatSystem.downloadPreviewVideo()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
-            <i class="fas fa-download"></i>
-        </button>
-    </div>
-</div>
-
-<!-- 4.3: مشاركة الموقع -->
-<div id="locationSwipeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10003;align-items:center;justify-content:center;backdrop-filter:blur(5px);font-family:system-ui,sans-serif;">
-    <div style="background:#0a0e27;border-radius:40px;width:340px;max-width:90%;padding:30px 20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4);">
-        <div style="font-size:3rem;margin-bottom:10px;">🗺️</div>
-        <h3 style="color:white;margin:0 0 5px;">مشاركة الموقع</h3>
-        <p style="color:#aaa;font-size:0.8rem;margin-bottom:20px;">هل تريد مشاركة موقعك الحالي</p>
-        <div style="background:rgba(76,175,80,0.15);border-radius:20px;padding:12px;margin-bottom:20px;">
-            <div style="color:#4CAF50;font-size:0.9rem;font-weight:bold;margin-bottom:5px;">الإحداثيات</div>
-            <div style="color:white;font-weight:bold;font-size:0.9rem;" id="locationCoordsText">0.000000 , 0.000000</div>
-        </div>
-        <div style="margin-bottom:15px;">
-            <div style="color:white;font-size:0.9rem;font-weight:bold;margin-bottom:10px;">عدد مرات فتح الموقع</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;" id="clickPresets">
-                <button class="click-preset" data-clicks="1">1</button>
-                <button class="click-preset" data-clicks="2">2</button>
-                <button class="click-preset" data-clicks="3">3</button>
-                <button class="click-preset" data-clicks="4">4</button>
-                <button class="click-preset" data-clicks="5">5</button>
-            </div>
-        </div>
-        <div style="margin-bottom:15px;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
-                <span style="color:white;font-size:0.8rem;">بلا حدود</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="unlimitedToggle">
-                    <span class="toggle-slider"></span>
-                </label>
-                <span style="color:#aaa;font-size:0.8rem;">محدود</span>
-            </div>
-        </div>
-        <p style="color:#888;font-size:0.65rem;margin:10px 0;">بعد انتهاء العدد، سيغلق الموقع تلقائياً</p>
-        <div class="swipe-container" style="width:100%;margin:20px 0;position:relative;">
-            <div id="locationSwipeButton" style="width:100%;height:70px;border-radius:50px;position:relative;overflow:hidden;cursor:grab;user-select:none;touch-action:none;background:linear-gradient(90deg,#1a5a2a 0%,#1a5a2a 50%,#8b1a1a 50%,#8b1a1a 100%);border:2px solid #2196F3;">
-                <div style="position:absolute;top:10px;bottom:10px;left:50%;width:2px;background:#2196F3;transform:translateX(-50%);"></div>
-                <div style="position:absolute;top:50%;left:50%;width:10px;height:10px;background:#2196F3;border-radius:50%;transform:translate(-50%,-50%);"></div>
-                <div id="locationLeftThumb" style="position:absolute;top:8px;left:8px;width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#4CAF50,#1b5e2a);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:grab;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:left 0.05s linear;color:white;">
-                    <i class="fas fa-check"></i>
-                </div>
-                <div id="locationRightThumb" style="position:absolute;top:8px;right:8px;width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,#f44336,#8b0000);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:grab;box-shadow:0 4px 15px rgba(0,0,0,0.3);transition:right 0.05s linear;color:white;">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 4.4: شريط التقدم -->
+<!-- 4.2: شريط التقدم -->
 <div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
     <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
     <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
 </div>
 
-<!-- 4.5: شاشة تسجيل الدخول -->
+<!-- 4.3: شاشة تسجيل الدخول -->
 <div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
     <div style="text-align:center;padding:20px;max-width:350px;">
         <div style="font-size:5rem;">🛡️</div>
@@ -411,79 +286,22 @@
 
 <!-- ==================== القسم 5: قوالب الرسائل الثابتة ==================== -->
 
-<!-- 5.0: قالب غلاف الرسالة -->
 <template id="messageWrapperTemplate">
     <div class="message"></div>
 </template>
 
-<!-- 5.1: قالب الصورة -->
 <template id="imageMessageTemplate">
-    <div class="message-image-wrapper">
-        <img class="message-image-content" src="" alt="صورة" loading="lazy">
+    <div class="message-image-wrapper" style="border-radius:12px;overflow:hidden;width:200px;height:200px;cursor:pointer;display:inline-block;border:2px solid var(--border-color);">
+        <img class="message-image-content" src="" alt="صورة" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;">
     </div>
 </template>
 
-<!-- 5.2: قالب الفيديو -->
-<template id="videoMessageTemplate">
-    <div class="message-content video-thumbnail">
-        <video class="video-thumbnail-content" preload="metadata" playsinline>
-            <source src="" type="video/mp4">
-        </video>
-        <div class="video-play-overlay">
-            <i class="fas fa-expand"></i>
-        </div>
-    </div>
-</template>
-
-<!-- 5.3: قالب البصمة الصوتية -->
-<template id="voiceMessageTemplate">
-    <div class="message-content voice-message">
-        <div class="voice-controls">
-            <button class="voice-play-btn">
-                <i class="fas fa-play"></i>
-            </button>
-            <button class="voice-replay-btn">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-            <div class="voice-timer">
-                <span class="voice-current-time">0:00</span>
-                <span class="voice-duration">0:00</span>
-            </div>
-            <button class="voice-mute-btn">
-                <i class="fas fa-volume-up"></i>
-            </button>
-        </div>
-        <audio class="voice-audio-element" style="display:none;"></audio>
-    </div>
-</template>
-
-<!-- 5.4: قالب الملف -->
-<template id="fileMessageTemplate">
-    <div class="message-content file-card">
-        <div class="file-icon">📄</div>
-        <div class="file-info">
-            <div class="file-name"></div>
-        </div>
-        <button class="download-file-btn">
-            <i class="fas fa-download"></i>
-        </button>
-    </div>
-</template>
-
-<!-- 5.5: قالب الموقع -->
-<template id="locationMessageTemplate">
-    <div class="message-content location-card">
-        <i class="fas fa-map-marker-alt"></i>
-    </div>
-</template>
-
-<!-- ✅ 5.6: قالب الرسالة النصية (جديد) -->
 <template id="textMessageTemplate">
-    <div class="message-content" style="border: 1.5px solid var(--border-color); background: var(--bg); color: var(--text); border-radius: 18px; padding: 10px 14px; max-width: 100%; word-wrap: break-word; position: relative;">
-        <span style="font-size: 1rem; line-height: 1.4; display: block;"></span>
+    <div class="message-content" style="border:1.5px solid var(--border-color);background:var(--bg);color:var(--text);border-radius:18px;padding:10px 14px;max-width:100%;word-wrap:break-word;position:relative;">
+        <span style="font-size:1rem;line-height:1.4;display:block;"></span>
     </div>
 </template>
-    
+
 <!-- ==================== القسم 6: النوافذ المنبثقة (Modals) ==================== -->
 
 <!-- 6.1: نافذة تعديل الملف الشخصي -->
@@ -497,12 +315,11 @@
     </div>
 </div>
 
-<!-- 6.2: نافذة اختيار الصورة الرمزية (معدلة - بدون نصوص + تحديد بالدائرة الزرقاء) -->
+<!-- 6.2: نافذة اختيار الصورة الرمزية -->
 <div class="modal" id="avatarModal">
     <div class="modal-content">
         <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
         <div class="avatar-options-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:15px 0;">
-            <!-- الصف الأول: رجل - 3 ألوان -->
             <button class="avatar-option-btn" data-type="man_light" onclick="selectAvatar('man_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
                 <span style="font-size:2.8rem;">🧔🏻‍♂️</span>
             </button>
@@ -512,7 +329,6 @@
             <button class="avatar-option-btn" data-type="man_dark" onclick="selectAvatar('man_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
                 <span style="font-size:2.8rem;">🧔🏽‍♂️</span>
             </button>
-            <!-- الصف الثاني: امرأة - 3 ألوان -->
             <button class="avatar-option-btn" data-type="woman_light" onclick="selectAvatar('woman_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
                 <span style="font-size:2.8rem;">👩🏻</span>
             </button>
@@ -561,13 +377,11 @@
 
 <!-- ==================== القسم 8: ملفات الجافاسكريبت ==================== -->
 <script src="js/i18n.js?v=2"></script>
-<script src="js/theme.js?v=2"></script>
 <script src="js/secure-chat.js?v=3"></script>
 <script src="js/chat-system.js?v=3"></script>
 <script src="js/ui-functions.js?v=3"></script>
 <script src="js/auth.js?v=3"></script>
 <script src="js/friends.js?v=3"></script>
-<script src="js/prevent-menu.js"></script>
 
 <!-- ==================== القسم 9: كود التشغيل ==================== -->
 <script>
@@ -599,6 +413,6 @@ window.addEventListener('load', function() {
 
 window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
 </script>
-    
+
 </body>
 </html>
