@@ -1,11 +1,11 @@
-// ========== chat-system.js - النسخة النهائية المصححة (بدون اهتزاز) ==========
+// ========== chat-system.js - النسخة النهائية المصححة (مسح الحاوية بالكامل) ==========
 // نظام الدردشة E2EE + الصور
 
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
     chatItemTemplate: null,
-    _displayedIds: new Set(), // ✅ تتبع الرسائل المعروضة
+    _displayedIds: new Set(),
     
     // ==================== القسم 1: init ====================
     init() { 
@@ -43,7 +43,7 @@ const ChatSystem = {
         
         this.currentChat = friendId;
         this.friendInConversation = true;
-        this._displayedIds = new Set(); // ✅ إعادة تعيين المعرفات المعروضة
+        this._displayedIds = new Set();
         
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
@@ -58,7 +58,7 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 4: closeChat ====================
+    // ==================== القسم 4: closeChat (مصحح - مسح الحاوية بالكامل) ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         const chatId = this.currentChat;
@@ -70,6 +70,7 @@ const ChatSystem = {
             localStorage.setItem(key, JSON.stringify(filteredMessages));
             console.log('✅ تم حفظ البيانات في localStorage');
             
+            // ✅ إلغاء تحميل جميع الصور (blob URLs)
             document.querySelectorAll('img').forEach(el => {
                 if (el.src && el.src.startsWith('blob:')) {
                     URL.revokeObjectURL(el.src);
@@ -78,7 +79,16 @@ const ChatSystem = {
             });
         }
         
+        // ✅ مسح حاوية الرسائل بالكامل (إزالة جميع العناصر بما فيها الإطارات)
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+            console.log('✅ تم مسح حاوية الرسائل بالكامل');
+        }
+        
+        // ✅ إعادة تعيين المعرفات المعروضة
         this._displayedIds = new Set();
+        
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
@@ -119,12 +129,11 @@ const ChatSystem = {
         console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
     },
     
-    // ==================== القسم 6: displayMessages (لا يعيد بناء الكل) ====================
+    // ==================== القسم 6: displayMessages ====================
     displayMessages(friendId) { 
         const c = document.getElementById('messagesContainer'); 
         if (!c) return; 
         
-        // ✅ مسح فقط عند أول فتح للمحادثة
         if (this._displayedIds.size === 0) {
             c.innerHTML = '';
         }
@@ -133,21 +142,18 @@ const ChatSystem = {
         console.log(`📨 عرض ${messages.length} رسالة للمحادثة ${friendId}`);
         
         messages.forEach(msg => { 
-            // ✅ عرض فقط الرسائل الجديدة
             if (!this._displayedIds.has(msg.id)) {
                 this.displayMessage(msg);
             }
         });
         
-        // ✅ التمرير للأسفل بعد إضافة رسائل جديدة
         setTimeout(() => {
             c.scrollTop = c.scrollHeight;
         }, 50);
     },
 
-    // ==================== القسم 7: displayMessage (إضافة فقط، لا إعادة بناء) ====================
+    // ==================== القسم 7: displayMessage ====================
     displayMessage(msg) {
-        // ✅ منع التكرار
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
         
@@ -212,10 +218,7 @@ const ChatSystem = {
             }
         }
         
-        // ✅ إضافة الرسالة فقط (بدون إعادة بناء)
         c.appendChild(div);
-        
-        // ✅ التمرير للأسفل
         setTimeout(() => {
             c.scrollTop = c.scrollHeight;
         }, 50);
