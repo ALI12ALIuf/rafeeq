@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة النهائية المصححة (إزالة الإطارات الفارغة) ==========
+// ========== chat-system.js - النسخة النهائية المصححة (مسح الإطارات عند الإغلاق) ==========
 // نظام الدردشة E2EE + الصور
 
 const ChatSystem = {
@@ -26,18 +26,7 @@ const ChatSystem = {
                 const fid = k.replace('chat_', ''); 
                 try { 
                     const data = JSON.parse(localStorage.getItem(k)) || [];
-                    // ✅ تنظيف الصور بدون بيانات
-                    const cleaned = data.filter(m => {
-                        if (m.type === 'image' && (!m.data || m.data === '')) {
-                            console.log(`🧹 تنظيف صورة بدون بيانات: ${m.id}`);
-                            return false;
-                        }
-                        return true;
-                    });
-                    this.messages[fid] = cleaned;
-                    if (cleaned.length !== data.length) {
-                        localStorage.setItem(k, JSON.stringify(cleaned));
-                    }
+                    this.messages[fid] = data;
                 } catch (e) { 
                     this.messages[fid] = []; 
                 } 
@@ -63,13 +52,32 @@ const ChatSystem = {
         document.querySelector('.chat-page').style.display = 'none'; 
         document.getElementById('conversationPage').style.display = 'flex';
         
+        // ✅ مسح الحاوية قبل عرض الرسائل
+        this.clearMessagesContainer();
         this.displayMessages(friendId);
         
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 4: closeChat ====================
+    // ==================== القسم 3.1: clearMessagesContainer (جديد) ====================
+    clearMessagesContainer() {
+        const c = document.getElementById('messagesContainer');
+        if (c) {
+            // ✅ مسح جميع العناصر وإلغاء تحميل الصور
+            const images = c.querySelectorAll('img');
+            images.forEach(img => {
+                if (img.src && img.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(img.src);
+                }
+                img.src = '';
+            });
+            c.innerHTML = '';
+        }
+        this._displayedIds = new Set();
+    },
+    
+    // ==================== القسم 4: closeChat (مصحح) ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         const chatId = this.currentChat;
@@ -77,16 +85,11 @@ const ChatSystem = {
         if (chatId) {
             const key = `chat_${chatId}`;
             const messages = this.messages[chatId] || [];
-            // ✅ تنظيف الصور بدون بيانات قبل الحفظ
-            const cleanedMessages = messages.filter(m => {
-                if (m.type === 'image' && (!m.data || m.data === '')) {
-                    return false;
-                }
-                return true;
-            });
-            localStorage.setItem(key, JSON.stringify(cleanedMessages));
+            const filteredMessages = messages.filter(msg => msg.type === 'text' || msg.type === 'image');
+            localStorage.setItem(key, JSON.stringify(filteredMessages));
             console.log('✅ تم حفظ البيانات في localStorage');
             
+            // ✅ تنظيف الصور المؤقتة
             document.querySelectorAll('img').forEach(el => {
                 if (el.src && el.src.startsWith('blob:')) {
                     URL.revokeObjectURL(el.src);
@@ -96,11 +99,7 @@ const ChatSystem = {
         }
         
         // ✅ مسح حاوية الرسائل بالكامل
-        const messagesContainer = document.getElementById('messagesContainer');
-        if (messagesContainer) {
-            messagesContainer.innerHTML = '';
-            console.log('✅ تم مسح حاوية الرسائل بالكامل');
-        }
+        this.clearMessagesContainer();
         
         this._displayedIds = new Set();
         document.body.classList.remove('conversation-open');
@@ -121,14 +120,7 @@ const ChatSystem = {
             console.log('✅ تم مسح localStorage بالكامل');
         } else {
             const messages = this.messages[chatId] || [];
-            // ✅ تنظيف الصور بدون بيانات
-            const cleaned = messages.filter(m => {
-                if (m.type === 'image' && (!m.data || m.data === '')) {
-                    return false;
-                }
-                return true;
-            });
-            const savedMessages = cleaned.slice(-100);
+            const savedMessages = messages.slice(-100);
             this.messages[chatId] = savedMessages;
             localStorage.setItem(key, JSON.stringify(savedMessages));
             console.log('✅ تم الاحتفاظ بآخر 100 رسالة');
@@ -142,10 +134,7 @@ const ChatSystem = {
         });
         
         if (this.currentChat === chatId) {
-            const messagesContainer = document.getElementById('messagesContainer');
-            if (messagesContainer) {
-                messagesContainer.innerHTML = '';
-            }
+            this.clearMessagesContainer();
         }
         console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
     },
@@ -154,10 +143,6 @@ const ChatSystem = {
     displayMessages(friendId) { 
         const c = document.getElementById('messagesContainer'); 
         if (!c) return; 
-        
-        if (this._displayedIds.size === 0) {
-            c.innerHTML = '';
-        }
         
         const messages = this.messages[friendId] || [];
         console.log(`📨 عرض ${messages.length} رسالة للمحادثة ${friendId}`);
@@ -173,16 +158,9 @@ const ChatSystem = {
         }, 50);
     },
 
-    // ==================== القسم 7: displayMessage (مصحح - تجاهل الصور بدون بيانات) ====================
+    // ==================== القسم 7: displayMessage ====================
     displayMessage(msg) {
         if (this._displayedIds.has(msg.id)) return;
-        
-        // ✅ تجاهل الصور التي ليس لها بيانات صالحة
-        if (msg.type === 'image' && (!msg.data || msg.data === '')) {
-            console.log(`⚠️ تجاهل صورة بدون بيانات: ${msg.id}`);
-            return;
-        }
-        
         this._displayedIds.add(msg.id);
         
         const c = document.getElementById('messagesContainer'); 
@@ -219,14 +197,8 @@ const ChatSystem = {
             }
         }
         
-        // ==================== معالجة الصورة (مصححة) ====================
+        // ==================== معالجة الصورة ====================
         else if (msg.type === 'image') {
-            // ✅ التحقق من وجود بيانات صالحة للصورة
-            if (!msg.data || msg.data === '') {
-                console.log(`⚠️ تخطي عرض الصورة ${msg.id} - لا توجد بيانات`);
-                return;
-            }
-            
             const templateImg = document.getElementById('imageMessageTemplate');
             if (templateImg) {
                 const clone = templateImg.content.cloneNode(true);
@@ -235,15 +207,12 @@ const ChatSystem = {
                     wrapper.style.border = `2px solid ${borderColor}`;
                     const img = wrapper.querySelector('.message-image-content');
                     if (img) {
-                        // ✅ تعيين مصدر الصورة
-                        if (msg.data.startsWith('blob:') || msg.data.startsWith('data:')) {
+                        if (msg.data && (msg.data.startsWith('blob:') || msg.data.startsWith('data:'))) {
                             img.src = msg.data;
-                        } else if (msg.data.startsWith('http')) {
+                        } else if (msg.data && msg.data.startsWith('http')) {
                             img.src = msg.data;
                         } else {
-                            // ✅ إذا كانت الصورة غير صالحة، لا نعرض الإطار
-                            console.log(`⚠️ تخطي عرض الصورة ${msg.id} - مصدر غير صالح`);
-                            return;
+                            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23333"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23666" font-size="24" font-family="sans-serif"%3E🖼️%3C/text%3E%3C/svg%3E';
                         }
                         img.onclick = () => this.showImagePreview(img.src);
                         img.oncontextmenu = (e) => e.preventDefault();
@@ -255,13 +224,12 @@ const ChatSystem = {
             }
         }
         
-        // ✅ إضافة الرسالة فقط إذا كانت تحتوي على محتوى
-        if (div.children.length > 0) {
-            c.appendChild(div);
-            setTimeout(() => {
-                c.scrollTop = c.scrollHeight;
-            }, 50);
-        }
+        // ✅ إضافة الرسالة فقط
+        c.appendChild(div);
+        
+        setTimeout(() => {
+            c.scrollTop = c.scrollHeight;
+        }, 50);
     },
     
     // ==================== القسم 8: showImagePreview ====================
@@ -451,21 +419,13 @@ const ChatSystem = {
         }
     },
 
-    // ==================== القسم 14: saveMessage (مصحح) ====================
+    // ==================== القسم 14: saveMessage ====================
     saveMessage(friendId, message) { 
         if (!friendId || !message) return;
         
         if (message.type !== 'text' && message.type !== 'image') {
             console.log(`📝 نوع الرسالة (${message.type}) لن يُحفظ`);
             return;
-        }
-        
-        // ✅ للصور: التحقق من وجود بيانات صالحة
-        if (message.type === 'image') {
-            if (!message.data || message.data === '') {
-                console.log(`⚠️ تخطي حفظ صورة بدون بيانات: ${message.id}`);
-                return;
-            }
         }
         
         const key = `chat_${friendId}`; 
@@ -476,21 +436,11 @@ const ChatSystem = {
             messages = []; 
         }
         
-        // ✅ منع حفظ الرسائل المكررة
         const exists = messages.some(m => m.id === message.id);
         if (exists) {
             console.log(`⚠️ رسالة مكررة ${message.id}، تم تخطيها`);
             return;
         }
-        
-        // ✅ إزالة أي صور قديمة بدون بيانات قبل الحفظ
-        messages = messages.filter(m => {
-            if (m.type === 'image' && (!m.data || m.data === '')) {
-                console.log(`🧹 إزالة صورة قديمة بدون بيانات: ${m.id}`);
-                return false;
-            }
-            return true;
-        });
         
         messages.push(message); 
         
@@ -698,6 +648,12 @@ function performGlobalCleanup() {
             el.src = '';
         }
     });
+    
+    // ✅ تنظيف حاوية الرسائل
+    const container = document.getElementById('messagesContainer');
+    if (container) {
+        container.innerHTML = '';
+    }
     
     const modals = ['imagePreviewModal'];
     modals.forEach(id => {
