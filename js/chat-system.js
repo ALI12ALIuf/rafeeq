@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة النهائية المصححة (مسح الإطارات عند الإغلاق) ==========
+// ========== chat-system.js - النسخة النهائية المصححة (إزالة الإطارات نهائياً) ==========
 // نظام الدردشة E2EE + الصور
 
 const ChatSystem = {
@@ -60,24 +60,33 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 3.1: clearMessagesContainer (جديد) ====================
+    // ==================== القسم 3.1: clearMessagesContainer ====================
     clearMessagesContainer() {
         const c = document.getElementById('messagesContainer');
         if (c) {
-            // ✅ مسح جميع العناصر وإلغاء تحميل الصور
+            // ✅ إلغاء تحميل جميع الصور المؤقتة
             const images = c.querySelectorAll('img');
             images.forEach(img => {
-                if (img.src && img.src.startsWith('blob:')) {
-                    URL.revokeObjectURL(img.src);
+                if (img.src && (img.src.startsWith('blob:') || img.src.startsWith('data:image'))) {
+                    try { URL.revokeObjectURL(img.src); } catch(e) {}
                 }
                 img.src = '';
+                img.removeAttribute('src');
             });
+            
+            // ✅ حذف جميع العناصر الفرعية
+            while (c.firstChild) {
+                c.removeChild(c.firstChild);
+            }
+            
+            // ✅ تنظيف أي عناصر متبقية
             c.innerHTML = '';
         }
         this._displayedIds = new Set();
+        console.log('✅ تم مسح حاوية الرسائل بالكامل');
     },
     
-    // ==================== القسم 4: closeChat (مصحح) ====================
+    // ==================== القسم 4: closeChat ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         const chatId = this.currentChat;
@@ -88,15 +97,16 @@ const ChatSystem = {
             const filteredMessages = messages.filter(msg => msg.type === 'text' || msg.type === 'image');
             localStorage.setItem(key, JSON.stringify(filteredMessages));
             console.log('✅ تم حفظ البيانات في localStorage');
-            
-            // ✅ تنظيف الصور المؤقتة
-            document.querySelectorAll('img').forEach(el => {
-                if (el.src && el.src.startsWith('blob:')) {
-                    URL.revokeObjectURL(el.src);
-                    el.src = '';
-                }
-            });
         }
+        
+        // ✅ تنظيف الصور المؤقتة في جميع أنحاء الصفحة
+        document.querySelectorAll('img').forEach(el => {
+            if (el.src && (el.src.startsWith('blob:') || el.src.startsWith('data:image'))) {
+                try { URL.revokeObjectURL(el.src); } catch(e) {}
+                el.src = '';
+                el.removeAttribute('src');
+            }
+        });
         
         // ✅ مسح حاوية الرسائل بالكامل
         this.clearMessagesContainer();
@@ -126,10 +136,12 @@ const ChatSystem = {
             console.log('✅ تم الاحتفاظ بآخر 100 رسالة');
         }
         
+        // ✅ تنظيف الصور
         document.querySelectorAll('img').forEach(el => {
-            if (el.src && el.src.startsWith('blob:')) {
-                URL.revokeObjectURL(el.src);
+            if (el.src && (el.src.startsWith('blob:') || el.src.startsWith('data:image'))) {
+                try { URL.revokeObjectURL(el.src); } catch(e) {}
                 el.src = '';
+                el.removeAttribute('src');
             }
         });
         
@@ -331,7 +343,13 @@ const ChatSystem = {
         const modal = document.getElementById('imagePreviewModal');
         const img = document.getElementById('previewImage');
         if (modal) modal.style.display = 'none';
-        if (img) { img.src = ''; img.style.transform = 'none'; }
+        if (img) { 
+            if (img.src && img.src.startsWith('blob:')) {
+                try { URL.revokeObjectURL(img.src); } catch(e) {}
+            }
+            img.src = ''; 
+            img.style.transform = 'none'; 
+        }
     },
 
     // ==================== القسم 11: downloadPreviewImage ====================
@@ -642,16 +660,21 @@ window.openChat = friendId => {
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
+    // ✅ تنظيف جميع الصور المؤقتة
     document.querySelectorAll('img').forEach(el => {
-        if (el.src && el.src.startsWith('blob:')) {
-            URL.revokeObjectURL(el.src);
+        if (el.src && (el.src.startsWith('blob:') || el.src.startsWith('data:image'))) {
+            try { URL.revokeObjectURL(el.src); } catch(e) {}
             el.src = '';
+            el.removeAttribute('src');
         }
     });
     
     // ✅ تنظيف حاوية الرسائل
     const container = document.getElementById('messagesContainer');
     if (container) {
+        while (container.firstChild) {
+            container.removeChild(container.firstChild);
+        }
         container.innerHTML = '';
     }
     
@@ -662,7 +685,12 @@ function performGlobalCleanup() {
             el.style.display = 'none';
             if (id === 'imagePreviewModal') {
                 const img = document.getElementById('previewImage');
-                if (img) img.src = '';
+                if (img) {
+                    if (img.src && img.src.startsWith('blob:')) {
+                        try { URL.revokeObjectURL(img.src); } catch(e) {}
+                    }
+                    img.src = '';
+                }
             }
         }
     });
