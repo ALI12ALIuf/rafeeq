@@ -60,10 +60,12 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 3.1: clearMessagesContainer ====================
+    // ==================== القسم 3.1: clearMessagesContainer (مصحح) ====================
     clearMessagesContainer() {
         const c = document.getElementById('messagesContainer');
         if (c) {
+            console.log('🧹 مسح حاوية الرسائل بالكامل...');
+            
             // ✅ إلغاء تحميل جميع الصور المؤقتة
             const images = c.querySelectorAll('img');
             images.forEach(img => {
@@ -74,19 +76,20 @@ const ChatSystem = {
                 img.removeAttribute('src');
             });
             
-            // ✅ حذف جميع العناصر الفرعية
+            // ✅ مسح الحاوية بالكامل باستخدام innerHTML
+            c.innerHTML = '';
+            
+            // ✅ التأكد من إزالة جميع العناصر
             while (c.firstChild) {
                 c.removeChild(c.firstChild);
             }
             
-            // ✅ تنظيف أي عناصر متبقية
-            c.innerHTML = '';
+            console.log('✅ تم مسح حاوية الرسائل بالكامل، عدد العناصر:', c.children.length);
         }
         this._displayedIds = new Set();
-        console.log('✅ تم مسح حاوية الرسائل بالكامل');
     },
     
-    // ==================== القسم 4: closeChat ====================
+    // ==================== القسم 4: closeChat (مصحح) ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         const chatId = this.currentChat;
@@ -110,6 +113,16 @@ const ChatSystem = {
         
         // ✅ مسح حاوية الرسائل بالكامل
         this.clearMessagesContainer();
+        
+        // ✅ مسح أي عناصر متبقية في conversation-page
+        const convPage = document.getElementById('conversationPage');
+        if (convPage) {
+            // إزالة أي عناصر عالقة
+            const container = document.getElementById('messagesContainer');
+            if (container) {
+                container.innerHTML = '';
+            }
+        }
         
         this._displayedIds = new Set();
         document.body.classList.remove('conversation-open');
@@ -155,6 +168,11 @@ const ChatSystem = {
     displayMessages(friendId) { 
         const c = document.getElementById('messagesContainer'); 
         if (!c) return; 
+        
+        // ✅ التأكد من أن الحاوية فارغة قبل العرض
+        if (this._displayedIds.size === 0) {
+            c.innerHTML = '';
+        }
         
         const messages = this.messages[friendId] || [];
         console.log(`📨 عرض ${messages.length} رسالة للمحادثة ${friendId}`);
@@ -669,13 +687,13 @@ function performGlobalCleanup() {
         }
     });
     
-    // ✅ تنظيف حاوية الرسائل
+    // ✅ تنظيف حاوية الرسائل بالكامل
     const container = document.getElementById('messagesContainer');
     if (container) {
+        container.innerHTML = '';
         while (container.firstChild) {
             container.removeChild(container.firstChild);
         }
-        container.innerHTML = '';
     }
     
     const modals = ['imagePreviewModal'];
