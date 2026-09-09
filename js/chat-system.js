@@ -1,11 +1,12 @@
 // ========== chat-system.js - النسخة النهائية المصححة بالكامل ==========
-// نظام الدردشة E2EE + الصور
+// نظام الدردشة E2EE + الصور (بدون أخطاء)
 
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
     chatItemTemplate: null,
     _displayedIds: new Set(),
+    _isProcessing: false, // ✅ منع المعالجة المتزامنة
     
     // ==================== القسم 1: init ====================
     init() { 
@@ -44,6 +45,7 @@ const ChatSystem = {
         this.currentChat = friendId;
         this.friendInConversation = true;
         this._displayedIds = new Set();
+        this._isProcessing = false;
         
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
@@ -58,7 +60,7 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 4: closeChat (مصحح) ====================
+    // ==================== القسم 4: closeChat ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         const chatId = this.currentChat;
@@ -70,13 +72,11 @@ const ChatSystem = {
             localStorage.setItem(key, JSON.stringify(filteredMessages));
             console.log('✅ تم حفظ البيانات في localStorage');
             
-            // ✅ إزالة جميع عناصر الصور من الـ DOM
             const container = document.getElementById('messagesContainer');
             if (container) {
                 container.innerHTML = '';
             }
             
-            // ✅ تحرير جميع الـ blob URLs
             document.querySelectorAll('img[data-blob-url]').forEach(img => {
                 const blobUrl = img.dataset.blobUrl;
                 if (blobUrl && blobUrl.startsWith('blob:')) {
@@ -86,13 +86,13 @@ const ChatSystem = {
                 img.dataset.blobUrl = '';
             });
             
-            // ✅ إزالة جميع الصور المتبقية
             document.querySelectorAll('.message-image-wrapper, .message-image-content').forEach(el => {
                 el.remove();
             });
         }
         
         this._displayedIds = new Set();
+        this._isProcessing = false;
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
@@ -101,7 +101,7 @@ const ChatSystem = {
         console.log('✅ closeChat - انتهى');
     },
     
-    // ==================== القسم 5: cleanConversationData (مصحح) ====================
+    // ==================== القسم 5: cleanConversationData ====================
     cleanConversationData(chatId, cleanAll = false) {
         console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
         const key = `chat_${chatId}`;
@@ -141,8 +141,14 @@ const ChatSystem = {
     
     // ==================== القسم 6: displayMessages ====================
     displayMessages(friendId) { 
+        if (this._isProcessing) return;
+        this._isProcessing = true;
+        
         const c = document.getElementById('messagesContainer'); 
-        if (!c) return; 
+        if (!c) {
+            this._isProcessing = false;
+            return; 
+        }
         
         if (this._displayedIds.size === 0) {
             c.innerHTML = '';
@@ -159,11 +165,13 @@ const ChatSystem = {
         
         setTimeout(() => {
             c.scrollTop = c.scrollHeight;
+            this._isProcessing = false;
         }, 50);
     },
 
-    // ==================== القسم 7: displayMessage (مصحح) ====================
+    // ==================== القسم 7: displayMessage (مصحح بالكامل) ====================
     displayMessage(msg) {
+        // ✅ منع التكرار
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
         
@@ -201,7 +209,7 @@ const ChatSystem = {
             }
         }
         
-        // ==================== معالجة الصورة (مصححة) ====================
+        // ==================== معالجة الصورة (مصححة بالكامل) ====================
         else if (msg.type === 'image') {
             const templateImg = document.getElementById('imageMessageTemplate');
             if (templateImg) {
@@ -212,6 +220,7 @@ const ChatSystem = {
                     
                     const img = wrapper.querySelector('.message-image-content');
                     if (img) {
+                        // ✅ تعيين src مباشرة
                         if (msg.data && (msg.data.startsWith('blob:') || msg.data.startsWith('data:'))) {
                             img.src = msg.data;
                         } else if (msg.data && msg.data.startsWith('http')) {
@@ -220,7 +229,15 @@ const ChatSystem = {
                             img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23333"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23666" font-size="24" font-family="sans-serif"%3E🖼️%3C/text%3E%3C/svg%3E';
                         }
                         
-                        img.onclick = () => this.showImagePreview(img.src);
+                        // ✅ أحداث الصورة - مع منع التكرار
+                        let previewOpen = false;
+                        img.onclick = () => {
+                            if (previewOpen) return;
+                            previewOpen = true;
+                            this.showImagePreview(img.src);
+                            setTimeout(() => { previewOpen = false; }, 500);
+                        };
+                        
                         img.oncontextmenu = (e) => e.preventDefault();
                         img.ondragstart = (e) => e.preventDefault();
                         img.setAttribute('loading', 'lazy');
@@ -235,7 +252,10 @@ const ChatSystem = {
             }
         }
         
-        c.appendChild(div);
+        // ✅ منع إضافة رسائل مكررة
+        if (!c.querySelector(`#msg-${msg.id}`)) {
+            c.appendChild(div);
+        }
         
         setTimeout(() => {
             c.scrollTop = c.scrollHeight;
