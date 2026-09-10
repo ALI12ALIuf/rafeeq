@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية ==========
+// ========== ui-functions.js - النسخة النهائية (مع زر حذف الصديق) ==========
 
 window._pageStack = [];
 
@@ -48,7 +48,7 @@ async function loadChats(force = false) {
         
         list.innerHTML = '';
         
-        // عرض طلبات الصداقة
+        // ===== عرض طلبات الصداقة =====
         if (requestTemplate) {
             const pendingRequests = await window.loadFriendRequestsForChat ? await window.loadFriendRequestsForChat() : [];
             const addedRequestIds = new Set();
@@ -108,6 +108,7 @@ async function loadChats(force = false) {
         
         const addedFriendIds = new Set();
         
+        // ===== عرض الأصدقاء =====
         for (const fid of friends) { 
             if (addedFriendIds.has(fid)) continue;
             addedFriendIds.add(fid);
@@ -117,14 +118,13 @@ async function loadChats(force = false) {
                 if (fdoc.exists) { 
                     const f = fdoc.data(); 
                     const key = `chat_${fid}`; 
-                    let lm = 'اضغط لبدء المحادثة', lt = ''; 
+                    let lm = 'اضغط لبدء المحادثة'; 
                     
                     try { 
                         const h = JSON.parse(localStorage.getItem(key)) || []; 
                         if (h.length > 0) { 
                             const l = h[h.length - 1]; 
                             if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
-                            lt = new Date(l.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); 
                         } 
                     } catch (e) {} 
                     
@@ -134,14 +134,27 @@ async function loadChats(force = false) {
                     const avatar = chatItem.querySelector('.chat-avatar-emoji');
                     const name = chatItem.querySelector('.chat-info h4');
                     const lastMsg = chatItem.querySelector('.last-message');
-                    const time = chatItem.querySelector('.chat-time');
+                    const userIdSpan = chatItem.querySelector('.chat-user-id');
+                    const removeBtn = chatItem.querySelector('.remove-friend-btn');
                     
                     if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️';
                     if (name) name.textContent = f.name || 'مستخدم';
                     if (lastMsg) lastMsg.textContent = lm;
-                    if (time) time.textContent = lt || '';
+                    if (userIdSpan) userIdSpan.textContent = f.shareableId || '';
                     
-                    chatItem.onclick = () => openChat(fid);
+                    // ✅ زر حذف الصديق
+                    if (removeBtn) {
+                        removeBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            window.confirmRemoveFriend(fid, f.name || 'مستخدم');
+                        };
+                    }
+                    
+                    // ✅ فتح المحادثة عند النقر على البطاقة
+                    chatItem.onclick = (e) => {
+                        if (e.target.closest('.remove-friend-btn')) return;
+                        openChat(fid);
+                    };
                     
                     list.appendChild(clone);
                 } 
@@ -161,6 +174,49 @@ async function loadChats(force = false) {
         isLoadingChats = false;
     } 
 }
+
+// ✅ دالة تأكيد حذف الصديق
+window.confirmRemoveFriend = function(friendId, friendName) {
+    const confirmed = confirm(`هل أنت متأكد من حذف "${friendName}" من قائمة الأصدقاء؟`);
+    if (confirmed) {
+        removeFriend(friendId);
+    }
+};
+
+// ✅ دالة حذف الصديق
+window.removeFriend = async function(friendId) {
+    if (!window.auth?.currentUser) return;
+    try { 
+        const uid = window.auth.currentUser.uid; 
+        const FieldValue = firebase.firestore.FieldValue;
+        
+        // حذف الصديق من قائمة المستخدم الحالي
+        await window.db.collection('users').doc(uid).update({ 
+            friends: FieldValue.arrayRemove(friendId) 
+        }); 
+        
+        // حذف المستخدم الحالي من قائمة الصديق
+        await window.db.collection('users').doc(friendId).update({ 
+            friends: FieldValue.arrayRemove(uid) 
+        }); 
+        
+        // حذف الرسائل المحلية
+        localStorage.removeItem(`chat_${friendId}`);
+        delete ChatSystem.messages[friendId];
+        
+        // تحديث العدد
+        if (typeof updateFriendsCount === 'function') await updateFriendsCount();
+        
+        // إعادة تحميل القائمة
+        chatsLoaded = false;
+        loadChats(true);
+        
+        console.log(`✅ تم حذف الصديق ${friendId}`);
+    } catch (e) { 
+        console.error('❌ خطأ في حذف الصديق:', e);
+        alert('حدث خطأ في حذف الصديق'); 
+    }
+};
 
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
@@ -254,6 +310,17 @@ async function updateTripsCount() {
         const c = document.getElementById('tripsCount'); 
         if (c) c.textContent = formatNumber(s.size); 
     } catch (error) {} 
+}
+
+async function updateFriendsCount() {
+    if (!window.auth?.currentUser) return;
+    try { 
+        const d = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); 
+        if (d.exists) { 
+            const c = document.getElementById('friendsCount'); 
+            if (c) c.textContent = formatNumber((d.data().friends||[]).length); 
+        } 
+    } catch (e) {}
 }
 
 function ensureSinglePage() { 
@@ -360,14 +427,6 @@ window.showUserTrips = function() {
     document.getElementById('tripsPage').style.display = 'block';
 };
 
-window.showFriendsList = function() {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('friendsPage').style.display = 'block';
-    if (typeof loadFriendsList === 'function') loadFriendsList();
-};
-
 window.goBack = function() {
     document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
     document.body.classList.remove('profile-subpage-open');
@@ -394,6 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadChats();
     setupChatListeners();
     updateTripsCount();
+    updateFriendsCount();
 });
 
 window.addEventListener('authReady', async function() {
