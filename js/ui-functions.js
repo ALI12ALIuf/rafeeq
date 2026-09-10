@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (مع زر حذف الصديق) ==========
+// ========== ui-functions.js - النسخة النهائية (ID مع زر نسخ + زر حذف) ==========
 
 window._pageStack = [];
 
@@ -135,12 +135,31 @@ async function loadChats(force = false) {
                     const name = chatItem.querySelector('.chat-info h4');
                     const lastMsg = chatItem.querySelector('.last-message');
                     const userIdSpan = chatItem.querySelector('.chat-user-id');
+                    const copyIdBtn = chatItem.querySelector('.copy-chat-id-btn');
                     const removeBtn = chatItem.querySelector('.remove-friend-btn');
                     
                     if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️';
                     if (name) name.textContent = f.name || 'مستخدم';
                     if (lastMsg) lastMsg.textContent = lm;
                     if (userIdSpan) userIdSpan.textContent = f.shareableId || '';
+                    
+                    // ✅ زر نسخ ID
+                    if (copyIdBtn) {
+                        copyIdBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            const id = f.shareableId || '';
+                            if (!id) return;
+                            navigator.clipboard.writeText(id).then(() => {
+                                const icon = copyIdBtn.querySelector('i');
+                                if (icon) {
+                                    icon.className = 'fas fa-check';
+                                    setTimeout(() => { 
+                                        icon.className = 'far fa-copy'; 
+                                    }, 1500);
+                                }
+                            }).catch(() => {});
+                        };
+                    }
                     
                     // ✅ زر حذف الصديق
                     if (removeBtn) {
@@ -152,7 +171,7 @@ async function loadChats(force = false) {
                     
                     // ✅ فتح المحادثة عند النقر على البطاقة
                     chatItem.onclick = (e) => {
-                        if (e.target.closest('.remove-friend-btn')) return;
+                        if (e.target.closest('.remove-friend-btn') || e.target.closest('.copy-chat-id-btn')) return;
                         openChat(fid);
                     };
                     
@@ -190,24 +209,19 @@ window.removeFriend = async function(friendId) {
         const uid = window.auth.currentUser.uid; 
         const FieldValue = firebase.firestore.FieldValue;
         
-        // حذف الصديق من قائمة المستخدم الحالي
         await window.db.collection('users').doc(uid).update({ 
             friends: FieldValue.arrayRemove(friendId) 
         }); 
         
-        // حذف المستخدم الحالي من قائمة الصديق
         await window.db.collection('users').doc(friendId).update({ 
             friends: FieldValue.arrayRemove(uid) 
         }); 
         
-        // حذف الرسائل المحلية
         localStorage.removeItem(`chat_${friendId}`);
         delete ChatSystem.messages[friendId];
         
-        // تحديث العدد
         if (typeof updateFriendsCount === 'function') await updateFriendsCount();
         
-        // إعادة تحميل القائمة
         chatsLoaded = false;
         loadChats(true);
         
