@@ -1,5 +1,5 @@
-// ========== secure-chat.js ==========
-// نظام التشفير E2EE + ضغط الصور
+// ========== secure-chat.js - النسخة النهائية (نصوص فقط) ==========
+// نظام التشفير E2EE
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -132,33 +132,6 @@ const SecureChatSystem = {
         } catch (error) { throw error; }
     },
     
-    // ==================== القسم 5: ضغط الصور ====================
-    async compressImage(file) { 
-        return new Promise((resolve, reject) => { 
-            const img = new Image(); 
-            const canvas = document.createElement('canvas'); 
-            const ctx = canvas.getContext('2d');
-            const url = URL.createObjectURL(file);
-            img.onload = () => { 
-                URL.revokeObjectURL(url);
-                let w = img.width, h = img.height; 
-                if (w > 1200 || h > 1200) { 
-                    if (w > h) { h *= 1200 / w; w = 1200; } 
-                    else { w *= 1200 / h; h = 1200; } 
-                } 
-                canvas.width = w; 
-                canvas.height = h; 
-                ctx.drawImage(img, 0, 0, w, h); 
-                canvas.toBlob((blob) => { 
-                    if (blob) resolve(blob); 
-                    else reject(new Error('فشل ضغط الصورة')); 
-                }, 'image/jpeg', 0.8); 
-            };
-            img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('فشل تحميل الصورة')); };
-            img.src = url;
-        }); 
-    },
-    
     // ==================== القسم 6: إرسال واستقبال الرسائل ====================
     async sendToServer(receiverId, encryptedPackage) { 
         if (!receiverId || !encryptedPackage) throw new Error('بيانات غير صالحة للإرسال');
@@ -200,24 +173,13 @@ const SecureChatSystem = {
             if (!myPrivateKey || !senderPublicKey) return;
             const sharedKey = await this.deriveSharedKey(myPrivateKey, senderPublicKey);
             
+            // ✅ نصوص فقط
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
                 ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
                 if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
-            else if (msg.package.type === 'image') {
-                const decryptedBase64 = await this.decryptData(msg.package.data, sharedKey);
-                const binaryString = atob(decryptedBase64);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: 'image/jpeg' });
-                const imageUrl = URL.createObjectURL(blob);
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'image', data: imageUrl, fileName: msg.package.fileName || 'صورة', sender: 'friend', time: new Date().toISOString(), _blobUrl: imageUrl });
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
-            }
             
             if (typeof loadChats === 'function') loadChats();
         } catch (error) {
