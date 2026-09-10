@@ -61,7 +61,7 @@
             </div>
         </div>
 
-        <!-- ===== صفحة الدردشة (مع الأصدقاء) ===== -->
+        <!-- ===== صفحة الدردشة ===== -->
         <div class="page chat-page">
             <div class="search-container">
                 <div class="search-box">
@@ -85,14 +85,20 @@
             </div>
             <div class="chats-list" id="chatsList"></div>
             
-            <!-- ✅ قالب عنصر المحادثة (المعدل - زر الحذف بدل الوقت) -->
+            <!-- ✅ قالب عنصر المحادثة (المعدل - ID مع زر نسخ + زر حذف) -->
             <template id="chatItemTemplate">
                 <div class="chat-item">
                     <div class="chat-avatar-emoji"></div>
                     <div class="chat-info">
                         <h4></h4>
                         <p class="last-message"></p>
-                        <span class="chat-user-id"></span>
+                        <div class="chat-id-row">
+                            <span class="chat-id-label">ID</span>
+                            <span class="chat-user-id"></span>
+                            <button class="copy-chat-id-btn" title="نسخ ID">
+                                <i class="far fa-copy"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="chat-meta">
                         <button class="remove-friend-btn" title="حذف الصديق">
@@ -191,7 +197,7 @@
             </div>
         </div>
 
-        <!-- ===== الصفحات الفرعية (الرحلات فقط) ===== -->
+        <!-- ===== الصفحات الفرعية ===== -->
         <div class="profile-pages">
             <div class="profile-subpage" id="tripsPage" style="display: none;">
                 <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
@@ -334,12 +340,12 @@
 </script>
 
 <!-- ==================== ملفات الجافاسكريبت ==================== -->
-<script src="js/i18n.js?v=2"></script>
-<script src="js/secure-chat.js?v=5"></script>
-<script src="js/chat-system.js?v=5"></script>
-<script src="js/ui-functions.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
-<script src="js/friends.js?v=5"></script>
+<script src="js/i18n.js?v=6"></script>
+<script src="js/secure-chat.js?v=6"></script>
+<script src="js/chat-system.js?v=6"></script>
+<script src="js/ui-functions.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
+<script src="js/friends.js?v=6"></script>
 
 <script>
 window.addEventListener('load', function() {
