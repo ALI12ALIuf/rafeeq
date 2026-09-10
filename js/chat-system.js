@@ -1,12 +1,12 @@
-// ========== chat-system.js - النسخة النهائية المصححة بالكامل ==========
-// نظام الدردشة E2EE + الصور (بدون أخطاء)
+// ========== chat-system.js - النسخة النهائية ==========
+// الصور لا تُحفظ - تظهر فقط أثناء المحادثة
 
 const ChatSystem = {
     currentChat: null, messages: {},
     friendInConversation: false,
     chatItemTemplate: null,
     _displayedIds: new Set(),
-    _isProcessing: false, // ✅ منع المعالجة المتزامنة
+    _isProcessing: false,
     
     // ==================== القسم 1: init ====================
     init() { 
@@ -19,7 +19,7 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 2: loadAllChats ====================
+    // ==================== القسم 2: loadAllChats (نصوص فقط) ====================
     loadAllChats() { 
         for (let i = 0; i < localStorage.length; i++) { 
             const k = localStorage.key(i); 
@@ -27,7 +27,15 @@ const ChatSystem = {
                 const fid = k.replace('chat_', ''); 
                 try { 
                     const data = JSON.parse(localStorage.getItem(k)) || [];
-                    this.messages[fid] = data;
+                    // ✅ فلترة الصور عند التحميل (النصوص فقط)
+                    const textOnly = data.filter(msg => msg.type === 'text');
+                    this.messages[fid] = textOnly;
+                    
+                    // ✅ إعادة الحفظ بدون صور
+                    if (textOnly.length !== data.length) {
+                        localStorage.setItem(k, JSON.stringify(textOnly));
+                        console.log(`🧹 تم حذف ${data.length - textOnly.length} صورة من ${fid}`);
+                    }
                 } catch (e) { 
                     this.messages[fid] = []; 
                 } 
@@ -60,39 +68,30 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 4: closeChat ====================
+    // ==================== القسم 4: closeChat (مسح كل شيء) ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         const chatId = this.currentChat;
         
         if (chatId) {
+            // ✅ حفظ النصوص فقط (بدون صور)
             const key = `chat_${chatId}`;
             const messages = this.messages[chatId] || [];
-            const filteredMessages = messages.filter(msg => msg.type === 'text' || msg.type === 'image');
-            localStorage.setItem(key, JSON.stringify(filteredMessages));
-            console.log('✅ تم حفظ البيانات في localStorage');
+            const textOnly = messages.filter(msg => msg.type === 'text');
+            localStorage.setItem(key, JSON.stringify(textOnly));
+            console.log(`✅ تم حفظ ${textOnly.length} رسالة نصية فقط`);
             
+            // ✅ مسح جميع الرسائل من الحاوية (بما فيها الصور والإطارات)
             const container = document.getElementById('messagesContainer');
             if (container) {
                 container.innerHTML = '';
             }
             
-            document.querySelectorAll('img[data-blob-url]').forEach(img => {
-                const blobUrl = img.dataset.blobUrl;
-                if (blobUrl && blobUrl.startsWith('blob:')) {
-                    URL.revokeObjectURL(blobUrl);
-                }
-                img.src = '';
-                img.dataset.blobUrl = '';
-            });
-            
-            document.querySelectorAll('.message-image-wrapper, .message-image-content').forEach(el => {
-                el.remove();
-            });
+            // ✅ مسح الصور من الذاكرة أيضاً
+            this.messages[chatId] = textOnly;
         }
         
         this._displayedIds = new Set();
-        this._isProcessing = false;
         document.body.classList.remove('conversation-open');
         document.getElementById('conversationPage').style.display = 'none';
         document.querySelector('.chat-page').style.display = 'block';
@@ -108,10 +107,11 @@ const ChatSystem = {
         
         if (!cleanAll) {
             const messages = this.messages[chatId] || [];
-            const savedMessages = messages.slice(-100);
-            this.messages[chatId] = savedMessages;
-            localStorage.setItem(key, JSON.stringify(savedMessages));
-            console.log('✅ تم الاحتفاظ بآخر 100 رسالة');
+            // ✅ الاحتفاظ بالنصوص فقط
+            const textOnly = messages.filter(msg => msg.type === 'text').slice(-100);
+            this.messages[chatId] = textOnly;
+            localStorage.setItem(key, JSON.stringify(textOnly));
+            console.log(`✅ تم الاحتفاظ بـ ${textOnly.length} رسالة نصية فقط`);
         } else {
             localStorage.removeItem(key);
             delete this.messages[chatId];
@@ -122,19 +122,6 @@ const ChatSystem = {
         if (container) {
             container.innerHTML = '';
         }
-        
-        document.querySelectorAll('img[data-blob-url]').forEach(img => {
-            const blobUrl = img.dataset.blobUrl;
-            if (blobUrl && blobUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(blobUrl);
-            }
-            img.src = '';
-            img.dataset.blobUrl = '';
-        });
-        
-        document.querySelectorAll('.message-image-wrapper, .message-image-content').forEach(el => {
-            el.remove();
-        });
         
         console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
     },
@@ -169,9 +156,8 @@ const ChatSystem = {
         }, 50);
     },
 
-    // ==================== القسم 7: displayMessage (مصحح بالكامل) ====================
+    // ==================== القسم 7: displayMessage ====================
     displayMessage(msg) {
-        // ✅ منع التكرار
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
         
@@ -209,7 +195,7 @@ const ChatSystem = {
             }
         }
         
-        // ==================== معالجة الصورة (مصححة بالكامل) ====================
+        // ==================== معالجة الصورة (مؤقتة فقط) ====================
         else if (msg.type === 'image') {
             const templateImg = document.getElementById('imageMessageTemplate');
             if (templateImg) {
@@ -219,40 +205,23 @@ const ChatSystem = {
                     wrapper.style.border = `2px solid ${borderColor}`;
                     
                     const img = wrapper.querySelector('.message-image-content');
-                    if (img) {
-                        // ✅ تعيين src مباشرة
-                        if (msg.data && (msg.data.startsWith('blob:') || msg.data.startsWith('data:'))) {
-                            img.src = msg.data;
-                        } else if (msg.data && msg.data.startsWith('http')) {
-                            img.src = msg.data;
-                        } else {
-                            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23333"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23666" font-size="24" font-family="sans-serif"%3E🖼️%3C/text%3E%3C/svg%3E';
-                        }
+                    if (img && msg.data) {
+                        img.src = msg.data;
                         
-                        // ✅ أحداث الصورة - مع منع التكرار
-                        let previewOpen = false;
                         img.onclick = () => {
-                            if (previewOpen) return;
-                            previewOpen = true;
-                            this.showImagePreview(img.src);
-                            setTimeout(() => { previewOpen = false; }, 500);
+                            if (img.src) {
+                                this.showImagePreview(img.src);
+                            }
                         };
-                        
                         img.oncontextmenu = (e) => e.preventDefault();
                         img.ondragstart = (e) => e.preventDefault();
                         img.setAttribute('loading', 'lazy');
-                        
-                        if (msg.data && msg.data.startsWith('blob:')) {
-                            img.dataset.blobUrl = msg.data;
-                        }
                     }
-                    
-                    div.appendChild(clone);
                 }
+                div.appendChild(clone);
             }
         }
         
-        // ✅ منع إضافة رسائل مكررة
         if (!c.querySelector(`#msg-${msg.id}`)) {
             c.appendChild(div);
         }
@@ -407,15 +376,21 @@ const ChatSystem = {
             const compressedBlob = await SecureChatSystem.compressImage(file);
             console.log('✅ تم ضغط الصورة');
             
-            const arrayBuffer = await compressedBlob.arrayBuffer();
-            const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            // ✅ تحويل إلى base64 دائم
+            const base64Data = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(compressedBlob);
+            });
+            
+            const base64Only = base64Data.split(',')[1];
             
             const pr = await SecureChatSystem.getMyPrivateKey();
             const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
             if (!pr || !pu) return;
             
             const sk = await SecureChatSystem.deriveSharedKey(pr, pu);
-            const encrypted = await SecureChatSystem.encryptData(base64Data, sk);
+            const encrypted = await SecureChatSystem.encryptData(base64Only, sk);
             
             const msgId = Date.now().toString();
             await SecureChatSystem.sendToServer(this.currentChat, { 
@@ -426,35 +401,39 @@ const ChatSystem = {
                 timestamp: Date.now() 
             });
             
-            const tempUrl = URL.createObjectURL(compressedBlob);
-            
+            // ✅ حفظ الرسالة في الذاكرة فقط (لا تُحفظ في localStorage)
             const msg = { 
                 id: msgId, 
                 type: 'image', 
-                data: tempUrl,
+                data: base64Data,
                 fileName: file.name, 
                 sender: 'me', 
                 time: new Date().toISOString(), 
-                status: 'sent',
-                _blobUrl: tempUrl
+                status: 'sent'
             };
             
-            this.saveMessage(this.currentChat, msg);
+            // ✅ إضافة إلى الذاكرة الحالية (بدون localStorage)
+            if (!this.messages[this.currentChat]) {
+                this.messages[this.currentChat] = [];
+            }
+            this.messages[this.currentChat].push(msg);
+            
             this.displayMessage(msg);
             
-            console.log('✅ تم إرسال الصورة عبر Firebase');
+            console.log('✅ تم إرسال الصورة (لن تُحفظ بعد الإغلاق)');
         } catch (e) {
             console.error('❌ فشل إرسال الصورة:', e);
             alert('فشل إرسال الصورة: ' + (e.message || 'خطأ غير معروف'));
         }
     },
 
-    // ==================== القسم 14: saveMessage ====================
+    // ==================== القسم 14: saveMessage (نصوص فقط) ====================
     saveMessage(friendId, message) { 
         if (!friendId || !message) return;
         
-        if (message.type !== 'text' && message.type !== 'image') {
-            console.log(`📝 نوع الرسالة (${message.type}) لن يُحفظ`);
+        // ✅ حفظ النصوص فقط في localStorage
+        if (message.type !== 'text') {
+            console.log(`📝 نوع الرسالة (${message.type}) لن يُحفظ - تظهر فقط أثناء المحادثة`);
             return;
         }
         
@@ -482,17 +461,9 @@ const ChatSystem = {
         try { 
             localStorage.setItem(key, JSON.stringify(messages)); 
             this.messages[friendId] = messages;
-            console.log(`✅ تم حفظ رسالة ${message.type} (${message.id})`);
+            console.log(`✅ تم حفظ رسالة نصية (${message.id})`);
         } catch (e) {
             console.error('❌ فشل حفظ في localStorage:', e);
-            const reduced = messages.slice(-50);
-            try { 
-                localStorage.setItem(key, JSON.stringify(reduced)); 
-                this.messages[friendId] = reduced;
-                console.log(`✅ تم حفظ آخر 50 رسالة`);
-            } catch (e2) {
-                console.error('❌ فشل حتى في حفظ 50 رسالة');
-            }
         }
     },
 
@@ -671,15 +642,6 @@ window.openChat = friendId => {
 // ==================== القسم 22: التنظيف الشامل ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
-    
-    document.querySelectorAll('img[data-blob-url]').forEach(img => {
-        const blobUrl = img.dataset.blobUrl;
-        if (blobUrl && blobUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(blobUrl);
-        }
-        img.src = '';
-        img.dataset.blobUrl = '';
-    });
     
     const container = document.getElementById('messagesContainer');
     if (container) {
