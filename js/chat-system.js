@@ -1,5 +1,5 @@
-// ========== chat-system.js - النسخة النهائية ==========
-// الصور لا تُحفظ - تظهر فقط أثناء المحادثة
+// ========== chat-system.js - النسخة النهائية (نصوص فقط) ==========
+// نظام الدردشة E2EE - بدون صور
 
 const ChatSystem = {
     currentChat: null, messages: {},
@@ -19,7 +19,7 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 2: loadAllChats (نصوص فقط) ====================
+    // ==================== القسم 2: loadAllChats ====================
     loadAllChats() { 
         for (let i = 0; i < localStorage.length; i++) { 
             const k = localStorage.key(i); 
@@ -27,14 +27,14 @@ const ChatSystem = {
                 const fid = k.replace('chat_', ''); 
                 try { 
                     const data = JSON.parse(localStorage.getItem(k)) || [];
-                    // ✅ فلترة الصور عند التحميل (النصوص فقط)
-                    const textOnly = data.filter(msg => msg.type === 'text');
+                    // ✅ نصوص فقط + آخر 25 رسالة
+                    const textOnly = data.filter(msg => msg.type === 'text').slice(-25);
                     this.messages[fid] = textOnly;
                     
-                    // ✅ إعادة الحفظ بدون صور
+                    // ✅ إعادة الحفظ بدون أي رسالة غير نصية
                     if (textOnly.length !== data.length) {
                         localStorage.setItem(k, JSON.stringify(textOnly));
-                        console.log(`🧹 تم حذف ${data.length - textOnly.length} صورة من ${fid}`);
+                        console.log(`🧹 تم حذف ${data.length - textOnly.length} رسالة غير نصية من ${fid}`);
                     }
                 } catch (e) { 
                     this.messages[fid] = []; 
@@ -68,26 +68,23 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 4: closeChat (مسح كل شيء) ====================
+    // ==================== القسم 4: closeChat ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         const chatId = this.currentChat;
         
         if (chatId) {
-            // ✅ حفظ النصوص فقط (بدون صور)
             const key = `chat_${chatId}`;
             const messages = this.messages[chatId] || [];
-            const textOnly = messages.filter(msg => msg.type === 'text');
+            const textOnly = messages.filter(msg => msg.type === 'text').slice(-25);
             localStorage.setItem(key, JSON.stringify(textOnly));
             console.log(`✅ تم حفظ ${textOnly.length} رسالة نصية فقط`);
             
-            // ✅ مسح جميع الرسائل من الحاوية (بما فيها الصور والإطارات)
             const container = document.getElementById('messagesContainer');
             if (container) {
                 container.innerHTML = '';
             }
             
-            // ✅ مسح الصور من الذاكرة أيضاً
             this.messages[chatId] = textOnly;
         }
         
@@ -107,8 +104,7 @@ const ChatSystem = {
         
         if (!cleanAll) {
             const messages = this.messages[chatId] || [];
-            // ✅ الاحتفاظ بالنصوص فقط
-            const textOnly = messages.filter(msg => msg.type === 'text').slice(-100);
+            const textOnly = messages.filter(msg => msg.type === 'text').slice(-25);
             this.messages[chatId] = textOnly;
             localStorage.setItem(key, JSON.stringify(textOnly));
             console.log(`✅ تم الاحتفاظ بـ ${textOnly.length} رسالة نصية فقط`);
@@ -156,7 +152,7 @@ const ChatSystem = {
         }, 50);
     },
 
-    // ==================== القسم 7: displayMessage ====================
+    // ==================== القسم 7: displayMessage (نصوص فقط) ====================
     displayMessage(msg) {
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
@@ -178,7 +174,7 @@ const ChatSystem = {
         div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
         div.id = `msg-${msg.id}`;
         
-        // ==================== معالجة الرسائل النصية ====================
+        // ==================== معالجة الرسائل النصية فقط ====================
         if (msg.type === 'text') {
             const textTemplate = document.getElementById('textMessageTemplate');
             if (textTemplate) {
@@ -195,33 +191,6 @@ const ChatSystem = {
             }
         }
         
-        // ==================== معالجة الصورة (مؤقتة فقط) ====================
-        else if (msg.type === 'image') {
-            const templateImg = document.getElementById('imageMessageTemplate');
-            if (templateImg) {
-                const clone = templateImg.content.cloneNode(true);
-                const wrapper = clone.querySelector('.message-image-wrapper');
-                if (wrapper) {
-                    wrapper.style.border = `2px solid ${borderColor}`;
-                    
-                    const img = wrapper.querySelector('.message-image-content');
-                    if (img && msg.data) {
-                        img.src = msg.data;
-                        
-                        img.onclick = () => {
-                            if (img.src) {
-                                this.showImagePreview(img.src);
-                            }
-                        };
-                        img.oncontextmenu = (e) => e.preventDefault();
-                        img.ondragstart = (e) => e.preventDefault();
-                        img.setAttribute('loading', 'lazy');
-                    }
-                }
-                div.appendChild(clone);
-            }
-        }
-        
         if (!c.querySelector(`#msg-${msg.id}`)) {
             c.appendChild(div);
         }
@@ -231,118 +200,6 @@ const ChatSystem = {
         }, 50);
     },
     
-    // ==================== القسم 8: showImagePreview ====================
-    showImagePreview(imageSrc) {
-        const modal = document.getElementById('imagePreviewModal');
-        const img = document.getElementById('previewImage');
-        if (!modal || !img || !imageSrc) return;
-        img.src = imageSrc;
-        modal.style.display = 'flex';
-        this.setupImageZoom(modal, img);
-    },
-    
-    // ==================== القسم 9: setupImageZoom ====================
-    setupImageZoom(modal, img) {
-        if (img._zoomCleanup) {
-            img._zoomCleanup();
-            img._zoomCleanup = null;
-        }
-        
-        let currentScale = 1;
-        let initialDistance = 0;
-        let initialScale = 1;
-        let startX = 0, startY = 0;
-        let translateX = 0, translateY = 0;
-        let isTouching = false;
-        
-        const minScale = 0.8;
-        const maxScale = 3;
-        
-        const updateTransform = () => {
-            img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
-        };
-        
-        const touchStartHandler = (e) => {
-            e.preventDefault();
-            const touches = e.touches;
-            if (touches.length === 2) {
-                const dx = touches[0].clientX - touches[1].clientX;
-                const dy = touches[0].clientY - touches[1].clientY;
-                initialDistance = Math.hypot(dx, dy);
-                initialScale = currentScale;
-                isTouching = false;
-            } else if (touches.length === 1) {
-                startX = touches[0].clientX - translateX;
-                startY = touches[0].clientY - translateY;
-                isTouching = true;
-            }
-        };
-        
-        const touchMoveHandler = (e) => {
-            e.preventDefault();
-            const touches = e.touches;
-            if (touches.length === 2 && initialDistance > 0) {
-                const dx = touches[0].clientX - touches[1].clientX;
-                const dy = touches[0].clientY - touches[1].clientY;
-                const newDistance = Math.hypot(dx, dy);
-                let newScale = initialScale * (newDistance / initialDistance);
-                newScale = Math.min(maxScale, Math.max(minScale, newScale));
-                if (newScale !== currentScale) {
-                    currentScale = newScale;
-                    updateTransform();
-                }
-            } else if (touches.length === 1 && isTouching && currentScale > 1) {
-                translateX = touches[0].clientX - startX;
-                translateY = touches[0].clientY - startY;
-                const maxTranslateX = (currentScale - 1) * 200;
-                const maxTranslateY = (currentScale - 1) * 200;
-                translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
-                translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
-                updateTransform();
-            }
-        };
-        
-        const touchEndHandler = (e) => {
-            e.preventDefault();
-            initialDistance = 0;
-            isTouching = false;
-            if (currentScale < 0.95) {
-                currentScale = 1;
-                translateX = 0;
-                translateY = 0;
-                updateTransform();
-            }
-        };
-        
-        img.addEventListener('touchstart', touchStartHandler);
-        img.addEventListener('touchmove', touchMoveHandler, { passive: false });
-        img.addEventListener('touchend', touchEndHandler);
-        
-        img._zoomCleanup = () => {
-            img.removeEventListener('touchstart', touchStartHandler);
-            img.removeEventListener('touchmove', touchMoveHandler);
-            img.removeEventListener('touchend', touchEndHandler);
-        };
-    },
-
-    // ==================== القسم 10: closeImagePreview ====================
-    closeImagePreview() {
-        const modal = document.getElementById('imagePreviewModal');
-        const img = document.getElementById('previewImage');
-        if (modal) modal.style.display = 'none';
-        if (img) { img.src = ''; img.style.transform = 'none'; }
-    },
-
-    // ==================== القسم 11: downloadPreviewImage ====================
-    downloadPreviewImage() {
-        const img = document.getElementById('previewImage');
-        if (!img || !img.src) return;
-        const link = document.createElement('a');
-        link.href = img.src;
-        link.download = 'image.jpg';
-        link.click();
-    },
-
     // ==================== القسم 12: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
@@ -367,73 +224,13 @@ const ChatSystem = {
         } 
     },
 
-    // ==================== القسم 13: sendImage ====================
-    async sendImage(file) { 
-        if (!this.currentChat) return;
-        
-        try {
-            console.log('📸 بدء ضغط الصورة...');
-            const compressedBlob = await SecureChatSystem.compressImage(file);
-            console.log('✅ تم ضغط الصورة');
-            
-            // ✅ تحويل إلى base64 دائم
-            const base64Data = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.readAsDataURL(compressedBlob);
-            });
-            
-            const base64Only = base64Data.split(',')[1];
-            
-            const pr = await SecureChatSystem.getMyPrivateKey();
-            const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat);
-            if (!pr || !pu) return;
-            
-            const sk = await SecureChatSystem.deriveSharedKey(pr, pu);
-            const encrypted = await SecureChatSystem.encryptData(base64Only, sk);
-            
-            const msgId = Date.now().toString();
-            await SecureChatSystem.sendToServer(this.currentChat, { 
-                id: msgId, 
-                type: 'image', 
-                data: encrypted, 
-                fileName: file.name,
-                timestamp: Date.now() 
-            });
-            
-            // ✅ حفظ الرسالة في الذاكرة فقط (لا تُحفظ في localStorage)
-            const msg = { 
-                id: msgId, 
-                type: 'image', 
-                data: base64Data,
-                fileName: file.name, 
-                sender: 'me', 
-                time: new Date().toISOString(), 
-                status: 'sent'
-            };
-            
-            // ✅ إضافة إلى الذاكرة الحالية (بدون localStorage)
-            if (!this.messages[this.currentChat]) {
-                this.messages[this.currentChat] = [];
-            }
-            this.messages[this.currentChat].push(msg);
-            
-            this.displayMessage(msg);
-            
-            console.log('✅ تم إرسال الصورة (لن تُحفظ بعد الإغلاق)');
-        } catch (e) {
-            console.error('❌ فشل إرسال الصورة:', e);
-            alert('فشل إرسال الصورة: ' + (e.message || 'خطأ غير معروف'));
-        }
-    },
-
-    // ==================== القسم 14: saveMessage (نصوص فقط) ====================
+    // ==================== القسم 14: saveMessage (نصوص فقط - آخر 25 رسالة) ====================
     saveMessage(friendId, message) { 
         if (!friendId || !message) return;
         
-        // ✅ حفظ النصوص فقط في localStorage
+        // ✅ نصوص فقط
         if (message.type !== 'text') {
-            console.log(`📝 نوع الرسالة (${message.type}) لن يُحفظ - تظهر فقط أثناء المحادثة`);
+            console.log(`🚫 نوع الرسالة (${message.type}) غير مدعوم - النصوص فقط`);
             return;
         }
         
@@ -453,9 +250,10 @@ const ChatSystem = {
         
         messages.push(message); 
         
-        if (messages.length > 100) {
-            messages = messages.slice(-100);
-            console.log(`🧹 تم الاقتصار على آخر 100 رسالة`);
+        // ✅ آخر 25 رسالة فقط
+        if (messages.length > 25) {
+            messages = messages.slice(-25);
+            console.log(`🧹 تم الاقتصار على آخر 25 رسالة`);
         }
         
         try { 
@@ -484,38 +282,13 @@ const ChatSystem = {
         const div = document.createElement('div'); 
         div.textContent = text; 
         return div.innerHTML; 
-    },
-    
-    // ==================== القسم 17: showProgressBar ====================
-    showProgressBar(message, percent) {
-        const bar = document.getElementById('progressBar');
-        if (!bar) return;
-        bar.style.display = 'flex';
-        const fill = document.getElementById('progressFill');
-        const perc = document.getElementById('progressPercent');
-        if (fill) fill.style.width = '0%';
-        if (perc) perc.textContent = '0%';
-    },
-    
-    // ==================== القسم 18: updateProgressBar ====================
-    updateProgressBar(percent, message) {
-        const fill = document.getElementById('progressFill');
-        const perc = document.getElementById('progressPercent');
-        if (fill) fill.style.width = Math.min(percent, 100) + '%';
-        if (perc) perc.textContent = Math.round(percent) + '%';
-    },
-    
-    // ==================== القسم 19: hideProgressBar ====================
-    hideProgressBar() { 
-        const bar = document.getElementById('progressBar'); 
-        if (bar) bar.style.display = 'none'; 
     }
 };
 
-// ==================== القسم 20: تشغيل النظام ====================
+// ==================== تشغيل النظام ====================
 ChatSystem.init();
 
-// ==================== القسم 21: دوال الواجهة العامة ====================
+// ==================== دوال الواجهة العامة ====================
 window.sendMessage = () => { 
     const inp = document.getElementById('messageInput'); 
     if (inp && inp.value.trim()) {
@@ -542,21 +315,11 @@ window.toggleSendButton = function() {
     const btn = document.getElementById('actionBtn');
     if (!input || !btn) return;
     
-    const hasText = input.value.trim().length > 0;
-    
-    if (hasText) {
-        btn.className = 'send-mode';
-        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
-        btn.title = 'إرسال';
-        btn.style.background = 'var(--primary)';
-        btn.style.color = 'white';
-    } else {
-        btn.className = 'send-mode';
-        btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
-        btn.title = 'إرسال';
-        btn.style.background = 'var(--primary)';
-        btn.style.color = 'white';
-    }
+    btn.className = 'send-mode';
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+    btn.title = 'إرسال';
+    btn.style.background = 'var(--primary)';
+    btn.style.color = 'white';
     btn.style.display = 'flex';
 };
 
@@ -567,28 +330,6 @@ window.handleActionButton = function() {
     if (hasText) {
         window.sendMessage();
     }
-};
-
-window.sendImage = () => { 
-    const i = document.createElement('input'); 
-    i.type = 'file'; 
-    i.accept = 'image/*'; 
-    i.onchange = e => { 
-        const f = e.target.files[0]; 
-        if (f && ChatSystem.currentChat) {
-            console.log('📸 تم اختيار صورة، جاري الإرسال...');
-            ChatSystem.sendImage(f); 
-        }
-    }; 
-    i.click(); 
-};
-
-window.closeImagePreview = function() {
-    ChatSystem.closeImagePreview();
-};
-
-window.downloadPreviewImage = function() {
-    ChatSystem.downloadPreviewImage();
 };
 
 window.closeConversation = () => { 
@@ -639,7 +380,7 @@ window.openChat = friendId => {
     }).catch(() => {});
 };
 
-// ==================== القسم 22: التنظيف الشامل ====================
+// ==================== التنظيف الشامل ====================
 function performGlobalCleanup() {
     console.log('🧹 بدء التنظيف الشامل للموقع...');
     
@@ -647,18 +388,6 @@ function performGlobalCleanup() {
     if (container) {
         container.innerHTML = '';
     }
-    
-    const modals = ['imagePreviewModal'];
-    modals.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.style.display = 'none';
-            if (id === 'imagePreviewModal') {
-                const img = document.getElementById('previewImage');
-                if (img) img.src = '';
-            }
-        }
-    });
     
     console.log('✅ اكتمل التنظيف الشامل للموقع');
 }
@@ -669,7 +398,7 @@ if (document.readyState === 'loading') {
     performGlobalCleanup();
 }
 
-// ==================== القسم 23: إصلاح الكيبورد ====================
+// ==================== إصلاح الكيبورد ====================
 const initVisualViewportFix = () => {
     if (!window.visualViewport) return;
     const fixViewportHeight = () => {
