@@ -16,7 +16,7 @@
 </head>
 <body class="theme-dark" data-page="home">
 
-<!-- ==================== القسم 1: شاشة البداية ==================== -->
+<!-- ==================== شاشة البداية ==================== -->
 <div class="splash-screen" id="splash">
     <div class="splash-content">
         <div class="app-icon">🛡️</div>
@@ -26,7 +26,7 @@
     </div>
 </div>
 
-<!-- ==================== القسم 2: الحاوية الرئيسية ==================== -->
+<!-- ==================== الحاوية الرئيسية ==================== -->
 <div class="app-container" id="app" style="display: none;">
     
     <header class="app-header">
@@ -61,7 +61,7 @@
             </div>
         </div>
 
-        <!-- ===== صفحة الدردشة ===== -->
+        <!-- ===== صفحة الدردشة (مع الأصدقاء) ===== -->
         <div class="page chat-page">
             <div class="search-container">
                 <div class="search-box">
@@ -85,15 +85,19 @@
             </div>
             <div class="chats-list" id="chatsList"></div>
             
+            <!-- ✅ قالب عنصر المحادثة (المعدل - زر الحذف بدل الوقت) -->
             <template id="chatItemTemplate">
-                <div class="chat-item" onclick="">
+                <div class="chat-item">
                     <div class="chat-avatar-emoji"></div>
                     <div class="chat-info">
                         <h4></h4>
                         <p class="last-message"></p>
+                        <span class="chat-user-id"></span>
                     </div>
                     <div class="chat-meta">
-                        <span class="chat-time"></span>
+                        <button class="remove-friend-btn" title="حذف الصديق">
+                            <i class="fas fa-user-minus"></i>
+                        </button>
                     </div>
                 </div>
             </template>
@@ -128,7 +132,7 @@
             </template>
         </div>
 
-        <!-- ===== صفحة المحادثة (نصوص فقط) ===== -->
+        <!-- ===== صفحة المحادثة ===== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
             
             <div class="conversation-header">
@@ -176,7 +180,7 @@
                 <p class="profile-bio" id="profileBio"></p>
                 <div class="profile-stats">
                     <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
-                    <a href="#" class="stat-link" onclick="showFriendsList()"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
+                    <a href="#" class="stat-link"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
                 </div>
             </div>
             
@@ -187,34 +191,12 @@
             </div>
         </div>
 
-        <!-- ===== الصفحات الفرعية ===== -->
+        <!-- ===== الصفحات الفرعية (الرحلات فقط) ===== -->
         <div class="profile-pages">
             <div class="profile-subpage" id="tripsPage" style="display: none;">
                 <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
                 <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
             </div>
-            <div class="profile-subpage" id="friendsPage" style="display: none;">
-                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="friends">الأصدقاء</h3></div>
-                <div class="users-list" id="friendsList"><div class="empty-state"><i class="fas fa-user-friends"></i><h3 data-i18n="no_friends">لا يوجد أصدقاء</h3><p data-i18n="no_friends_desc">لم تضف أي أصدقاء بعد</p></div></div>
-            </div>
-            
-            <template id="friendItemTemplate">
-                <div class="user-item">
-                    <div class="user-avatar-emoji"></div>
-                    <div class="user-info">
-                        <h4></h4>
-                        <p></p>
-                    </div>
-                    <div class="user-actions">
-                        <button class="action-btn chat-btn" title="محادثة">
-                            <i class="fas fa-comment"></i>
-                        </button>
-                        <button class="action-btn remove-btn" title="حذف" style="background:var(--danger);color:white;">
-                            <i class="fas fa-user-minus"></i>
-                        </button>
-                    </div>
-                </div>
-            </template>
         </div>
 
         <!-- ===== صفحة الإعدادات ===== -->
@@ -241,13 +223,11 @@
 
 <!-- ==================== العناصر الثابتة ==================== -->
 
-<!-- شريط التقدم -->
 <div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
     <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
     <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
 </div>
 
-<!-- شاشة تسجيل الدخول -->
 <div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
     <div style="text-align:center;padding:20px;max-width:350px;">
         <div style="font-size:5rem;">🛡️</div>
@@ -273,7 +253,6 @@
 
 <!-- ==================== النوافذ المنبثقة ==================== -->
 
-<!-- نافذة تعديل الملف الشخصي -->
 <div class="modal" id="editProfileModal">
     <div class="modal-content">
         <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
@@ -296,7 +275,6 @@
     </div>
 </div>
 
-<!-- نافذة اختيار الصورة الرمزية -->
 <div class="modal" id="avatarModal">
     <div class="modal-content">
         <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
@@ -324,7 +302,6 @@
     </div>
 </div>
 
-<!-- نافذة اختيار اللغة -->
 <div class="modal" id="languageModal">
     <div class="modal-content">
         <h3 data-i18n="select_language">اختر اللغة</h3>
@@ -358,13 +335,12 @@
 
 <!-- ==================== ملفات الجافاسكريبت ==================== -->
 <script src="js/i18n.js?v=2"></script>
-<script src="js/secure-chat.js?v=4"></script>
-<script src="js/chat-system.js?v=4"></script>
-<script src="js/ui-functions.js?v=4"></script>
-<script src="js/auth.js?v=4"></script>
-<script src="js/friends.js?v=4"></script>
+<script src="js/secure-chat.js?v=5"></script>
+<script src="js/chat-system.js?v=5"></script>
+<script src="js/ui-functions.js?v=5"></script>
+<script src="js/auth.js?v=5"></script>
+<script src="js/friends.js?v=5"></script>
 
-<!-- ==================== كود التشغيل ==================== -->
 <script>
 window.addEventListener('load', function() {
     setTimeout(function() {
