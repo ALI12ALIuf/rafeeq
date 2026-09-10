@@ -395,3 +395,59 @@ body:not(.conversation-open) .conversation-page {
 .nav-item.active i { color: var(--primary) !important; }
 .app-content { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
 .page { padding: 0.5rem !important; }
+
+
+
+/* ==================== زر حذف الصديق في قائمة الدردشة ==================== */
+.chat-item {
+    position: relative;
+}
+
+.chat-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-user-id {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-light);
+    font-family: monospace;
+    direction: ltr;
+    text-align: right;
+    margin-top: 2px;
+    opacity: 0.7;
+}
+
+.chat-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-right: auto;
+}
+
+.remove-friend-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(244, 67, 54, 0.15);
+    color: var(--danger);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.remove-friend-btn:hover {
+    background: rgba(244, 67, 54, 0.3);
+    transform: scale(1.05);
+}
+
+.remove-friend-btn:active {
+    transform: scale(0.95);
+}
