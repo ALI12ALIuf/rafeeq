@@ -398,16 +398,41 @@ body:not(.conversation-open) .conversation-page {
 
 
 
+/* ==================== chat-info (الاسم فوق + ID تحته مباشرة) ==================== */
+.chat-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    text-align: right;
+}
 
-/* ==================== صف ID في قائمة الدردشة (ID + رقم + نسخ بصف واحد على اليمين) ==================== */
+.chat-info h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+    width: 100%;
+}
+
+/* ✅ إخفاء last-message تماماً */
+.chat-info .last-message {
+    display: none !important;
+}
+
+/* ==================== صف ID (تحت الاسم مباشرة، بصف واحد على اليمين) ==================== */
 .chat-id-row {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: 4px;
     direction: rtl;
-    justify-content: flex-end;
     width: 100%;
+    justify-content: flex-start;
+    padding: 0;
+    margin: 0;
 }
 
 .chat-id-label {
@@ -439,7 +464,7 @@ body:not(.conversation-open) .conversation-page {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 3px 4px;
+    padding: 3px;
     border-radius: 50%;
     transition: all 0.2s ease;
     flex-shrink: 0;
@@ -454,60 +479,3 @@ body:not(.conversation-open) .conversation-page {
 .copy-chat-id-btn:active {
     transform: scale(0.9);
 }
-
-/* ==================== تحسين chat-info ==================== */
-.chat-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.chat-info h4 {
-    margin: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text);
-    text-align: right;
-}
-
-/* ✅ إخفاء last-message تماماً */
-.chat-info .last-message {
-    display: none !important;
-}
-
-/* ==================== زر حذف الصديق ==================== */
-.chat-meta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-right: auto;
-}
-
-.remove-friend-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(244, 67, 54, 0.15);
-    color: var(--danger);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-
-.remove-friend-btn:hover {
-    background: rgba(244, 67, 54, 0.3);
-    transform: scale(1.05);
-}
-
-.remove-friend-btn:active {
-    transform: scale(0.95);
-}
-
