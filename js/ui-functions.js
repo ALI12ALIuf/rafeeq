@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (ID مع زر نسخ + زر حذف) ==========
+// ========== ui-functions.js - النسخة النهائية (ID تحت الاسم فقط + زر نسخ + زر حذف) ==========
 
 window._pageStack = [];
 
@@ -108,7 +108,7 @@ async function loadChats(force = false) {
         
         const addedFriendIds = new Set();
         
-        // ===== عرض الأصدقاء =====
+        // ===== عرض الأصدقاء (ID تحت الاسم فقط) =====
         for (const fid of friends) { 
             if (addedFriendIds.has(fid)) continue;
             addedFriendIds.add(fid);
@@ -117,30 +117,18 @@ async function loadChats(force = false) {
                 const fdoc = await window.db.collection('users').doc(fid).get(); 
                 if (fdoc.exists) { 
                     const f = fdoc.data(); 
-                    const key = `chat_${fid}`; 
-                    let lm = 'اضغط لبدء المحادثة'; 
-                    
-                    try { 
-                        const h = JSON.parse(localStorage.getItem(key)) || []; 
-                        if (h.length > 0) { 
-                            const l = h[h.length - 1]; 
-                            if (l.type === 'text') lm = l.text.length > 30 ? l.text.substring(0, 30) + '...' : l.text; 
-                        } 
-                    } catch (e) {} 
                     
                     const clone = chatTemplate.content.cloneNode(true);
                     const chatItem = clone.querySelector('.chat-item');
                     
                     const avatar = chatItem.querySelector('.chat-avatar-emoji');
                     const name = chatItem.querySelector('.chat-info h4');
-                    const lastMsg = chatItem.querySelector('.last-message');
                     const userIdSpan = chatItem.querySelector('.chat-user-id');
                     const copyIdBtn = chatItem.querySelector('.copy-chat-id-btn');
                     const removeBtn = chatItem.querySelector('.remove-friend-btn');
                     
                     if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️';
                     if (name) name.textContent = f.name || 'مستخدم';
-                    if (lastMsg) lastMsg.textContent = lm;
                     if (userIdSpan) userIdSpan.textContent = f.shareableId || '';
                     
                     // ✅ زر نسخ ID
