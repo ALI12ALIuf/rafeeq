@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (ID + رقم + نسخ بصف واحد) ==========
+// ========== ui-functions.js - النسخة النهائية (ID تحت الاسم فقط + زر نسخ + زر حذف) ==========
 
 window._pageStack = [];
 
@@ -108,7 +108,7 @@ async function loadChats(force = false) {
         
         const addedFriendIds = new Set();
         
-        // ===== عرض الأصدقاء (ID + رقم + نسخ بصف واحد) =====
+        // ===== عرض الأصدقاء (ID تحت الاسم فقط) =====
         for (const fid of friends) { 
             if (addedFriendIds.has(fid)) continue;
             addedFriendIds.add(fid);
