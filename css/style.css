@@ -106,123 +106,10 @@ body.conversation-open {
 .chats-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .chat-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .chat-avatar-emoji { width: 50px; height: 50px; min-width: 50px; min-height: 50px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; line-height: 1; }
+.chat-info { flex: 1; }
+.chat-info h4 { margin-bottom: 0.25rem; font-size: 0.9rem; }
+.chat-info p { color: var(--text-light); font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-time { color: var(--text-light); font-size: 0.7rem; }
-
-/* ==================== القسم 8.1: chat-info (الاسم فوق + ID تحته) ==================== */
-.chat-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    align-items: flex-end;
-    text-align: right;
-}
-
-.chat-info h4 {
-    margin: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text);
-    text-align: right;
-    width: 100%;
-}
-
-/* ✅ إخفاء last-message تماماً */
-.chat-info .last-message {
-    display: none !important;
-}
-
-/* ==================== القسم 8.2: صف ID (مثل شريط البحث) ==================== */
-.chat-id-row {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    direction: ltr;
-    justify-content: flex-start;
-    padding: 0;
-    margin: 0;
-    width: 100%;
-}
-
-.chat-id-label {
-    font-size: 0.75rem;
-    color: var(--primary);
-    font-weight: 700;
-    font-family: sans-serif;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
-    order: 3;
-}
-
-.chat-user-id {
-    font-size: 0.8rem;
-    color: var(--text-light);
-    font-family: monospace;
-    direction: ltr;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
-    order: 2;
-}
-
-.copy-chat-id-btn {
-    background: transparent;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    font-size: 0.85rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 3px;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-    order: 1;
-}
-
-.copy-chat-id-btn:hover {
-    background: rgba(33, 150, 243, 0.15);
-    transform: scale(1.15);
-}
-
-.copy-chat-id-btn:active {
-    transform: scale(0.9);
-}
-
-/* ==================== القسم 8.3: chat-meta (زر الحذف) ==================== */
-.chat-meta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-right: auto;
-}
-
-.remove-friend-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(244, 67, 54, 0.15);
-    color: var(--danger);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-
-.remove-friend-btn:hover {
-    background: rgba(244, 67, 54, 0.3);
-    transform: scale(1.05);
-}
-
-.remove-friend-btn:active {
-    transform: scale(0.95);
-}
 
 /* ==================== القسم 9: صفحة الملف الشخصي ==================== */
 .profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
@@ -508,3 +395,118 @@ body:not(.conversation-open) .conversation-page {
 .nav-item.active i { color: var(--primary) !important; }
 .app-content { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
 .page { padding: 0.5rem !important; }
+
+
+
+
+/* ==================== صف ID في قائمة الدردشة ==================== */
+.chat-id-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    margin-top: 3px;
+    direction: rtl;
+}
+
+.chat-id-label {
+    font-size: 0.75rem;
+    color: var(--primary);
+    font-weight: 700;
+    font-family: sans-serif;
+    letter-spacing: 0.5px;
+}
+
+.chat-user-id {
+    font-size: 0.78rem;
+    color: var(--text-light);
+    font-family: monospace;
+    direction: ltr;
+    letter-spacing: 0.5px;
+    opacity: 0.9;
+}
+
+.copy-chat-id-btn {
+    background: transparent;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 4px;
+    margin-right: 2px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.copy-chat-id-btn:hover {
+    background: rgba(33, 150, 243, 0.15);
+    transform: scale(1.15);
+}
+
+.copy-chat-id-btn:active {
+    transform: scale(0.9);
+}
+
+/* ==================== زر حذف الصديق ==================== */
+.chat-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-right: auto;
+}
+
+.remove-friend-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(244, 67, 54, 0.15);
+    color: var(--danger);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.remove-friend-btn:hover {
+    background: rgba(244, 67, 54, 0.3);
+    transform: scale(1.05);
+}
+
+.remove-friend-btn:active {
+    transform: scale(0.95);
+}
+
+/* ==================== تحسين chat-info ==================== */
+.chat-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.chat-info h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.chat-info .last-message {
+    color: var(--text-light);
+    font-size: 0.78rem;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0;
+}
