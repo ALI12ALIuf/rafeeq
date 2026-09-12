@@ -133,7 +133,7 @@ body.conversation-open {
     flex-shrink: 0;
 }
 
-/* ==================== القسم 8.1: chat-info و ID (الجديد) ==================== */
+/* ==================== القسم 8.1: chat-info و ID ==================== */
 .chat-info {
     flex: 1;
     min-width: 0;
@@ -157,7 +157,7 @@ body.conversation-open {
     display: none !important;
 }
 
-/* ✅ صف ID (ID + الرقم + نسخ بصف واحد ومتقاربين) */
+/* ✅ صف ID (ID في أقصى اليمين → الرقم → 📋 على اليسار) */
 .chat-id-row {
     display: flex;
     align-items: center;
@@ -166,7 +166,8 @@ body.conversation-open {
     margin-top: 3px;
     direction: ltr;
     width: 100%;
-    padding-right: 2px;
+    padding-right: 0;
+    flex-direction: row-reverse;
 }
 
 .chat-id-label {
@@ -177,6 +178,7 @@ body.conversation-open {
     letter-spacing: 0.5px;
     flex-shrink: 0;
     line-height: 1;
+    order: 3;
 }
 
 .chat-user-id {
@@ -188,6 +190,7 @@ body.conversation-open {
     flex-shrink: 0;
     line-height: 1;
     opacity: 0.9;
+    order: 2;
 }
 
 .copy-chat-id-btn {
@@ -204,6 +207,7 @@ body.conversation-open {
     transition: all 0.2s ease;
     flex-shrink: 0;
     line-height: 1;
+    order: 1;
 }
 
 .copy-chat-id-btn:hover {
