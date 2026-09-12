@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (ID تحت الاسم فقط + زر نسخ + زر حذف) ==========
+// ========== ui-functions.js - النسخة النهائية (بدون رحلات وأصدقاء) ==========
 
 window._pageStack = [];
 
@@ -108,7 +108,7 @@ async function loadChats(force = false) {
         
         const addedFriendIds = new Set();
         
-        // ===== عرض الأصدقاء (ID تحت الاسم فقط) =====
+        // ===== عرض الأصدقاء =====
         for (const fid of friends) { 
             if (addedFriendIds.has(fid)) continue;
             addedFriendIds.add(fid);
@@ -131,7 +131,6 @@ async function loadChats(force = false) {
                     if (name) name.textContent = f.name || 'مستخدم';
                     if (userIdSpan) userIdSpan.textContent = f.shareableId || '';
                     
-                    // ✅ زر نسخ ID
                     if (copyIdBtn) {
                         copyIdBtn.onclick = (e) => {
                             e.stopPropagation();
@@ -141,15 +140,12 @@ async function loadChats(force = false) {
                                 const icon = copyIdBtn.querySelector('i');
                                 if (icon) {
                                     icon.className = 'fas fa-check';
-                                    setTimeout(() => { 
-                                        icon.className = 'far fa-copy'; 
-                                    }, 1500);
+                                    setTimeout(() => { icon.className = 'far fa-copy'; }, 1500);
                                 }
                             }).catch(() => {});
                         };
                     }
                     
-                    // ✅ زر حذف الصديق
                     if (removeBtn) {
                         removeBtn.onclick = (e) => {
                             e.stopPropagation();
@@ -157,7 +153,6 @@ async function loadChats(force = false) {
                         };
                     }
                     
-                    // ✅ فتح المحادثة عند النقر على البطاقة
                     chatItem.onclick = (e) => {
                         if (e.target.closest('.remove-friend-btn') || e.target.closest('.copy-chat-id-btn')) return;
                         openChat(fid);
@@ -207,8 +202,6 @@ window.removeFriend = async function(friendId) {
         
         localStorage.removeItem(`chat_${friendId}`);
         delete ChatSystem.messages[friendId];
-        
-        if (typeof updateFriendsCount === 'function') await updateFriendsCount();
         
         chatsLoaded = false;
         loadChats(true);
@@ -305,26 +298,6 @@ function formatNumber(num) {
     return num.toString(); 
 }
 
-async function updateTripsCount() { 
-    if (!window.auth || !window.auth.currentUser) return; 
-    try { 
-        const s = await window.db.collection('trips').where('userId', '==', window.auth.currentUser.uid).where('status', '==', 'ended').get(); 
-        const c = document.getElementById('tripsCount'); 
-        if (c) c.textContent = formatNumber(s.size); 
-    } catch (error) {} 
-}
-
-async function updateFriendsCount() {
-    if (!window.auth?.currentUser) return;
-    try { 
-        const d = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); 
-        if (d.exists) { 
-            const c = document.getElementById('friendsCount'); 
-            if (c) c.textContent = formatNumber((d.data().friends||[]).length); 
-        } 
-    } catch (e) {}
-}
-
 function ensureSinglePage() { 
     document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); 
     document.querySelectorAll('.page').forEach(p => { 
@@ -387,7 +360,7 @@ function setupModals() {
     }); 
 }
 
-// ==================== دوال التعديل والرجوع ====================
+// ==================== دوال التعديل ====================
 
 window.openEditProfileModal = function() {
     const modal = document.getElementById('editProfileModal');
@@ -422,30 +395,6 @@ window.saveProfile = function() {
     }
 };
 
-window.showUserTrips = function() {
-    pushPage('page', 'profile');
-    document.body.classList.add('profile-subpage-open');
-    document.querySelector('.profile-page').style.display = 'none';
-    document.getElementById('tripsPage').style.display = 'block';
-};
-
-window.goBack = function() {
-    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
-    document.body.classList.remove('profile-subpage-open');
-    
-    const profilePage = document.querySelector('.profile-page');
-    if (profilePage) {
-        profilePage.style.display = 'block';
-        profilePage.classList.add('active');
-    }
-    
-    clearStack();
-    document.querySelectorAll('.nav-item').forEach(n => {
-        n.classList.remove('active');
-        if (n.dataset.page === 'profile') n.classList.add('active');
-    });
-};
-
 // ==================== تهيئة الصفحة ====================
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 تهيئة ui-functions...');
@@ -454,8 +403,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupModals();
     loadChats();
     setupChatListeners();
-    updateTripsCount();
-    updateFriendsCount();
 });
 
 window.addEventListener('authReady', async function() {
