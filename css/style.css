@@ -133,14 +133,15 @@ body.conversation-open {
     flex-shrink: 0;
 }
 
-/* ==================== القسم 8.1: chat-info و ID (الجديد) ==================== */
+/* ==================== القسم 8.1: chat-info و ID ==================== */
 .chat-info {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    align-items: flex-start;
+    align-items: flex-end;
+    text-align: right;
 }
 
 .chat-info h4 {
@@ -157,16 +158,16 @@ body.conversation-open {
     display: none !important;
 }
 
-/* ✅ صف ID (ID + الرقم + نسخ بصف واحد ومتقاربين) */
+/* ✅ صف ID (ID + الرقم + نسخ) - محاذاة على اليمين */
 .chat-id-row {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: flex-end;
     gap: 5px;
     margin-top: 3px;
-    direction: ltr;
+    direction: rtl;
     width: 100%;
-    padding-right: 2px;
+    padding-right: 0;
 }
 
 .chat-id-label {
