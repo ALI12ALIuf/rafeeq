@@ -167,7 +167,7 @@
             </div>
         </div>
 
-        <!-- ===== صفحة الملف الشخصي ===== -->
+        <!-- ===== صفحة الملف الشخصي (بدون إحصائيات) ===== -->
         <div class="page profile-page">
             <div class="profile-header">
                 <div class="profile-cover">
@@ -183,24 +183,12 @@
                     </div>
                 </div>
                 <p class="profile-bio" id="profileBio"></p>
-                <div class="profile-stats">
-                    <a href="#" class="stat-link" onclick="showUserTrips()"><span class="stat-value" id="tripsCount">0</span><span data-i18n="trips">رحلات</span></a>
-                    <a href="#" class="stat-link"><span class="stat-value" id="friendsCount">0</span><span data-i18n="friends">الأصدقاء</span></a>
-                </div>
             </div>
             
             <div class="profile-settings-btn" style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; border: 1px solid var(--border);" onclick="switchPage('settings')">
                 <i class="fas fa-cog" style="color: var(--primary); font-size: 1.2rem;"></i>
                 <span style="color: var(--text); font-size: 0.95rem;" data-i18n="settings">الإعدادات</span>
                 <i class="fas fa-chevron-left" style="color: var(--text-light); margin-right: auto;"></i>
-            </div>
-        </div>
-
-        <!-- ===== الصفحات الفرعية ===== -->
-        <div class="profile-pages">
-            <div class="profile-subpage" id="tripsPage" style="display: none;">
-                <div class="subpage-header"><button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-right"></i></button><h3 data-i18n="trips">الرحلات</h3></div>
-                <div class="trips-grid" id="tripsGrid"><div class="empty-state"><i class="fas fa-map-marked-alt"></i><h3 data-i18n="no_trips">لا توجد رحلات</h3><p data-i18n="no_trips_desc">لم تقم بأي رحلة بعد</p></div></div>
             </div>
         </div>
 
@@ -339,12 +327,12 @@
 </script>
 
 <!-- ==================== ملفات الجافاسكريبت ==================== -->
-<script src="js/i18n.js?v=9"></script>
-<script src="js/secure-chat.js?v=9"></script>
-<script src="js/chat-system.js?v=9"></script>
-<script src="js/ui-functions.js?v=9"></script>
-<script src="js/auth.js?v=9"></script>
-<script src="js/friends.js?v=9"></script>
+<script src="js/i18n.js?v=10"></script>
+<script src="js/secure-chat.js?v=10"></script>
+<script src="js/chat-system.js?v=10"></script>
+<script src="js/ui-functions.js?v=10"></script>
+<script src="js/auth.js?v=10"></script>
+<script src="js/friends.js?v=10"></script>
 
 <script>
 window.addEventListener('load', function() {
