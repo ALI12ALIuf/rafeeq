@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (15 حرف + عداد) ==========
+// ========== ui-functions.js - النسخة النهائية (معزول لكل حساب) ==========
 
 window._pageStack = [];
 
@@ -131,6 +131,7 @@ async function loadChats(force = false) {
                     if (name) name.textContent = f.name || 'مستخدم';
                     if (userIdSpan) userIdSpan.textContent = f.shareableId || '';
                     
+                    // ✅ زر نسخ ID
                     if (copyIdBtn) {
                         copyIdBtn.onclick = (e) => {
                             e.stopPropagation();
@@ -146,6 +147,7 @@ async function loadChats(force = false) {
                         };
                     }
                     
+                    // ✅ زر حذف الصديق
                     if (removeBtn) {
                         removeBtn.onclick = (e) => {
                             e.stopPropagation();
@@ -153,6 +155,7 @@ async function loadChats(force = false) {
                         };
                     }
                     
+                    // ✅ فتح المحادثة عند النقر على البطاقة
                     chatItem.onclick = (e) => {
                         if (e.target.closest('.remove-friend-btn') || e.target.closest('.copy-chat-id-btn')) return;
                         openChat(fid);
@@ -200,7 +203,9 @@ window.removeFriend = async function(friendId) {
             friends: FieldValue.arrayRemove(uid) 
         }); 
         
-        localStorage.removeItem(`chat_${friendId}`);
+        // ✅ حذف رسائل هذا الصديق فقط للحساب الحالي
+        const userKey = `chat_${uid}_${friendId}`;
+        localStorage.removeItem(userKey);
         delete ChatSystem.messages[friendId];
         
         chatsLoaded = false;
@@ -373,10 +378,8 @@ window.updateCharCounter = function() {
     
     counter.textContent = `${length}/${maxLength}`;
     
-    // إزالة الكلاسات السابقة
     counter.classList.remove('warning', 'full');
     
-    // إضافة الكلاس المناسب
     if (length >= maxLength) {
         counter.classList.add('full');
     } else if (length >= maxLength - 3) {
@@ -397,7 +400,6 @@ window.openEditProfileModal = function() {
     const avatarPreview = document.getElementById('currentAvatarEmoji');
     if (avatarPreview) avatarPreview.textContent = currentEmoji || '🧔🏻‍♂️';
     
-    // ✅ تحديث العداد عند فتح النافذة
     window.updateCharCounter();
     
     modal.classList.add('active');
@@ -418,6 +420,23 @@ window.saveProfile = function() {
             })
             .catch(() => alert('فشل حفظ التغييرات'));
     }
+};
+
+window.goBack = function() {
+    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
+    document.body.classList.remove('profile-subpage-open');
+    
+    const profilePage = document.querySelector('.profile-page');
+    if (profilePage) {
+        profilePage.style.display = 'block';
+        profilePage.classList.add('active');
+    }
+    
+    clearStack();
+    document.querySelectorAll('.nav-item').forEach(n => {
+        n.classList.remove('active');
+        if (n.dataset.page === 'profile') n.classList.add('active');
+    });
 };
 
 // ==================== تهيئة الصفحة ====================
