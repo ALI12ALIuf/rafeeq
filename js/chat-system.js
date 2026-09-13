@@ -1,5 +1,5 @@
-// ========== chat-system.js - النسخة النهائية (إرسال فوري) ==========
-// نظام الدردشة E2EE - نصوص فقط
+// ========== chat-system.js - النسخة النهائية (بدون علامة صح) ==========
+// نظام الدردشة E2EE - نصوص فقط - إرسال فوري بدون علامات
 
 const ChatSystem = {
     currentChat: null, messages: {},
@@ -198,7 +198,7 @@ const ChatSystem = {
         }, 50);
     },
     
-    // ==================== القسم 12: sendMessage (إرسال فوري) ====================
+    // ==================== القسم 12: sendMessage (إرسال فوري - بدون علامة صح) ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         
@@ -206,14 +206,13 @@ const ChatSystem = {
         const messageText = text.trim();
         const chatId = this.currentChat;
         
-        // ✅ 1. عرض الرسالة فوراً (قبل التشفير والإرسال)
+        // ✅ 1. عرض الرسالة فوراً (بدون أي مؤشر)
         const msg = { 
             id: mid, 
             type: 'text', 
             text: messageText, 
             sender: 'me', 
-            time: new Date().toISOString(), 
-            status: 'sending' 
+            time: new Date().toISOString()
         };
         
         this.saveMessage(chatId, msg); 
@@ -221,7 +220,7 @@ const ChatSystem = {
         
         console.log('⚡ تم عرض الرسالة فوراً - جاري الإرسال في الخلفية');
         
-        // ✅ 2. إرسال في الخلفية (بدون انتظار)
+        // ✅ 2. إرسال في الخلفية (بدون أي تحديث للواجهة)
         this._sendMessageInBackground(chatId, mid, messageText);
         
         return true; 
@@ -238,7 +237,6 @@ const ChatSystem = {
             
             if (!myPrivateKey || !receiverPublicKey) {
                 console.error('❌ فشل الحصول على المفاتيح');
-                this._updateMessageStatus(chatId, messageId, 'failed');
                 return;
             }
             
@@ -256,86 +254,10 @@ const ChatSystem = {
                 timestamp: Date.now() 
             });
             
-            // 5. تحديث الحالة إلى "مرسلة"
-            this._updateMessageStatus(chatId, messageId, 'sent');
             console.log(`✅ تم إرسال الرسالة ${messageId} بنجاح`);
             
         } catch (e) { 
             console.error('❌ فشل إرسال الرسالة في الخلفية:', e);
-            this._updateMessageStatus(chatId, messageId, 'failed');
-        }
-    },
-    
-    // ✅ دالة تحديث حالة الرسالة
-    _updateMessageStatus(chatId, messageId, status) {
-        try {
-            // 1. تحديث في الذاكرة
-            if (this.messages[chatId]) {
-                const msg = this.messages[chatId].find(m => m.id === messageId);
-                if (msg) {
-                    msg.status = status;
-                    console.log(`📝 تم تحديث حالة الرسالة ${messageId} إلى: ${status}`);
-                }
-            }
-            
-            // 2. تحديث في localStorage
-            const key = `chat_${chatId}`;
-            let messages = [];
-            try {
-                messages = JSON.parse(localStorage.getItem(key)) || [];
-            } catch (e) {
-                messages = [];
-            }
-            
-            const msgIndex = messages.findIndex(m => m.id === messageId);
-            if (msgIndex !== -1) {
-                messages[msgIndex].status = status;
-                localStorage.setItem(key, JSON.stringify(messages));
-            }
-            
-            // 3. تحديث في الواجهة (إذا كانت المحادثة مفتوحة)
-            if (this.currentChat === chatId) {
-                this._updateMessageUI(messageId, status);
-            }
-        } catch (e) {
-            console.error('❌ خطأ في تحديث حالة الرسالة:', e);
-        }
-    },
-    
-    // ✅ دالة تحديث واجهة الرسالة بناءً على الحالة
-    _updateMessageUI(messageId, status) {
-        const msgEl = document.getElementById(`msg-${messageId}`);
-        if (!msgEl) return;
-        
-        // إزالة أي مؤشر سابق
-        const existingIndicator = msgEl.querySelector('.message-status-indicator');
-        if (existingIndicator) existingIndicator.remove();
-        
-        // إضافة مؤشر جديد
-        const indicator = document.createElement('span');
-        indicator.className = 'message-status-indicator';
-        
-        if (status === 'sending') {
-            indicator.innerHTML = '⏳';
-            indicator.style.color = '#FFC107';
-        } else if (status === 'sent') {
-            indicator.innerHTML = '✓';
-            indicator.style.color = '#4CAF50';
-        } else if (status === 'failed') {
-            indicator.innerHTML = '✗';
-            indicator.style.color = '#f44336';
-        }
-        
-        indicator.style.fontSize = '0.75rem';
-        indicator.style.marginRight = '4px';
-        indicator.style.marginLeft = '4px';
-        indicator.style.fontWeight = 'bold';
-        
-        // إضافتها إلى الرسالة
-        const contentDiv = msgEl.querySelector('.message-content');
-        if (contentDiv) {
-            contentDiv.style.position = 'relative';
-            contentDiv.appendChild(indicator);
         }
     },
 
