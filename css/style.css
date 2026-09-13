@@ -251,7 +251,7 @@ body.conversation-open {
     transform: scale(0.95);
 }
 
-/* ==================== القسم 9: صفحة الملف الشخصي (بدون إحصائيات) ==================== */
+/* ==================== القسم 9: صفحة الملف الشخصي ==================== */
 .profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
 .profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
 .profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
@@ -274,8 +274,48 @@ body.conversation-open {
 .edit-field { margin-bottom: 1.5rem; text-align: center; }
 .edit-field label { display: block; margin-bottom: 0.5rem; color: var(--text-light); font-size: 0.9rem; }
 .input-wrapper { position: relative; width: 100%; max-width: 300px; margin: 0 auto; direction: ltr; }
-.edit-field input { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--light); color: var(--text); font-size: 1rem; text-align: center; }
+.edit-field input { width: 100%; padding: 0.75rem; padding-left: 55px; padding-right: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--light); color: var(--text); font-size: 1rem; text-align: center; }
 .edit-field input:focus { outline: none; border-color: var(--primary); }
+
+/* ✅ عداد الأحرف */
+.char-counter {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-weight: 500;
+    direction: ltr;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    pointer-events: none;
+    font-family: monospace;
+    background: transparent;
+    padding: 2px 4px;
+    border-radius: 8px;
+}
+
+.char-counter.warning {
+    color: #FFC107;
+    opacity: 1;
+    font-weight: 700;
+    background: rgba(255, 193, 7, 0.15);
+}
+
+.char-counter.full {
+    color: #f44336;
+    opacity: 1;
+    font-weight: 700;
+    background: rgba(244, 67, 54, 0.2);
+    animation: counterPulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes counterPulse {
+    from { transform: translateY(-50%) scale(1); }
+    to { transform: translateY(-50%) scale(1.05); }
+}
+
 .current-avatar { width: 80px; height: 80px; min-width: 80px; min-height: 80px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 4rem; margin: 0 auto 1rem; overflow: hidden; line-height: 1; }
 .change-avatar-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 0 auto; padding: 0.5rem 1rem; background: var(--light); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; cursor: pointer; }
 .modal-actions { display: flex; gap: 1.2rem; margin-top: 2rem; justify-content: center; }
@@ -442,45 +482,3 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 .nav-item.active i { color: var(--primary) !important; }
 .app-content { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
 .page { padding: 0.5rem !important; }
-
-
-
-
-/* ==================== عداد الأحرف في حقل الاسم ==================== */
-.char-counter {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.75rem;
-    color: var(--text-light);
-    font-weight: 500;
-    direction: ltr;
-    opacity: 0.7;
-    transition: all 0.2s ease;
-    pointer-events: none;
-    font-family: monospace;
-    background: var(--light);
-    padding: 2px 6px;
-    border-radius: 8px;
-}
-
-.char-counter.warning {
-    color: #FFC107;
-    opacity: 1;
-    font-weight: 700;
-    background: rgba(255, 193, 7, 0.15);
-}
-
-.char-counter.full {
-    color: #f44336;
-    opacity: 1;
-    font-weight: 700;
-    background: rgba(244, 67, 54, 0.2);
-    animation: counterPulse 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes counterPulse {
-    from { transform: translateY(-50%) scale(1); }
-    to { transform: translateY(-50%) scale(1.05); }
-}
