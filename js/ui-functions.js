@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (بدون رحلات وأصدقاء) ==========
+// ========== ui-functions.js - النسخة النهائية (15 حرف + عداد) ==========
 
 window._pageStack = [];
 
@@ -360,7 +360,29 @@ function setupModals() {
     }); 
 }
 
-// ==================== دوال التعديل ====================
+// ==================== دوال التعديل + العداد ====================
+
+// ✅ دالة تحديث عداد الأحرف
+window.updateCharCounter = function() {
+    const nameInput = document.getElementById('editName');
+    const counter = document.getElementById('charCounter');
+    if (!nameInput || !counter) return;
+    
+    const length = nameInput.value.length;
+    const maxLength = 15;
+    
+    counter.textContent = `${length}/${maxLength}`;
+    
+    // إزالة الكلاسات السابقة
+    counter.classList.remove('warning', 'full');
+    
+    // إضافة الكلاس المناسب
+    if (length >= maxLength) {
+        counter.classList.add('full');
+    } else if (length >= maxLength - 3) {
+        counter.classList.add('warning');
+    }
+};
 
 window.openEditProfileModal = function() {
     const modal = document.getElementById('editProfileModal');
@@ -375,13 +397,16 @@ window.openEditProfileModal = function() {
     const avatarPreview = document.getElementById('currentAvatarEmoji');
     if (avatarPreview) avatarPreview.textContent = currentEmoji || '🧔🏻‍♂️';
     
+    // ✅ تحديث العداد عند فتح النافذة
+    window.updateCharCounter();
+    
     modal.classList.add('active');
 };
 
 window.saveProfile = function() {
     const n = document.getElementById('editName')?.value?.trim();
-    if (!n || n.length > 25) {
-        alert('الاسم مطلوب ولا يزيد عن 25 حرف');
+    if (!n || n.length > 15) {
+        alert('الاسم مطلوب ولا يزيد عن 15 حرف');
         return;
     }
     if (auth?.currentUser) {
@@ -403,6 +428,12 @@ document.addEventListener('DOMContentLoaded', function() {
     setupModals();
     loadChats();
     setupChatListeners();
+    
+    // ✅ ربط حدث الإدخال بالعداد
+    const nameInput = document.getElementById('editName');
+    if (nameInput) {
+        nameInput.addEventListener('input', window.updateCharCounter);
+    }
 });
 
 window.addEventListener('authReady', async function() {
