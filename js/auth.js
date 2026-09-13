@@ -1,6 +1,7 @@
-// ========== auth.js - النسخة النهائية ==========
+// ========== auth.js - النسخة النهائية (15 حرف) ==========
 // Firebase Auth الأساسي
 
+// ==================== القسم 1: دوال مساعدة ====================
 function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
@@ -13,6 +14,7 @@ function generateShareableId() {
     return id;
 }
 
+// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
 function getEmojiForUser(userData) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -22,6 +24,7 @@ function getEmojiForUser(userData) {
         'woman_medium': '👩🏼',
         'woman_dark': '👩🏽'
     };
+    // دعم التوافق مع المستخدمين القدامى
     if (!userData?.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
         return '🧔🏻‍♂️';
     }
@@ -30,6 +33,7 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
+// ==================== القسم 2: showApp ====================
 function showApp() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     const loginScreen = document.getElementById('loginScreen');
@@ -38,23 +42,29 @@ function showApp() {
     if (app) { app.style.display = 'flex'; }
 }
 
+// ==================== القسم 3: showLoginScreen ====================
 function showLoginScreen() {
     const loginScreen = document.getElementById('loginScreen');
     if (loginScreen) loginScreen.style.display = 'flex';
 }
 
+// ==================== القسم 4: startGoogleLogin ====================
 async function startGoogleLogin() {
     try {
         if (!window.auth || !window.googleProvider) {
             alert('مكتبة Firebase لم يتم تحميلها بعد.');
             return;
         }
+        
         const splash = document.getElementById('splash');
         if (splash) { splash.style.display = 'none'; }
+        
         const loginScreen = document.getElementById('loginScreen');
         if (loginScreen) { loginScreen.style.display = 'none'; }
+        
         const result = await window.auth.signInWithPopup(window.googleProvider);
         await saveUserAndEnter(result.user);
+        
     } catch (error) {
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
@@ -63,21 +73,29 @@ async function startGoogleLogin() {
     }
 }
 
+// ==================== القسم 5: saveUserAndEnter (15 حرف) ====================
 async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
             await window.db.collection('users').doc(user.uid).set({
-                uid: user.uid, name: (user.displayName || 'مستخدم').substring(0, 25),
-                email: user.email || '', shareableId: generateShareableId(),
-                bio: '', avatarType: 'man_light',
-                friends: [], blocked: [], createdAt: new Date()
+                uid: user.uid, 
+                name: (user.displayName || 'مستخدم').substring(0, 15), // ✅ 15 حرف
+                email: user.email || '', 
+                shareableId: generateShareableId(),
+                bio: '', 
+                avatarType: 'man_light',
+                friends: [], 
+                blocked: [], 
+                createdAt: new Date()
             });
         } else {
-            const userData = userDoc.data(); const updates = {};
+            const userData = userDoc.data(); 
+            const updates = {};
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
+            // ✅ دعم التوافق مع المستخدمين القدامى
             if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
                 updates.avatarType = 'man_light';
             }
@@ -93,6 +111,7 @@ async function saveUserAndEnter(user) {
     }
 }
 
+// ==================== القسم 6: دوال إضافية ====================
 async function signInWithGoogle() { await startGoogleLogin(); }
 
 function updateUserUI() { 
@@ -106,6 +125,7 @@ function updateUserUI() {
     } 
 }
 
+// ==================== القسم 7: logout ====================
 async function logout() { 
     try {
         if (window.auth?.currentUser) {
@@ -119,28 +139,36 @@ async function logout() {
     window.location.reload(); 
 }
 
+// ==================== القسم 8: loadUserData (15 حرف) ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
         if (doc.exists) {
             const d = doc.data();
-            const pn = document.getElementById('profileName'), pa = document.getElementById('profileAvatarEmoji'), pb = document.getElementById('profileBio'), si = document.getElementById('shareableId'), ca = document.getElementById('currentAvatarEmoji');
-            if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 25);
+            const pn = document.getElementById('profileName');
+            const pa = document.getElementById('profileAvatarEmoji');
+            const pb = document.getElementById('profileBio');
+            const si = document.getElementById('shareableId');
+            const ca = document.getElementById('currentAvatarEmoji');
+            
+            if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 15); // ✅ 15 حرف
             if (pb) pb.textContent = d.bio || '';
             if (si) si.textContent = d.shareableId || '0000000000';
+            
             const emoji = getEmojiForUser(d);
-            if (pa) pa.textContent = emoji; if (ca) ca.textContent = emoji;
-            const fc = document.getElementById('friendsCount');
-            if (fc) fc.textContent = formatNumber((d.friends || []).length);
+            if (pa) pa.textContent = emoji; 
+            if (ca) ca.textContent = emoji;
         }
     } catch (e) {
         console.warn('خطأ في loadUserData:', e);
     }
 }
 
+// ==================== القسم 9: مراقب حالة تسجيل الدخول ====================
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
+        
         if (user) {
             await loadUserData(user.uid);
             setupFriendRequestsListener(user.uid);
@@ -149,6 +177,7 @@ if (typeof window.auth !== 'undefined') {
         } else {
             if (app) app.style.display = 'none';
             if (splash) { splash.style.display = 'flex'; }
+            
             setTimeout(() => {
                 if (splash) { splash.style.display = 'none'; }
                 showLoginScreen();
@@ -157,6 +186,7 @@ if (typeof window.auth !== 'undefined') {
     });
 }
 
+// ==================== القسم 10: copyId ====================
 function copyId() { 
     const el = document.getElementById('shareableId'); 
     if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ')); 
