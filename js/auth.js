@@ -1,4 +1,4 @@
-// ========== auth.js - النسخة النهائية (15 حرف) ==========
+// ========== auth.js - النسخة النهائية (15 حرف - مُصحح) ==========
 // Firebase Auth الأساسي
 
 // ==================== القسم 1: دوال مساعدة ====================
@@ -14,7 +14,7 @@ function generateShareableId() {
     return id;
 }
 
-// ✅ دالة الإيموجي الجديدة - خيارين فقط مع 3 ألوان لكل منهما
+// ✅ دالة الإيموجي
 function getEmojiForUser(userData) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -24,7 +24,6 @@ function getEmojiForUser(userData) {
         'woman_medium': '👩🏼',
         'woman_dark': '👩🏽'
     };
-    // دعم التوافق مع المستخدمين القدامى
     if (!userData?.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
         return '🧔🏻‍♂️';
     }
@@ -73,14 +72,21 @@ async function startGoogleLogin() {
     }
 }
 
-// ==================== القسم 5: saveUserAndEnter (15 حرف) ====================
+// ==================== القسم 5: saveUserAndEnter (إصلاح 15 حرف) ====================
 async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
+        
+        // ✅ قص اسم Google إلى 15 حرف قبل أي عملية
+        let shortName = (user.displayName || 'مستخدم').trim();
+        if (shortName.length > 15) {
+            shortName = shortName.substring(0, 15);
+        }
+        
         if (!userDoc.exists) {
             await window.db.collection('users').doc(user.uid).set({
                 uid: user.uid, 
-                name: (user.displayName || 'مستخدم').substring(0, 15), // ✅ 15 حرف
+                name: shortName,
                 email: user.email || '', 
                 shareableId: generateShareableId(),
                 bio: '', 
@@ -89,18 +95,30 @@ async function saveUserAndEnter(user) {
                 blocked: [], 
                 createdAt: new Date()
             });
+            console.log('✅ مستخدم جديد - تم حفظ الاسم:', shortName);
         } else {
             const userData = userDoc.data(); 
             const updates = {};
+            
+            // ✅ إذا كان الاسم محفوظاً أطول من 15 حرف، قصه
+            if (userData.name && userData.name.length > 15) {
+                updates.name = userData.name.substring(0, 15);
+                console.log('✅ تم قص الاسم القديم:', updates.name);
+            }
+            
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
-            // ✅ دعم التوافق مع المستخدمين القدامى
             if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
                 updates.avatarType = 'man_light';
             }
-            if (Object.keys(updates).length > 0) await window.db.collection('users').doc(user.uid).update(updates);
+            
+            if (Object.keys(updates).length > 0) {
+                await window.db.collection('users').doc(user.uid).update(updates);
+                console.log('✅ تم تحديث بيانات المستخدم');
+            }
         }
+        
         await loadUserData(user.uid);
         setupFriendRequestsListener(user.uid);
         if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
@@ -139,7 +157,7 @@ async function logout() {
     window.location.reload(); 
 }
 
-// ==================== القسم 8: loadUserData (15 حرف) ====================
+// ==================== القسم 8: loadUserData (15 حرف - إجباري) ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
@@ -151,7 +169,19 @@ async function loadUserData(uid) {
             const si = document.getElementById('shareableId');
             const ca = document.getElementById('currentAvatarEmoji');
             
-            if (pn) pn.textContent = (d.name || 'مستخدم').substring(0, 15); // ✅ 15 حرف
+            // ✅ قص الاسم إلى 15 حرف
+            let displayName = d.name || 'مستخدم';
+            if (displayName.length > 15) {
+                displayName = displayName.substring(0, 15);
+                try {
+                    await window.db.collection('users').doc(uid).update({ 
+                        name: displayName 
+                    });
+                    console.log('✅ تم قص الاسم في Firebase');
+                } catch (e) {}
+            }
+            if (pn) pn.textContent = displayName;
+            
             if (pb) pb.textContent = d.bio || '';
             if (si) si.textContent = d.shareableId || '0000000000';
             
