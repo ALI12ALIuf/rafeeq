@@ -1,5 +1,5 @@
-// ========== chat-system.js - النسخة النهائية (بدون علامة صح) ==========
-// نظام الدردشة E2EE - نصوص فقط - إرسال فوري بدون علامات
+// ========== chat-system.js - النسخة النهائية (معزول لكل حساب) ==========
+// نظام الدردشة E2EE - نصوص فقط - كل حساب معزول في localStorage
 
 const ChatSystem = {
     currentChat: null, messages: {},
@@ -19,16 +19,30 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 2: loadAllChats ====================
+    // ==================== القسم 2: loadAllChats (معزول لكل حساب) ====================
     loadAllChats() { 
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid) {
+            console.warn('⚠️ لا يوجد مستخدم مسجل - تخطي تحميل الرسائل');
+            this.messages = {};
+            return;
+        }
+        
+        // ✅ تصفير الرسائل أولاً
+        this.messages = {};
+        
+        const prefix = `chat_${uid}_`;
+        let loadedCount = 0;
+        
         for (let i = 0; i < localStorage.length; i++) { 
             const k = localStorage.key(i); 
-            if (k && k.startsWith('chat_')) { 
-                const fid = k.replace('chat_', ''); 
+            if (k && k.startsWith(prefix)) { 
+                const fid = k.replace(prefix, ''); 
                 try { 
                     const data = JSON.parse(localStorage.getItem(k)) || [];
                     const textOnly = data.filter(msg => msg.type === 'text').slice(-25);
                     this.messages[fid] = textOnly;
+                    loadedCount++;
                     
                     if (textOnly.length !== data.length) {
                         localStorage.setItem(k, JSON.stringify(textOnly));
@@ -38,7 +52,9 @@ const ChatSystem = {
                     this.messages[fid] = []; 
                 } 
             } 
-        } 
+        }
+        
+        console.log(`✅ تم تحميل ${loadedCount} محادثة للمستخدم ${uid.substring(0, 8)}...`);
     },
     
     // ==================== القسم 3: openChat ====================
@@ -70,9 +86,10 @@ const ChatSystem = {
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
         const chatId = this.currentChat;
+        const uid = window.auth?.currentUser?.uid;
         
-        if (chatId) {
-            const key = `chat_${chatId}`;
+        if (chatId && uid) {
+            const key = `chat_${uid}_${chatId}`;
             const messages = this.messages[chatId] || [];
             const textOnly = messages.filter(msg => msg.type === 'text').slice(-25);
             localStorage.setItem(key, JSON.stringify(textOnly));
@@ -98,7 +115,10 @@ const ChatSystem = {
     // ==================== القسم 5: cleanConversationData ====================
     cleanConversationData(chatId, cleanAll = false) {
         console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
-        const key = `chat_${chatId}`;
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid) return;
+        
+        const key = `chat_${uid}_${chatId}`;
         
         if (!cleanAll) {
             const messages = this.messages[chatId] || [];
@@ -172,7 +192,6 @@ const ChatSystem = {
         div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
         div.id = `msg-${msg.id}`;
         
-        // ==================== معالجة الرسائل النصية فقط ====================
         if (msg.type === 'text') {
             const textTemplate = document.getElementById('textMessageTemplate');
             if (textTemplate) {
@@ -198,7 +217,7 @@ const ChatSystem = {
         }, 50);
     },
     
-    // ==================== القسم 12: sendMessage (إرسال فوري - بدون علامة صح) ====================
+    // ==================== القسم 12: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         
@@ -206,7 +225,7 @@ const ChatSystem = {
         const messageText = text.trim();
         const chatId = this.currentChat;
         
-        // ✅ 1. عرض الرسالة فوراً (بدون أي مؤشر)
+        // ✅ 1. عرض الرسالة فوراً
         const msg = { 
             id: mid, 
             type: 'text', 
@@ -220,7 +239,7 @@ const ChatSystem = {
         
         console.log('⚡ تم عرض الرسالة فوراً - جاري الإرسال في الخلفية');
         
-        // ✅ 2. إرسال في الخلفية (بدون أي تحديث للواجهة)
+        // ✅ 2. إرسال في الخلفية
         this._sendMessageInBackground(chatId, mid, messageText);
         
         return true; 
@@ -231,7 +250,6 @@ const ChatSystem = {
         try {
             console.log(`📤 بدء إرسال الرسالة ${messageId} في الخلفية...`);
             
-            // 1. جلب المفاتيح
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
             
@@ -240,13 +258,9 @@ const ChatSystem = {
                 return;
             }
             
-            // 2. اشتقاق المفتاح المشترك
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
-            
-            // 3. تشفير الرسالة
             const encrypted = await SecureChatSystem.encryptData(text, sharedKey);
             
-            // 4. إرسال إلى Firebase
             await SecureChatSystem.sendToServer(chatId, { 
                 id: messageId, 
                 type: 'text', 
@@ -270,7 +284,13 @@ const ChatSystem = {
             return;
         }
         
-        const key = `chat_${friendId}`; 
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid) {
+            console.warn('⚠️ لا يوجد مستخدم مسجل');
+            return;
+        }
+        
+        const key = `chat_${uid}_${friendId}`; 
         let messages = []; 
         try { 
             messages = JSON.parse(localStorage.getItem(key)) || []; 
@@ -317,11 +337,53 @@ const ChatSystem = {
         const div = document.createElement('div'); 
         div.textContent = text; 
         return div.innerHTML; 
+    },
+    
+    // ==================== القسم 17: مسح كل رسائل المستخدم ====================
+    clearAllMyMessages() {
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid) return;
+        
+        const confirmDelete = confirm('هل أنت متأكد من مسح جميع رسائلك؟ لا يمكن التراجع.');
+        if (!confirmDelete) return;
+        
+        const prefix = `chat_${uid}_`;
+        let count = 0;
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(prefix)) {
+                localStorage.removeItem(key);
+                count++;
+            }
+        }
+        
+        this.messages = {};
+        console.log(`🗑️ تم مسح ${count} محادثة`);
+        alert(`✅ تم مسح ${count} محادثة`);
+        
+        setTimeout(() => location.reload(), 500);
     }
 };
 
 // ==================== تشغيل النظام ====================
-ChatSystem.init();
+ChatSystem.chatItemTemplate = document.getElementById('chatItemTemplate');
+
+// ✅ تحميل الرسائل بعد تسجيل الدخول
+window.addEventListener('authReady', function() {
+    console.log('✅ authReady - تحميل الرسائل');
+    setTimeout(() => {
+        ChatSystem.loadAllChats();
+        if (typeof loadChats === 'function') {
+            chatsLoaded = false;
+            loadChats(true);
+        }
+    }, 100);
+});
+
+// ✅ إذا كان المستخدم مسجلاً بالفعل
+if (window.auth?.currentUser) {
+    setTimeout(() => ChatSystem.loadAllChats(), 100);
+}
 
 // ==================== دوال الواجهة العامة ====================
 window.sendMessage = () => { 
