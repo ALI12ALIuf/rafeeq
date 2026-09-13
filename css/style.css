@@ -482,3 +482,38 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 .nav-item.active i { color: var(--primary) !important; }
 .app-content { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
 .page { padding: 0.5rem !important; }
+
+/* ==================== القسم 17: تنسيق الحالة الفارغة (لا توجد محادثات) ==================== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+    width: 100%;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.empty-state p {
+    font-size: 1rem;
+    max-width: 300px;
+    margin: 0 auto;
+    line-height: 1.6;
+    color: var(--text-light);
+}
