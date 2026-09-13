@@ -1,5 +1,5 @@
-// ========== chat-system.js - النسخة النهائية (نصوص فقط) ==========
-// نظام الدردشة E2EE - بدون صور
+// ========== chat-system.js - النسخة النهائية (إرسال فوري) ==========
+// نظام الدردشة E2EE - نصوص فقط
 
 const ChatSystem = {
     currentChat: null, messages: {},
@@ -27,11 +27,9 @@ const ChatSystem = {
                 const fid = k.replace('chat_', ''); 
                 try { 
                     const data = JSON.parse(localStorage.getItem(k)) || [];
-                    // ✅ نصوص فقط + آخر 25 رسالة
                     const textOnly = data.filter(msg => msg.type === 'text').slice(-25);
                     this.messages[fid] = textOnly;
                     
-                    // ✅ إعادة الحفظ بدون أي رسالة غير نصية
                     if (textOnly.length !== data.length) {
                         localStorage.setItem(k, JSON.stringify(textOnly));
                         console.log(`🧹 تم حذف ${data.length - textOnly.length} رسالة غير نصية من ${fid}`);
@@ -152,7 +150,7 @@ const ChatSystem = {
         }, 50);
     },
 
-    // ==================== القسم 7: displayMessage (نصوص فقط) ====================
+    // ==================== القسم 7: displayMessage ====================
     displayMessage(msg) {
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
@@ -200,35 +198,151 @@ const ChatSystem = {
         }, 50);
     },
     
-    // ==================== القسم 12: sendMessage ====================
+    // ==================== القسم 12: sendMessage (إرسال فوري) ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
-        const mid = Date.now().toString(); 
         
-        try { 
-            const pr = await SecureChatSystem.getMyPrivateKey();
-            const pu = await SecureChatSystem.getReceiverPublicKey(this.currentChat); 
-            if (!pr || !pu) return false;
-            const sk = await SecureChatSystem.deriveSharedKey(pr, pu);
-            const enc = await SecureChatSystem.encryptData(text.trim(), sk); 
-            await SecureChatSystem.sendToServer(this.currentChat, { id: mid, type: 'text', data: enc, timestamp: Date.now() }); 
+        const mid = Date.now().toString(); 
+        const messageText = text.trim();
+        const chatId = this.currentChat;
+        
+        // ✅ 1. عرض الرسالة فوراً (قبل التشفير والإرسال)
+        const msg = { 
+            id: mid, 
+            type: 'text', 
+            text: messageText, 
+            sender: 'me', 
+            time: new Date().toISOString(), 
+            status: 'sending' 
+        };
+        
+        this.saveMessage(chatId, msg); 
+        this.displayMessage(msg); 
+        
+        console.log('⚡ تم عرض الرسالة فوراً - جاري الإرسال في الخلفية');
+        
+        // ✅ 2. إرسال في الخلفية (بدون انتظار)
+        this._sendMessageInBackground(chatId, mid, messageText);
+        
+        return true; 
+    },
+    
+    // ✅ دالة مساعدة: إرسال في الخلفية
+    async _sendMessageInBackground(chatId, messageId, text) {
+        try {
+            console.log(`📤 بدء إرسال الرسالة ${messageId} في الخلفية...`);
             
-            const msg = { id: mid, type: 'text', text: text.trim(), sender: 'me', time: new Date().toISOString(), status: 'sent' };
-            this.saveMessage(this.currentChat, msg); 
-            this.displayMessage(msg); 
-            console.log('✅ تم إرسال النص عبر Firebase');
-            return true; 
+            // 1. جلب المفاتيح
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
+            
+            if (!myPrivateKey || !receiverPublicKey) {
+                console.error('❌ فشل الحصول على المفاتيح');
+                this._updateMessageStatus(chatId, messageId, 'failed');
+                return;
+            }
+            
+            // 2. اشتقاق المفتاح المشترك
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
+            
+            // 3. تشفير الرسالة
+            const encrypted = await SecureChatSystem.encryptData(text, sharedKey);
+            
+            // 4. إرسال إلى Firebase
+            await SecureChatSystem.sendToServer(chatId, { 
+                id: messageId, 
+                type: 'text', 
+                data: encrypted, 
+                timestamp: Date.now() 
+            });
+            
+            // 5. تحديث الحالة إلى "مرسلة"
+            this._updateMessageStatus(chatId, messageId, 'sent');
+            console.log(`✅ تم إرسال الرسالة ${messageId} بنجاح`);
+            
         } catch (e) { 
-            console.error('❌ فشل إرسال النص:', e);
-            return false; 
-        } 
+            console.error('❌ فشل إرسال الرسالة في الخلفية:', e);
+            this._updateMessageStatus(chatId, messageId, 'failed');
+        }
+    },
+    
+    // ✅ دالة تحديث حالة الرسالة
+    _updateMessageStatus(chatId, messageId, status) {
+        try {
+            // 1. تحديث في الذاكرة
+            if (this.messages[chatId]) {
+                const msg = this.messages[chatId].find(m => m.id === messageId);
+                if (msg) {
+                    msg.status = status;
+                    console.log(`📝 تم تحديث حالة الرسالة ${messageId} إلى: ${status}`);
+                }
+            }
+            
+            // 2. تحديث في localStorage
+            const key = `chat_${chatId}`;
+            let messages = [];
+            try {
+                messages = JSON.parse(localStorage.getItem(key)) || [];
+            } catch (e) {
+                messages = [];
+            }
+            
+            const msgIndex = messages.findIndex(m => m.id === messageId);
+            if (msgIndex !== -1) {
+                messages[msgIndex].status = status;
+                localStorage.setItem(key, JSON.stringify(messages));
+            }
+            
+            // 3. تحديث في الواجهة (إذا كانت المحادثة مفتوحة)
+            if (this.currentChat === chatId) {
+                this._updateMessageUI(messageId, status);
+            }
+        } catch (e) {
+            console.error('❌ خطأ في تحديث حالة الرسالة:', e);
+        }
+    },
+    
+    // ✅ دالة تحديث واجهة الرسالة بناءً على الحالة
+    _updateMessageUI(messageId, status) {
+        const msgEl = document.getElementById(`msg-${messageId}`);
+        if (!msgEl) return;
+        
+        // إزالة أي مؤشر سابق
+        const existingIndicator = msgEl.querySelector('.message-status-indicator');
+        if (existingIndicator) existingIndicator.remove();
+        
+        // إضافة مؤشر جديد
+        const indicator = document.createElement('span');
+        indicator.className = 'message-status-indicator';
+        
+        if (status === 'sending') {
+            indicator.innerHTML = '⏳';
+            indicator.style.color = '#FFC107';
+        } else if (status === 'sent') {
+            indicator.innerHTML = '✓';
+            indicator.style.color = '#4CAF50';
+        } else if (status === 'failed') {
+            indicator.innerHTML = '✗';
+            indicator.style.color = '#f44336';
+        }
+        
+        indicator.style.fontSize = '0.75rem';
+        indicator.style.marginRight = '4px';
+        indicator.style.marginLeft = '4px';
+        indicator.style.fontWeight = 'bold';
+        
+        // إضافتها إلى الرسالة
+        const contentDiv = msgEl.querySelector('.message-content');
+        if (contentDiv) {
+            contentDiv.style.position = 'relative';
+            contentDiv.appendChild(indicator);
+        }
     },
 
-    // ==================== القسم 14: saveMessage (نصوص فقط - آخر 25 رسالة) ====================
+    // ==================== القسم 14: saveMessage ====================
     saveMessage(friendId, message) { 
         if (!friendId || !message) return;
         
-        // ✅ نصوص فقط
         if (message.type !== 'text') {
             console.log(`🚫 نوع الرسالة (${message.type}) غير مدعوم - النصوص فقط`);
             return;
@@ -250,7 +364,6 @@ const ChatSystem = {
         
         messages.push(message); 
         
-        // ✅ آخر 25 رسالة فقط
         if (messages.length > 25) {
             messages = messages.slice(-25);
             console.log(`🧹 تم الاقتصار على آخر 25 رسالة`);
