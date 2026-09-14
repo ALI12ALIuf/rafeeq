@@ -1,5 +1,5 @@
-// ========== secure-chat.js - النسخة النهائية (نصوص فقط) ==========
-// نظام التشفير E2EE
+// ========== secure-chat.js - النسخة النهائية (مع نظام غير المقروء) ==========
+// نظام التشفير E2EE - نصوص فقط
 
 const SecureChatSystem = {
     MESSAGE_EXPIRY_HOURS: 24,
@@ -63,8 +63,14 @@ const SecureChatSystem = {
     },
     
     // ==================== القسم 3: دوال المفاتيح ====================
-    async generateKeyPair() { return await window.crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']); },
-    async exportPublicKey(key) { const raw = await window.crypto.subtle.exportKey('raw', key); return btoa(String.fromCharCode(...new Uint8Array(raw))); },
+    async generateKeyPair() { 
+        return await window.crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']); 
+    },
+    
+    async exportPublicKey(key) { 
+        const raw = await window.crypto.subtle.exportKey('raw', key); 
+        return btoa(String.fromCharCode(...new Uint8Array(raw))); 
+    },
     
     async importPublicKey(base64Key) { 
         if (!base64Key) throw new Error('المفتاح العام فارغ');
@@ -101,7 +107,9 @@ const SecureChatSystem = {
         const cacheKey = `${window.auth.currentUser.uid}_${await this.exportPublicKey(publicKey)}`;
         if (this.sharedKeyCache.has(cacheKey)) return this.sharedKeyCache.get(cacheKey);
         try {
-            const sharedKey = await window.crypto.subtle.deriveKey({ name: 'ECDH', public: publicKey }, privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+            const sharedKey = await window.crypto.subtle.deriveKey({ 
+                name: 'ECDH', public: publicKey 
+            }, privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
             this.sharedKeyCache.set(cacheKey, sharedKey);
             setTimeout(() => this.sharedKeyCache.delete(cacheKey), 300000);
             return sharedKey;
@@ -113,7 +121,9 @@ const SecureChatSystem = {
         const encoder = new TextEncoder();
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
         try {
-            const encrypted = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, typeof data === 'string' ? encoder.encode(data) : data);
+            const encrypted = await window.crypto.subtle.encrypt({ 
+                name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') 
+            }, sharedKey, typeof data === 'string' ? encoder.encode(data) : data);
             const combined = new Uint8Array(iv.length + encrypted.byteLength);
             combined.set(iv);
             combined.set(new Uint8Array(encrypted), iv.length);
@@ -127,7 +137,9 @@ const SecureChatSystem = {
             const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
             const iv = combined.slice(0, 12);
             const data = combined.slice(12);
-            const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') }, sharedKey, data);
+            const decrypted = await window.crypto.subtle.decrypt({ 
+                name: 'AES-GCM', iv, additionalData: encoder.encode('rafeeq-secure') 
+            }, sharedKey, data);
             return new TextDecoder().decode(decrypted);
         } catch (error) { throw error; }
     },
@@ -165,7 +177,7 @@ const SecureChatSystem = {
         }); 
     },
 
-    // ==================== القسم 8: معالجة الرسائل المستلمة ====================
+    // ==================== القسم 8: معالجة الرسائل المستلمة (مع نظام غير المقروء) ====================
     async processReceivedMessage(msg) {
         try {
             const myPrivateKey = await this.getMyPrivateKey(); 
@@ -176,8 +188,27 @@ const SecureChatSystem = {
             // ✅ نصوص فقط
             if (msg.package.type === 'text') { 
                 const decryptedText = await this.decryptData(msg.package.data, sharedKey); 
-                ChatSystem.saveMessage(msg.from, { id: msg.package.id, type: 'text', text: decryptedText, sender: 'friend', time: new Date().toISOString() }); 
-                if (ChatSystem.currentChat === msg.from) ChatSystem.displayMessages(msg.from);
+                
+                ChatSystem.saveMessage(msg.from, { 
+                    id: msg.package.id, 
+                    type: 'text', 
+                    text: decryptedText, 
+                    sender: 'friend', 
+                    time: new Date().toISOString() 
+                }); 
+                
+                if (ChatSystem.currentChat === msg.from) {
+                    // ✅ المستخدم في المحادثة حالياً → عرض فوري بدون علامة
+                    ChatSystem.displayMessages(msg.from);
+                    console.log('✅ رسالة جديدة - عرض فوري (المستخدم في المحادثة)');
+                } else {
+                    // ✅ المستخدم خارج المحادثة → تسجيل كغير مقروءة
+                    if (typeof window.markMessageAsUnread === 'function') {
+                        window.markMessageAsUnread(msg.from);
+                        console.log('📩 رسالة جديدة - تسجيل كغير مقروءة');
+                    }
+                }
+                
                 ChatSystem.updateLastMessage(msg.from, decryptedText); 
             } 
             
