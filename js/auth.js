@@ -1,4 +1,4 @@
-// ========== auth.js - النسخة النهائية (15 حرف - مُصحح) ==========
+// ========== auth.js - النسخة النهائية (تحديث فوري) ==========
 // Firebase Auth الأساسي
 
 // ==================== القسم 1: دوال مساعدة ====================
@@ -14,7 +14,6 @@ function generateShareableId() {
     return id;
 }
 
-// ✅ دالة الإيموجي
 function getEmojiForUser(userData) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️',
@@ -72,12 +71,11 @@ async function startGoogleLogin() {
     }
 }
 
-// ==================== القسم 5: saveUserAndEnter (إصلاح 15 حرف) ====================
+// ==================== القسم 5: saveUserAndEnter ====================
 async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         
-        // ✅ قص اسم Google إلى 15 حرف قبل أي عملية
         let shortName = (user.displayName || 'مستخدم').trim();
         if (shortName.length > 15) {
             shortName = shortName.substring(0, 15);
@@ -100,7 +98,6 @@ async function saveUserAndEnter(user) {
             const userData = userDoc.data(); 
             const updates = {};
             
-            // ✅ إذا كان الاسم محفوظاً أطول من 15 حرف، قصه
             if (userData.name && userData.name.length > 15) {
                 updates.name = userData.name.substring(0, 15);
                 console.log('✅ تم قص الاسم القديم:', updates.name);
@@ -119,8 +116,18 @@ async function saveUserAndEnter(user) {
             }
         }
         
+        // ✅ إعداد المستمعين (للتحديث الفوري)
+        if (typeof setupFriendRequestsListener === 'function') {
+            setupFriendRequestsListener(user.uid);
+        }
+        if (typeof setupFriendsListener === 'function') {
+            setupFriendsListener(user.uid);
+        }
+        
+        // ✅ إشعار باقي النظام
+        window.dispatchEvent(new Event('authReady'));
+        
         await loadUserData(user.uid);
-        setupFriendRequestsListener(user.uid);
         if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
         showApp();
     } catch (error) {
@@ -153,11 +160,14 @@ async function logout() {
             });
         }
     } catch (e) {}
+    
     try { await window.auth.signOut(); } catch (e) {}
+    
+    console.log('🔓 تم تسجيل الخروج');
     window.location.reload(); 
 }
 
-// ==================== القسم 8: loadUserData (15 حرف - إجباري) ====================
+// ==================== القسم 8: loadUserData ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
@@ -169,14 +179,11 @@ async function loadUserData(uid) {
             const si = document.getElementById('shareableId');
             const ca = document.getElementById('currentAvatarEmoji');
             
-            // ✅ قص الاسم إلى 15 حرف
             let displayName = d.name || 'مستخدم';
             if (displayName.length > 15) {
                 displayName = displayName.substring(0, 15);
                 try {
-                    await window.db.collection('users').doc(uid).update({ 
-                        name: displayName 
-                    });
+                    await window.db.collection('users').doc(uid).update({ name: displayName });
                     console.log('✅ تم قص الاسم في Firebase');
                 } catch (e) {}
             }
@@ -200,8 +207,18 @@ if (typeof window.auth !== 'undefined') {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
+            // ✅ إعداد المستمعين (للتحديث الفوري)
+            if (typeof setupFriendRequestsListener === 'function') {
+                setupFriendRequestsListener(user.uid);
+            }
+            if (typeof setupFriendsListener === 'function') {
+                setupFriendsListener(user.uid);
+            }
+            
+            // ✅ إشعار باقي النظام
+            window.dispatchEvent(new Event('authReady'));
+            
             await loadUserData(user.uid);
-            setupFriendRequestsListener(user.uid);
             if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
             showApp();
         } else {
