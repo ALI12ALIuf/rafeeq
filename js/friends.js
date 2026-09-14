@@ -349,4 +349,152 @@ window.findUserById = async function() {
             if (idText) {
                 const shareableId = u.shareableId || '';
                 idText.innerHTML = `
-                    <button class="copy-id-btn-search" style="background:transparent;border:none;color:var(--primary);cursor:pointer;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;padding:2px;flex-shrink
+                    <button class="copy-id-btn-search" style="background:transparent;border:none;color:var(--primary);cursor:pointer;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;padding:2px;flex-shrink:0;" title="نسخ ID">
+                        <i class="fas fa-copy" style="font-size:0.7rem;"></i>
+                    </button>
+                    <span style="font-size:0.75rem;font-family:monospace;direction:ltr;">${shareableId}</span>
+                    <span style="color:var(--primary);font-weight:700;font-size:0.85rem;font-family:sans-serif;">ID</span>
+                `;
+                const copyBtn = idText.querySelector('.copy-id-btn-search');
+                if (copyBtn) {
+                    copyBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(shareableId).then(() => {
+                            const icon = copyBtn.querySelector('i');
+                            if (icon) {
+                                icon.className = 'fas fa-check';
+                                setTimeout(() => { icon.className = 'fas fa-copy'; }, 1500);
+                            }
+                        }).catch(() => {});
+                    };
+                }
+            }
+            if (actionBtn) actionBtn.style.display = 'none';
+            
+            rc.innerHTML = '';
+            rc.appendChild(clone);
+            return;
+        }
+        
+        // تحديد حالة العلاقة
+        let btnIcon = '', btnDisabled = false, btnStyle = '', btnAction = null;
+        
+        if (cu) { 
+            const me = await window.db.collection('users').doc(cu.uid).get();
+            const myFriends = me.data().friends || [];
+            
+            if (myFriends.includes(uid)) { 
+                btnIcon = 'fa-comment';
+                btnDisabled = false;
+                btnStyle = 'background:var(--primary);color:white;';
+                btnAction = () => openChat(uid);
+            } else { 
+                const sentRequests = await window.db.collection('friendRequests')
+                    .where('from','==',cu.uid)
+                    .where('to','==',uid)
+                    .where('status','==','pending')
+                    .get();
+                
+                if (!sentRequests.empty) { 
+                    btnIcon = 'fa-clock';
+                    btnDisabled = true;
+                    btnStyle = 'background:transparent;color:white;border:2px solid var(--primary);border-radius:50%;width:36px;height:36px;padding:0;cursor:default;display:flex;align-items:center;justify-content:center;';
+                    btnAction = null;
+                } else {
+                    const receivedRequests = await window.db.collection('friendRequests')
+                        .where('from','==',uid)
+                        .where('to','==',cu.uid)
+                        .where('status','==','pending')
+                        .get();
+                    
+                    if (!receivedRequests.empty) {
+                        btnIcon = 'fa-check';
+                        btnDisabled = false;
+                        btnStyle = 'background:#4CAF50;color:white;border-radius:50%;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;';
+                        btnAction = () => {
+                            const reqDoc = receivedRequests.docs[0];
+                            window.acceptFriendRequest(reqDoc.id, uid);
+                            hideSearchResults();
+                        };
+                    } else {
+                        btnIcon = 'fa-plus';
+                        btnDisabled = false;
+                        btnStyle = 'background:var(--primary);color:white;';
+                        btnAction = () => {
+                            addNewFriend(uid);
+                            hideSearchResults();
+                        };
+                    }
+                }
+            } 
+        } else {
+            btnIcon = 'fa-lock';
+            btnDisabled = true;
+            btnStyle = 'background:#555;color:#888;cursor:not-allowed;border-radius:50%;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;';
+            btnAction = null;
+        }
+        
+        const clone = template.content.cloneNode(true);
+        const resultItem = clone.querySelector('.search-result-item');
+        const avatar = resultItem.querySelector('.search-result-avatar');
+        const name = resultItem.querySelector('.search-result-info h4');
+        const idText = resultItem.querySelector('.search-result-info p');
+        const actionBtn = resultItem.querySelector('.search-action-btn');
+        
+        if (avatar) avatar.textContent = getEmojiForUser(u);
+        if (name) name.textContent = u.name || 'مستخدم';
+        if (idText) {
+            const shareableId = u.shareableId || '';
+            idText.innerHTML = `
+                <button class="copy-id-btn-search" style="background:transparent;border:none;color:var(--primary);cursor:pointer;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;padding:2px;flex-shrink:0;" title="نسخ ID">
+                    <i class="fas fa-copy" style="font-size:0.7rem;"></i>
+                </button>
+                <span style="font-size:0.75rem;font-family:monospace;direction:ltr;">${shareableId}</span>
+                <span style="color:var(--primary);font-weight:700;font-size:0.85rem;font-family:sans-serif;">ID</span>
+            `;
+            const copyBtn = idText.querySelector('.copy-id-btn-search');
+            if (copyBtn) {
+                copyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(shareableId).then(() => {
+                        const icon = copyBtn.querySelector('i');
+                        if (icon) {
+                            icon.className = 'fas fa-check';
+                            setTimeout(() => { icon.className = 'fas fa-copy'; }, 1500);
+                        }
+                    }).catch(() => {});
+                };
+            }
+        }
+        
+        if (actionBtn) {
+            actionBtn.innerHTML = `<i class="fas ${btnIcon}"></i>`;
+            actionBtn.style.cssText = `padding:6px 14px;border:none;border-radius:20px;${btnStyle}font-size:0.85rem;cursor:${btnDisabled ? 'not-allowed' : 'pointer'};display:flex;align-items:center;justify-content:center;gap:6px;min-width:40px;`;
+            if (btnDisabled) { actionBtn.disabled = true; }
+            if (btnAction) { actionBtn.onclick = btnAction; }
+        }
+        
+        rc.innerHTML = '';
+        rc.appendChild(clone);
+        
+    } catch (e) { 
+        console.error('خطأ في البحث:', e);
+        rc.innerHTML = `<div style="text-align:center;padding:15px;color:var(--text-light);">❌ حدث خطأ في البحث</div>`; 
+    }
+};
+
+// ==================== القسم 10: إخفاء نتائج البحث ====================
+window.hideSearchResults = function() { 
+    const rc = document.getElementById('searchResultsContainer'); 
+    const inp = document.getElementById('searchInput');
+    if (rc) { 
+        rc.style.display = 'none'; 
+        rc.innerHTML = ''; 
+    }
+    if (inp) { inp.value = ''; }
+};
+
+// ==================== القسم 11: تصدير الدوال ====================
+window.loadFriendRequestsForChat = loadFriendRequestsForChat;
+window.setupFriendRequestsListener = setupFriendRequestsListener;
+window.setupFriendsListener = setupFriendsListener;
