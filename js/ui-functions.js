@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (المرسل/المستلم أولاً) ==========
+// ========== ui-functions.js - النسخة النهائية (حفظ حالة غير المقروء) ==========
 
 window._pageStack = [];
 
@@ -28,6 +28,48 @@ let _currentChatsElements = {
 let _updateLock = false;
 let _unreadMessages = new Map();
 
+// ==================== ✅ دوال حفظ/تحميل حالة غير المقروء ====================
+function saveUnreadMessages() {
+    const uid = window.auth?.currentUser?.uid;
+    if (!uid) return;
+    
+    try {
+        const data = {};
+        _unreadMessages.forEach((count, fid) => {
+            data[fid] = count;
+        });
+        localStorage.setItem(`unread_${uid}`, JSON.stringify(data));
+        console.log(`💾 تم حفظ ${_unreadMessages.size} محادثة غير مقروءة`);
+    } catch (e) {
+        console.warn('⚠️ فشل حفظ حالة غير المقروء:', e);
+    }
+}
+
+function loadUnreadMessages() {
+    const uid = window.auth?.currentUser?.uid;
+    if (!uid) return;
+    
+    _unreadMessages.clear();
+    try {
+        const data = JSON.parse(localStorage.getItem(`unread_${uid}`)) || {};
+        Object.keys(data).forEach(fid => {
+            if (data[fid] > 0) {
+                _unreadMessages.set(fid, data[fid]);
+            }
+        });
+        console.log(`📩 تم تحميل ${_unreadMessages.size} محادثة غير مقروءة`);
+    } catch (e) {
+        console.warn('⚠️ فشل تحميل حالة غير المقروء:', e);
+    }
+}
+
+function clearUnreadMessages() {
+    const uid = window.auth?.currentUser?.uid;
+    if (!uid) return;
+    localStorage.removeItem(`unread_${uid}`);
+    _unreadMessages.clear();
+}
+
 // ==================== تحميل المحادثات ====================
 async function loadChats(force = false) { 
     if (!window.auth || !window.auth.currentUser) return; 
@@ -54,6 +96,9 @@ async function loadChats(force = false) {
             return; 
         }
         const friends = udoc.data().friends || []; 
+        
+        // ✅ تحميل حالة غير المقروء من localStorage
+        loadUnreadMessages();
         
         _currentChatsElements.requests.clear();
         _currentChatsElements.friends.clear();
@@ -111,6 +156,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
                 el.remove();
                 _currentChatsElements.friends.delete(id);
                 _unreadMessages.delete(id);
+                saveUnreadMessages();
             }
         });
         
@@ -245,7 +291,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
     }
 }
 
-// ==================== إعادة الترتيب (آخر رسالة أولاً) ====================
+// ==================== إعادة الترتيب ====================
 function reorderChatsList(list) {
     if (!list) return;
     
@@ -308,6 +354,9 @@ window.markMessageAsUnread = function(friendId) {
     const currentCount = _unreadMessages.get(friendId) || 0;
     _unreadMessages.set(friendId, currentCount + 1);
     
+    // ✅ حفظ في localStorage
+    saveUnreadMessages();
+    
     console.log(`📩 رسالة جديدة من ${friendId} - عدد غير المقروء: ${currentCount + 1}`);
     
     const list = document.getElementById('chatsList');
@@ -322,6 +371,10 @@ window.clearUnreadStatus = function(friendId) {
     
     if (_unreadMessages.has(friendId)) {
         _unreadMessages.delete(friendId);
+        
+        // ✅ حفظ في localStorage
+        saveUnreadMessages();
+        
         console.log(`✅ تم مسح حالة غير المقروء لـ ${friendId}`);
     }
     
@@ -371,7 +424,7 @@ function updateEmptyState(list) {
 function resetChatsCache() {
     _currentChatsElements.requests.clear();
     _currentChatsElements.friends.clear();
-    _unreadMessages.clear();
+    // ❌ لا تمسح _unreadMessages هنا!
 }
 
 // ==================== تأكيد حذف الصديق ====================
@@ -404,6 +457,7 @@ window.removeFriend = async function(friendId) {
         }
         
         _unreadMessages.delete(friendId);
+        saveUnreadMessages();
         
         const element = _currentChatsElements.friends.get(friendId);
         if (element) {
@@ -649,10 +703,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-window.addEventListener('authReady', async function() {
-    if (window.auth?.currentUser && typeof SecureChatSystem !== 'undefined') {
-        await SecureChatSystem.init();
-    }
+window.addEventListener('authReady', function() {
+    console.log('✅ authReady - تحميل حالة غير المقروء');
+    // ✅ تحميل الحالة عند تسجيل الدخول
+    setTimeout(() => {
+        loadUnreadMessages();
+        if (window.auth?.currentUser && typeof SecureChatSystem !== 'undefined') {
+            SecureChatSystem.init();
+        }
+    }, 100);
 });
 
 if ('Notification' in window && Notification.permission === 'default') {
@@ -672,3 +731,6 @@ window.resetChatsCache = resetChatsCache;
 window.reorderChatsList = reorderChatsList;
 window.getLastMessageTime = getLastMessageTime;
 window._unreadMessages = _unreadMessages;
+window.saveUnreadMessages = saveUnreadMessages;
+window.loadUnreadMessages = loadUnreadMessages;
+window.clearUnreadMessages = clearUnreadMessages;
