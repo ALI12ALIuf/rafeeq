@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (مع علامة الرسائل غير المقروءة) ==========
+// ========== ui-functions.js - النسخة النهائية (بدون عداد + الاسم على اليمين) ==========
 
 window._pageStack = [];
 
@@ -258,7 +258,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
     }
 }
 
-// ==================== ✅ إعادة ترتيب القائمة ====================
+// ==================== ✅ إعادة ترتيب القائمة (بدون عداد) ====================
 function reorderChatsList(list) {
     if (!list) return;
     
@@ -277,7 +277,7 @@ function reorderChatsList(list) {
         }
     });
     
-    // 2. ترتيب محادثات غير المقروءة حسب عدد الرسائل
+    // 2. ترتيب محادثات غير المقروءة
     unreadFriends.sort((a, b) => {
         const fidA = a.getAttribute('data-friend-id');
         const fidB = b.getAttribute('data-friend-id');
@@ -298,28 +298,18 @@ function reorderChatsList(list) {
     unreadFriends.forEach(el => list.appendChild(el));
     readFriends.forEach(el => list.appendChild(el));
     
-    // 5. تحديث الألوان والشارات
+    // 5. ✅ تحديث الألوان فقط (بدون شارة)
     _currentChatsElements.friends.forEach((el, fid) => {
         const nameEl = el.querySelector('.chat-info h4');
-        const chatInfo = el.querySelector('.chat-info');
-        
-        // إزالة الشارة القديمة
-        const oldBadge = chatInfo?.querySelector('.unread-badge');
-        if (oldBadge) oldBadge.remove();
         
         if (_unreadMessages.has(fid) && _unreadMessages.get(fid) > 0) {
-            // ✅ أزرق + شارة
+            // ✅ أزرق للمرسل
             if (nameEl) nameEl.style.color = 'var(--primary)';
-            
-            if (chatInfo) {
-                const badge = document.createElement('span');
-                badge.className = 'unread-badge';
-                badge.textContent = _unreadMessages.get(fid);
-                nameEl.appendChild(badge);
-            }
+            el.classList.add('unread-dot');
         } else {
             // ⚪ أبيض عادي
             if (nameEl) nameEl.style.color = 'var(--text)';
+            el.classList.remove('unread-dot');
         }
     });
 }
