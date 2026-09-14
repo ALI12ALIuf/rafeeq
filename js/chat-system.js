@@ -1,5 +1,5 @@
-// ========== chat-system.js - النسخة النهائية (معزول + تحميل صحيح) ==========
-// نظام الدردشة E2EE - نصوص فقط - كل حساب معزول في localStorage
+// ========== chat-system.js - النسخة النهائية (مع نظام غير المقروء) ==========
+// نظام الدردشة E2EE - نصوص فقط - معزول لكل حساب
 
 const ChatSystem = {
     currentChat: null, messages: {},
@@ -19,7 +19,7 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 2: loadAllChats (معزول لكل حساب) ====================
+    // ==================== القسم 2: loadAllChats ====================
     loadAllChats() { 
         const uid = window.auth?.currentUser?.uid;
         if (!uid) {
@@ -56,7 +56,7 @@ const ChatSystem = {
         console.log(`✅ تم تحميل ${loadedCount} محادثة للمستخدم ${uid.substring(0, 8)}...`);
     },
     
-    // ==================== القسم 2.1: loadChatMessages (تحميل رسائل صديق معين) ====================
+    // ==================== القسم 3: loadChatMessages ====================
     loadChatMessages(friendId) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid || !friendId) return [];
@@ -74,8 +74,13 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 3: openChat (مع تحميل فوري) ====================
+    // ==================== القسم 4: openChat (مع مسح حالة غير المقروء) ====================
     openChat(friendId, friendName, friendAvatar) {
+        // ✅ مسح حالة غير المقروء
+        if (typeof window.clearUnreadStatus === 'function') {
+            window.clearUnreadStatus(friendId);
+        }
+        
         if (this.currentChat && this.currentChat !== friendId) {
             console.log('🧹 تنظيف المحادثة السابقة:', this.currentChat);
             this.cleanConversationData(this.currentChat, false);
@@ -86,7 +91,6 @@ const ChatSystem = {
         this._displayedIds = new Set();
         this._isProcessing = false;
         
-        // ✅ تحميل رسائل هذا الصديق مباشرة
         this.loadChatMessages(friendId);
         
         document.body.classList.add('conversation-open');
@@ -102,9 +106,15 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 4: closeChat ====================
+    // ==================== القسم 5: closeChat (مع مسح حالة غير المقروء) ====================
     closeChat() {
         console.log('🔴 closeChat - بدء إغلاق المحادثة');
+        
+        // ✅ مسح حالة غير المقروء
+        if (typeof window.clearUnreadStatus === 'function' && this.currentChat) {
+            window.clearUnreadStatus(this.currentChat);
+        }
+        
         const chatId = this.currentChat;
         const uid = window.auth?.currentUser?.uid;
         
@@ -132,7 +142,7 @@ const ChatSystem = {
         console.log('✅ closeChat - انتهى');
     },
     
-    // ==================== القسم 5: cleanConversationData ====================
+    // ==================== القسم 6: cleanConversationData ====================
     cleanConversationData(chatId, cleanAll = false) {
         console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
         const uid = window.auth?.currentUser?.uid;
@@ -160,7 +170,7 @@ const ChatSystem = {
         console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
     },
     
-    // ==================== القسم 6: displayMessages (مع تحميل احتياطي) ====================
+    // ==================== القسم 7: displayMessages ====================
     displayMessages(friendId) { 
         if (this._isProcessing) return;
         this._isProcessing = true;
@@ -171,7 +181,6 @@ const ChatSystem = {
             return; 
         }
         
-        // ✅ تحميل الرسائل من localStorage إذا كانت فارغة
         if (!this.messages[friendId] || this.messages[friendId].length === 0) {
             console.log(`📂 تحميل احتياطي للرسائل من localStorage للصديق ${friendId}`);
             this.loadChatMessages(friendId);
@@ -196,7 +205,7 @@ const ChatSystem = {
         }, 50);
     },
 
-    // ==================== القسم 7: displayMessage ====================
+    // ==================== القسم 8: displayMessage ====================
     displayMessage(msg) {
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
@@ -243,7 +252,7 @@ const ChatSystem = {
         }, 50);
     },
     
-    // ==================== القسم 12: sendMessage ====================
+    // ==================== القسم 12: sendMessage (إرسال فوري) ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         
