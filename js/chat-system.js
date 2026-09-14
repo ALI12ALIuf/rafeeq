@@ -252,7 +252,7 @@ const ChatSystem = {
         }, 50);
     },
     
-    // ==================== القسم 12: sendMessage (إرسال فوري) ====================
+    // ==================== القسم 12: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         
