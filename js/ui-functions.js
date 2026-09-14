@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (بدون تكرار) ==========
+// ========== ui-functions.js - النسخة النهائية (بدون إعادة تحميل عند التنقل) ==========
 
 window._pageStack = [];
 
@@ -123,7 +123,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             }
         });
         
-        // ✅ 5. إضافة طلبات الصداقة الجديدة (مع منع التكرار)
+        // ✅ 5. إضافة طلبات الصداقة الجديدة
         const addedRequestIds = new Set();
         for (const req of pendingRequests) {
             if (addedRequestIds.has(req.id)) continue;
@@ -182,7 +182,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             }
         }
         
-        // ✅ 6. إضافة الأصدقاء الجدد (مع منع التكرار)
+        // ✅ 6. إضافة الأصدقاء الجدد
         const addedFriendIds = new Set();
         for (const fid of friends) {
             if (addedFriendIds.has(fid)) continue;
@@ -416,6 +416,7 @@ function ensureSinglePage() {
     }); 
 }
 
+// ==================== ✅ التنقل (مع عرض فوري بدون إعادة تحميل) ====================
 function setupNavigation() { 
     const nav = document.querySelectorAll('.nav-item'); 
     const pages = document.querySelectorAll('.page'); 
@@ -447,10 +448,20 @@ function setupNavigation() {
             pageTitle.setAttribute('data-i18n', id);
         }
         
+        // ✅ الحل: عرض فوري بدون إعادة تحميل
         if (id === 'chat') {
-            resetChatsCache();
-            chatsLoaded = false;
-            loadChats(true);
+            const list = document.getElementById('chatsList');
+            
+            // ✅ الحالة 1: القائمة موجودة → عرض فوري بدون تحميل
+            if (chatsLoaded && list && list.children.length > 0) {
+                console.log('✅ عرض فوري - القائمة موجودة');
+                // لا تفعل شيء - القائمة موجودة كما هي
+            } 
+            // ✅ الحالة 2: أول مرة → تحميل كامل
+            else {
+                console.log('🔄 تحميل أول مرة');
+                loadChats();
+            }
         }
         
         nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); 
