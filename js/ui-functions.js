@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (مع مسح فوري للإشارة) ==========
+// ========== ui-functions.js - النسخة النهائية (المرسل/المستلم أولاً) ==========
 
 window._pageStack = [];
 
@@ -20,16 +20,12 @@ function clearStack() {
 let chatsLoaded = false;
 let isLoadingChats = false;
 
-// ✅ متتبع العناصر المعروضة حالياً
 let _currentChatsElements = {
     requests: new Map(),
     friends: new Map()
 };
 
-// ✅ قفل منع التحديثات المتزامنة
 let _updateLock = false;
-
-// ✅ تتبع الرسائل غير المقروءة لكل صديق
 let _unreadMessages = new Map();
 
 // ==================== تحميل المحادثات ====================
@@ -74,7 +70,7 @@ async function loadChats(force = false) {
     } 
 }
 
-// ==================== ✅ التحديث الذكي ====================
+// ==================== التحديث الذكي ====================
 async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list) {
     if (_updateLock) {
         await new Promise(resolve => {
@@ -96,14 +92,12 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             return;
         }
         
-        // 1. جلب طلبات الصداقة
         const pendingRequests = await window.loadFriendRequestsForChat 
             ? await window.loadFriendRequestsForChat() 
             : [];
         
         const currentFriendIds = new Set(friends);
         
-        // 2. إزالة الطلبات غير الموجودة
         _currentChatsElements.requests.forEach((el, id) => {
             const stillExists = pendingRequests.some(r => r.id === id);
             if (!stillExists) {
@@ -112,7 +106,6 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             }
         });
         
-        // 3. إزالة الأصدقاء غير الموجودين
         _currentChatsElements.friends.forEach((el, id) => {
             if (!currentFriendIds.has(id)) {
                 el.remove();
@@ -121,7 +114,6 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             }
         });
         
-        // 4. إضافة طلبات الصداقة الجديدة
         const addedRequestIds = new Set();
         for (const req of pendingRequests) {
             if (addedRequestIds.has(req.id)) continue;
@@ -154,7 +146,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
                             const icon = copyBtn.querySelector('i');
                             if (icon) {
                                 icon.className = 'fas fa-check';
-                                setTimeout(() => { icon.className = 'fas fa-copy'; }, 1500);
+                                setTimeout(() => { icon.className = 'far fa-copy'; }, 1500);
                             }
                         }).catch(() => {});
                     };
@@ -179,7 +171,6 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             }
         }
         
-        // 5. إضافة الأصدقاء الجدد
         const addedFriendIds = new Set();
         for (const fid of friends) {
             if (addedFriendIds.has(fid)) continue;
@@ -226,16 +217,11 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
                         };
                     }
                     
-                    // ✅ عند النقر على البطاقة: مسح الإشارة + فتح المحادثة
                     chatItem.onclick = (e) => {
                         if (e.target.closest('.remove-friend-btn') || e.target.closest('.copy-chat-id-btn')) return;
-                        
-                        // ✅ مسح الإشارة فوراً (بدون انتظار)
                         if (typeof window.clearUnreadStatus === 'function') {
                             window.clearUnreadStatus(fid);
                         }
-                        
-                        // ✅ فتح المحادثة
                         openChat(fid);
                     };
                     
@@ -251,10 +237,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             }
         }
         
-        // 6. إعادة ترتيب القائمة
         reorderChatsList(list);
-        
-        // 7. إدارة الحالة الفارغة
         updateEmptyState(list);
         
     } finally {
@@ -262,63 +245,63 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
     }
 }
 
-// ==================== ✅ إعادة ترتيب القائمة (بدون عداد) ====================
+// ==================== إعادة الترتيب (آخر رسالة أولاً) ====================
 function reorderChatsList(list) {
     if (!list) return;
     
-    // 1. جلب كل العناصر
     const requests = [];
-    const unreadFriends = [];
-    const readFriends = [];
+    const friendsWithTime = [];
     
     _currentChatsElements.requests.forEach(el => requests.push(el));
     
     _currentChatsElements.friends.forEach((el, fid) => {
-        if (_unreadMessages.has(fid) && _unreadMessages.get(fid) > 0) {
-            unreadFriends.push(el);
-        } else {
-            readFriends.push(el);
-        }
+        const lastTime = getLastMessageTime(fid);
+        friendsWithTime.push({ el, fid, lastTime });
     });
     
-    // 2. ترتيب محادثات غير المقروءة
-    unreadFriends.sort((a, b) => {
-        const fidA = a.getAttribute('data-friend-id');
-        const fidB = b.getAttribute('data-friend-id');
-        const countA = _unreadMessages.get(fidA) || 0;
-        const countB = _unreadMessages.get(fidB) || 0;
-        return countB - countA;
-    });
+    friendsWithTime.sort((a, b) => b.lastTime - a.lastTime);
     
-    // 3. إزالة كل العناصر
-    [...requests, ...unreadFriends, ...readFriends].forEach(el => {
+    [...requests, ...friendsWithTime.map(f => f.el)].forEach(el => {
         if (el.parentNode === list) {
             el.remove();
         }
     });
     
-    // 4. إعادة الإضافة بالترتيب
     requests.forEach(el => list.appendChild(el));
-    unreadFriends.forEach(el => list.appendChild(el));
-    readFriends.forEach(el => list.appendChild(el));
+    friendsWithTime.forEach(f => list.appendChild(f.el));
     
-    // 5. ✅ تحديث الألوان فقط (بدون شارة)
     _currentChatsElements.friends.forEach((el, fid) => {
         const nameEl = el.querySelector('.chat-info h4');
         
         if (_unreadMessages.has(fid) && _unreadMessages.get(fid) > 0) {
-            // ✅ أزرق للمرسل
             if (nameEl) nameEl.style.color = 'var(--primary)';
             el.classList.add('unread-dot');
         } else {
-            // ⚪ أبيض عادي
             if (nameEl) nameEl.style.color = 'var(--text)';
             el.classList.remove('unread-dot');
         }
     });
 }
 
-// ==================== ✅ تسجيل رسالة غير مقروءة ====================
+// ==================== جلب وقت آخر رسالة ====================
+function getLastMessageTime(friendId) {
+    const uid = window.auth?.currentUser?.uid;
+    if (!uid || !friendId) return 0;
+    
+    const key = `chat_${uid}_${friendId}`;
+    try {
+        const messages = JSON.parse(localStorage.getItem(key)) || [];
+        if (messages.length === 0) return 0;
+        
+        const lastMsg = messages[messages.length - 1];
+        const time = new Date(lastMsg.time).getTime();
+        return isNaN(time) ? 0 : time;
+    } catch (e) {
+        return 0;
+    }
+}
+
+// ==================== تسجيل رسالة غير مقروءة ====================
 window.markMessageAsUnread = function(friendId) {
     if (!friendId) return;
     
@@ -333,28 +316,24 @@ window.markMessageAsUnread = function(friendId) {
     }
 };
 
-// ==================== ✅ مسح حالة غير المقروء (فوري) ====================
+// ==================== مسح حالة غير المقروء ====================
 window.clearUnreadStatus = function(friendId) {
     if (!friendId) return;
     
-    // 1. مسح من الذاكرة
     if (_unreadMessages.has(friendId)) {
         _unreadMessages.delete(friendId);
         console.log(`✅ تم مسح حالة غير المقروء لـ ${friendId}`);
     }
     
-    // 2. ✅ تحديث فوري للعنصر في DOM (بدون انتظار)
     const element = _currentChatsElements.friends.get(friendId);
     if (element) {
         const nameEl = element.querySelector('.chat-info h4');
         if (nameEl) {
-            nameEl.style.color = 'var(--text)';  // ← أبيض
+            nameEl.style.color = 'var(--text)';
         }
-        element.classList.remove('unread-dot');  // ← إزالة الخط الأزرق
-        console.log('✅ تم تحديث العنصر مباشرة');
+        element.classList.remove('unread-dot');
     }
     
-    // 3. إعادة الترتيب (لتحديث المواقع)
     setTimeout(() => {
         const list = document.getElementById('chatsList');
         if (list && typeof reorderChatsList === 'function') {
@@ -527,7 +506,6 @@ function ensureSinglePage() {
     }); 
 }
 
-// ==================== التنقل ====================
 function setupNavigation() { 
     const nav = document.querySelectorAll('.nav-item'); 
     const pages = document.querySelectorAll('.page'); 
@@ -559,13 +537,13 @@ function setupNavigation() {
             pageTitle.setAttribute('data-i18n', id);
         }
         
-        // ✅ عرض فوري بدون إعادة تحميل
         if (id === 'chat') {
             const list = document.getElementById('chatsList');
             if (chatsLoaded && list && list.children.length > 0) {
-                console.log('✅ عرض فوري');
+                if (typeof reorderChatsList === 'function') {
+                    reorderChatsList(list);
+                }
             } else {
-                console.log('🔄 تحميل أول مرة');
                 loadChats();
             }
         }
@@ -689,8 +667,8 @@ window.addEventListener('unhandledrejection', function(event) {
     console.error('❌ خطأ غير معالج:', event.reason);
 });
 
-// ✅ تصدير الدوال
 window.smartUpdateChatsList = smartUpdateChatsList;
 window.resetChatsCache = resetChatsCache;
 window.reorderChatsList = reorderChatsList;
+window.getLastMessageTime = getLastMessageTime;
 window._unreadMessages = _unreadMessages;
