@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة النهائية (معزول لكل حساب) ==========
+// ========== chat-system.js - النسخة النهائية (معزول + تحميل صحيح) ==========
 // نظام الدردشة E2EE - نصوص فقط - كل حساب معزول في localStorage
 
 const ChatSystem = {
@@ -28,7 +28,6 @@ const ChatSystem = {
             return;
         }
         
-        // ✅ تصفير الرسائل أولاً
         this.messages = {};
         
         const prefix = `chat_${uid}_`;
@@ -57,7 +56,25 @@ const ChatSystem = {
         console.log(`✅ تم تحميل ${loadedCount} محادثة للمستخدم ${uid.substring(0, 8)}...`);
     },
     
-    // ==================== القسم 3: openChat ====================
+    // ==================== القسم 2.1: loadChatMessages (تحميل رسائل صديق معين) ====================
+    loadChatMessages(friendId) {
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid || !friendId) return [];
+        
+        const key = `chat_${uid}_${friendId}`;
+        try {
+            const data = JSON.parse(localStorage.getItem(key)) || [];
+            const textOnly = data.filter(msg => msg.type === 'text').slice(-25);
+            this.messages[friendId] = textOnly;
+            console.log(`✅ تم تحميل ${textOnly.length} رسالة للصديق ${friendId}`);
+            return textOnly;
+        } catch (e) {
+            this.messages[friendId] = [];
+            return [];
+        }
+    },
+    
+    // ==================== القسم 3: openChat (مع تحميل فوري) ====================
     openChat(friendId, friendName, friendAvatar) {
         if (this.currentChat && this.currentChat !== friendId) {
             console.log('🧹 تنظيف المحادثة السابقة:', this.currentChat);
@@ -68,6 +85,9 @@ const ChatSystem = {
         this.friendInConversation = true;
         this._displayedIds = new Set();
         this._isProcessing = false;
+        
+        // ✅ تحميل رسائل هذا الصديق مباشرة
+        this.loadChatMessages(friendId);
         
         document.body.classList.add('conversation-open');
         const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
@@ -140,7 +160,7 @@ const ChatSystem = {
         console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
     },
     
-    // ==================== القسم 6: displayMessages ====================
+    // ==================== القسم 6: displayMessages (مع تحميل احتياطي) ====================
     displayMessages(friendId) { 
         if (this._isProcessing) return;
         this._isProcessing = true;
@@ -149,6 +169,12 @@ const ChatSystem = {
         if (!c) {
             this._isProcessing = false;
             return; 
+        }
+        
+        // ✅ تحميل الرسائل من localStorage إذا كانت فارغة
+        if (!this.messages[friendId] || this.messages[friendId].length === 0) {
+            console.log(`📂 تحميل احتياطي للرسائل من localStorage للصديق ${friendId}`);
+            this.loadChatMessages(friendId);
         }
         
         if (this._displayedIds.size === 0) {
@@ -225,7 +251,6 @@ const ChatSystem = {
         const messageText = text.trim();
         const chatId = this.currentChat;
         
-        // ✅ 1. عرض الرسالة فوراً
         const msg = { 
             id: mid, 
             type: 'text', 
@@ -239,13 +264,11 @@ const ChatSystem = {
         
         console.log('⚡ تم عرض الرسالة فوراً - جاري الإرسال في الخلفية');
         
-        // ✅ 2. إرسال في الخلفية
         this._sendMessageInBackground(chatId, mid, messageText);
         
         return true; 
     },
     
-    // ✅ دالة مساعدة: إرسال في الخلفية
     async _sendMessageInBackground(chatId, messageId, text) {
         try {
             console.log(`📤 بدء إرسال الرسالة ${messageId} في الخلفية...`);
