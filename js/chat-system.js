@@ -1,5 +1,4 @@
-// ========== chat-system.js - النسخة النهائية (مع نظام غير المقروء) ==========
-// نظام الدردشة E2EE - نصوص فقط - معزول لكل حساب
+// ========== chat-system.js - النسخة النهائية ==========
 
 const ChatSystem = {
     currentChat: null, messages: {},
@@ -8,30 +7,17 @@ const ChatSystem = {
     _displayedIds: new Set(),
     _isProcessing: false,
     
-    // ==================== القسم 1: init ====================
     init() { 
         this.loadAllChats(); 
         this.chatItemTemplate = document.getElementById('chatItemTemplate');
-        if (!this.chatItemTemplate) {
-            console.warn('⚠️ قالب chatItemTemplate غير موجود في HTML');
-        } else {
-            console.log('✅ تم تحميل قالب chatItemTemplate بنجاح');
-        }
     },
     
-    // ==================== القسم 2: loadAllChats ====================
     loadAllChats() { 
         const uid = window.auth?.currentUser?.uid;
-        if (!uid) {
-            console.warn('⚠️ لا يوجد مستخدم مسجل - تخطي تحميل الرسائل');
-            this.messages = {};
-            return;
-        }
+        if (!uid) { this.messages = {}; return; }
         
         this.messages = {};
-        
         const prefix = `chat_${uid}_`;
-        let loadedCount = 0;
         
         for (let i = 0; i < localStorage.length; i++) { 
             const k = localStorage.key(i); 
@@ -41,22 +27,13 @@ const ChatSystem = {
                     const data = JSON.parse(localStorage.getItem(k)) || [];
                     const textOnly = data.filter(msg => msg.type === 'text').slice(-25);
                     this.messages[fid] = textOnly;
-                    loadedCount++;
-                    
-                    if (textOnly.length !== data.length) {
-                        localStorage.setItem(k, JSON.stringify(textOnly));
-                        console.log(`🧹 تم حذف ${data.length - textOnly.length} رسالة غير نصية من ${fid}`);
-                    }
                 } catch (e) { 
                     this.messages[fid] = []; 
                 } 
             } 
         }
-        
-        console.log(`✅ تم تحميل ${loadedCount} محادثة للمستخدم ${uid.substring(0, 8)}...`);
     },
     
-    // ==================== القسم 3: loadChatMessages ====================
     loadChatMessages(friendId) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid || !friendId) return [];
@@ -66,7 +43,6 @@ const ChatSystem = {
             const data = JSON.parse(localStorage.getItem(key)) || [];
             const textOnly = data.filter(msg => msg.type === 'text').slice(-25);
             this.messages[friendId] = textOnly;
-            console.log(`✅ تم تحميل ${textOnly.length} رسالة للصديق ${friendId}`);
             return textOnly;
         } catch (e) {
             this.messages[friendId] = [];
@@ -74,15 +50,12 @@ const ChatSystem = {
         }
     },
     
-    // ==================== القسم 4: openChat (مع مسح حالة غير المقروء) ====================
     openChat(friendId, friendName, friendAvatar) {
-        // ✅ مسح حالة غير المقروء
         if (typeof window.clearUnreadStatus === 'function') {
             window.clearUnreadStatus(friendId);
         }
         
         if (this.currentChat && this.currentChat !== friendId) {
-            console.log('🧹 تنظيف المحادثة السابقة:', this.currentChat);
             this.cleanConversationData(this.currentChat, false);
         }
         
@@ -106,11 +79,7 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
-    // ==================== القسم 5: closeChat (مع مسح حالة غير المقروء) ====================
     closeChat() {
-        console.log('🔴 closeChat - بدء إغلاق المحادثة');
-        
-        // ✅ مسح حالة غير المقروء
         if (typeof window.clearUnreadStatus === 'function' && this.currentChat) {
             window.clearUnreadStatus(this.currentChat);
         }
@@ -123,12 +92,9 @@ const ChatSystem = {
             const messages = this.messages[chatId] || [];
             const textOnly = messages.filter(msg => msg.type === 'text').slice(-25);
             localStorage.setItem(key, JSON.stringify(textOnly));
-            console.log(`✅ تم حفظ ${textOnly.length} رسالة نصية فقط`);
             
             const container = document.getElementById('messagesContainer');
-            if (container) {
-                container.innerHTML = '';
-            }
+            if (container) container.innerHTML = '';
             
             this.messages[chatId] = textOnly;
         }
@@ -139,12 +105,9 @@ const ChatSystem = {
         document.querySelector('.chat-page').style.display = 'block';
         this.currentChat = null;
         this.friendInConversation = false;
-        console.log('✅ closeChat - انتهى');
     },
     
-    // ==================== القسم 6: cleanConversationData ====================
     cleanConversationData(chatId, cleanAll = false) {
-        console.log('🧹 بدء مسح بيانات المحادثة:', chatId);
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
         
@@ -155,43 +118,29 @@ const ChatSystem = {
             const textOnly = messages.filter(msg => msg.type === 'text').slice(-25);
             this.messages[chatId] = textOnly;
             localStorage.setItem(key, JSON.stringify(textOnly));
-            console.log(`✅ تم الاحتفاظ بـ ${textOnly.length} رسالة نصية فقط`);
         } else {
             localStorage.removeItem(key);
             delete this.messages[chatId];
-            console.log('✅ تم مسح localStorage بالكامل');
         }
         
         const container = document.getElementById('messagesContainer');
-        if (container) {
-            container.innerHTML = '';
-        }
-        
-        console.log('✅ اكتمل مسح بيانات المحادثة:', chatId);
+        if (container) container.innerHTML = '';
     },
     
-    // ==================== القسم 7: displayMessages ====================
     displayMessages(friendId) { 
         if (this._isProcessing) return;
         this._isProcessing = true;
         
         const c = document.getElementById('messagesContainer'); 
-        if (!c) {
-            this._isProcessing = false;
-            return; 
-        }
+        if (!c) { this._isProcessing = false; return; }
         
         if (!this.messages[friendId] || this.messages[friendId].length === 0) {
-            console.log(`📂 تحميل احتياطي للرسائل من localStorage للصديق ${friendId}`);
             this.loadChatMessages(friendId);
         }
         
-        if (this._displayedIds.size === 0) {
-            c.innerHTML = '';
-        }
+        if (this._displayedIds.size === 0) c.innerHTML = '';
         
         const messages = this.messages[friendId] || [];
-        console.log(`📨 عرض ${messages.length} رسالة للمحادثة ${friendId}`);
         
         messages.forEach(msg => { 
             if (!this._displayedIds.has(msg.id)) {
@@ -205,7 +154,6 @@ const ChatSystem = {
         }, 50);
     },
 
-    // ==================== القسم 8: displayMessage ====================
     displayMessage(msg) {
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
@@ -233,26 +181,17 @@ const ChatSystem = {
                 const clone = textTemplate.content.cloneNode(true);
                 const contentDiv = clone.querySelector('.message-content');
                 const textSpan = contentDiv?.querySelector('span');
-                if (contentDiv) {
-                    contentDiv.style.border = `1.5px solid ${borderColor}`;
-                }
-                if (textSpan) {
-                    textSpan.innerHTML = this.escapeHtml(msg.text || '');
-                }
+                if (contentDiv) contentDiv.style.border = `1.5px solid ${borderColor}`;
+                if (textSpan) textSpan.innerHTML = this.escapeHtml(msg.text || '');
                 div.appendChild(clone);
             }
         }
         
-        if (!c.querySelector(`#msg-${msg.id}`)) {
-            c.appendChild(div);
-        }
+        if (!c.querySelector(`#msg-${msg.id}`)) c.appendChild(div);
         
-        setTimeout(() => {
-            c.scrollTop = c.scrollHeight;
-        }, 50);
+        setTimeout(() => { c.scrollTop = c.scrollHeight; }, 50);
     },
     
-    // ==================== القسم 12: sendMessage ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         
@@ -261,17 +200,18 @@ const ChatSystem = {
         const chatId = this.currentChat;
         
         const msg = { 
-            id: mid, 
-            type: 'text', 
-            text: messageText, 
-            sender: 'me', 
-            time: new Date().toISOString()
+            id: mid, type: 'text', text: messageText, 
+            sender: 'me', time: new Date().toISOString()
         };
         
         this.saveMessage(chatId, msg); 
         this.displayMessage(msg); 
         
-        console.log('⚡ تم عرض الرسالة فوراً - جاري الإرسال في الخلفية');
+        // ✅ إعادة الترتيب
+        if (typeof window.reorderChatsList === 'function') {
+            const list = document.getElementById('chatsList');
+            if (list) window.reorderChatsList(list);
+        }
         
         this._sendMessageInBackground(chatId, mid, messageText);
         
@@ -280,79 +220,48 @@ const ChatSystem = {
     
     async _sendMessageInBackground(chatId, messageId, text) {
         try {
-            console.log(`📤 بدء إرسال الرسالة ${messageId} في الخلفية...`);
-            
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
             
-            if (!myPrivateKey || !receiverPublicKey) {
-                console.error('❌ فشل الحصول على المفاتيح');
-                return;
-            }
+            if (!myPrivateKey || !receiverPublicKey) return;
             
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(text, sharedKey);
             
             await SecureChatSystem.sendToServer(chatId, { 
-                id: messageId, 
-                type: 'text', 
-                data: encrypted, 
-                timestamp: Date.now() 
+                id: messageId, type: 'text', data: encrypted, timestamp: Date.now() 
             });
-            
-            console.log(`✅ تم إرسال الرسالة ${messageId} بنجاح`);
-            
         } catch (e) { 
-            console.error('❌ فشل إرسال الرسالة في الخلفية:', e);
+            console.error('❌ فشل إرسال الرسالة:', e);
         }
     },
 
-    // ==================== القسم 14: saveMessage ====================
     saveMessage(friendId, message) { 
         if (!friendId || !message) return;
-        
-        if (message.type !== 'text') {
-            console.log(`🚫 نوع الرسالة (${message.type}) غير مدعوم - النصوص فقط`);
-            return;
-        }
+        if (message.type !== 'text') return;
         
         const uid = window.auth?.currentUser?.uid;
-        if (!uid) {
-            console.warn('⚠️ لا يوجد مستخدم مسجل');
-            return;
-        }
+        if (!uid) return;
         
         const key = `chat_${uid}_${friendId}`; 
         let messages = []; 
-        try { 
-            messages = JSON.parse(localStorage.getItem(key)) || []; 
-        } catch (e) { 
-            messages = []; 
-        }
+        try { messages = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { messages = []; }
         
         const exists = messages.some(m => m.id === message.id);
-        if (exists) {
-            console.log(`⚠️ رسالة مكررة ${message.id}، تم تخطيها`);
-            return;
-        }
+        if (exists) return;
         
         messages.push(message); 
         
-        if (messages.length > 25) {
-            messages = messages.slice(-25);
-            console.log(`🧹 تم الاقتصار على آخر 25 رسالة`);
-        }
+        if (messages.length > 25) messages = messages.slice(-25);
         
         try { 
             localStorage.setItem(key, JSON.stringify(messages)); 
             this.messages[friendId] = messages;
-            console.log(`✅ تم حفظ رسالة نصية (${message.id})`);
         } catch (e) {
             console.error('❌ فشل حفظ في localStorage:', e);
         }
     },
 
-    // ==================== القسم 15: updateLastMessage ====================
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
             if (item.getAttribute('onclick')?.includes(friendId)) { 
@@ -363,46 +272,17 @@ const ChatSystem = {
         }); 
     },
 
-    // ==================== القسم 16: escapeHtml ====================
     escapeHtml(text) { 
         if (!text) return '';
         const div = document.createElement('div'); 
         div.textContent = text; 
         return div.innerHTML; 
-    },
-    
-    // ==================== القسم 17: مسح كل رسائل المستخدم ====================
-    clearAllMyMessages() {
-        const uid = window.auth?.currentUser?.uid;
-        if (!uid) return;
-        
-        const confirmDelete = confirm('هل أنت متأكد من مسح جميع رسائلك؟ لا يمكن التراجع.');
-        if (!confirmDelete) return;
-        
-        const prefix = `chat_${uid}_`;
-        let count = 0;
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith(prefix)) {
-                localStorage.removeItem(key);
-                count++;
-            }
-        }
-        
-        this.messages = {};
-        console.log(`🗑️ تم مسح ${count} محادثة`);
-        alert(`✅ تم مسح ${count} محادثة`);
-        
-        setTimeout(() => location.reload(), 500);
     }
 };
 
-// ==================== تشغيل النظام ====================
 ChatSystem.chatItemTemplate = document.getElementById('chatItemTemplate');
 
-// ✅ تحميل الرسائل بعد تسجيل الدخول
 window.addEventListener('authReady', function() {
-    console.log('✅ authReady - تحميل الرسائل');
     setTimeout(() => {
         ChatSystem.loadAllChats();
         if (typeof loadChats === 'function') {
@@ -412,12 +292,10 @@ window.addEventListener('authReady', function() {
     }, 100);
 });
 
-// ✅ إذا كان المستخدم مسجلاً بالفعل
 if (window.auth?.currentUser) {
     setTimeout(() => ChatSystem.loadAllChats(), 100);
 }
 
-// ==================== دوال الواجهة العامة ====================
 window.sendMessage = () => { 
     const inp = document.getElementById('messageInput'); 
     if (inp && inp.value.trim()) {
@@ -425,18 +303,14 @@ window.sendMessage = () => {
             if (s) { 
                 inp.value = ''; 
                 inp.style.height = 'auto';
-                if (typeof window.toggleSendButton === 'function') {
-                    window.toggleSendButton();
-                }
+                if (typeof window.toggleSendButton === 'function') window.toggleSendButton();
             } 
         }); 
     }
 };
 
 window.handleMessageKeyPress = function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) e.preventDefault();
 };
 
 window.toggleSendButton = function() {
@@ -455,10 +329,7 @@ window.toggleSendButton = function() {
 window.handleActionButton = function() {
     const input = document.getElementById('messageInput');
     if (!input) return;
-    const hasText = input.value.trim().length > 0;
-    if (hasText) {
-        window.sendMessage();
-    }
+    if (input.value.trim().length > 0) window.sendMessage();
 };
 
 window.closeConversation = () => { 
@@ -493,8 +364,6 @@ window.closeConversation = () => {
 window.openChat = friendId => {
     if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
         pushPage('subpage', 'friendsPage');
-    } else if (document.getElementById('tripsPage') && document.getElementById('tripsPage').style.display === 'block') {
-        pushPage('subpage', 'tripsPage');
     } else if (document.querySelector('.profile-page') && getComputedStyle(document.querySelector('.profile-page')).display === 'block') {
         pushPage('page', 'profile');
     } else {
@@ -509,16 +378,9 @@ window.openChat = friendId => {
     }).catch(() => {});
 };
 
-// ==================== التنظيف الشامل ====================
 function performGlobalCleanup() {
-    console.log('🧹 بدء التنظيف الشامل للموقع...');
-    
     const container = document.getElementById('messagesContainer');
-    if (container) {
-        container.innerHTML = '';
-    }
-    
-    console.log('✅ اكتمل التنظيف الشامل للموقع');
+    if (container) container.innerHTML = '';
 }
 
 if (document.readyState === 'loading') {
@@ -527,7 +389,6 @@ if (document.readyState === 'loading') {
     performGlobalCleanup();
 }
 
-// ==================== إصلاح الكيبورد ====================
 const initVisualViewportFix = () => {
     if (!window.visualViewport) return;
     const fixViewportHeight = () => {
@@ -554,9 +415,7 @@ if (document.readyState === 'loading') {
 document.addEventListener('touchmove', function(e) {
     if (document.body.classList.contains('conversation-open')) {
         const isMessagesContainer = e.target.closest('.messages-container');
-        if (!isMessagesContainer) {
-            e.preventDefault();
-        }
+        if (!isMessagesContainer) e.preventDefault();
     }
 }, { passive: false });
 
