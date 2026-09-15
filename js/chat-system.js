@@ -1,4 +1,4 @@
-// ========== chat-system.js - النسخة النهائية ==========
+// ========== chat-system.js - النسخة النهائية (حد 200 حرف) ==========
 
 const ChatSystem = {
     currentChat: null, messages: {},
@@ -7,11 +7,15 @@ const ChatSystem = {
     _displayedIds: new Set(),
     _isProcessing: false,
     
+    // ✅ الحد الأقصى للرسالة
+    MAX_MESSAGE_LENGTH: 200,
+    
     init() { 
         this.loadAllChats(); 
         this.chatItemTemplate = document.getElementById('chatItemTemplate');
     },
     
+    // ==================== تحميل جميع المحادثات ====================
     loadAllChats() { 
         const uid = window.auth?.currentUser?.uid;
         if (!uid) { this.messages = {}; return; }
@@ -34,6 +38,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== تحميل رسائل صديق معين ====================
     loadChatMessages(friendId) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid || !friendId) return [];
@@ -50,6 +55,7 @@ const ChatSystem = {
         }
     },
     
+    // ==================== فتح المحادثة ====================
     openChat(friendId, friendName, friendAvatar) {
         if (typeof window.clearUnreadStatus === 'function') {
             window.clearUnreadStatus(friendId);
@@ -79,6 +85,7 @@ const ChatSystem = {
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
     },
     
+    // ==================== إغلاق المحادثة ====================
     closeChat() {
         if (typeof window.clearUnreadStatus === 'function' && this.currentChat) {
             window.clearUnreadStatus(this.currentChat);
@@ -107,6 +114,7 @@ const ChatSystem = {
         this.friendInConversation = false;
     },
     
+    // ==================== تنظيف بيانات المحادثة ====================
     cleanConversationData(chatId, cleanAll = false) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
@@ -127,6 +135,7 @@ const ChatSystem = {
         if (container) container.innerHTML = '';
     },
     
+    // ==================== عرض جميع الرسائل ====================
     displayMessages(friendId) { 
         if (this._isProcessing) return;
         this._isProcessing = true;
@@ -154,6 +163,7 @@ const ChatSystem = {
         }, 50);
     },
 
+    // ==================== عرض رسالة واحدة ====================
     displayMessage(msg) {
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
@@ -192,50 +202,74 @@ const ChatSystem = {
         setTimeout(() => { c.scrollTop = c.scrollHeight; }, 50);
     },
     
+    // ==================== إرسال رسالة (مع حد 200 حرف) ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         
-        const mid = Date.now().toString(); 
         const messageText = text.trim();
+        const MAX_LENGTH = this.MAX_MESSAGE_LENGTH; // 200
+        
+        // ✅ التحقق من الحد الأقصى
+        if (messageText.length > MAX_LENGTH) {
+            alert(`❌ الرسالة طويلة جداً!\n\nالحد الأقصى: ${MAX_LENGTH} حرف\nالحالي: ${messageText.length} حرف\n\nيرجى تقصير الرسالة.`);
+            return false;
+        }
+        
+        const mid = Date.now().toString(); 
         const chatId = this.currentChat;
         
         const msg = { 
-            id: mid, type: 'text', text: messageText, 
-            sender: 'me', time: new Date().toISOString()
+            id: mid, 
+            type: 'text', 
+            text: messageText, 
+            sender: 'me', 
+            time: new Date().toISOString()
         };
         
         this.saveMessage(chatId, msg); 
         this.displayMessage(msg); 
         
-        // ✅ إعادة الترتيب
+        // ✅ إعادة الترتيب (نقل الصديق للأعلى)
         if (typeof window.reorderChatsList === 'function') {
             const list = document.getElementById('chatsList');
             if (list) window.reorderChatsList(list);
         }
+        
+        console.log('⚡ تم عرض الرسالة فوراً - جاري الإرسال في الخلفية');
         
         this._sendMessageInBackground(chatId, mid, messageText);
         
         return true; 
     },
     
+    // ==================== إرسال في الخلفية ====================
     async _sendMessageInBackground(chatId, messageId, text) {
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const receiverPublicKey = await SecureChatSystem.getReceiverPublicKey(chatId);
             
-            if (!myPrivateKey || !receiverPublicKey) return;
+            if (!myPrivateKey || !receiverPublicKey) {
+                console.error('❌ فشل الحصول على المفاتيح');
+                return;
+            }
             
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(text, sharedKey);
             
             await SecureChatSystem.sendToServer(chatId, { 
-                id: messageId, type: 'text', data: encrypted, timestamp: Date.now() 
+                id: messageId, 
+                type: 'text', 
+                data: encrypted, 
+                timestamp: Date.now() 
             });
+            
+            console.log(`✅ تم إرسال الرسالة ${messageId} بنجاح`);
         } catch (e) { 
-            console.error('❌ فشل إرسال الرسالة:', e);
+            console.error('❌ فشل إرسال الرسالة في الخلفية:', e);
         }
     },
 
+    // ==================== حفظ رسالة ====================
     saveMessage(friendId, message) { 
         if (!friendId || !message) return;
         if (message.type !== 'text') return;
@@ -262,6 +296,7 @@ const ChatSystem = {
         }
     },
 
+    // ==================== تحديث آخر رسالة ====================
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
             if (item.getAttribute('onclick')?.includes(friendId)) { 
@@ -272,6 +307,7 @@ const ChatSystem = {
         }); 
     },
 
+    // ==================== escapeHtml ====================
     escapeHtml(text) { 
         if (!text) return '';
         const div = document.createElement('div'); 
@@ -280,6 +316,7 @@ const ChatSystem = {
     }
 };
 
+// ==================== تشغيل النظام ====================
 ChatSystem.chatItemTemplate = document.getElementById('chatItemTemplate');
 
 window.addEventListener('authReady', function() {
@@ -296,6 +333,9 @@ if (window.auth?.currentUser) {
     setTimeout(() => ChatSystem.loadAllChats(), 100);
 }
 
+// ==================== دوال الواجهة العامة ====================
+
+// ✅ إرسال الرسالة
 window.sendMessage = () => { 
     const inp = document.getElementById('messageInput'); 
     if (inp && inp.value.trim()) {
@@ -303,16 +343,72 @@ window.sendMessage = () => {
             if (s) { 
                 inp.value = ''; 
                 inp.style.height = 'auto';
+                inp.style.color = 'var(--text)'; // ✅ إعادة اللون الطبيعي
+                
+                // ✅ إخفاء العداد
+                const counter = document.getElementById('messageCharCounter');
+                if (counter) {
+                    counter.classList.remove('show', 'warning', 'full');
+                }
+                
                 if (typeof window.toggleSendButton === 'function') window.toggleSendButton();
             } 
         }); 
     }
 };
 
+// ✅ منع Enter من إرسال الرسالة (إلا مع Shift)
 window.handleMessageKeyPress = function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) e.preventDefault();
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+    }
 };
 
+// ✅ معالجة الكتابة (عداد + تنبيه)
+window.handleMessageInput = function(e) {
+    const input = e.target;
+    const maxLength = 200;
+    const currentLength = input.value.length;
+    
+    // ✅ تحديث حالة زر الإرسال
+    if (typeof window.toggleSendButton === 'function') {
+        window.toggleSendButton();
+    }
+    
+    // ✅ العداد (يظهر عند 180+)
+    const counter = document.getElementById('messageCharCounter');
+    if (counter) {
+        if (currentLength >= maxLength - 20) {
+            counter.classList.add('show');
+            counter.textContent = `${currentLength}/${maxLength}`;
+            
+            if (currentLength >= maxLength) {
+                counter.className = 'show full';
+                input.style.color = '#f44336'; // أحمر
+            } else {
+                counter.className = 'show warning';
+                input.style.color = '#FFC107'; // أصفر
+            }
+        } else {
+            counter.classList.remove('show', 'warning', 'full');
+            input.style.color = 'var(--text)'; // عادي
+        }
+    }
+    
+    // ✅ تحديث زر الإرسال
+    const sendBtn = document.getElementById('actionBtn');
+    if (sendBtn) {
+        if (currentLength >= maxLength) {
+            sendBtn.title = `الحد الأقصى ${maxLength} حرف`;
+        } else if (currentLength >= maxLength - 20) {
+            sendBtn.title = `متبقي ${maxLength - currentLength} حرف`;
+        } else {
+            sendBtn.title = 'إرسال';
+        }
+    }
+};
+
+// ✅ زر الإرسال
 window.toggleSendButton = function() {
     const input = document.getElementById('messageInput');
     const btn = document.getElementById('actionBtn');
@@ -326,12 +422,14 @@ window.toggleSendButton = function() {
     btn.style.display = 'flex';
 };
 
+// ✅ زر الإجراء
 window.handleActionButton = function() {
     const input = document.getElementById('messageInput');
     if (!input) return;
     if (input.value.trim().length > 0) window.sendMessage();
 };
 
+// ✅ إغلاق المحادثة
 window.closeConversation = () => { 
     ChatSystem.closeChat();
     
@@ -361,6 +459,7 @@ window.closeConversation = () => {
     }, 200);
 };
 
+// ✅ فتح محادثة
 window.openChat = friendId => {
     if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
         pushPage('subpage', 'friendsPage');
@@ -378,6 +477,7 @@ window.openChat = friendId => {
     }).catch(() => {});
 };
 
+// ==================== التنظيف الشامل ====================
 function performGlobalCleanup() {
     const container = document.getElementById('messagesContainer');
     if (container) container.innerHTML = '';
@@ -389,6 +489,7 @@ if (document.readyState === 'loading') {
     performGlobalCleanup();
 }
 
+// ==================== إصلاح الكيبورد ====================
 const initVisualViewportFix = () => {
     if (!window.visualViewport) return;
     const fixViewportHeight = () => {
