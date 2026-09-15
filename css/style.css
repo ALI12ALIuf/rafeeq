@@ -652,3 +652,47 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     opacity: 1;
     font-weight: 700;
 }
+
+
+
+
+/* ==================== عداد الرسالة (حد 200 حرف) ==================== */
+#messageInput {
+    transition: color 0.2s ease;
+}
+
+#messageCharCounter {
+    display: none;
+    font-size: 0.7rem;
+    color: var(--text-light);
+    font-family: monospace;
+    padding: 2px 6px;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    align-self: center;
+    margin-left: 4px;
+    direction: ltr;
+}
+
+#messageCharCounter.show {
+    display: inline-block;
+}
+
+#messageCharCounter.warning {
+    color: #FFC107;
+    background: rgba(255, 193, 7, 0.15);
+    font-weight: 700;
+}
+
+#messageCharCounter.full {
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.2);
+    font-weight: 700;
+    animation: counterPulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes counterPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+}
