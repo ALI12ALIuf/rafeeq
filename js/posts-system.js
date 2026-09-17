@@ -6,12 +6,12 @@ const PostsSystem = {
     selectedCategory: 'all',
     showAllCountries: false,
     _countryDropdownOpen: false,
-    _publishCountryDropdowns: {},
+    _publishDropdowns: {},
+    _publishCategoryDropdowns: {},
     
     IMAGE_MAX_WIDTH: 600,
     IMAGE_QUALITY: 0.65,
     
-    // ✅ أقسام الوظائف بألوان
     jobCategories: [
         { code: 'all', name: 'الكل', icon: 'fas fa-layer-group', color: '#64B5F6' },
         { code: 'it', name: 'تقنية المعلومات', icon: 'fas fa-laptop-code', color: '#2196F3' },
@@ -34,7 +34,7 @@ const PostsSystem = {
         this.loadSavedSettings();
         this.loadAllPosts();
         this.setupRealtimeListeners();
-        this.renderCountrySelector();
+        this.renderCountryHeaderSelector();
         this.renderJobCategories();
         console.log('✅ تم تهيئة نظام المنشورات');
     },
@@ -55,58 +55,59 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== ✅ منتقي البلد المصغّر ====================
-    renderCountrySelector() {
-        const container = document.getElementById('countrySelector');
+    // ==================== ✅ منتقي البلد في الرأس ====================
+    renderCountryHeaderSelector() {
+        const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
         
         const currentFlag = window.Countries.getFlag(this.selectedCountry);
         const currentName = this.showAllCountries ? 'الكل' : window.Countries.getName(this.selectedCountry);
         
         container.innerHTML = `
-            <button class="country-mini-btn" onclick="PostsSystem.toggleCountryDropdown(event)">
-                <span class="country-mini-flag">${this.showAllCountries ? '🌍' : currentFlag}</span>
-                <span class="country-mini-name">${currentName}</span>
-                <i class="fas fa-chevron-down country-mini-arrow"></i>
-            </button>
-            <div class="country-mini-dropdown" id="countryDropdown" style="display: none;">
-                <button class="country-mini-option ${this.showAllCountries ? 'active' : ''}" 
-                        onclick="PostsSystem.selectAllCountries()">
-                    <span class="country-mini-flag">🌍</span>
-                    <span class="country-mini-name">جميع الدول</span>
-                    ${this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
+            <div class="country-header-inline">
+                <button class="country-header-btn" onclick="PostsSystem.toggleHeaderCountryDropdown(event)">
+                    <span class="country-header-title" id="pageTitle">الرئيسية</span>
+                    <span class="country-header-flag">${this.showAllCountries ? '🌍' : currentFlag}</span>
+                    <span class="country-header-name">${currentName}</span>
+                    <i class="fas fa-chevron-down country-header-arrow"></i>
                 </button>
-                <div class="country-mini-divider"></div>
-                ${window.Countries.list.map(c => `
-                    <button class="country-mini-option ${c.code === this.selectedCountry && !this.showAllCountries ? 'active' : ''}" 
-                            onclick="PostsSystem.selectCountry('${c.code}')">
-                        <span class="country-mini-flag">${c.flag}</span>
-                        <span class="country-mini-name">${c.name}</span>
-                        ${c.code === this.selectedCountry && !this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
+                <div class="country-header-dropdown" id="countryHeaderDropdown" style="display: none;">
+                    <button class="country-mini-option ${this.showAllCountries ? 'active' : ''}" 
+                            onclick="PostsSystem.selectAllCountries()">
+                        <span class="country-mini-flag">🌍</span>
+                        <span class="country-mini-name">جميع الدول</span>
+                        ${this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
                     </button>
-                `).join('')}
+                    <div class="country-mini-divider"></div>
+                    ${window.Countries.list.map(c => `
+                        <button class="country-mini-option ${c.code === this.selectedCountry && !this.showAllCountries ? 'active' : ''}" 
+                                onclick="PostsSystem.selectCountry('${c.code}')">
+                            <span class="country-mini-flag">${c.flag}</span>
+                            <span class="country-mini-name">${c.name}</span>
+                            ${c.code === this.selectedCountry && !this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
+                        </button>
+                    `).join('')}
+                </div>
             </div>
         `;
     },
     
-    toggleCountryDropdown(event) {
+    toggleHeaderCountryDropdown(event) {
         if (event) event.stopPropagation();
         
-        const dropdown = document.getElementById('countryDropdown');
-        const arrow = document.querySelector('.country-mini-arrow');
+        const dropdown = document.getElementById('countryHeaderDropdown');
+        const arrow = document.querySelector('.country-header-arrow');
         if (!dropdown) return;
         
         if (dropdown.style.display === 'none' || !dropdown.style.display) {
             dropdown.style.display = 'block';
-            this._countryDropdownOpen = true;
             if (arrow) arrow.style.transform = 'rotate(180deg)';
             
             setTimeout(() => {
                 const closeHandler = (e) => {
-                    const container = document.getElementById('countrySelector');
-                    if (container && !container.contains(e.target)) {
+                    const wrapper = document.getElementById('countryHeaderSelector');
+                    if (wrapper && !wrapper.contains(e.target)) {
                         dropdown.style.display = 'none';
-                        this._countryDropdownOpen = false;
                         if (arrow) arrow.style.transform = 'rotate(0deg)';
                         document.removeEventListener('click', closeHandler);
                     }
@@ -115,7 +116,6 @@ const PostsSystem = {
             }, 100);
         } else {
             dropdown.style.display = 'none';
-            this._countryDropdownOpen = false;
             if (arrow) arrow.style.transform = 'rotate(0deg)';
         }
     },
@@ -124,12 +124,12 @@ const PostsSystem = {
         this.selectedCountry = code;
         this.showAllCountries = false;
         this.saveSettings();
-        this.renderCountrySelector();
+        this.renderCountryHeaderSelector();
         this.loadAllPosts();
         
-        const dropdown = document.getElementById('countryDropdown');
+        const dropdown = document.getElementById('countryHeaderDropdown');
         if (dropdown) dropdown.style.display = 'none';
-        const arrow = document.querySelector('.country-mini-arrow');
+        const arrow = document.querySelector('.country-header-arrow');
         if (arrow) arrow.style.transform = 'rotate(0deg)';
         
         console.log(`🌍 تم اختيار: ${window.Countries.getName(code)}`);
@@ -138,16 +138,18 @@ const PostsSystem = {
     selectAllCountries() {
         this.showAllCountries = true;
         this.saveSettings();
-        this.renderCountrySelector();
+        this.renderCountryHeaderSelector();
         this.loadAllPosts();
         
-        const dropdown = document.getElementById('countryDropdown');
+        const dropdown = document.getElementById('countryHeaderDropdown');
         if (dropdown) dropdown.style.display = 'none';
+        const arrow = document.querySelector('.country-header-arrow');
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
         
         console.log('🌍 عرض جميع الدول');
     },
     
-    // ==================== ✅ أقسام الوظائف المُحسّنة ====================
+    // ==================== أقسام الوظائف ====================
     renderJobCategories() {
         const container = document.getElementById('jobCategories');
         if (!container) return;
@@ -169,7 +171,6 @@ const PostsSystem = {
         this.saveSettings();
         this.renderJobCategories();
         this.loadJobsPosts();
-        console.log(`💼 تم اختيار قسم: ${this.getCategoryName(code)}`);
     },
     
     getCategoryName(code) {
@@ -185,6 +186,150 @@ const PostsSystem = {
     getCategoryColor(code) {
         const cat = this.jobCategories.find(c => c.code === code);
         return cat ? cat.color : '#64B5F6';
+    },
+    
+    // ==================== ✅ منتقي القسم الداخلي (للنشر) ====================
+    renderPublishCategoryDropdown() {
+        const container = document.getElementById('jobCategorySelector');
+        const input = document.getElementById('jobCategory');
+        if (!container || !input) return;
+        
+        const selectedCode = input.value || 'it';
+        const selectedCat = this.jobCategories.find(c => c.code === selectedCode && c.code !== 'all');
+        
+        container.innerHTML = `
+            <button type="button" class="publish-category-btn" onclick="PostsSystem.togglePublishCategoryDropdown(event)">
+                <span class="publish-category-icon" style="background: ${selectedCat ? selectedCat.color + '20' : '#64B5F620'}; color: ${selectedCat ? selectedCat.color : '#64B5F6'};">
+                    <i class="${selectedCat ? selectedCat.icon : 'fas fa-th-large'}"></i>
+                </span>
+                <span class="publish-category-name">${selectedCat ? selectedCat.name : 'اختر القسم'}</span>
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <div class="publish-category-dropdown" id="jobCategoryDropdown" style="display: none;">
+                ${this.jobCategories.filter(c => c.code !== 'all').map(cat => `
+                    <button type="button" class="publish-category-option ${cat.code === selectedCode ? 'active' : ''}" 
+                            onclick="PostsSystem.selectPublishCategory('${cat.code}')">
+                        <span class="publish-category-icon" style="background: ${cat.color}20; color: ${cat.color};">
+                            <i class="${cat.icon}"></i>
+                        </span>
+                        <span class="publish-category-name">${cat.name}</span>
+                        ${cat.code === selectedCode ? '<i class="fas fa-check"></i>' : ''}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+    },
+    
+    togglePublishCategoryDropdown(event) {
+        if (event) event.stopPropagation();
+        
+        const dropdown = document.getElementById('jobCategoryDropdown');
+        if (!dropdown) return;
+        
+        // ✅ إغلاق باقي القوائم
+        document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
+            if (d.id !== 'jobCategoryDropdown') d.style.display = 'none';
+        });
+        
+        if (dropdown.style.display === 'none' || !dropdown.style.display) {
+            dropdown.style.display = 'block';
+            
+            setTimeout(() => {
+                const closeHandler = (e) => {
+                    const container = document.getElementById('jobCategorySelector');
+                    if (container && !container.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                        document.removeEventListener('click', closeHandler);
+                    }
+                };
+                document.addEventListener('click', closeHandler);
+            }, 100);
+        } else {
+            dropdown.style.display = 'none';
+        }
+    },
+    
+    selectPublishCategory(code) {
+        const input = document.getElementById('jobCategory');
+        if (input) input.value = code;
+        
+        const dropdown = document.getElementById('jobCategoryDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        
+        this.renderPublishCategoryDropdown();
+    },
+    
+    // ==================== منتقي البلد الداخلي (للنشر) ====================
+    renderPublishCountryDropdown(publishType) {
+        const prefix = publishType === 'jobs' ? 'job' : 'marriage';
+        const containerId = `${prefix}CountrySelector`;
+        const inputId = `${prefix}CountryCode`;
+        
+        const container = document.getElementById(containerId);
+        const input = document.getElementById(inputId);
+        if (!container || !input) return;
+        
+        const selectedCode = input.value || this.selectedCountry;
+        const selectedCountry = window.Countries.getCountry(selectedCode);
+        
+        container.innerHTML = `
+            <button type="button" class="publish-country-btn" onclick="PostsSystem.togglePublishCountryDropdown('${publishType}', event)">
+                <span class="publish-country-flag">${selectedCountry ? selectedCountry.flag : '🌍'}</span>
+                <span class="publish-country-name">${selectedCountry ? selectedCountry.name : 'اختر البلد'}</span>
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <div class="publish-country-dropdown" id="${prefix}CountryDropdown" style="display: none;">
+                ${window.Countries.list.map(c => `
+                    <button type="button" class="publish-country-option ${c.code === selectedCode ? 'active' : ''}" 
+                            onclick="PostsSystem.selectPublishCountry('${publishType}', '${c.code}')">
+                        <span class="publish-country-flag">${c.flag}</span>
+                        <span class="publish-country-name">${c.name}</span>
+                        ${c.code === selectedCode ? '<i class="fas fa-check"></i>' : ''}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+    },
+    
+    togglePublishCountryDropdown(publishType, event) {
+        if (event) event.stopPropagation();
+        
+        const prefix = publishType === 'jobs' ? 'job' : 'marriage';
+        const dropdownId = `${prefix}CountryDropdown`;
+        const dropdown = document.getElementById(dropdownId);
+        if (!dropdown) return;
+        
+        document.querySelectorAll('.publish-country-dropdown, .publish-category-dropdown').forEach(d => {
+            if (d.id !== dropdownId) d.style.display = 'none';
+        });
+        
+        if (dropdown.style.display === 'none' || !dropdown.style.display) {
+            dropdown.style.display = 'block';
+            
+            setTimeout(() => {
+                const closeHandler = (e) => {
+                    const container = document.getElementById(`${prefix}CountrySelector`);
+                    if (container && !container.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                        document.removeEventListener('click', closeHandler);
+                    }
+                };
+                document.addEventListener('click', closeHandler);
+            }, 100);
+        } else {
+            dropdown.style.display = 'none';
+        }
+    },
+    
+    selectPublishCountry(publishType, code) {
+        const prefix = publishType === 'jobs' ? 'job' : 'marriage';
+        const input = document.getElementById(`${prefix}CountryCode`);
+        if (input) input.value = code;
+        
+        const dropdown = document.getElementById(`${prefix}CountryDropdown`);
+        if (dropdown) dropdown.style.display = 'none';
+        
+        this.renderPublishCountryDropdown(publishType);
     },
     
     // ==================== التبديل بين التبويبات ====================
@@ -211,7 +356,6 @@ const PostsSystem = {
         await this.loadMarriagePosts();
     },
     
-    // ==================== تحميل الوظائف ====================
     async loadJobsPosts() {
         const container = document.getElementById('jobsPostsContainer');
         const emptyState = document.getElementById('jobsEmptyState');
@@ -223,7 +367,6 @@ const PostsSystem = {
             if (!this.showAllCountries && this.selectedCountry) {
                 query = query.where('countryCode', '==', this.selectedCountry);
             }
-            
             if (this.selectedCategory && this.selectedCategory !== 'all') {
                 query = query.where('category', '==', this.selectedCategory);
             }
@@ -235,7 +378,6 @@ const PostsSystem = {
                 if (emptyState) emptyState.style.display = 'flex';
                 return;
             }
-            
             if (emptyState) emptyState.style.display = 'none';
             
             const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -246,18 +388,15 @@ const PostsSystem = {
             });
             
             for (const post of posts) {
-                const postEl = this.createJobPost(post);
-                if (postEl) container.appendChild(postEl);
+                const el = this.createJobPost(post);
+                if (el) container.appendChild(el);
             }
-            
-            console.log(`✅ تم تحميل ${posts.length} وظيفة`);
         } catch (e) {
             console.error('❌ خطأ في تحميل الوظائف:', e);
             if (emptyState) emptyState.style.display = 'flex';
         }
     },
     
-    // ==================== تحميل الزواج ====================
     async loadMarriagePosts() {
         const container = document.getElementById('marriagePostsContainer');
         const emptyState = document.getElementById('marriageEmptyState');
@@ -277,7 +416,6 @@ const PostsSystem = {
                 if (emptyState) emptyState.style.display = 'flex';
                 return;
             }
-            
             if (emptyState) emptyState.style.display = 'none';
             
             const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -288,18 +426,15 @@ const PostsSystem = {
             });
             
             for (const post of posts) {
-                const postEl = this.createMarriagePost(post);
-                if (postEl) container.appendChild(postEl);
+                const el = this.createMarriagePost(post);
+                if (el) container.appendChild(el);
             }
-            
-            console.log(`✅ تم تحميل ${posts.length} إعلان زواج`);
         } catch (e) {
-            console.error('❌ خطأ في تحميل إعلانات الزواج:', e);
+            console.error('❌ خطأ في تحميل الزواج:', e);
             if (emptyState) emptyState.style.display = 'flex';
         }
     },
     
-    // ==================== إنشاء بطاقة وظيفة ====================
     createJobPost(post) {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
@@ -329,7 +464,7 @@ const PostsSystem = {
                 ${deleteBtn}
             </div>
             <div class="post-content">
-                <div class="post-job-title" style="color: ${catColor}; background: ${catColor}15; border-right: 3px solid ${catColor};">
+                <div class="post-job-title" style="color: ${catColor}; background: ${catColor}15;">
                     <i class="${catIcon}" style="color: ${catColor};"></i>
                     <strong>${this.escapeHtml(post.jobTitle || '')}</strong>
                 </div>
@@ -350,7 +485,6 @@ const PostsSystem = {
         return card;
     },
     
-    // ==================== إنشاء بطاقة زواج ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -404,7 +538,6 @@ const PostsSystem = {
         return card;
     },
     
-    // ==================== معاينة الصورة ====================
     openImagePreview(postId) {
         const card = document.querySelector(`[data-post-id="${postId}"]`);
         if (!card) return;
@@ -421,20 +554,11 @@ const PostsSystem = {
     },
     
     setupPostImageZoom(modal, img) {
-        if (img._zoomCleanup) {
-            img._zoomCleanup();
-            img._zoomCleanup = null;
-        }
+        if (img._zoomCleanup) { img._zoomCleanup(); img._zoomCleanup = null; }
         
-        let currentScale = 1;
-        let initialDistance = 0;
-        let initialScale = 1;
-        let startX = 0, startY = 0;
-        let translateX = 0, translateY = 0;
-        let isTouching = false;
-        
-        const minScale = 1;
-        const maxScale = 4;
+        let currentScale = 1, initialDistance = 0, initialScale = 1;
+        let startX = 0, startY = 0, translateX = 0, translateY = 0, isTouching = false;
+        const minScale = 1, maxScale = 4;
         
         const updateTransform = () => {
             img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
@@ -465,17 +589,14 @@ const PostsSystem = {
                 const newDistance = Math.hypot(dx, dy);
                 let newScale = initialScale * (newDistance / initialDistance);
                 newScale = Math.min(maxScale, Math.max(minScale, newScale));
-                if (newScale !== currentScale) {
-                    currentScale = newScale;
-                    updateTransform();
-                }
+                if (newScale !== currentScale) { currentScale = newScale; updateTransform(); }
             } else if (touches.length === 1 && isTouching && currentScale > 1) {
                 translateX = touches[0].clientX - startX;
                 translateY = touches[0].clientY - startY;
-                const maxTranslateX = (currentScale - 1) * 200;
-                const maxTranslateY = (currentScale - 1) * 200;
-                translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
-                translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
+                const maxX = (currentScale - 1) * 200;
+                const maxY = (currentScale - 1) * 200;
+                translateX = Math.min(maxX, Math.max(-maxX, translateX));
+                translateY = Math.min(maxY, Math.max(-maxY, translateY));
                 updateTransform();
             }
         };
@@ -485,9 +606,7 @@ const PostsSystem = {
             initialDistance = 0;
             isTouching = false;
             if (currentScale < 1) {
-                currentScale = 1;
-                translateX = 0;
-                translateY = 0;
+                currentScale = 1; translateX = 0; translateY = 0;
                 updateTransform();
             }
         };
@@ -520,53 +639,35 @@ const PostsSystem = {
         };
     },
     
-    // ==================== حذف منشور ====================
     async deletePost(postId) {
         if (!confirm('هل أنت متأكد من حذف هذا المنشور؟')) return;
         try {
             await window.db.collection('posts').doc(postId).delete();
-            console.log(`✅ تم حذف المنشور ${postId}`);
             this.loadAllPosts();
         } catch (e) {
-            console.error('❌ خطأ في الحذف:', e);
             alert('حدث خطأ في الحذف');
         }
     },
     
-    // ==================== مستمعي الوقت الحقيقي ====================
     setupRealtimeListeners() {
         window.db.collection('posts').where('type', '==', 'job')
-            .onSnapshot(snapshot => {
-                console.log(`📊 تحديث الوظائف: ${snapshot.size}`);
-                this.loadJobsPosts();
-            }, error => console.warn('⚠️ خطأ:', error.message));
+            .onSnapshot(() => this.loadJobsPosts(), error => console.warn('⚠️', error.message));
         
         window.db.collection('posts').where('type', '==', 'marriage')
-            .onSnapshot(snapshot => {
-                console.log(`📊 تحديث الزواج: ${snapshot.size}`);
-                this.loadMarriagePosts();
-            }, error => console.warn('⚠️ خطأ:', error.message));
+            .onSnapshot(() => this.loadMarriagePosts(), error => console.warn('⚠️', error.message));
     },
     
-    // ==================== ضغط الصورة ====================
     async compressImage(file) {
         return new Promise((resolve, reject) => {
-            if (!file.type.startsWith('image/')) {
-                reject(new Error('الملف ليس صورة'));
-                return;
-            }
-            if (file.size > 10 * 1024 * 1024) {
-                reject(new Error('الصورة كبيرة جداً (الحد الأقصى 10 MB)'));
-                return;
-            }
+            if (!file.type.startsWith('image/')) { reject(new Error('الملف ليس صورة')); return; }
+            if (file.size > 10 * 1024 * 1024) { reject(new Error('الصورة كبيرة جداً')); return; }
+            
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    
+                    let width = img.width, height = img.height;
                     if (width > this.IMAGE_MAX_WIDTH) {
                         height = Math.round((height * this.IMAGE_MAX_WIDTH) / width);
                         width = this.IMAGE_MAX_WIDTH;
@@ -575,9 +676,7 @@ const PostsSystem = {
                         width = Math.round((width * this.IMAGE_MAX_WIDTH) / height);
                         height = this.IMAGE_MAX_WIDTH;
                     }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
+                    canvas.width = width; canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.imageSmoothingEnabled = true;
                     ctx.imageSmoothingQuality = 'high';
@@ -589,11 +688,9 @@ const PostsSystem = {
                         reader2.onload = () => {
                             const compressedSize = Math.round(reader2.result.length / 1024);
                             const originalSize = Math.round(file.size / 1024);
-                            const saving = Math.round((1 - compressedSize / originalSize) * 100);
-                            console.log(`📸 ضغط الصورة: ${originalSize} KB → ${compressedSize} KB (${saving}% توفير)`);
+                            console.log(`📸 ضغط: ${originalSize} KB → ${compressedSize} KB`);
                             resolve(reader2.result);
                         };
-                        reader2.onerror = reject;
                         reader2.readAsDataURL(blob);
                     }, 'image/jpeg', this.IMAGE_QUALITY);
                 };
@@ -605,85 +702,6 @@ const PostsSystem = {
         });
     },
     
-    // ==================== ✅ منتقي البلد الداخلي (للنشر) ====================
-    renderPublishCountryDropdown(publishType) {
-        const prefix = publishType === 'jobs' ? 'job' : 'marriage';
-        const containerId = `${prefix}CountrySelector`;
-        const inputId = `${prefix}CountryCode`;
-        
-        const container = document.getElementById(containerId);
-        const input = document.getElementById(inputId);
-        if (!container || !input) return;
-        
-        const selectedCode = input.value || this.selectedCountry;
-        const selectedCountry = window.Countries.getCountry(selectedCode);
-        
-        container.innerHTML = `
-            <button type="button" class="publish-country-btn" onclick="PostsSystem.togglePublishCountryDropdown('${publishType}', event)">
-                <span class="publish-country-flag">${selectedCountry ? selectedCountry.flag : '🌍'}</span>
-                <span class="publish-country-name">${selectedCountry ? selectedCountry.name : 'اختر البلد'}</span>
-                <i class="fas fa-chevron-down"></i>
-            </button>
-            <div class="publish-country-dropdown" id="${prefix}CountryDropdown" style="display: none;">
-                ${window.Countries.list.map(c => `
-                    <button type="button" class="publish-country-option ${c.code === selectedCode ? 'active' : ''}" 
-                            onclick="PostsSystem.selectPublishCountry('${publishType}', '${c.code}')">
-                        <span class="publish-country-flag">${c.flag}</span>
-                        <span class="publish-country-name">${c.name}</span>
-                        ${c.code === selectedCode ? '<i class="fas fa-check"></i>' : ''}
-                    </button>
-                `).join('')}
-            </div>
-        `;
-    },
-    
-    togglePublishCountryDropdown(publishType, event) {
-        if (event) event.stopPropagation();
-        
-        const prefix = publishType === 'jobs' ? 'job' : 'marriage';
-        const dropdownId = `${prefix}CountryDropdown`;
-        const dropdown = document.getElementById(dropdownId);
-        if (!dropdown) return;
-        
-        // ✅ إغلاق أي قائمة مفتوحة
-        document.querySelectorAll('.publish-country-dropdown').forEach(d => {
-            if (d.id !== dropdownId) d.style.display = 'none';
-        });
-        
-        if (dropdown.style.display === 'none' || !dropdown.style.display) {
-            dropdown.style.display = 'block';
-            this._publishCountryDropdowns[publishType] = true;
-            
-            setTimeout(() => {
-                const closeHandler = (e) => {
-                    const container = document.getElementById(`${prefix}CountrySelector`);
-                    if (container && !container.contains(e.target)) {
-                        dropdown.style.display = 'none';
-                        this._publishCountryDropdowns[publishType] = false;
-                        document.removeEventListener('click', closeHandler);
-                    }
-                };
-                document.addEventListener('click', closeHandler);
-            }, 100);
-        } else {
-            dropdown.style.display = 'none';
-            this._publishCountryDropdowns[publishType] = false;
-        }
-    },
-    
-    selectPublishCountry(publishType, code) {
-        const prefix = publishType === 'jobs' ? 'job' : 'marriage';
-        const inputId = `${prefix}CountryCode`;
-        const input = document.getElementById(inputId);
-        if (input) input.value = code;
-        
-        const dropdown = document.getElementById(`${prefix}CountryDropdown`);
-        if (dropdown) dropdown.style.display = 'none';
-        
-        this.renderPublishCountryDropdown(publishType);
-    },
-    
-    // ==================== دوال مساعدة ====================
     escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
@@ -694,9 +712,7 @@ const PostsSystem = {
 
 // ==================== دوال الواجهة العامة ====================
 
-window.switchHomeTab = function(tab) {
-    PostsSystem.switchTab(tab);
-};
+window.switchHomeTab = (tab) => PostsSystem.switchTab(tab);
 
 window.openPublishModal = function(type) {
     if (type === 'jobs') {
@@ -713,22 +729,13 @@ window.openPublishModal = function(type) {
 PostsSystem.fillPublishJobForm = function() {
     const countryInput = document.getElementById('jobCountryCode');
     if (countryInput) countryInput.value = this.selectedCountry;
-    
     this.renderPublishCountryDropdown('jobs');
-    
-    const categorySelect = document.getElementById('jobCategory');
-    if (categorySelect) {
-        categorySelect.innerHTML = this.jobCategories
-            .filter(c => c.code !== 'all')
-            .map(c => `<option value="${c.code}">${c.name}</option>`)
-            .join('');
-    }
+    this.renderPublishCategoryDropdown();
 };
 
 PostsSystem.fillPublishMarriageForm = function() {
     const countryInput = document.getElementById('marriageCountryCode');
     if (countryInput) countryInput.value = this.selectedCountry;
-    
     this.renderPublishCountryDropdown('marriage');
 };
 
@@ -744,7 +751,7 @@ window.closePostImagePreview = function() {
 };
 
 window.publishJob = async function() {
-    if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول أولاً'); return; }
+    if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول'); return; }
     
     const name = document.getElementById('jobName')?.value?.trim();
     const age = document.getElementById('jobAge')?.value;
@@ -758,7 +765,7 @@ window.publishJob = async function() {
         alert('يرجى تعبئة جميع الحقول');
         return;
     }
-    if (age < 15 || age > 80) { alert('العمر يجب أن يكون بين 15 و 80'); return; }
+    if (age < 15 || age > 80) { alert('العمر بين 15 و 80'); return; }
     
     try {
         let imageBase64 = null;
@@ -771,14 +778,12 @@ window.publishJob = async function() {
             }
         }
         
-        const countryName = window.Countries.getName(countryCode);
-        console.log('📤 جاري نشر الوظيفة...');
-        
         await window.db.collection('posts').add({
             type: 'job',
             userId: window.auth.currentUser.uid,
             name, age: parseInt(age),
-            country: countryName, countryCode,
+            country: window.Countries.getName(countryCode),
+            countryCode,
             category, jobTitle, bio,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -791,15 +796,13 @@ window.publishJob = async function() {
         if (typeof switchPage === 'function') switchPage('home');
         PostsSystem.selectCountry(countryCode);
         setTimeout(() => PostsSystem.switchTab('jobs'), 100);
-        
     } catch (e) {
-        console.error('❌ خطأ في النشر:', e);
         alert('حدث خطأ: ' + e.message);
     }
 };
 
 window.publishMarriage = async function() {
-    if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول أولاً'); return; }
+    if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول'); return; }
     
     const name = document.getElementById('marriageName')?.value?.trim();
     const age = document.getElementById('marriageAge')?.value;
@@ -813,7 +816,7 @@ window.publishMarriage = async function() {
         alert('يرجى تعبئة جميع الحقول');
         return;
     }
-    if (age < 15 || age > 80) { alert('العمر يجب أن يكون بين 15 و 80'); return; }
+    if (age < 15 || age > 80) { alert('العمر بين 15 و 80'); return; }
     
     try {
         let imageBase64 = null;
@@ -826,14 +829,12 @@ window.publishMarriage = async function() {
             }
         }
         
-        const countryName = window.Countries.getName(countryCode);
-        console.log('📤 جاري نشر إعلان الزواج...');
-        
         await window.db.collection('posts').add({
             type: 'marriage',
             userId: window.auth.currentUser.uid,
             name, age: parseInt(age),
-            country: countryName, countryCode,
+            country: window.Countries.getName(countryCode),
+            countryCode,
             bio, married, children,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -846,9 +847,7 @@ window.publishMarriage = async function() {
         if (typeof switchPage === 'function') switchPage('home');
         PostsSystem.selectCountry(countryCode);
         setTimeout(() => PostsSystem.switchTab('marriage'), 100);
-        
     } catch (e) {
-        console.error('❌ خطأ في النشر:', e);
         alert('حدث خطأ: ' + e.message);
     }
 };
