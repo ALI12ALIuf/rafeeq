@@ -72,10 +72,30 @@ body.conversation-open {
 
 /* ==================== القسم 5: الحاوية الرئيسية ==================== */
 .app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
-.app-header { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; position: sticky; top: 0; z-index: 100; }
-.header-left, .header-right { display: flex; gap: 0.5rem; }
-.icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.app-header { 
+    height: var(--header-height); 
+    background: var(--card-bg); 
+    border-bottom: 1px solid var(--border); 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    padding: 0 1rem; 
+    position: sticky; 
+    top: 0; 
+    z-index: 100; 
+}
+.header-left, .header-right { display: flex; gap: 0.5rem; width: 50px; }
+.header-title { 
+    flex: 1; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    position: relative;
+}
 .header-title h1 { font-size: 1.2rem; font-weight: 600; }
+
+.icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
 .app-content { 
     flex: 1; 
     overflow-y: auto; 
@@ -91,81 +111,89 @@ body.conversation-open {
 .nav-item i { font-size: 1.2rem; }
 .nav-item.active { color: var(--primary); }
 
-/* ==================== القسم 7: شريط أعلى الصفحة الرئيسية ==================== */
-.home-top-bar {
+/* ==================== القسم 7: منتقي البلد في الرأس ==================== */
+.country-header-wrapper {
+    position: relative;
     display: flex;
-    justify-content: flex-start;
-    margin-bottom: 10px;
-    padding: 0 2px;
+    justify-content: center;
+    width: 100%;
 }
 
-/* ==================== القسم 8: منتقي البلد المصغّر ==================== */
-.country-mini-container {
+.country-header-inline {
     position: relative;
     display: inline-block;
 }
 
-.country-mini-btn {
+.country-header-btn {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
+    padding: 5px 12px;
+    background: transparent;
+    border: 1.5px solid var(--border);
     border-radius: 20px;
     color: var(--text);
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: var(--shadow);
-    -webkit-tap-highlight-color: transparent;
     font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.country-mini-btn:active {
+.country-header-btn:active {
     transform: scale(0.96);
 }
 
-.country-mini-btn:hover {
+.country-header-btn:hover {
     border-color: var(--primary);
+    background: rgba(100, 181, 246, 0.08);
 }
 
-.country-mini-flag {
+.country-header-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary);
+    display: none;
+}
+
+.country-header-flag {
     font-size: 1.15rem;
     line-height: 1;
 }
 
-.country-mini-name {
+.country-header-name {
     font-size: 0.8rem;
     font-weight: 600;
+    color: var(--text);
 }
 
-.country-mini-arrow {
-    font-size: 0.65rem;
+.country-header-arrow {
+    font-size: 0.6rem;
     color: var(--primary);
     transition: transform 0.25s ease;
 }
 
-.country-mini-dropdown {
+.country-header-dropdown {
     position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    min-width: 200px;
-    max-height: 350px;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 220px;
+    max-height: 60vh;
     overflow-y: auto;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    z-index: 500;
+    z-index: 9999;
     padding: 6px;
     animation: dropdownSlide 0.2s ease;
 }
 
 @keyframes dropdownSlide {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 .country-mini-option {
@@ -186,30 +214,16 @@ body.conversation-open {
     -webkit-tap-highlight-color: transparent;
 }
 
-.country-mini-option:hover {
-    background: var(--light);
-}
-
+.country-mini-option:hover { background: var(--light); }
 .country-mini-option.active {
     background: rgba(100, 181, 246, 0.15);
     color: var(--primary);
     font-weight: 700;
 }
 
-.country-mini-option .country-mini-flag {
-    font-size: 1.2rem;
-}
-
-.country-mini-option .country-mini-name {
-    flex: 1;
-    text-align: right;
-    font-weight: inherit;
-}
-
-.country-mini-option i {
-    font-size: 0.8rem;
-    color: var(--primary);
-}
+.country-mini-flag { font-size: 1.2rem; line-height: 1; }
+.country-mini-name { flex: 1; text-align: right; }
+.country-mini-option i { font-size: 0.8rem; color: var(--primary); }
 
 .country-mini-divider {
     height: 1px;
@@ -217,7 +231,7 @@ body.conversation-open {
     margin: 4px 6px;
 }
 
-/* ==================== القسم 9: تبويبات الرئيسية ==================== */
+/* ==================== القسم 8: تبويبات الرئيسية ==================== */
 .home-tabs {
     display: flex;
     gap: 8px;
@@ -263,7 +277,7 @@ body.conversation-open {
 .home-content { display: none; }
 .home-content.active { display: block; }
 
-/* ==================== القسم 10: أقسام الوظائف (Scroll أفقي) ==================== */
+/* ==================== القسم 9: أقسام الوظائف ==================== */
 .categories-scroll {
     display: flex;
     gap: 8px;
@@ -275,9 +289,7 @@ body.conversation-open {
     scroll-behavior: smooth;
 }
 
-.categories-scroll::-webkit-scrollbar {
-    display: none;
-}
+.categories-scroll::-webkit-scrollbar { display: none; }
 
 .category-tab {
     display: flex;
@@ -309,7 +321,6 @@ body.conversation-open {
     border-color: var(--cat-color, var(--primary));
     color: white;
     box-shadow: 0 4px 12px var(--cat-color, rgba(100, 181, 246, 0.4));
-    opacity: 1;
 }
 
 .category-tab.active .category-icon-wrapper {
@@ -328,15 +339,10 @@ body.conversation-open {
     transition: all 0.2s;
 }
 
-.category-icon-wrapper i {
-    font-size: 0.75rem;
-}
+.category-icon-wrapper i { font-size: 0.75rem; }
+.category-name { line-height: 1; }
 
-.category-name {
-    line-height: 1;
-}
-
-/* ==================== القسم 11: بطاقات المنشورات ==================== */
+/* ==================== القسم 10: بطاقات المنشورات ==================== */
 .posts-container {
     display: flex;
     flex-direction: column;
@@ -352,13 +358,8 @@ body.conversation-open {
     transition: box-shadow 0.2s ease;
 }
 
-.post-card:last-child {
-    margin-bottom: 20px;
-}
-
-.post-card:hover {
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-}
+.post-card:last-child { margin-bottom: 20px; }
+.post-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
 
 .post-header {
     display: flex;
@@ -385,9 +386,7 @@ body.conversation-open {
     transition: transform 0.2s ease;
 }
 
-.post-avatar-emoji:hover {
-    transform: scale(1.05);
-}
+.post-avatar-emoji:hover { transform: scale(1.05); }
 
 .post-avatar-emoji img {
     width: 100%;
@@ -413,16 +412,12 @@ body.conversation-open {
     pointer-events: none;
 }
 
-.post-avatar-emoji:not(:has(img))::after {
-    display: none;
-}
+.post-avatar-emoji:not(:has(img))::after { display: none; }
 
 .post-user { flex: 1; }
 .post-user h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
 
-.post-time {
-    display: none !important;
-}
+.post-time { display: none !important; }
 
 .post-menu {
     background: none;
@@ -441,9 +436,7 @@ body.conversation-open {
     color: var(--danger);
 }
 
-.post-content {
-    padding: 0 1rem 1rem;
-}
+.post-content { padding: 0 1rem 1rem; }
 
 .post-job-title {
     display: flex;
@@ -457,9 +450,7 @@ body.conversation-open {
     background: rgba(100, 181, 246, 0.1);
 }
 
-.post-job-title i {
-    font-size: 1.1rem;
-}
+.post-job-title i { font-size: 1.1rem; }
 
 .post-info-row {
     display: flex;
@@ -479,16 +470,8 @@ body.conversation-open {
     border-radius: 12px;
 }
 
-.post-info-row i {
-    color: var(--primary);
-    font-size: 0.8rem;
-}
-
-.post-info-row span span {
-    padding: 0;
-    background: transparent;
-    line-height: 1;
-}
+.post-info-row i { color: var(--primary); font-size: 0.8rem; }
+.post-info-row span span { padding: 0; background: transparent; line-height: 1; }
 
 .post-bio {
     background: var(--light);
@@ -506,43 +489,19 @@ body.conversation-open {
     border-right: 3px solid var(--primary);
 }
 
-.job-post-card {
-    border-right: 3px solid var(--primary);
-}
+.job-post-card { border-right: 3px solid var(--primary); }
 
-.marriage-post-card {
-    border-right: 3px solid #e91e63;
-}
+.marriage-post-card { border-right: 3px solid #e91e63; }
+.marriage-post-card .post-job-title { color: #e91e63; background: rgba(233, 30, 99, 0.1); }
+.marriage-post-card .post-info-row i { color: #e91e63; }
+.marriage-post-card .post-bio { border-right-color: #e91e63; }
 
-.marriage-post-card .post-job-title {
-    color: #e91e63;
-    background: rgba(233, 30, 99, 0.1);
-}
+/* ==================== القسم 11: نافذة معاينة صورة المنشور ==================== */
+#postImagePreviewModal { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+#postPreviewImage { will-change: transform; backface-visibility: hidden; }
 
-.marriage-post-card .post-info-row i {
-    color: #e91e63;
-}
-
-.marriage-post-card .post-bio {
-    border-right-color: #e91e63;
-}
-
-/* ==================== القسم 12: نافذة معاينة صورة المنشور ==================== */
-#postImagePreviewModal {
-    animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-#postPreviewImage {
-    will-change: transform;
-    backface-visibility: hidden;
-}
-
-/* ==================== القسم 13: أزرار النشر في الملف الشخصي ==================== */
+/* ==================== القسم 12: أزرار النشر ==================== */
 .publish-buttons {
     display: flex;
     gap: 10px;
@@ -591,7 +550,7 @@ body.conversation-open {
 
 .publish-btn:active { transform: scale(0.98); }
 
-/* ==================== القسم 14: صفحة الدردشة ==================== */
+/* ==================== القسم 13: صفحة الدردشة ==================== */
 .search-box { display: flex; align-items: center; background: var(--light); border-radius: 25px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; font-family: inherit; }
@@ -742,7 +701,7 @@ body.conversation-open {
 
 .remove-friend-btn:active { transform: scale(0.95); }
 
-/* ==================== القسم 15: الملف الشخصي ==================== */
+/* ==================== القسم 14: الملف الشخصي ==================== */
 .profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
 .profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
 .profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
@@ -757,7 +716,7 @@ body.conversation-open {
 .id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
 .profile-bio { padding: 0 1rem 1rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
 
-/* ==================== القسم 16: النوافذ المنبثقة ==================== */
+/* ==================== القسم 15: النوافذ المنبثقة ==================== */
 .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s; }
 .modal.active { opacity: 1; visibility: visible; }
 .modal-content { background: var(--card-bg); border-radius: var(--radius); padding: 2rem; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
@@ -811,6 +770,104 @@ body.conversation-open {
     border-radius: 50%;
 }
 
+/* ==================== القسم 16: منتقي القسم الداخلي ==================== */
+.publish-category-container {
+    position: relative;
+    width: 100%;
+}
+
+.publish-category-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: right;
+    box-sizing: border-box;
+}
+
+.publish-category-btn:hover { border-color: var(--primary); }
+
+.publish-category-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+}
+
+.publish-category-name {
+    flex: 1;
+    text-align: right;
+    font-weight: 600;
+}
+
+.publish-category-btn i {
+    font-size: 0.8rem;
+    color: var(--primary);
+    transition: transform 0.2s;
+}
+
+.publish-category-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    z-index: 3000;
+    padding: 6px;
+    animation: dropdownSlide2 0.2s ease;
+}
+
+@keyframes dropdownSlide2 {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.publish-category-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: right;
+    transition: background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.publish-category-option:hover { background: var(--light); }
+.publish-category-option.active {
+    background: rgba(100, 181, 246, 0.15);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.publish-category-option .publish-category-name { flex: 1; }
+.publish-category-option i.fa-check { font-size: 0.8rem; color: var(--primary); }
+
 /* ==================== القسم 17: منتقي البلد الداخلي (للنشر) ==================== */
 .publish-country-container {
     position: relative;
@@ -835,20 +892,9 @@ body.conversation-open {
     box-sizing: border-box;
 }
 
-.publish-country-btn:hover {
-    border-color: var(--primary);
-}
-
-.publish-country-flag {
-    font-size: 1.3rem;
-    line-height: 1;
-}
-
-.publish-country-name {
-    flex: 1;
-    text-align: right;
-    font-weight: 600;
-}
+.publish-country-btn:hover { border-color: var(--primary); }
+.publish-country-flag { font-size: 1.3rem; line-height: 1; }
+.publish-country-name { flex: 1; text-align: right; font-weight: 600; }
 
 .publish-country-btn i {
     font-size: 0.8rem;
@@ -869,7 +915,7 @@ body.conversation-open {
     box-shadow: 0 10px 30px rgba(0,0,0,0.6);
     z-index: 3000;
     padding: 6px;
-    animation: dropdownSlide 0.2s ease;
+    animation: dropdownSlide2 0.2s ease;
 }
 
 .publish-country-option {
@@ -890,29 +936,16 @@ body.conversation-open {
     -webkit-tap-highlight-color: transparent;
 }
 
-.publish-country-option:hover {
-    background: var(--light);
-}
-
+.publish-country-option:hover { background: var(--light); }
 .publish-country-option.active {
     background: rgba(100, 181, 246, 0.15);
     color: var(--primary);
     font-weight: 700;
 }
 
-.publish-country-option .publish-country-flag {
-    font-size: 1.2rem;
-}
-
-.publish-country-option .publish-country-name {
-    flex: 1;
-    text-align: right;
-}
-
-.publish-country-option i {
-    font-size: 0.8rem;
-    color: var(--primary);
-}
+.publish-country-option .publish-country-flag { font-size: 1.2rem; }
+.publish-country-option .publish-country-name { flex: 1; }
+.publish-country-option i { font-size: 0.8rem; color: var(--primary); }
 
 /* ==================== القسم 18: الحالة الفارغة ==================== */
 .empty-state {
@@ -947,18 +980,6 @@ body.conversation-open {
     .post-info-row span { padding: 3px 8px; }
     .post-bio { font-size: 0.85rem; padding: 10px 12px; }
     
-    .country-mini-btn {
-        padding: 5px 10px;
-    }
-    
-    .country-mini-flag {
-        font-size: 1rem;
-    }
-    
-    .country-mini-name {
-        font-size: 0.75rem;
-    }
-    
     .category-tab {
         padding: 5px 10px 5px 5px;
         font-size: 0.72rem;
@@ -969,13 +990,16 @@ body.conversation-open {
         height: 24px;
     }
     
-    .category-icon-wrapper i {
-        font-size: 0.7rem;
+    .category-icon-wrapper i { font-size: 0.7rem; }
+    .category-name { font-size: 0.72rem; }
+    
+    .country-header-btn {
+        padding: 4px 10px;
+        font-size: 0.75rem;
     }
     
-    .category-name {
-        font-size: 0.72rem;
-    }
+    .country-header-flag { font-size: 1rem; }
+    .country-header-name { font-size: 0.72rem; }
 }
 
 /* ==================== القسم 20: أنماط المحادثة ==================== */
