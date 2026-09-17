@@ -1,24 +1,21 @@
-// ========== posts-system.js - النسخة النهائية (مع ضغط الصور) ==========
-// نظام المنشورات (وظائف + زواج) مع ضغط ذكي للصور
+// ========== posts-system.js - النسخة النهائية ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
     
     // ==================== إعدادات ضغط الصور ====================
-    // ✅ يمكنك تعديل هذه القيم حسب الحاجة
-    IMAGE_MAX_WIDTH: 600,      // العرض الأقصى بالبكسل
-    IMAGE_QUALITY: 0.65,        // جودة JPEG (0.1 = ضعيفة، 1 = عالية)
+    IMAGE_MAX_WIDTH: 600,
+    IMAGE_QUALITY: 0.65,
     
-    // ==================== القسم 1: init ====================
+    // ==================== init ====================
     init() {
         console.log('🚀 تهيئة نظام المنشورات...');
-        console.log(`📐 إعدادات الصور: ${this.IMAGE_MAX_WIDTH}px @ ${this.IMAGE_QUALITY * 100}%`);
         this.loadAllPosts();
         this.setupRealtimeListeners();
         console.log('✅ تم تهيئة نظام المنشورات');
     },
     
-    // ==================== القسم 2: التبديل بين التبويبات ====================
+    // ==================== التبديل بين التبويبات ====================
     switchTab(tab) {
         this.currentTab = tab;
         
@@ -39,13 +36,13 @@ const PostsSystem = {
         }
     },
     
-    // ==================== القسم 3: تحميل جميع المنشورات ====================
+    // ==================== تحميل جميع المنشورات ====================
     async loadAllPosts() {
         await this.loadJobsPosts();
         await this.loadMarriagePosts();
     },
     
-    // ==================== القسم 4: تحميل منشورات الوظائف ====================
+    // ==================== تحميل منشورات الوظائف ====================
     async loadJobsPosts() {
         const container = document.getElementById('jobsPostsContainer');
         const emptyState = document.getElementById('jobsEmptyState');
@@ -84,7 +81,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== القسم 5: تحميل إعلانات الزواج ====================
+    // ==================== تحميل إعلانات الزواج ====================
     async loadMarriagePosts() {
         const container = document.getElementById('marriagePostsContainer');
         const emptyState = document.getElementById('marriageEmptyState');
@@ -123,7 +120,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== القسم 6: إنشاء بطاقة وظيفة ====================
+    // ==================== إنشاء بطاقة وظيفة ====================
     createJobPost(post) {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
@@ -140,10 +137,11 @@ const PostsSystem = {
         
         card.innerHTML = `
             <div class="post-header">
-                <div class="post-avatar-emoji">${avatarContent}</div>
+                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
+                    ${avatarContent}
+                </div>
                 <div class="post-user">
                     <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
-                    <span class="post-time">${this.formatTime(post.timestamp)}</span>
                 </div>
                 ${deleteBtn}
             </div>
@@ -156,16 +154,20 @@ const PostsSystem = {
                     <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
                     <span><i class="fas fa-map-marker-alt"></i> ${this.escapeHtml(post.country || '')}</span>
                 </div>
-                <div class="post-bio">
-                    ${this.escapeHtml(post.bio || '')}
-                </div>
+                <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
             </div>
         `;
+        
+        // ✅ تخزين الصورة للمعاينة
+        if (post.image) {
+            card.setAttribute('data-post-image', post.image);
+            card.setAttribute('data-post-id', post.id);
+        }
         
         return card;
     },
     
-    // ==================== القسم 7: إنشاء بطاقة زواج ====================
+    // ==================== إنشاء بطاقة زواج ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -191,10 +193,11 @@ const PostsSystem = {
         
         card.innerHTML = `
             <div class="post-header">
-                <div class="post-avatar-emoji">${avatarContent}</div>
+                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
+                    ${avatarContent}
+                </div>
                 <div class="post-user">
                     <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
-                    <span class="post-time">${this.formatTime(post.timestamp)}</span>
                 </div>
                 ${deleteBtn}
             </div>
@@ -207,22 +210,160 @@ const PostsSystem = {
                     <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married || ''}</span>
                     <span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>
                 </div>
-                <div class="post-bio">
-                    ${this.escapeHtml(post.bio || '')}
-                </div>
+                <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
             </div>
         `;
+        
+        // ✅ تخزين الصورة للمعاينة
+        if (post.image) {
+            card.setAttribute('data-post-image', post.image);
+            card.setAttribute('data-post-id', post.id);
+        }
         
         return card;
     },
     
-    // ==================== القسم 8: حذف منشور ====================
+    // ==================== ✅ فتح معاينة الصورة ====================
+    openImagePreview(postId) {
+        // ✅ البحث عن البطاقة بالمعرف
+        const card = document.querySelector(`[data-post-id="${postId}"]`);
+        if (!card) return;
+        
+        const imageSrc = card.getAttribute('data-post-image');
+        if (!imageSrc) return;
+        
+        const modal = document.getElementById('postImagePreviewModal');
+        const img = document.getElementById('postPreviewImage');
+        if (!modal || !img) return;
+        
+        img.src = imageSrc;
+        modal.style.display = 'flex';
+        
+        // ✅ إعداد التكبير/التصغير
+        this.setupPostImageZoom(modal, img);
+    },
+    
+    // ==================== ✅ تكبير/تصغير صورة المنشور ====================
+    setupPostImageZoom(modal, img) {
+        // ✅ إزالة المستمعات السابقة
+        if (img._zoomCleanup) {
+            img._zoomCleanup();
+            img._zoomCleanup = null;
+        }
+        
+        let currentScale = 1;
+        let initialDistance = 0;
+        let initialScale = 1;
+        let startX = 0, startY = 0;
+        let translateX = 0, translateY = 0;
+        let isTouching = false;
+        
+        const minScale = 1;
+        const maxScale = 4;
+        
+        const updateTransform = () => {
+            img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+        };
+        
+        // ✅ لمس بـ إصبعين للتكبير
+        const touchStartHandler = (e) => {
+            e.preventDefault();
+            const touches = e.touches;
+            
+            if (touches.length === 2) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                initialDistance = Math.hypot(dx, dy);
+                initialScale = currentScale;
+                isTouching = false;
+            } else if (touches.length === 1) {
+                startX = touches[0].clientX - translateX;
+                startY = touches[0].clientY - translateY;
+                isTouching = true;
+            }
+        };
+        
+        const touchMoveHandler = (e) => {
+            e.preventDefault();
+            const touches = e.touches;
+            
+            if (touches.length === 2 && initialDistance > 0) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                const newDistance = Math.hypot(dx, dy);
+                let newScale = initialScale * (newDistance / initialDistance);
+                newScale = Math.min(maxScale, Math.max(minScale, newScale));
+                
+                if (newScale !== currentScale) {
+                    currentScale = newScale;
+                    updateTransform();
+                }
+            } else if (touches.length === 1 && isTouching && currentScale > 1) {
+                translateX = touches[0].clientX - startX;
+                translateY = touches[0].clientY - startY;
+                
+                const maxTranslateX = (currentScale - 1) * 200;
+                const maxTranslateY = (currentScale - 1) * 200;
+                translateX = Math.min(maxTranslateX, Math.max(-maxTranslateX, translateX));
+                translateY = Math.min(maxTranslateY, Math.max(-maxTranslateY, translateY));
+                
+                updateTransform();
+            }
+        };
+        
+        const touchEndHandler = (e) => {
+            e.preventDefault();
+            initialDistance = 0;
+            isTouching = false;
+            
+            // ✅ إعادة للمقياس الطبيعي عند التصغير جداً
+            if (currentScale < 1) {
+                currentScale = 1;
+                translateX = 0;
+                translateY = 0;
+                updateTransform();
+            }
+        };
+        
+        // ✅ نقر مزدوج للتكبير/التصغير
+        let lastTap = 0;
+        const doubleTapHandler = (e) => {
+            const now = Date.now();
+            if (now - lastTap < 300) {
+                e.preventDefault();
+                // ✅ تبديل بين 1x و 2x
+                if (currentScale > 1.5) {
+                    currentScale = 1;
+                    translateX = 0;
+                    translateY = 0;
+                } else {
+                    currentScale = 2;
+                }
+                updateTransform();
+            }
+            lastTap = now;
+        };
+        
+        img.addEventListener('touchstart', touchStartHandler, { passive: false });
+        img.addEventListener('touchmove', touchMoveHandler, { passive: false });
+        img.addEventListener('touchend', touchEndHandler);
+        img.addEventListener('click', doubleTapHandler);
+        
+        img._zoomCleanup = () => {
+            img.removeEventListener('touchstart', touchStartHandler);
+            img.removeEventListener('touchmove', touchMoveHandler);
+            img.removeEventListener('touchend', touchEndHandler);
+            img.removeEventListener('click', doubleTapHandler);
+        };
+    },
+    
+    // ==================== حذف منشور ====================
     async deletePost(postId) {
         if (!confirm('هل أنت متأكد من حذف هذا المنشور؟')) return;
         
         try {
             await window.db.collection('posts').doc(postId).delete();
-            console.log(`✅ تم حذف المنشور ${postId} بالكامل (بما فيه الصورة)`);
+            console.log(`✅ تم حذف المنشور ${postId}`);
             this.loadAllPosts();
         } catch (e) {
             console.error('❌ خطأ في الحذف:', e);
@@ -230,7 +371,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== القسم 9: مستمعي الوقت الحقيقي ====================
+    // ==================== مستمعي الوقت الحقيقي ====================
     setupRealtimeListeners() {
         window.db.collection('posts')
             .where('type', '==', 'job')
@@ -251,16 +392,14 @@ const PostsSystem = {
             });
     },
     
-    // ==================== القسم 10: ضغط الصورة الذكي ====================
+    // ==================== ضغط الصورة ====================
     async compressImage(file) {
         return new Promise((resolve, reject) => {
-            // ✅ التحقق من نوع الصورة
             if (!file.type.startsWith('image/')) {
                 reject(new Error('الملف ليس صورة'));
                 return;
             }
             
-            // ✅ التحقق من حجم الملف الأصلي (10 MB كحد أقصى)
             if (file.size > 10 * 1024 * 1024) {
                 reject(new Error('الصورة كبيرة جداً (الحد الأقصى 10 MB)'));
                 return;
@@ -274,13 +413,11 @@ const PostsSystem = {
                     let width = img.width;
                     let height = img.height;
                     
-                    // ✅ تصغير الصورة إذا كانت كبيرة
                     if (width > this.IMAGE_MAX_WIDTH) {
                         height = Math.round((height * this.IMAGE_MAX_WIDTH) / width);
                         width = this.IMAGE_MAX_WIDTH;
                     }
                     
-                    // ✅ إذا كانت الصورة عمودية كبيرة، نحدد الارتفاع
                     if (height > this.IMAGE_MAX_WIDTH) {
                         width = Math.round((width * this.IMAGE_MAX_WIDTH) / height);
                         height = this.IMAGE_MAX_WIDTH;
@@ -290,12 +427,10 @@ const PostsSystem = {
                     canvas.height = height;
                     
                     const ctx = canvas.getContext('2d');
-                    // ✅ تحسين جودة الرسم
                     ctx.imageSmoothingEnabled = true;
                     ctx.imageSmoothingQuality = 'high';
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // ✅ ضغط إلى JPEG
                     canvas.toBlob(
                         (blob) => {
                             if (!blob) {
@@ -309,12 +444,6 @@ const PostsSystem = {
                                 const originalSize = Math.round(file.size / 1024);
                                 const saving = Math.round((1 - compressedSize / originalSize) * 100);
                                 console.log(`📸 ضغط الصورة: ${originalSize} KB → ${compressedSize} KB (${saving}% توفير)`);
-                                
-                                // ✅ التحقق من الحجم النهائي
-                                if (compressedSize > 200) {
-                                    console.warn(`⚠️ الصورة المضغوطة كبيرة (${compressedSize} KB)`);
-                                }
-                                
                                 resolve(reader2.result);
                             };
                             reader2.onerror = reject;
@@ -332,41 +461,21 @@ const PostsSystem = {
         });
     },
     
-    // ==================== القسم 11: دوال مساعدة ====================
+    // ==================== دوال مساعدة ====================
     escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    },
-    
-    formatTime(timestamp) {
-        if (!timestamp) return 'الآن';
-        try {
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            const now = new Date();
-            const diff = Math.floor((now - date) / 1000);
-            
-            if (diff < 60) return 'الآن';
-            if (diff < 3600) return `منذ ${Math.floor(diff / 60)} دقيقة`;
-            if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} ساعة`;
-            if (diff < 604800) return `منذ ${Math.floor(diff / 86400)} يوم`;
-            
-            return date.toLocaleDateString('ar-EG');
-        } catch (e) {
-            return 'الآن';
-        }
     }
 };
 
 // ==================== دوال الواجهة العامة ====================
 
-// ✅ تبديل التبويبات
 window.switchHomeTab = function(tab) {
     PostsSystem.switchTab(tab);
 };
 
-// ✅ فتح نافذة النشر
 window.openPublishModal = function(type) {
     if (type === 'jobs') {
         const modal = document.getElementById('publishJobModal');
@@ -377,7 +486,6 @@ window.openPublishModal = function(type) {
     }
 };
 
-// ✅ معاينة صورة الوظيفة
 window.previewJobImage = function(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -392,7 +500,6 @@ window.previewJobImage = function(event) {
     reader.readAsDataURL(file);
 };
 
-// ✅ معاينة صورة الزواج
 window.previewMarriageImage = function(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -407,7 +514,23 @@ window.previewMarriageImage = function(event) {
     reader.readAsDataURL(file);
 };
 
-// ✅ نشر وظيفة (مع ضغط الصورة)
+// ✅ إغلاق معاينة صورة المنشور
+window.closePostImagePreview = function() {
+    const modal = document.getElementById('postImagePreviewModal');
+    const img = document.getElementById('postPreviewImage');
+    
+    if (modal) modal.style.display = 'none';
+    if (img) {
+        img.src = '';
+        img.style.transform = 'none';
+        if (img._zoomCleanup) {
+            img._zoomCleanup();
+            img._zoomCleanup = null;
+        }
+    }
+};
+
+// ✅ نشر وظيفة
 window.publishJob = async function() {
     if (!window.auth?.currentUser) {
         alert('يجب تسجيل الدخول أولاً');
@@ -421,7 +544,6 @@ window.publishJob = async function() {
     const bio = document.getElementById('jobBio')?.value?.trim();
     const imageInput = document.getElementById('jobImage');
     
-    // ✅ التحقق من الحقول
     if (!name || !age || !country || !jobTitle || !bio) {
         alert('يرجى تعبئة جميع الحقول');
         return;
@@ -435,7 +557,6 @@ window.publishJob = async function() {
     try {
         let imageBase64 = null;
         
-        // ✅ ضغط الصورة (إذا كانت موجودة)
         if (imageInput && imageInput.files[0]) {
             try {
                 imageBase64 = await PostsSystem.compressImage(imageInput.files[0]);
@@ -448,7 +569,6 @@ window.publishJob = async function() {
         
         console.log('📤 جاري نشر الوظيفة...');
         
-        // ✅ حفظ في Firebase
         await window.db.collection('posts').add({
             type: 'job',
             userId: window.auth.currentUser.uid,
@@ -463,18 +583,13 @@ window.publishJob = async function() {
         
         console.log('✅ تم نشر الوظيفة');
         
-        // ✅ إغلاق النافذة وتفريغ النموذج
         window.closeModal('publishJobModal');
         clearJobForm();
         
         alert('✅ تم نشر الوظيفة بنجاح');
         
-        // ✅ الانتقال للرئيسية
-        if (typeof switchPage === 'function') {
-            switchPage('home');
-        }
+        if (typeof switchPage === 'function') switchPage('home');
         
-        // ✅ التبديل لتبويب الوظائف وتحديث
         setTimeout(() => {
             PostsSystem.switchTab('jobs');
             PostsSystem.loadJobsPosts();
@@ -486,7 +601,7 @@ window.publishJob = async function() {
     }
 };
 
-// ✅ نشر إعلان زواج (مع ضغط الصورة)
+// ✅ نشر إعلان زواج
 window.publishMarriage = async function() {
     if (!window.auth?.currentUser) {
         alert('يجب تسجيل الدخول أولاً');
@@ -501,7 +616,6 @@ window.publishMarriage = async function() {
     const children = document.getElementById('marriageChildren')?.value;
     const imageInput = document.getElementById('marriageImage');
     
-    // ✅ التحقق من الحقول
     if (!name || !age || !country || !bio) {
         alert('يرجى تعبئة جميع الحقول');
         return;
@@ -515,7 +629,6 @@ window.publishMarriage = async function() {
     try {
         let imageBase64 = null;
         
-        // ✅ ضغط الصورة (إذا كانت موجودة)
         if (imageInput && imageInput.files[0]) {
             try {
                 imageBase64 = await PostsSystem.compressImage(imageInput.files[0]);
@@ -528,7 +641,6 @@ window.publishMarriage = async function() {
         
         console.log('📤 جاري نشر إعلان الزواج...');
         
-        // ✅ حفظ في Firebase
         await window.db.collection('posts').add({
             type: 'marriage',
             userId: window.auth.currentUser.uid,
@@ -544,18 +656,13 @@ window.publishMarriage = async function() {
         
         console.log('✅ تم نشر إعلان الزواج');
         
-        // ✅ إغلاق النافذة وتفريغ النموذج
         window.closeModal('publishMarriageModal');
         clearMarriageForm();
         
         alert('✅ تم نشر إعلان الزواج بنجاح');
         
-        // ✅ الانتقال للرئيسية
-        if (typeof switchPage === 'function') {
-            switchPage('home');
-        }
+        if (typeof switchPage === 'function') switchPage('home');
         
-        // ✅ التبديل لتبويب الزواج وتحديث
         setTimeout(() => {
             PostsSystem.switchTab('marriage');
             PostsSystem.loadMarriagePosts();
@@ -569,7 +676,6 @@ window.publishMarriage = async function() {
 
 // ==================== دوال مساعدة ====================
 
-// ✅ تفريغ نموذج الوظيفة
 function clearJobForm() {
     ['jobName', 'jobAge', 'jobCountry', 'jobTitle', 'jobBio'].forEach(id => {
         const el = document.getElementById(id);
@@ -581,7 +687,6 @@ function clearJobForm() {
     if (input) input.value = '';
 }
 
-// ✅ تفريغ نموذج الزواج
 function clearMarriageForm() {
     ['marriageName', 'marriageAge', 'marriageCountry', 'marriageBio'].forEach(id => {
         const el = document.getElementById(id);
@@ -594,8 +699,6 @@ function clearMarriageForm() {
 }
 
 // ==================== تشغيل النظام ====================
-
-// ✅ عند تحميل الصفحة
 window.addEventListener('load', () => {
     setTimeout(() => {
         if (window.auth?.currentUser) {
@@ -604,7 +707,6 @@ window.addEventListener('load', () => {
     }, 500);
 });
 
-// ✅ عند تسجيل الدخول
 window.addEventListener('authReady', () => {
     console.log('✅ authReady - تهيئة المنشورات');
     setTimeout(() => {
@@ -612,4 +714,4 @@ window.addEventListener('authReady', () => {
     }, 300);
 });
 
-console.log('✅ posts-system.js تم تحميله - إعدادات الصور: 600px @ 65%');
+console.log('✅ posts-system.js تم تحميله');
