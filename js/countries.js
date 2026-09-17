@@ -1,7 +1,6 @@
 // ========== countries.js - قائمة الدول والأعلام ==========
 
 window.Countries = {
-    // ✅ قائمة الدول العربية + الأجنبية
     list: [
         { code: 'IQ', name: 'العراق', flag: '🇮🇶' },
         { code: 'SA', name: 'السعودية', flag: '🇸🇦' },
@@ -33,24 +32,20 @@ window.Countries = {
         { code: 'AU', name: 'أستراليا', flag: '🇦🇺' }
     ],
     
-    // ==================== الحصول على العلم ====================
     getFlag(code) {
         const country = this.list.find(c => c.code === code);
         return country ? country.flag : '🌍';
     },
     
-    // ==================== الحصول على الاسم ====================
     getName(code) {
         const country = this.list.find(c => c.code === code);
         return country ? country.name : 'غير محدد';
     },
     
-    // ==================== الحصول على الكائن ====================
     getCountry(code) {
         return this.list.find(c => c.code === code);
     },
     
-    // ==================== البحث بالاسم ====================
     findByName(name) {
         return this.list.find(c => c.name === name);
     }
