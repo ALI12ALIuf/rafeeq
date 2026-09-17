@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع زر طلب الصداقة في الهيدر ==========
+// ========== posts-system.js - النسخة المحسّنة للأداء ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -8,6 +8,10 @@ const PostsSystem = {
     
     IMAGE_TARGET_SIZE: 400,
     IMAGE_QUALITY: 0.75,
+    
+    // ✅ منع التشغيل المزدوج
+    _isInitialized: false,
+    _isLoadingPosts: false,
     
     _countryCloseHandler: null,
     _relationshipCache: {
@@ -33,14 +37,23 @@ const PostsSystem = {
         { code: 'other', name: 'أخرى', icon: 'fas fa-th-large', color: '#9E9E9E' }
     ],
     
-    // ==================== init ====================
+    // ==================== ✅ init محسّن ====================
     init() {
+        if (this._isInitialized) {
+            console.log('⏭️ PostsSystem مُهيّأ بالفعل - تخطي');
+            return;
+        }
+        this._isInitialized = true;
+        
         console.log('🚀 تهيئة نظام المنشورات...');
         this.loadSavedSettings();
+        
+        // ✅ تحميل فوري بدون انتظار
         this.loadAllPosts();
         this.setupRealtimeListeners();
         this.renderCountryHeaderSelector();
         this.renderJobCategories();
+        
         console.log('✅ تم تهيئة نظام المنشورات');
     },
     
@@ -60,37 +73,41 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== تحميل حالات العلاقات (Batch) ====================
+    // ==================== ✅ تحميل حالات العلاقات (كاش 5 دقائق) ====================
     async loadRelationshipCache(force = false) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
         
         const now = Date.now();
-        if (!force && (now - this._relationshipCache.lastUpdate) < 30000) {
+        // ✅ 5 دقائق بدلاً من 30 ثانية
+        if (!force && (now - this._relationshipCache.lastUpdate) < 300000) {
             return;
         }
         
         try {
-            const userDoc = await window.db.collection('users').doc(uid).get();
+            // ✅ استخدام Promise.all لجلب البيانات بالتوازي
+            const [userDoc, sentSnap, receivedSnap] = await Promise.all([
+                window.db.collection('users').doc(uid).get(),
+                window.db.collection('friendRequests')
+                    .where('from', '==', uid)
+                    .where('status', '==', 'pending')
+                    .get(),
+                window.db.collection('friendRequests')
+                    .where('to', '==', uid)
+                    .where('status', '==', 'pending')
+                    .get()
+            ]);
+            
             if (userDoc.exists) {
-                const friends = userDoc.data().friends || [];
-                this._relationshipCache.friends = new Set(friends);
+                this._relationshipCache.friends = new Set(userDoc.data().friends || []);
             }
             
-            const sentSnap = await window.db.collection('friendRequests')
-                .where('from', '==', uid)
-                .where('status', '==', 'pending')
-                .get();
             this._relationshipCache.sentRequests = new Set();
             sentSnap.forEach(doc => {
                 const data = doc.data();
                 if (data.to) this._relationshipCache.sentRequests.add(data.to);
             });
             
-            const receivedSnap = await window.db.collection('friendRequests')
-                .where('to', '==', uid)
-                .where('status', '==', 'pending')
-                .get();
             this._relationshipCache.receivedRequests = new Map();
             receivedSnap.forEach(doc => {
                 const data = doc.data();
@@ -98,13 +115,12 @@ const PostsSystem = {
             });
             
             this._relationshipCache.lastUpdate = now;
-            console.log(`📊 تم تحديث حالات العلاقات: ${this._relationshipCache.friends.size} صديق، ${this._relationshipCache.sentRequests.size} طلب مرسل، ${this._relationshipCache.receivedRequests.size} طلب مستلم`);
+            console.log(`📊 حالة العلاقات: ${this._relationshipCache.friends.size} صديق، ${this._relationshipCache.sentRequests.size} مرسل، ${this._relationshipCache.receivedRequests.size} مستلم`);
         } catch (e) {
-            console.warn('⚠️ خطأ في تحميل حالات العلاقات:', e);
+            console.warn('⚠️ خطأ في حالات العلاقات:', e);
         }
     },
     
-    // ✅ تحديد حالة العلاقة مع مستخدم معين
     getRelationshipState(targetUserId) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return 'guest';
@@ -115,7 +131,6 @@ const PostsSystem = {
         return 'none';
     },
     
-    // ==================== إنشاء زر الإجراء (دائري صغير) ====================
     createPostActionButton(post) {
         const state = this.getRelationshipState(post.userId);
         const btn = document.createElement('button');
@@ -126,115 +141,38 @@ const PostsSystem = {
             case 'self':
                 btn.style.display = 'none';
                 return btn;
-                
             case 'guest':
                 btn.innerHTML = `<i class="fas fa-lock"></i>`;
-                btn.style.cssText = `
-                    background: transparent;
-                    color: var(--text-light);
-                    border: 1.5px solid var(--border);
-                    cursor: not-allowed;
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 0.9rem;
-                    padding: 0;
-                    flex-shrink: 0;
-                `;
+                btn.style.cssText = `background: transparent; color: var(--text-light); border: 1.5px solid var(--border); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
                 btn.title = 'سجل الدخول';
                 btn.disabled = true;
                 break;
-                
             case 'friend':
                 btn.innerHTML = `<i class="fas fa-comment"></i>`;
-                btn.style.cssText = `
-                    background: var(--primary);
-                    color: white;
-                    border: none;
-                    cursor: pointer;
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 0.9rem;
-                    padding: 0;
-                    flex-shrink: 0;
-                `;
+                btn.style.cssText = `background: var(--primary); color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
                 btn.title = 'مراسلة';
                 break;
-                
             case 'sent':
                 btn.innerHTML = `<i class="fas fa-clock"></i>`;
-                btn.style.cssText = `
-                    background: transparent;
-                    color: var(--primary);
-                    border: 1.5px solid var(--primary);
-                    cursor: not-allowed;
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 0.9rem;
-                    padding: 0;
-                    flex-shrink: 0;
-                `;
+                btn.style.cssText = `background: transparent; color: var(--primary); border: 1.5px solid var(--primary); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
                 btn.title = 'طلب معلق';
                 btn.disabled = true;
                 break;
-                
             case 'received':
                 btn.innerHTML = `<i class="fas fa-check"></i>`;
-                btn.style.cssText = `
-                    background: #4CAF50;
-                    color: white;
-                    border: none;
-                    cursor: pointer;
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 0.9rem;
-                    padding: 0;
-                    flex-shrink: 0;
-                `;
+                btn.style.cssText = `background: #4CAF50; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
                 btn.title = 'قبول الطلب';
                 break;
-                
             case 'none':
             default:
                 btn.innerHTML = `<i class="fas fa-plus"></i>`;
-                btn.style.cssText = `
-                    background: var(--primary);
-                    color: white;
-                    border: none;
-                    cursor: pointer;
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 0.9rem;
-                    padding: 0;
-                    flex-shrink: 0;
-                `;
+                btn.style.cssText = `background: var(--primary); color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
                 btn.title = 'إرسال طلب صداقة';
                 break;
         }
-        
         return btn;
     },
     
-    // ✅ ربط أحداث الزر بعد إدراج HTML
     bindActionButton(card, post) {
         if (!post.userId) return;
         const isOwner = window.auth?.currentUser?.uid === post.userId;
@@ -269,18 +207,10 @@ const PostsSystem = {
         }
     },
     
-    // ==================== إرسال طلب صداقة من المنشور ====================
     async sendFriendRequestFromPost(targetUserId, btnElement) {
         const uid = window.auth?.currentUser?.uid;
-        if (!uid) {
-            alert('يجب تسجيل الدخول أولاً');
-            return;
-        }
-        
-        if (uid === targetUserId) {
-            alert('لا يمكنك إضافة نفسك');
-            return;
-        }
+        if (!uid) { alert('يجب تسجيل الدخول أولاً'); return; }
+        if (uid === targetUserId) { alert('لا يمكنك إضافة نفسك'); return; }
         
         try {
             const exist = await window.db.collection('friendRequests')
@@ -289,10 +219,7 @@ const PostsSystem = {
                 .where('status', '==', 'pending')
                 .get();
             
-            if (!exist.empty) {
-                alert('أرسلت طلباً مسبقاً');
-                return;
-            }
+            if (!exist.empty) { alert('أرسلت طلباً مسبقاً'); return; }
             
             const me = await window.db.collection('users').doc(uid).get();
             if (me.exists && (me.data().friends || []).includes(targetUserId)) {
@@ -313,28 +240,13 @@ const PostsSystem = {
             
             if (btnElement) {
                 btnElement.innerHTML = `<i class="fas fa-clock"></i>`;
-                btnElement.style.cssText = `
-                    background: transparent;
-                    color: var(--primary);
-                    border: 1.5px solid var(--primary);
-                    cursor: not-allowed;
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 0.9rem;
-                    padding: 0;
-                    flex-shrink: 0;
-                `;
+                btnElement.style.cssText = `background: transparent; color: var(--primary); border: 1.5px solid var(--primary); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
                 btnElement.title = 'طلب معلق';
                 btnElement.disabled = true;
                 btnElement.onclick = null;
             }
             
             alert('✅ تم إرسال طلب الصداقة');
-            
         } catch (e) {
             console.error('خطأ في إرسال طلب الصداقة:', e);
             alert('حدث خطأ في إرسال الطلب');
@@ -346,11 +258,9 @@ const PostsSystem = {
         this.loadAllPosts();
     },
     
-    // ==================== منتقي البلد في الرأس ====================
     renderCountryHeaderSelector() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
-        
         this.updateCountrySelectorVisibility();
         
         const currentFlag = window.Countries.getFlag(this.selectedCountry);
@@ -370,7 +280,6 @@ const PostsSystem = {
     updateCountrySelectorVisibility() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
-        
         const homePage = document.querySelector('.page.home-page');
         const isHomeActive = homePage && homePage.classList.contains('active');
         container.style.display = isHomeActive ? 'block' : 'none';
@@ -379,10 +288,8 @@ const PostsSystem = {
     closeCountryDropdown() {
         const dd = document.getElementById('countryHeaderDropdown');
         if (dd) dd.remove();
-        
         const arrow = document.querySelector('.country-header-arrow');
         if (arrow) arrow.style.transform = 'rotate(0deg)';
-        
         if (this._countryCloseHandler) {
             document.removeEventListener('pointerdown', this._countryCloseHandler);
             document.removeEventListener('click', this._countryCloseHandler);
@@ -391,32 +298,22 @@ const PostsSystem = {
     },
     
     toggleHeaderCountryDropdown(event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
-        
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         const existing = document.getElementById('countryHeaderDropdown');
-        if (existing) {
-            this.closeCountryDropdown();
-            return;
-        }
+        if (existing) { this.closeCountryDropdown(); return; }
         
         const wrapper = document.querySelector('.country-header-inline');
         if (!wrapper) return;
-        
         const btn = wrapper.querySelector('.country-header-btn');
         if (!btn) return;
         
         const rect = btn.getBoundingClientRect();
-        
         const dropdown = document.createElement('div');
         dropdown.className = 'country-header-dropdown';
         dropdown.id = 'countryHeaderDropdown';
         dropdown.style.position = 'fixed';
         dropdown.style.top = (rect.bottom + 8) + 'px';
         dropdown.style.right = '10px';
-        dropdown.style.left = 'auto';
         dropdown.style.zIndex = '99999';
         dropdown.style.minWidth = '200px';
         dropdown.style.maxWidth = '240px';
@@ -429,8 +326,7 @@ const PostsSystem = {
         dropdown.style.padding = '6px';
         
         dropdown.innerHTML = `
-            <button class="country-mini-option ${this.showAllCountries ? 'active' : ''}" 
-                    onclick="PostsSystem.selectAllCountries()">
+            <button class="country-mini-option ${this.showAllCountries ? 'active' : ''}" onclick="PostsSystem.selectAllCountries()">
                 <span class="country-mini-flag">🌍</span>
                 <span class="country-mini-name">جميع الدول</span>
                 ${this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
@@ -447,20 +343,15 @@ const PostsSystem = {
         `;
         
         document.body.appendChild(dropdown);
-        
         const arrow = btn.querySelector('.country-header-arrow');
         if (arrow) arrow.style.transform = 'rotate(180deg)';
         
         const self = this;
         this._countryCloseHandler = (e) => {
             const dd = document.getElementById('countryHeaderDropdown');
-            if (!dd) {
-                self.closeCountryDropdown();
-                return;
-            }
+            if (!dd) { self.closeCountryDropdown(); return; }
             if (dd.contains(e.target)) return;
             if (btn.contains(e.target)) return;
-            
             self.closeCountryDropdown();
         };
         
@@ -474,7 +365,6 @@ const PostsSystem = {
         this.selectedCountry = code;
         this.showAllCountries = false;
         this.saveSettings();
-        
         this.closeCountryDropdown();
         
         const btn = document.querySelector('.country-header-btn');
@@ -484,16 +374,12 @@ const PostsSystem = {
             if (flagSpan) flagSpan.textContent = window.Countries.getFlag(code);
             if (nameSpan) nameSpan.textContent = window.Countries.getName(code);
         }
-        
         this.loadAllPosts();
-        
-        console.log(`🌍 تم اختيار: ${window.Countries.getName(code)}`);
     },
     
     selectAllCountries() {
         this.showAllCountries = true;
         this.saveSettings();
-        
         this.closeCountryDropdown();
         
         const btn = document.querySelector('.country-header-btn');
@@ -503,17 +389,12 @@ const PostsSystem = {
             if (flagSpan) flagSpan.textContent = '🌍';
             if (nameSpan) nameSpan.textContent = 'الكل';
         }
-        
         this.loadAllPosts();
-        
-        console.log('🌍 عرض جميع الدول');
     },
     
-    // ==================== أقسام الوظائف ====================
     renderJobCategories() {
         const container = document.getElementById('jobCategories');
         if (!container) return;
-        
         container.innerHTML = this.jobCategories.map(cat => `
             <button class="category-tab ${cat.code === this.selectedCategory ? 'active' : ''}" 
                     onclick="PostsSystem.selectCategory('${cat.code}')"
@@ -548,7 +429,6 @@ const PostsSystem = {
         return cat ? cat.color : '#64B5F6';
     },
     
-    // ==================== منتقي القسم (للنشر) ====================
     renderPublishCategoryDropdown() {
         const container = document.getElementById('jobCategorySelector');
         const input = document.getElementById('jobCategory');
@@ -582,14 +462,11 @@ const PostsSystem = {
     
     togglePublishCategoryDropdown(event) {
         if (event) event.stopPropagation();
-        
         const dropdown = document.getElementById('jobCategoryDropdown');
         if (!dropdown) return;
-        
         document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
             if (d.id !== 'jobCategoryDropdown') d.style.display = 'none';
         });
-        
         if (dropdown.style.display === 'none' || !dropdown.style.display) {
             dropdown.style.display = 'block';
             setTimeout(() => {
@@ -610,19 +487,15 @@ const PostsSystem = {
     selectPublishCategory(code) {
         const input = document.getElementById('jobCategory');
         if (input) input.value = code;
-        
         const dropdown = document.getElementById('jobCategoryDropdown');
         if (dropdown) dropdown.style.display = 'none';
-        
         this.renderPublishCategoryDropdown();
     },
     
-    // ==================== منتقي البلد (للنشر) ====================
     renderPublishCountryDropdown(publishType) {
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const containerId = `${prefix}CountrySelector`;
         const inputId = `${prefix}CountryCode`;
-        
         const container = document.getElementById(containerId);
         const input = document.getElementById(inputId);
         if (!container || !input) return;
@@ -651,16 +524,13 @@ const PostsSystem = {
     
     togglePublishCountryDropdown(publishType, event) {
         if (event) event.stopPropagation();
-        
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const dropdownId = `${prefix}CountryDropdown`;
         const dropdown = document.getElementById(dropdownId);
         if (!dropdown) return;
-        
         document.querySelectorAll('.publish-country-dropdown, .publish-category-dropdown').forEach(d => {
             if (d.id !== dropdownId) d.style.display = 'none';
         });
-        
         if (dropdown.style.display === 'none' || !dropdown.style.display) {
             dropdown.style.display = 'block';
             setTimeout(() => {
@@ -682,14 +552,11 @@ const PostsSystem = {
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const input = document.getElementById(`${prefix}CountryCode`);
         if (input) input.value = code;
-        
         const dropdown = document.getElementById(`${prefix}CountryDropdown`);
         if (dropdown) dropdown.style.display = 'none';
-        
         this.renderPublishCountryDropdown(publishType);
     },
     
-    // ==================== قوائم الزواج المخصصة ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -705,7 +572,6 @@ const PostsSystem = {
         
         const containerId = field === 'married' ? 'marriageMarriedSelector' : 'marriageChildrenSelector';
         const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
-        
         const container = document.getElementById(containerId);
         const input = document.getElementById(inputId);
         if (!container || !input) return;
@@ -724,18 +590,13 @@ const PostsSystem = {
     },
     
     toggleMarriageDropdown(field, event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
-        
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const existing = document.getElementById(dropdownId);
         if (existing) existing.remove();
         
         const btn = document.querySelector(`.publish-category-btn[data-field="${field}"]`);
         if (!btn) return;
-        
         const rect = btn.getBoundingClientRect();
         
         const options = field === 'married'
@@ -760,7 +621,6 @@ const PostsSystem = {
         dropdown.style.position = 'fixed';
         dropdown.style.top = (rect.bottom + 6) + 'px';
         dropdown.style.left = rect.left + 'px';
-        dropdown.style.right = 'auto';
         dropdown.style.width = rect.width + 'px';
         dropdown.style.maxHeight = '280px';
         dropdown.style.overflowY = 'auto';
@@ -797,7 +657,6 @@ const PostsSystem = {
         const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
         const input = document.getElementById(inputId);
         if (input) input.value = value;
-        
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const dropdown = document.getElementById(dropdownId);
         if (dropdown) dropdown.remove();
@@ -816,16 +675,12 @@ const PostsSystem = {
                 }
             }
         }
-        
         this.renderMarriageDropdown(field, value);
     },
     
-    // ==================== التبديل بين التبويبات ====================
     switchTab(tab) {
         this.currentTab = tab;
-        
         this.closeCountryDropdown();
-        
         document.querySelectorAll('.home-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tab);
         });
@@ -842,10 +697,44 @@ const PostsSystem = {
         }
     },
     
+    // ==================== ✅ loadAllPosts محسّن ====================
     async loadAllPosts() {
-        await this.loadRelationshipCache();
-        await this.loadJobsPosts();
-        await this.loadMarriagePosts();
+        // ✅ تحميل المنشورات أولاً (لا انتظار للعلاقات)
+        await Promise.all([
+            this.loadJobsPosts(),
+            this.loadMarriagePosts()
+        ]);
+        
+        // ✅ تحديث العلاقات في الخلفية (بدون await)
+        this.loadRelationshipCache().then(() => {
+            this.refreshActionButtons();
+        }).catch(() => {});
+    },
+    
+    // ✅ تحديث الأزرار فقط بعد تحديث العلاقات
+    refreshActionButtons() {
+        document.querySelectorAll('.post-card').forEach(card => {
+            const oldBtn = card.querySelector('.post-action-btn');
+            if (!oldBtn) return;
+            
+            const userId = oldBtn.getAttribute('data-user-id');
+            if (!userId) return;
+            
+            const post = { userId };
+            const newBtn = this.createPostActionButton(post);
+            
+            if (newBtn.style.display === 'none') {
+                oldBtn.style.display = 'none';
+                return;
+            }
+            
+            oldBtn.innerHTML = newBtn.innerHTML;
+            oldBtn.style.cssText = newBtn.style.cssText;
+            oldBtn.title = newBtn.title;
+            oldBtn.disabled = newBtn.disabled;
+            
+            this.bindActionButton(card, post);
+        });
     },
     
     async loadJobsPosts() {
@@ -855,7 +744,6 @@ const PostsSystem = {
         
         try {
             let query = window.db.collection('posts').where('type', '==', 'job');
-            
             if (!this.showAllCountries && this.selectedCountry) {
                 query = query.where('countryCode', '==', this.selectedCountry);
             }
@@ -879,10 +767,13 @@ const PostsSystem = {
                 return timeB - timeA;
             });
             
+            // ✅ استخدام DocumentFragment
+            const fragment = document.createDocumentFragment();
             for (const post of posts) {
                 const el = this.createJobPost(post);
-                if (el) container.appendChild(el);
+                if (el) fragment.appendChild(el);
             }
+            container.appendChild(fragment);
         } catch (e) {
             console.error('❌ خطأ في تحميل الوظائف:', e);
             if (emptyState) emptyState.style.display = 'flex';
@@ -896,7 +787,6 @@ const PostsSystem = {
         
         try {
             let query = window.db.collection('posts').where('type', '==', 'marriage');
-            
             if (!this.showAllCountries && this.selectedCountry) {
                 query = query.where('countryCode', '==', this.selectedCountry);
             }
@@ -917,17 +807,18 @@ const PostsSystem = {
                 return timeB - timeA;
             });
             
+            const fragment = document.createDocumentFragment();
             for (const post of posts) {
                 const el = this.createMarriagePost(post);
-                if (el) container.appendChild(el);
+                if (el) fragment.appendChild(el);
             }
+            container.appendChild(fragment);
         } catch (e) {
             console.error('❌ خطأ في تحميل الزواج:', e);
             if (emptyState) emptyState.style.display = 'flex';
         }
     },
     
-    // ==================== إنشاء كرت الوظيفة ====================
     createJobPost(post) {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
@@ -949,9 +840,7 @@ const PostsSystem = {
         let actionBtnHTML = '';
         if (post.userId && !isOwner) {
             const actionBtn = this.createPostActionButton(post);
-            if (actionBtn.style.display !== 'none') {
-                actionBtnHTML = actionBtn.outerHTML;
-            }
+            if (actionBtn.style.display !== 'none') actionBtnHTML = actionBtn.outerHTML;
         }
         
         card.innerHTML = `
@@ -987,11 +876,9 @@ const PostsSystem = {
             card.setAttribute('data-post-image', post.image);
             card.setAttribute('data-post-id', post.id);
         }
-        
         return card;
     },
     
-    // ==================== ✅ إنشاء كرت الزواج (سطر واحد للعمر/البلد/الحالة/الأطفال) ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -1003,7 +890,6 @@ const PostsSystem = {
             'no': 'أعزب/عزباء', 'yes': 'متزوج/متزوجة',
             'divorced': 'مطلق/مطلقة', 'widowed': 'أرمل/أرملة'
         };
-        
         const childrenText = post.children === 'yes' ? 'نعم' : 'لا';
         
         const avatarContent = post.image 
@@ -1017,12 +903,9 @@ const PostsSystem = {
         let actionBtnHTML = '';
         if (post.userId && !isOwner) {
             const actionBtn = this.createPostActionButton(post);
-            if (actionBtn.style.display !== 'none') {
-                actionBtnHTML = actionBtn.outerHTML;
-            }
+            if (actionBtn.style.display !== 'none') actionBtnHTML = actionBtn.outerHTML;
         }
         
-        // ✅ سطر واحد يجمع: العمر + البلد + الحالة الاجتماعية + الأطفال
         let childrenSpan = '';
         if (post.married !== 'no') {
             childrenSpan = `<span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>`;
@@ -1058,7 +941,6 @@ const PostsSystem = {
             card.setAttribute('data-post-image', post.image);
             card.setAttribute('data-post-id', post.id);
         }
-        
         return card;
     },
     
@@ -1079,7 +961,6 @@ const PostsSystem = {
     
     setupPostImageZoom(modal, img) {
         if (img._zoomCleanup) { img._zoomCleanup(); img._zoomCleanup = null; }
-        
         let currentScale = 1, initialDistance = 0, initialScale = 1;
         let startX = 0, startY = 0, translateX = 0, translateY = 0, isTouching = false;
         const minScale = 1, maxScale = 4;
@@ -1142,9 +1023,7 @@ const PostsSystem = {
                 e.preventDefault();
                 if (currentScale > 1.5) {
                     currentScale = 1; translateX = 0; translateY = 0;
-                } else {
-                    currentScale = 2;
-                }
+                } else { currentScale = 2; }
                 updateTransform();
             }
             lastTap = now;
@@ -1173,25 +1052,32 @@ const PostsSystem = {
         }
     },
     
+    // ==================== ✅ setupRealtimeListeners محسّن ====================
     setupRealtimeListeners() {
-        window.db.collection('posts').where('type', '==', 'job')
-            .onSnapshot(() => this.loadJobsPosts(), error => console.warn('⚠️', error.message));
+        // ✅ تحديث فقط عند وجود تغييرات فعلية
+        this._jobsUnsubscribe = window.db.collection('posts')
+            .where('type', '==', 'job')
+            .onSnapshot(snapshot => {
+                if (snapshot.docChanges().length > 0) {
+                    console.log('🔄 تحديث الوظائف...');
+                    this.loadJobsPosts();
+                }
+            }, error => console.warn('⚠️', error.message));
         
-        window.db.collection('posts').where('type', '==', 'marriage')
-            .onSnapshot(() => this.loadMarriagePosts(), error => console.warn('⚠️', error.message));
+        this._marriageUnsubscribe = window.db.collection('posts')
+            .where('type', '==', 'marriage')
+            .onSnapshot(snapshot => {
+                if (snapshot.docChanges().length > 0) {
+                    console.log('🔄 تحديث الزواج...');
+                    this.loadMarriagePosts();
+                }
+            }, error => console.warn('⚠️', error.message));
     },
     
-    // ==================== قص الصورة مربعة + ضغط ====================
     async compressImage(file) {
         return new Promise((resolve, reject) => {
-            if (!file.type.startsWith('image/')) { 
-                reject(new Error('الملف ليس صورة')); 
-                return; 
-            }
-            if (file.size > 10 * 1024 * 1024) { 
-                reject(new Error('الصورة كبيرة جداً (الحد 10MB)')); 
-                return; 
-            }
+            if (!file.type.startsWith('image/')) { reject(new Error('الملف ليس صورة')); return; }
+            if (file.size > 10 * 1024 * 1024) { reject(new Error('الصورة كبيرة جداً (الحد 10MB)')); return; }
             
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -1200,7 +1086,6 @@ const PostsSystem = {
                     const side = Math.min(img.width, img.height);
                     const sx = (img.width - side) / 2;
                     const sy = (img.height - side) / 2;
-                    
                     const TARGET = this.IMAGE_TARGET_SIZE;
                     const canvas = document.createElement('canvas');
                     canvas.width = TARGET;
@@ -1208,19 +1093,15 @@ const PostsSystem = {
                     const ctx = canvas.getContext('2d');
                     ctx.imageSmoothingEnabled = true;
                     ctx.imageSmoothingQuality = 'high';
-                    
                     ctx.drawImage(img, sx, sy, side, side, 0, 0, TARGET, TARGET);
                     
                     canvas.toBlob((blob) => {
-                        if (!blob) { 
-                            reject(new Error('فشل ضغط الصورة')); 
-                            return; 
-                        }
+                        if (!blob) { reject(new Error('فشل ضغط الصورة')); return; }
                         const reader2 = new FileReader();
                         reader2.onload = () => {
                             const compressedKB = Math.round(reader2.result.length / 1024);
                             const originalKB = Math.round(file.size / 1024);
-                            console.log(`📸 قص مربع + ضغط: ${originalKB} KB → ${compressedKB} KB (${TARGET}x${TARGET})`);
+                            console.log(`📸 قص مربع + ضغط: ${originalKB} KB → ${compressedKB} KB`);
                             resolve(reader2.result);
                         };
                         reader2.readAsDataURL(blob);
@@ -1237,12 +1118,9 @@ const PostsSystem = {
     async previewJobImage(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
-        
         const preview = document.getElementById('jobImagePreview');
         if (!preview) return;
-        
         preview.innerHTML = '<div style="color:#888;font-size:0.7rem;text-align:center;line-height:1.2;">جاري<br>المعالجة...</div>';
-        
         try {
             const compressed = await this.compressImage(file);
             preview.innerHTML = `<img src="${compressed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
@@ -1256,12 +1134,9 @@ const PostsSystem = {
     async previewMarriageImage(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
-        
         const preview = document.getElementById('marriageImagePreview');
         if (!preview) return;
-        
         preview.innerHTML = '<div style="color:#888;font-size:0.7rem;text-align:center;line-height:1.2;">جاري<br>المعالجة...</div>';
-        
         try {
             const compressed = await this.compressImage(file);
             preview.innerHTML = `<img src="${compressed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
@@ -1301,7 +1176,6 @@ PostsSystem.fillPublishJobForm = function() {
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('jobs');
     this.renderPublishCategoryDropdown();
-    
     const preview = document.getElementById('jobImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('jobImage');
@@ -1312,18 +1186,14 @@ PostsSystem.fillPublishMarriageForm = function() {
     const countryInput = document.getElementById('marriageCountryCode');
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('marriage');
-    
     const marriedInput = document.getElementById('marriageMarried');
     const childrenInput = document.getElementById('marriageChildren');
     if (marriedInput) marriedInput.value = 'no';
     if (childrenInput) childrenInput.value = 'no';
-    
     this.renderMarriageDropdown('married', 'no');
     this.renderMarriageDropdown('children', 'no');
-    
     const childrenField = document.getElementById('marriageChildrenField');
     if (childrenField) childrenField.style.display = 'none';
-    
     const preview = document.getElementById('marriageImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('marriageImage');
@@ -1343,7 +1213,6 @@ window.closePostImagePreview = function() {
 
 window.publishJob = async function() {
     if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول'); return; }
-    
     const name = document.getElementById('jobName')?.value?.trim();
     const age = document.getElementById('jobAge')?.value;
     const countryCode = document.getElementById('jobCountryCode')?.value;
@@ -1353,29 +1222,22 @@ window.publishJob = async function() {
     const imageInput = document.getElementById('jobImage');
     
     if (!name || !age || !countryCode || !category || !jobTitle || !bio) {
-        alert('يرجى تعبئة جميع الحقول');
-        return;
+        alert('يرجى تعبئة جميع الحقول'); return;
     }
     if (age < 15 || age > 80) { alert('العمر بين 15 و 80'); return; }
     
     try {
         let imageBase64 = null;
         if (imageInput && imageInput.files[0]) {
-            try {
-                imageBase64 = await PostsSystem.compressImage(imageInput.files[0]);
-            } catch (err) {
-                alert('فشل معالجة الصورة: ' + err.message);
-                return;
-            }
+            try { imageBase64 = await PostsSystem.compressImage(imageInput.files[0]); }
+            catch (err) { alert('فشل معالجة الصورة: ' + err.message); return; }
         }
         
         await window.db.collection('posts').add({
-            type: 'job',
-            userId: window.auth.currentUser.uid,
+            type: 'job', userId: window.auth.currentUser.uid,
             name, age: parseInt(age),
             country: window.Countries.getName(countryCode),
-            countryCode,
-            category, jobTitle, bio,
+            countryCode, category, jobTitle, bio,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -1383,18 +1245,14 @@ window.publishJob = async function() {
         window.closeModal('publishJobModal');
         clearJobForm();
         alert('✅ تم نشر الوظيفة بنجاح');
-        
         if (typeof switchPage === 'function') switchPage('home');
         PostsSystem.selectCountry(countryCode);
         setTimeout(() => PostsSystem.switchTab('jobs'), 100);
-    } catch (e) {
-        alert('حدث خطأ: ' + e.message);
-    }
+    } catch (e) { alert('حدث خطأ: ' + e.message); }
 };
 
 window.publishMarriage = async function() {
     if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول'); return; }
-    
     const name = document.getElementById('marriageName')?.value?.trim();
     const age = document.getElementById('marriageAge')?.value;
     const countryCode = document.getElementById('marriageCountryCode')?.value;
@@ -1403,30 +1261,21 @@ window.publishMarriage = async function() {
     const children = document.getElementById('marriageChildren')?.value;
     const imageInput = document.getElementById('marriageImage');
     
-    if (!name || !age || !countryCode || !bio) {
-        alert('يرجى تعبئة جميع الحقول');
-        return;
-    }
+    if (!name || !age || !countryCode || !bio) { alert('يرجى تعبئة جميع الحقول'); return; }
     if (age < 15 || age > 80) { alert('العمر بين 15 و 80'); return; }
     
     try {
         let imageBase64 = null;
         if (imageInput && imageInput.files[0]) {
-            try {
-                imageBase64 = await PostsSystem.compressImage(imageInput.files[0]);
-            } catch (err) {
-                alert('فشل معالجة الصورة: ' + err.message);
-                return;
-            }
+            try { imageBase64 = await PostsSystem.compressImage(imageInput.files[0]); }
+            catch (err) { alert('فشل معالجة الصورة: ' + err.message); return; }
         }
         
         await window.db.collection('posts').add({
-            type: 'marriage',
-            userId: window.auth.currentUser.uid,
+            type: 'marriage', userId: window.auth.currentUser.uid,
             name, age: parseInt(age),
             country: window.Countries.getName(countryCode),
-            countryCode,
-            bio, married,
+            countryCode, bio, married,
             children: (married === 'no') ? 'no' : children,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -1435,13 +1284,10 @@ window.publishMarriage = async function() {
         window.closeModal('publishMarriageModal');
         clearMarriageForm();
         alert('✅ تم نشر إعلان الزواج بنجاح');
-        
         if (typeof switchPage === 'function') switchPage('home');
         PostsSystem.selectCountry(countryCode);
         setTimeout(() => PostsSystem.switchTab('marriage'), 100);
-    } catch (e) {
-        alert('حدث خطأ: ' + e.message);
-    }
+    } catch (e) { alert('حدث خطأ: ' + e.message); }
 };
 
 function clearJobForm() {
@@ -1470,14 +1316,9 @@ window.PostsSystem = PostsSystem;
 window.previewJobImage = (e) => PostsSystem.previewJobImage(e);
 window.previewMarriageImage = (e) => PostsSystem.previewMarriageImage(e);
 
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        if (window.auth?.currentUser) PostsSystem.init();
-    }, 500);
-});
-
+// ✅ إزالة load listener القديم (authReady يكفي)
 window.addEventListener('authReady', () => {
-    setTimeout(() => PostsSystem.init(), 300);
+    setTimeout(() => PostsSystem.init(), 100);
 });
 
 window.addEventListener('friendsUpdated', () => {
@@ -1485,4 +1326,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - سطر واحد للعمر/البلد/الحالة/الأطفال');
+console.log('✅ posts-system.js تم تحميله - نسخة محسّنة للأداء');
