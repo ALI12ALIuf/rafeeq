@@ -54,9 +54,7 @@
             
             <!-- ✅ محتوى الوظائف -->
             <div class="home-content active" id="jobsContent">
-                <div class="posts-container" id="jobsPostsContainer">
-                    <!-- تُضاف المنشورات هنا تلقائياً -->
-                </div>
+                <div class="posts-container" id="jobsPostsContainer"></div>
                 <div class="empty-state" id="jobsEmptyState">
                     <i class="fas fa-briefcase"></i>
                     <h3>لا توجد وظائف</h3>
@@ -66,9 +64,7 @@
             
             <!-- ✅ محتوى الزواج -->
             <div class="home-content" id="marriageContent">
-                <div class="posts-container" id="marriagePostsContainer">
-                    <!-- تُضاف المنشورات هنا تلقائياً -->
-                </div>
+                <div class="posts-container" id="marriagePostsContainer"></div>
                 <div class="empty-state" id="marriageEmptyState">
                     <i class="fas fa-heart"></i>
                     <h3>لا توجد إعلانات زواج</h3>
@@ -192,7 +188,7 @@
             </div>
         </div>
 
-        <!-- ===== صفحة الملف الشخصي (مع أزرار النشر) ===== -->
+        <!-- ===== صفحة الملف الشخصي ===== -->
         <div class="page profile-page">
             <div class="profile-header">
                 <div class="profile-cover">
@@ -384,6 +380,7 @@
 
 <!-- ==================== قوالب الرسائل ==================== -->
 <template id="messageWrapperTemplate"><div class="message"></div></template>
+
 <template id="textMessageTemplate">
     <div class="message-content" style="border:1.5px solid var(--border-color);background:var(--bg);color:var(--text);border-radius:18px;padding:10px 14px;max-width:100%;word-wrap:break-word;position:relative;">
         <span style="font-size:1rem;line-height:1.4;display:block;"></span>
@@ -461,13 +458,13 @@
     window.googleProvider = new firebase.auth.GoogleAuthProvider();
 </script>
 
-<script src="js/i18n.js?v=17"></script>
-<script src="js/secure-chat.js?v=17"></script>
-<script src="js/chat-system.js?v=17"></script>
-<script src="js/ui-functions.js?v=17"></script>
-<script src="js/posts-system.js?v=17"></script>
-<script src="js/auth.js?v=17"></script>
-<script src="js/friends.js?v=17"></script>
+<script src="js/i18n.js?v=19"></script>
+<script src="js/secure-chat.js?v=19"></script>
+<script src="js/chat-system.js?v=19"></script>
+<script src="js/ui-functions.js?v=19"></script>
+<script src="js/posts-system.js?v=19"></script>
+<script src="js/auth.js?v=19"></script>
+<script src="js/friends.js?v=19"></script>
 
 <script>
 window.addEventListener('load', function() {
