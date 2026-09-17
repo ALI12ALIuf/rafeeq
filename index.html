@@ -40,7 +40,6 @@
         <!-- ===== صفحة الرئيسية (وظائف + زواج) ===== -->
         <div class="page home-page active">
             
-            <!-- ✅ تبويبات (وظائف / زواج) -->
             <div class="home-tabs">
                 <button class="home-tab active" data-tab="jobs" onclick="switchHomeTab('jobs')">
                     <i class="fas fa-briefcase"></i>
@@ -52,7 +51,6 @@
                 </button>
             </div>
             
-            <!-- ✅ محتوى الوظائف -->
             <div class="home-content active" id="jobsContent">
                 <div class="posts-container" id="jobsPostsContainer"></div>
                 <div class="empty-state" id="jobsEmptyState">
@@ -62,7 +60,6 @@
                 </div>
             </div>
             
-            <!-- ✅ محتوى الزواج -->
             <div class="home-content" id="marriageContent">
                 <div class="posts-container" id="marriagePostsContainer"></div>
                 <div class="empty-state" id="marriageEmptyState">
@@ -206,7 +203,6 @@
                 <p class="profile-bio" id="profileBio"></p>
             </div>
             
-            <!-- ✅ أزرار النشر -->
             <div class="publish-buttons">
                 <button class="publish-btn publish-btn-jobs" onclick="openPublishModal('jobs')">
                     <i class="fas fa-briefcase"></i>
@@ -360,6 +356,21 @@
     </div>
 </div>
 
+<!-- ✅ نافذة معاينة صورة المنشور -->
+<div id="postImagePreviewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:10070;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;touch-action:none;">
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;border:3px solid #4CAF50;border-radius:20px;pointer-events:none;z-index:10071;box-shadow:0 0 0 2px rgba(76,175,80,0.3);"></div>
+    
+    <div style="position:absolute;top:15px;left:15px;right:15px;bottom:15px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:16px;">
+        <img id="postPreviewImage" style="max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.1s;touch-action:none;cursor:default;">
+    </div>
+    
+    <div style="position:absolute;top:30px;right:0;left:0;display:flex;justify-content:flex-end;padding:0 30px;pointer-events:none;z-index:10072;">
+        <button onclick="closePostImagePreview()" style="background:rgba(0,0,0,0.7);border:2px solid #4CAF50;border-radius:50%;width:45px;height:45px;cursor:pointer;font-size:1.2rem;color:white;pointer-events:auto;display:flex;align-items:center;justify-content:center;transition:all 0.2s;">
+            <i class="fas fa-arrow-right"></i>
+        </button>
+    </div>
+</div>
+
 <!-- شريط التقدم -->
 <div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
     <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
@@ -458,13 +469,13 @@
     window.googleProvider = new firebase.auth.GoogleAuthProvider();
 </script>
 
-<script src="js/i18n.js?v=19"></script>
-<script src="js/secure-chat.js?v=19"></script>
-<script src="js/chat-system.js?v=19"></script>
-<script src="js/ui-functions.js?v=19"></script>
-<script src="js/posts-system.js?v=19"></script>
-<script src="js/auth.js?v=19"></script>
-<script src="js/friends.js?v=19"></script>
+<script src="js/i18n.js?v=20"></script>
+<script src="js/secure-chat.js?v=20"></script>
+<script src="js/chat-system.js?v=20"></script>
+<script src="js/ui-functions.js?v=20"></script>
+<script src="js/posts-system.js?v=20"></script>
+<script src="js/auth.js?v=20"></script>
+<script src="js/friends.js?v=20"></script>
 
 <script>
 window.addEventListener('load', function() {
