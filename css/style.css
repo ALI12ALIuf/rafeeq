@@ -131,7 +131,7 @@ body.conversation-open {
 .nav-item i { font-size: 1.2rem; }
 .nav-item.active { color: var(--primary); }
 
-/* ==================== القسم 7: منتقي البلد (مُصلّح) ==================== */
+/* ==================== القسم 7: منتقي البلد (على اليمين) ==================== */
 .country-header-wrapper {
     position: relative;
     display: flex;
@@ -192,7 +192,6 @@ body.conversation-open {
     transition: transform 0.25s ease;
 }
 
-/* ✅ القائمة المنسدلة - position: fixed لعرض صحيح */
 .country-header-dropdown {
     position: fixed;
     min-width: 200px;
@@ -374,6 +373,8 @@ body.conversation-open {
     overflow: hidden;
     box-shadow: var(--shadow);
     transition: box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
 }
 
 .post-card:last-child { margin-bottom: 20px; }
@@ -513,6 +514,40 @@ body.conversation-open {
 .marriage-post-card .post-job-title { color: #e91e63; background: rgba(233, 30, 99, 0.1); }
 .marriage-post-card .post-info-row i { color: #e91e63; }
 .marriage-post-card .post-bio { border-right-color: #e91e63; }
+
+/* ==================== ✅ زر طلب الصداقة في المنشور ==================== */
+.post-action-wrapper {
+    padding: 0 1rem 1rem 1rem;
+    margin-top: -4px;
+}
+
+.post-action-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s ease;
+}
+
+.post-action-btn i {
+    font-size: 1rem;
+}
+
+.post-action-btn:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(100, 181, 246, 0.3);
+}
+
+.post-action-btn:not(:disabled):active {
+    transform: scale(0.98);
+}
 
 /* ==================== القسم 11: نافذة معاينة صورة المنشور ==================== */
 #postImagePreviewModal { animation: fadeIn 0.2s ease; }
@@ -734,7 +769,7 @@ body.conversation-open {
 .id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
 .profile-bio { padding: 0 1rem 1rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
 
-/* ==================== القسم 15: النوافذ المنبثقة (مُصلّح - تمركز كامل) ==================== */
+/* ==================== القسم 15: النوافذ المنبثقة ==================== */
 .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s; }
 .modal.active { opacity: 1; visibility: visible; }
 
@@ -760,7 +795,6 @@ body.conversation-open {
     gap: 8px;
 }
 
-/* ✅ حقل مُوسَّط بالكامل */
 .edit-field { 
     margin-bottom: 1rem; 
     display: flex;
@@ -789,7 +823,6 @@ body.conversation-open {
     direction: rtl;
 }
 
-/* ✅ الحقول مع نص في المنتصف */
 .edit-field input,
 .edit-field textarea,
 .edit-field select { 
@@ -814,7 +847,6 @@ body.conversation-open {
     background: var(--card-bg);
 }
 
-/* ✅ الـ textarea تبقى نصها في اليمين (لأنها طويلة) */
 .edit-field textarea { 
     resize: vertical; 
     min-height: 80px; 
@@ -839,7 +871,6 @@ body.conversation-open {
 .char-counter.warning { color: #FFC107; opacity: 1; font-weight: 700; }
 .char-counter.full { color: #f44336; opacity: 1; font-weight: 700; }
 
-/* ✅ الصورة الرمزية متمركزة */
 .current-avatar { 
     width: 80px; 
     height: 80px; 
@@ -856,7 +887,6 @@ body.conversation-open {
     line-height: 1;
 }
 
-/* ✅ زر التغيير متمركز */
 .change-avatar-btn { 
     display: flex; 
     align-items: center; 
@@ -1146,6 +1176,8 @@ body.conversation-open {
     .country-header-flag { font-size: 1rem; }
     .country-header-name { font-size: 0.68rem; max-width: 55px; }
     .country-header-arrow { font-size: 0.55rem; }
+    
+    .post-action-btn { padding: 10px 14px; font-size: 0.88rem; }
 }
 
 /* ==================== القسم 20: أنماط المحادثة ==================== */
