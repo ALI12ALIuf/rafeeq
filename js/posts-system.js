@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية (إصلاح قائمة البلد) ==========
+// ========== posts-system.js - النسخة النهائية مع زر طلب الصداقة ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -10,6 +10,12 @@ const PostsSystem = {
     IMAGE_QUALITY: 0.75,
     
     _countryCloseHandler: null,
+    _relationshipCache: {
+        friends: new Set(),
+        sentRequests: new Set(),
+        receivedRequests: new Map(),
+        lastUpdate: 0
+    },
     
     jobCategories: [
         { code: 'all', name: 'الكل', icon: 'fas fa-layer-group', color: '#64B5F6' },
@@ -54,6 +60,229 @@ const PostsSystem = {
         } catch (e) {}
     },
     
+    // ==================== ✅ تحميل حالات العلاقات (Batch) ====================
+    async loadRelationshipCache(force = false) {
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid) return;
+        
+        const now = Date.now();
+        if (!force && (now - this._relationshipCache.lastUpdate) < 30000) {
+            return; // استخدم الكاش إذا كان حديث (30 ثانية)
+        }
+        
+        try {
+            // ✅ 1. الأصدقاء
+            const userDoc = await window.db.collection('users').doc(uid).get();
+            if (userDoc.exists) {
+                const friends = userDoc.data().friends || [];
+                this._relationshipCache.friends = new Set(friends);
+            }
+            
+            // ✅ 2. الطلبات المرسلة
+            const sentSnap = await window.db.collection('friendRequests')
+                .where('from', '==', uid)
+                .where('status', '==', 'pending')
+                .get();
+            this._relationshipCache.sentRequests = new Set();
+            sentSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.to) this._relationshipCache.sentRequests.add(data.to);
+            });
+            
+            // ✅ 3. الطلبات المستقبلة
+            const receivedSnap = await window.db.collection('friendRequests')
+                .where('to', '==', uid)
+                .where('status', '==', 'pending')
+                .get();
+            this._relationshipCache.receivedRequests = new Map();
+            receivedSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.from) this._relationshipCache.receivedRequests.set(data.from, doc.id);
+            });
+            
+            this._relationshipCache.lastUpdate = now;
+            console.log(`📊 تم تحديث حالات العلاقات: ${this._relationshipCache.friends.size} صديق، ${this._relationshipCache.sentRequests.size} طلب مرسل، ${this._relationshipCache.receivedRequests.size} طلب مستلم`);
+        } catch (e) {
+            console.warn('⚠️ خطأ في تحميل حالات العلاقات:', e);
+        }
+    },
+    
+    // ✅ تحديد حالة العلاقة مع مستخدم معين
+    getRelationshipState(targetUserId) {
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid) return 'guest'; // غير مسجل دخول
+        if (uid === targetUserId) return 'self'; // نفسه
+        if (this._relationshipCache.friends.has(targetUserId)) return 'friend';
+        if (this._relationshipCache.sentRequests.has(targetUserId)) return 'sent';
+        if (this._relationshipCache.receivedRequests.has(targetUserId)) return 'received';
+        return 'none';
+    },
+    
+    // ==================== ✅ إنشاء زر الإجراء ====================
+    createPostActionButton(post) {
+        const state = this.getRelationshipState(post.userId);
+        const btn = document.createElement('button');
+        btn.className = 'post-action-btn';
+        btn.setAttribute('data-user-id', post.userId);
+        
+        switch(state) {
+            case 'self':
+                // ✅ صاحب المنشور - لا يظهر الزر
+                btn.style.display = 'none';
+                return btn;
+                
+            case 'guest':
+                btn.innerHTML = `<i class="fas fa-lock"></i> <span>سجل الدخول</span>`;
+                btn.style.cssText = `
+                    background: transparent;
+                    color: var(--text-light);
+                    border: 2px solid var(--border);
+                    cursor: not-allowed;
+                `;
+                btn.disabled = true;
+                break;
+                
+            case 'friend':
+                btn.innerHTML = `<i class="fas fa-comment"></i> <span>مراسلة</span>`;
+                btn.style.cssText = `
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                `;
+                btn.onclick = () => {
+                    if (typeof openChat === 'function') {
+                        window.db.collection('users').doc(post.userId).get().then(doc => {
+                            if (doc.exists) {
+                                const f = doc.data();
+                                openChat(post.userId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
+                            }
+                        });
+                    }
+                };
+                break;
+                
+            case 'sent':
+                btn.innerHTML = `<i class="fas fa-clock"></i> <span>طلب معلق</span>`;
+                btn.style.cssText = `
+                    background: transparent;
+                    color: var(--primary);
+                    border: 2px solid var(--primary);
+                    cursor: not-allowed;
+                `;
+                btn.disabled = true;
+                break;
+                
+            case 'received':
+                btn.innerHTML = `<i class="fas fa-check"></i> <span>قبول الطلب</span>`;
+                btn.style.cssText = `
+                    background: #4CAF50;
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                `;
+                btn.onclick = async () => {
+                    const requestId = this._relationshipCache.receivedRequests.get(post.userId);
+                    if (requestId && typeof acceptFriendRequest === 'function') {
+                        await acceptFriendRequest(requestId, post.userId);
+                        // ✅ إعادة رسم الكرت
+                        this.refreshPostsAfterAction(post.userId);
+                    }
+                };
+                break;
+                
+            case 'none':
+            default:
+                btn.innerHTML = `<i class="fas fa-plus"></i> <span>إرسال طلب صداقة</span>`;
+                btn.style.cssText = `
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                `;
+                btn.onclick = () => this.sendFriendRequestFromPost(post.userId, btn);
+                break;
+        }
+        
+        return btn;
+    },
+    
+    // ==================== ✅ إرسال طلب صداقة من المنشور ====================
+    async sendFriendRequestFromPost(targetUserId, btnElement) {
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid) {
+            alert('يجب تسجيل الدخول أولاً');
+            return;
+        }
+        
+        if (uid === targetUserId) {
+            alert('لا يمكنك إضافة نفسك');
+            return;
+        }
+        
+        try {
+            // ✅ التحقق مرة أخرى من الحالة
+            const exist = await window.db.collection('friendRequests')
+                .where('from', '==', uid)
+                .where('to', '==', targetUserId)
+                .where('status', '==', 'pending')
+                .get();
+            
+            if (!exist.empty) {
+                alert('أرسلت طلباً مسبقاً');
+                return;
+            }
+            
+            const me = await window.db.collection('users').doc(uid).get();
+            if (me.exists && (me.data().friends || []).includes(targetUserId)) {
+                alert('صديقك بالفعل');
+                return;
+            }
+            
+            // ✅ إرسال الطلب
+            await window.db.collection('friendRequests').add({
+                from: uid,
+                to: targetUserId,
+                status: 'pending',
+                timestamp: new Date(),
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            });
+            
+            // ✅ تحديث الكاش
+            this._relationshipCache.sentRequests.add(targetUserId);
+            this._relationshipCache.lastUpdate = Date.now();
+            
+            // ✅ تحديث الزر فوراً
+            if (btnElement) {
+                btnElement.innerHTML = `<i class="fas fa-clock"></i> <span>طلب معلق</span>`;
+                btnElement.style.cssText = `
+                    background: transparent;
+                    color: var(--primary);
+                    border: 2px solid var(--primary);
+                    cursor: not-allowed;
+                `;
+                btnElement.disabled = true;
+                btnElement.onclick = null;
+            }
+            
+            // ✅ رسالة تأكيد
+            alert('✅ تم إرسال طلب الصداقة');
+            
+        } catch (e) {
+            console.error('خطأ في إرسال طلب الصداقة:', e);
+            alert('حدث خطأ في إرسال الطلب');
+        }
+    },
+    
+    // ==================== ✅ تحديث المنشورات بعد الإجراء ====================
+    refreshPostsAfterAction(targetUserId) {
+        // ✅ تحديث الكاش
+        this._relationshipCache.lastUpdate = 0;
+        
+        // ✅ إعادة تحميل المنشورات
+        this.loadAllPosts();
+    },
+    
     // ==================== منتقي البلد في الرأس ====================
     renderCountryHeaderSelector() {
         const container = document.getElementById('countryHeaderSelector');
@@ -84,7 +313,6 @@ const PostsSystem = {
         container.style.display = isHomeActive ? 'block' : 'none';
     },
     
-    // ✅ دالة إغلاق القائمة (مشتركة)
     closeCountryDropdown() {
         const dd = document.getElementById('countryHeaderDropdown');
         if (dd) dd.remove();
@@ -92,7 +320,6 @@ const PostsSystem = {
         const arrow = document.querySelector('.country-header-arrow');
         if (arrow) arrow.style.transform = 'rotate(0deg)';
         
-        // إزالة المستمع
         if (this._countryCloseHandler) {
             document.removeEventListener('pointerdown', this._countryCloseHandler);
             document.removeEventListener('click', this._countryCloseHandler);
@@ -106,7 +333,6 @@ const PostsSystem = {
             event.preventDefault();
         }
         
-        // ✅ إذا كانت القائمة مفتوحة → أغلقها
         const existing = document.getElementById('countryHeaderDropdown');
         if (existing) {
             this.closeCountryDropdown();
@@ -121,7 +347,6 @@ const PostsSystem = {
         
         const rect = btn.getBoundingClientRect();
         
-        // ✅ إنشاء القائمة
         const dropdown = document.createElement('div');
         dropdown.className = 'country-header-dropdown';
         dropdown.id = 'countryHeaderDropdown';
@@ -160,11 +385,9 @@ const PostsSystem = {
         
         document.body.appendChild(dropdown);
         
-        // ✅ تدوير السهم
         const arrow = btn.querySelector('.country-header-arrow');
         if (arrow) arrow.style.transform = 'rotate(180deg)';
         
-        // ✅ ربط مستمع الإغلاق (بدون setTimeout)
         const self = this;
         this._countryCloseHandler = (e) => {
             const dd = document.getElementById('countryHeaderDropdown');
@@ -172,15 +395,12 @@ const PostsSystem = {
                 self.closeCountryDropdown();
                 return;
             }
-            // ✅ إذا كان النقر داخل القائمة → لا تغلق
             if (dd.contains(e.target)) return;
-            // ✅ إذا كان النقر على الزر → لا تغلق (toggle سيتعامل)
             if (btn.contains(e.target)) return;
             
             self.closeCountryDropdown();
         };
         
-        // ✅ استخدام pointerdown للاستجابة الأسرع + click كاحتياطي
         setTimeout(() => {
             document.addEventListener('pointerdown', this._countryCloseHandler);
             document.addEventListener('click', this._countryCloseHandler);
@@ -192,10 +412,8 @@ const PostsSystem = {
         this.showAllCountries = false;
         this.saveSettings();
         
-        // ✅ إغلاق القائمة أولاً
         this.closeCountryDropdown();
         
-        // ✅ تحديث الزر بدون إعادة رسم (فقط النصوص)
         const btn = document.querySelector('.country-header-btn');
         if (btn) {
             const flagSpan = btn.querySelector('.country-header-flag');
@@ -213,10 +431,8 @@ const PostsSystem = {
         this.showAllCountries = true;
         this.saveSettings();
         
-        // ✅ إغلاق القائمة أولاً
         this.closeCountryDropdown();
         
-        // ✅ تحديث الزر
         const btn = document.querySelector('.country-header-btn');
         if (btn) {
             const flagSpan = btn.querySelector('.country-header-flag');
@@ -564,6 +780,8 @@ const PostsSystem = {
     },
     
     async loadAllPosts() {
+        // ✅ تحميل حالات العلاقات أولاً
+        await this.loadRelationshipCache();
         await this.loadJobsPosts();
         await this.loadMarriagePosts();
     },
@@ -647,6 +865,7 @@ const PostsSystem = {
         }
     },
     
+    // ==================== ✅ إنشاء كرت الوظيفة مع زر الصداقة ====================
     createJobPost(post) {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
@@ -689,6 +908,17 @@ const PostsSystem = {
             </div>
         `;
         
+        // ✅ إضافة زر طلب الصداقة
+        if (post.userId) {
+            const actionWrapper = document.createElement('div');
+            actionWrapper.className = 'post-action-wrapper';
+            const actionBtn = this.createPostActionButton(post);
+            if (actionBtn.style.display !== 'none') {
+                actionWrapper.appendChild(actionBtn);
+                card.appendChild(actionWrapper);
+            }
+        }
+        
         if (post.image) {
             card.setAttribute('data-post-image', post.image);
             card.setAttribute('data-post-id', post.id);
@@ -697,6 +927,7 @@ const PostsSystem = {
         return card;
     },
     
+    // ==================== ✅ إنشاء كرت الزواج مع زر الصداقة ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -745,6 +976,17 @@ const PostsSystem = {
                 <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
             </div>
         `;
+        
+        // ✅ إضافة زر طلب الصداقة
+        if (post.userId) {
+            const actionWrapper = document.createElement('div');
+            actionWrapper.className = 'post-action-wrapper';
+            const actionBtn = this.createPostActionButton(post);
+            if (actionBtn.style.display !== 'none') {
+                actionWrapper.appendChild(actionBtn);
+                card.appendChild(actionWrapper);
+            }
+        }
         
         if (post.image) {
             card.setAttribute('data-post-image', post.image);
@@ -1173,4 +1415,10 @@ window.addEventListener('authReady', () => {
     setTimeout(() => PostsSystem.init(), 300);
 });
 
-console.log('✅ posts-system.js تم تحميله - مع إصلاح قائمة البلد');
+// ✅ الاستماع لتحديثات قائمة الأصدقاء (لتحديث حالة الأزرار)
+window.addEventListener('friendsUpdated', () => {
+    PostsSystem._relationshipCache.lastUpdate = 0;
+    PostsSystem.loadAllPosts();
+});
+
+console.log('✅ posts-system.js تم تحميله - مع زر طلب الصداقة');
