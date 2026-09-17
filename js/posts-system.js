@@ -2,17 +2,177 @@
 
 const PostsSystem = {
     currentTab: 'jobs',
+    selectedCountry: 'IQ',      // ✅ البلد المختار (افتراضي: العراق)
+    selectedCategory: 'all',     // ✅ القسم المختار
+    showAllCountries: false,     // ✅ عرض كل الدول
     
-    // ==================== إعدادات ضغط الصور ====================
+    // ✅ إعدادات ضغط الصور
     IMAGE_MAX_WIDTH: 600,
     IMAGE_QUALITY: 0.65,
+    
+    // ✅ أقسام الوظائف
+    jobCategories: [
+        { code: 'all', name: 'الكل', icon: '📋' },
+        { code: 'it', name: 'تقنية المعلومات', icon: '💻' },
+        { code: 'engineering', name: 'الهندسة', icon: '🏗️' },
+        { code: 'education', name: 'التعليم', icon: '🎓' },
+        { code: 'medical', name: 'الطب والصحة', icon: '🏥' },
+        { code: 'design', name: 'التصميم', icon: '🎨' },
+        { code: 'accounting', name: 'المحاسبة', icon: '📊' },
+        { code: 'marketing', name: 'التسويق', icon: '📢' },
+        { code: 'industry', name: 'الصناعة', icon: '🏭' },
+        { code: 'transport', name: 'النقل', icon: '🚚' },
+        { code: 'restaurants', name: 'المطاعم', icon: '🍔' },
+        { code: 'crafts', name: 'الحرف والمهن', icon: '🔧' },
+        { code: 'other', name: 'أخرى', icon: '📌' }
+    ],
     
     // ==================== init ====================
     init() {
         console.log('🚀 تهيئة نظام المنشورات...');
+        this.loadSavedSettings();
         this.loadAllPosts();
         this.setupRealtimeListeners();
+        this.renderCountrySelector();
+        this.renderJobCategories();
         console.log('✅ تم تهيئة نظام المنشورات');
+    },
+    
+    // ==================== تحميل الإعدادات المحفوظة ====================
+    loadSavedSettings() {
+        try {
+            const savedCountry = localStorage.getItem('selected_country');
+            if (savedCountry) {
+                this.selectedCountry = savedCountry;
+            }
+            
+            const savedCategory = localStorage.getItem('selected_job_category');
+            if (savedCategory) {
+                this.selectedCategory = savedCategory;
+            }
+        } catch (e) {
+            console.warn('⚠️ فشل تحميل الإعدادات:', e);
+        }
+    },
+    
+    // ==================== حفظ الإعدادات ====================
+    saveSettings() {
+        try {
+            localStorage.setItem('selected_country', this.selectedCountry);
+            localStorage.setItem('selected_job_category', this.selectedCategory);
+        } catch (e) {}
+    },
+    
+    // ==================== عرض منتقي البلد ====================
+    renderCountrySelector() {
+        const container = document.getElementById('countrySelector');
+        if (!container) return;
+        
+        const currentFlag = window.Countries.getFlag(this.selectedCountry);
+        const currentName = window.Countries.getName(this.selectedCountry);
+        
+        container.innerHTML = `
+            <button class="country-btn" onclick="PostsSystem.toggleCountryDropdown()">
+                <span class="country-flag">${currentFlag}</span>
+                <span class="country-name">${currentName}</span>
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <div class="country-dropdown" id="countryDropdown" style="display: none;">
+                ${window.Countries.list.map(c => `
+                    <button class="country-option ${c.code === this.selectedCountry ? 'active' : ''}" 
+                            onclick="PostsSystem.selectCountry('${c.code}')">
+                        <span class="country-flag">${c.flag}</span>
+                        <span class="country-name">${c.name}</span>
+                    </button>
+                `).join('')}
+                <div style="height: 1px; background: var(--border); margin: 4px 0;"></div>
+                <button class="country-option ${this.showAllCountries ? 'active' : ''}" 
+                        onclick="PostsSystem.selectAllCountries()">
+                    <span class="country-flag">🌍</span>
+                    <span class="country-name">جميع الدول</span>
+                </button>
+            </div>
+        `;
+    },
+    
+    // ==================== تبديل القائمة المنسدلة ====================
+    toggleCountryDropdown() {
+        const dropdown = document.getElementById('countryDropdown');
+        if (!dropdown) return;
+        
+        if (dropdown.style.display === 'none' || !dropdown.style.display) {
+            dropdown.style.display = 'block';
+            
+            // ✅ إغلاق عند النقر خارجها
+            setTimeout(() => {
+                const closeHandler = (e) => {
+                    const container = document.getElementById('countrySelector');
+                    if (container && !container.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                        document.removeEventListener('click', closeHandler);
+                    }
+                };
+                document.addEventListener('click', closeHandler);
+            }, 100);
+        } else {
+            dropdown.style.display = 'none';
+        }
+    },
+    
+    // ==================== اختيار البلد ====================
+    selectCountry(code) {
+        this.selectedCountry = code;
+        this.showAllCountries = false;
+        this.saveSettings();
+        this.renderCountrySelector();
+        this.loadAllPosts();
+        
+        console.log(`🌍 تم اختيار: ${window.Countries.getName(code)}`);
+    },
+    
+    // ==================== اختيار كل الدول ====================
+    selectAllCountries() {
+        this.showAllCountries = true;
+        this.saveSettings();
+        this.renderCountrySelector();
+        this.loadAllPosts();
+        console.log('🌍 عرض جميع الدول');
+    },
+    
+    // ==================== عرض أقسام الوظائف ====================
+    renderJobCategories() {
+        const container = document.getElementById('jobCategories');
+        if (!container) return;
+        
+        container.innerHTML = this.jobCategories.map(cat => `
+            <button class="category-tab ${cat.code === this.selectedCategory ? 'active' : ''}" 
+                    onclick="PostsSystem.selectCategory('${cat.code}')">
+                <span class="category-icon">${cat.icon}</span>
+                <span class="category-name">${cat.name}</span>
+            </button>
+        `).join('');
+    },
+    
+    // ==================== اختيار القسم ====================
+    selectCategory(code) {
+        this.selectedCategory = code;
+        this.saveSettings();
+        this.renderJobCategories();
+        this.loadJobsPosts();
+        
+        console.log(`💼 تم اختيار قسم: ${this.getCategoryName(code)}`);
+    },
+    
+    // ==================== الحصول على اسم القسم ====================
+    getCategoryName(code) {
+        const cat = this.jobCategories.find(c => c.code === code);
+        return cat ? cat.name : code;
+    },
+    
+    // ==================== الحصول على أيقونة القسم ====================
+    getCategoryIcon(code) {
+        const cat = this.jobCategories.find(c => c.code === code);
+        return cat ? cat.icon : '📌';
     },
     
     // ==================== التبديل بين التبويبات ====================
@@ -49,10 +209,20 @@ const PostsSystem = {
         if (!container) return;
         
         try {
-            const snapshot = await window.db.collection('posts')
-                .where('type', '==', 'job')
-                .limit(50)
-                .get();
+            // ✅ بناء الاستعلام
+            let query = window.db.collection('posts').where('type', '==', 'job');
+            
+            // ✅ تصفية حسب البلد
+            if (!this.showAllCountries && this.selectedCountry) {
+                query = query.where('countryCode', '==', this.selectedCountry);
+            }
+            
+            // ✅ تصفية حسب القسم
+            if (this.selectedCategory && this.selectedCategory !== 'all') {
+                query = query.where('category', '==', this.selectedCategory);
+            }
+            
+            const snapshot = await query.limit(50).get();
             
             container.innerHTML = '';
             
@@ -78,6 +248,7 @@ const PostsSystem = {
             console.log(`✅ تم تحميل ${posts.length} وظيفة`);
         } catch (e) {
             console.error('❌ خطأ في تحميل الوظائف:', e);
+            if (emptyState) emptyState.style.display = 'flex';
         }
     },
     
@@ -88,10 +259,15 @@ const PostsSystem = {
         if (!container) return;
         
         try {
-            const snapshot = await window.db.collection('posts')
-                .where('type', '==', 'marriage')
-                .limit(50)
-                .get();
+            // ✅ بناء الاستعلام
+            let query = window.db.collection('posts').where('type', '==', 'marriage');
+            
+            // ✅ تصفية حسب البلد
+            if (!this.showAllCountries && this.selectedCountry) {
+                query = query.where('countryCode', '==', this.selectedCountry);
+            }
+            
+            const snapshot = await query.limit(50).get();
             
             container.innerHTML = '';
             
@@ -117,6 +293,7 @@ const PostsSystem = {
             console.log(`✅ تم تحميل ${posts.length} إعلان زواج`);
         } catch (e) {
             console.error('❌ خطأ في تحميل إعلانات الزواج:', e);
+            if (emptyState) emptyState.style.display = 'flex';
         }
     },
     
@@ -126,6 +303,9 @@ const PostsSystem = {
         card.className = 'post-card job-post-card';
         
         const isOwner = window.auth?.currentUser?.uid === post.userId;
+        const flag = window.Countries.getFlag(post.countryCode);
+        const catIcon = this.getCategoryIcon(post.category);
+        const catName = this.getCategoryName(post.category);
         
         const avatarContent = post.image 
             ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy">` 
@@ -152,13 +332,13 @@ const PostsSystem = {
                 </div>
                 <div class="post-info-row">
                     <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
-                    <span><i class="fas fa-map-marker-alt"></i> ${this.escapeHtml(post.country || '')}</span>
+                    <span><span style="font-size:1.1rem;">${flag}</span> ${this.escapeHtml(post.country || '')}</span>
+                    <span><span style="font-size:1rem;">${catIcon}</span> ${this.escapeHtml(catName)}</span>
                 </div>
                 <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
             </div>
         `;
         
-        // ✅ تخزين الصورة للمعاينة
         if (post.image) {
             card.setAttribute('data-post-image', post.image);
             card.setAttribute('data-post-id', post.id);
@@ -173,6 +353,7 @@ const PostsSystem = {
         card.className = 'post-card marriage-post-card';
         
         const isOwner = window.auth?.currentUser?.uid === post.userId;
+        const flag = window.Countries.getFlag(post.countryCode);
         
         const marriedText = {
             'no': 'أعزب/عزباء',
@@ -204,7 +385,7 @@ const PostsSystem = {
             <div class="post-content">
                 <div class="post-info-row">
                     <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
-                    <span><i class="fas fa-map-marker-alt"></i> ${this.escapeHtml(post.country || '')}</span>
+                    <span><span style="font-size:1.1rem;">${flag}</span> ${this.escapeHtml(post.country || '')}</span>
                 </div>
                 <div class="post-info-row">
                     <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married || ''}</span>
@@ -214,7 +395,6 @@ const PostsSystem = {
             </div>
         `;
         
-        // ✅ تخزين الصورة للمعاينة
         if (post.image) {
             card.setAttribute('data-post-image', post.image);
             card.setAttribute('data-post-id', post.id);
@@ -223,9 +403,8 @@ const PostsSystem = {
         return card;
     },
     
-    // ==================== ✅ فتح معاينة الصورة ====================
+    // ==================== فتح معاينة الصورة ====================
     openImagePreview(postId) {
-        // ✅ البحث عن البطاقة بالمعرف
         const card = document.querySelector(`[data-post-id="${postId}"]`);
         if (!card) return;
         
@@ -239,13 +418,11 @@ const PostsSystem = {
         img.src = imageSrc;
         modal.style.display = 'flex';
         
-        // ✅ إعداد التكبير/التصغير
         this.setupPostImageZoom(modal, img);
     },
     
-    // ==================== ✅ تكبير/تصغير صورة المنشور ====================
+    // ==================== تكبير/تصغير صورة المنشور ====================
     setupPostImageZoom(modal, img) {
-        // ✅ إزالة المستمعات السابقة
         if (img._zoomCleanup) {
             img._zoomCleanup();
             img._zoomCleanup = null;
@@ -265,7 +442,6 @@ const PostsSystem = {
             img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
         };
         
-        // ✅ لمس بـ إصبعين للتكبير
         const touchStartHandler = (e) => {
             e.preventDefault();
             const touches = e.touches;
@@ -316,7 +492,6 @@ const PostsSystem = {
             initialDistance = 0;
             isTouching = false;
             
-            // ✅ إعادة للمقياس الطبيعي عند التصغير جداً
             if (currentScale < 1) {
                 currentScale = 1;
                 translateX = 0;
@@ -325,13 +500,11 @@ const PostsSystem = {
             }
         };
         
-        // ✅ نقر مزدوج للتكبير/التصغير
         let lastTap = 0;
         const doubleTapHandler = (e) => {
             const now = Date.now();
             if (now - lastTap < 300) {
                 e.preventDefault();
-                // ✅ تبديل بين 1x و 2x
                 if (currentScale > 1.5) {
                     currentScale = 1;
                     translateX = 0;
@@ -480,38 +653,46 @@ window.openPublishModal = function(type) {
     if (type === 'jobs') {
         const modal = document.getElementById('publishJobModal');
         if (modal) modal.classList.add('active');
+        // ✅ ملء قائمة الدول والأقسام
+        PostsSystem.fillPublishJobForm();
     } else if (type === 'marriage') {
         const modal = document.getElementById('publishMarriageModal');
         if (modal) modal.classList.add('active');
+        // ✅ ملء قائمة الدول
+        PostsSystem.fillPublishMarriageForm();
     }
 };
 
-window.previewJobImage = function(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+// ==================== ملء نموذج الوظيفة ====================
+PostsSystem.fillPublishJobForm = function() {
+    // ✅ قائمة الدول
+    const countrySelect = document.getElementById('jobCountryCode');
+    if (countrySelect) {
+        countrySelect.innerHTML = window.Countries.list.map(c => 
+            `<option value="${c.code}">${c.flag} ${c.name}</option>`
+        ).join('');
+        countrySelect.value = this.selectedCountry;
+    }
     
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const preview = document.getElementById('jobImagePreview');
-        if (preview) {
-            preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-        }
-    };
-    reader.readAsDataURL(file);
+    // ✅ قائمة الأقسام
+    const categorySelect = document.getElementById('jobCategory');
+    if (categorySelect) {
+        categorySelect.innerHTML = this.jobCategories
+            .filter(c => c.code !== 'all')
+            .map(c => `<option value="${c.code}">${c.icon} ${c.name}</option>`)
+            .join('');
+    }
 };
 
-window.previewMarriageImage = function(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const preview = document.getElementById('marriageImagePreview');
-        if (preview) {
-            preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-        }
-    };
-    reader.readAsDataURL(file);
+// ==================== ملء نموذج الزواج ====================
+PostsSystem.fillPublishMarriageForm = function() {
+    const countrySelect = document.getElementById('marriageCountryCode');
+    if (countrySelect) {
+        countrySelect.innerHTML = window.Countries.list.map(c => 
+            `<option value="${c.code}">${c.flag} ${c.name}</option>`
+        ).join('');
+        countrySelect.value = this.selectedCountry;
+    }
 };
 
 // ✅ إغلاق معاينة صورة المنشور
@@ -530,7 +711,7 @@ window.closePostImagePreview = function() {
     }
 };
 
-// ✅ نشر وظيفة
+// ==================== نشر وظيفة ====================
 window.publishJob = async function() {
     if (!window.auth?.currentUser) {
         alert('يجب تسجيل الدخول أولاً');
@@ -539,12 +720,13 @@ window.publishJob = async function() {
     
     const name = document.getElementById('jobName')?.value?.trim();
     const age = document.getElementById('jobAge')?.value;
-    const country = document.getElementById('jobCountry')?.value?.trim();
+    const countryCode = document.getElementById('jobCountryCode')?.value;
+    const category = document.getElementById('jobCategory')?.value;
     const jobTitle = document.getElementById('jobTitle')?.value?.trim();
     const bio = document.getElementById('jobBio')?.value?.trim();
     const imageInput = document.getElementById('jobImage');
     
-    if (!name || !age || !country || !jobTitle || !bio) {
+    if (!name || !age || !countryCode || !category || !jobTitle || !bio) {
         alert('يرجى تعبئة جميع الحقول');
         return;
     }
@@ -567,6 +749,7 @@ window.publishJob = async function() {
             }
         }
         
+        const countryName = window.Countries.getName(countryCode);
         console.log('📤 جاري نشر الوظيفة...');
         
         await window.db.collection('posts').add({
@@ -574,7 +757,9 @@ window.publishJob = async function() {
             userId: window.auth.currentUser.uid,
             name: name,
             age: parseInt(age),
-            country: country,
+            country: countryName,
+            countryCode: countryCode,
+            category: category,
             jobTitle: jobTitle,
             bio: bio,
             image: imageBase64,
@@ -590,9 +775,10 @@ window.publishJob = async function() {
         
         if (typeof switchPage === 'function') switchPage('home');
         
+        // ✅ الانتقال للبلد الصحيح
+        PostsSystem.selectCountry(countryCode);
         setTimeout(() => {
             PostsSystem.switchTab('jobs');
-            PostsSystem.loadJobsPosts();
         }, 100);
         
     } catch (e) {
@@ -601,7 +787,7 @@ window.publishJob = async function() {
     }
 };
 
-// ✅ نشر إعلان زواج
+// ==================== نشر إعلان زواج ====================
 window.publishMarriage = async function() {
     if (!window.auth?.currentUser) {
         alert('يجب تسجيل الدخول أولاً');
@@ -610,13 +796,13 @@ window.publishMarriage = async function() {
     
     const name = document.getElementById('marriageName')?.value?.trim();
     const age = document.getElementById('marriageAge')?.value;
-    const country = document.getElementById('marriageCountry')?.value?.trim();
+    const countryCode = document.getElementById('marriageCountryCode')?.value;
     const bio = document.getElementById('marriageBio')?.value?.trim();
     const married = document.getElementById('marriageMarried')?.value;
     const children = document.getElementById('marriageChildren')?.value;
     const imageInput = document.getElementById('marriageImage');
     
-    if (!name || !age || !country || !bio) {
+    if (!name || !age || !countryCode || !bio) {
         alert('يرجى تعبئة جميع الحقول');
         return;
     }
@@ -639,6 +825,7 @@ window.publishMarriage = async function() {
             }
         }
         
+        const countryName = window.Countries.getName(countryCode);
         console.log('📤 جاري نشر إعلان الزواج...');
         
         await window.db.collection('posts').add({
@@ -646,7 +833,8 @@ window.publishMarriage = async function() {
             userId: window.auth.currentUser.uid,
             name: name,
             age: parseInt(age),
-            country: country,
+            country: countryName,
+            countryCode: countryCode,
             bio: bio,
             married: married,
             children: children,
@@ -663,9 +851,9 @@ window.publishMarriage = async function() {
         
         if (typeof switchPage === 'function') switchPage('home');
         
+        PostsSystem.selectCountry(countryCode);
         setTimeout(() => {
             PostsSystem.switchTab('marriage');
-            PostsSystem.loadMarriagePosts();
         }, 100);
         
     } catch (e) {
@@ -675,9 +863,8 @@ window.publishMarriage = async function() {
 };
 
 // ==================== دوال مساعدة ====================
-
 function clearJobForm() {
-    ['jobName', 'jobAge', 'jobCountry', 'jobTitle', 'jobBio'].forEach(id => {
+    ['jobName', 'jobAge', 'jobTitle', 'jobBio'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -688,7 +875,7 @@ function clearJobForm() {
 }
 
 function clearMarriageForm() {
-    ['marriageName', 'marriageAge', 'marriageCountry', 'marriageBio'].forEach(id => {
+    ['marriageName', 'marriageAge', 'marriageBio'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
