@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع زر الصداقة في الهيدر ==========
+// ========== posts-system.js - النسخة النهائية مع زر طلب الصداقة في الهيدر ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -98,12 +98,13 @@ const PostsSystem = {
             });
             
             this._relationshipCache.lastUpdate = now;
-            console.log(`📊 تحديث العلاقات: ${this._relationshipCache.friends.size} صديق، ${this._relationshipCache.sentRequests.size} مرسل، ${this._relationshipCache.receivedRequests.size} مستلم`);
+            console.log(`📊 تم تحديث حالات العلاقات: ${this._relationshipCache.friends.size} صديق، ${this._relationshipCache.sentRequests.size} طلب مرسل، ${this._relationshipCache.receivedRequests.size} طلب مستلم`);
         } catch (e) {
-            console.warn('⚠️ خطأ في تحميل العلاقات:', e);
+            console.warn('⚠️ خطأ في تحميل حالات العلاقات:', e);
         }
     },
     
+    // ✅ تحديد حالة العلاقة مع مستخدم معين
     getRelationshipState(targetUserId) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return 'guest';
@@ -114,28 +115,12 @@ const PostsSystem = {
         return 'none';
     },
     
-    // ==================== ✅ زر الإجراء (أيقونة فقط) ====================
+    // ==================== إنشاء زر الإجراء (دائري صغير) ====================
     createPostActionButton(post) {
         const state = this.getRelationshipState(post.userId);
         const btn = document.createElement('button');
-        btn.className = 'post-action-icon-btn';
+        btn.className = 'post-action-btn';
         btn.setAttribute('data-user-id', post.userId);
-        
-        const baseStyle = `
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.95rem;
-            flex-shrink: 0;
-            padding: 0;
-            margin: 0;
-            font-family: inherit;
-            transition: all 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
-        `;
         
         switch(state) {
             case 'self':
@@ -144,90 +129,147 @@ const PostsSystem = {
                 
             case 'guest':
                 btn.innerHTML = `<i class="fas fa-lock"></i>`;
-                btn.title = 'سجل الدخول';
-                btn.style.cssText = baseStyle + `
-                    background: rgba(100, 100, 100, 0.2);
+                btn.style.cssText = `
+                    background: transparent;
                     color: var(--text-light);
                     border: 1.5px solid var(--border);
                     cursor: not-allowed;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    padding: 0;
+                    flex-shrink: 0;
                 `;
+                btn.title = 'سجل الدخول';
                 btn.disabled = true;
                 break;
                 
             case 'friend':
                 btn.innerHTML = `<i class="fas fa-comment"></i>`;
-                btn.title = 'مراسلة';
-                btn.style.cssText = baseStyle + `
+                btn.style.cssText = `
                     background: var(--primary);
                     color: white;
                     border: none;
                     cursor: pointer;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    padding: 0;
+                    flex-shrink: 0;
                 `;
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (typeof openChat === 'function') {
-                        window.db.collection('users').doc(post.userId).get().then(doc => {
-                            if (doc.exists) {
-                                const f = doc.data();
-                                openChat(post.userId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
-                            }
-                        });
-                    }
-                };
+                btn.title = 'مراسلة';
                 break;
                 
             case 'sent':
                 btn.innerHTML = `<i class="fas fa-clock"></i>`;
-                btn.title = 'طلب معلق';
-                btn.style.cssText = baseStyle + `
-                    background: rgba(100, 181, 246, 0.15);
+                btn.style.cssText = `
+                    background: transparent;
                     color: var(--primary);
                     border: 1.5px solid var(--primary);
                     cursor: not-allowed;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    padding: 0;
+                    flex-shrink: 0;
                 `;
+                btn.title = 'طلب معلق';
                 btn.disabled = true;
                 break;
                 
             case 'received':
                 btn.innerHTML = `<i class="fas fa-check"></i>`;
-                btn.title = 'قبول الطلب';
-                btn.style.cssText = baseStyle + `
+                btn.style.cssText = `
                     background: #4CAF50;
                     color: white;
                     border: none;
                     cursor: pointer;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    padding: 0;
+                    flex-shrink: 0;
                 `;
-                btn.onclick = async (e) => {
-                    e.stopPropagation();
-                    const requestId = this._relationshipCache.receivedRequests.get(post.userId);
-                    if (requestId && typeof acceptFriendRequest === 'function') {
-                        await acceptFriendRequest(requestId, post.userId);
-                        this.refreshPostsAfterAction(post.userId);
-                    }
-                };
+                btn.title = 'قبول الطلب';
                 break;
                 
             case 'none':
             default:
                 btn.innerHTML = `<i class="fas fa-plus"></i>`;
-                btn.title = 'إرسال طلب صداقة';
-                btn.style.cssText = baseStyle + `
+                btn.style.cssText = `
                     background: var(--primary);
                     color: white;
                     border: none;
                     cursor: pointer;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    padding: 0;
+                    flex-shrink: 0;
                 `;
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    this.sendFriendRequestFromPost(post.userId, btn);
-                };
+                btn.title = 'إرسال طلب صداقة';
                 break;
         }
         
         return btn;
     },
     
-    // ==================== إرسال طلب صداقة ====================
+    // ✅ ربط أحداث الزر بعد إدراج HTML
+    bindActionButton(card, post) {
+        if (!post.userId) return;
+        const isOwner = window.auth?.currentUser?.uid === post.userId;
+        if (isOwner) return;
+        
+        const newBtn = card.querySelector('.post-action-btn');
+        if (!newBtn) return;
+        
+        const state = this.getRelationshipState(post.userId);
+        
+        if (state === 'friend') {
+            newBtn.onclick = () => {
+                if (typeof openChat === 'function') {
+                    window.db.collection('users').doc(post.userId).get().then(doc => {
+                        if (doc.exists) {
+                            const f = doc.data();
+                            openChat(post.userId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
+                        }
+                    });
+                }
+            };
+        } else if (state === 'received') {
+            newBtn.onclick = async () => {
+                const requestId = this._relationshipCache.receivedRequests.get(post.userId);
+                if (requestId && typeof acceptFriendRequest === 'function') {
+                    await acceptFriendRequest(requestId, post.userId);
+                    this.refreshPostsAfterAction(post.userId);
+                }
+            };
+        } else if (state === 'none') {
+            newBtn.onclick = () => this.sendFriendRequestFromPost(post.userId, newBtn);
+        }
+    },
+    
+    // ==================== إرسال طلب صداقة من المنشور ====================
     async sendFriendRequestFromPost(targetUserId, btnElement) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) {
@@ -271,11 +313,22 @@ const PostsSystem = {
             
             if (btnElement) {
                 btnElement.innerHTML = `<i class="fas fa-clock"></i>`;
+                btnElement.style.cssText = `
+                    background: transparent;
+                    color: var(--primary);
+                    border: 1.5px solid var(--primary);
+                    cursor: not-allowed;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    padding: 0;
+                    flex-shrink: 0;
+                `;
                 btnElement.title = 'طلب معلق';
-                btnElement.style.background = 'rgba(100, 181, 246, 0.15)';
-                btnElement.style.color = 'var(--primary)';
-                btnElement.style.border = '1.5px solid var(--primary)';
-                btnElement.style.cursor = 'not-allowed';
                 btnElement.disabled = true;
                 btnElement.onclick = null;
             }
@@ -874,7 +927,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== كرت الوظيفة ====================
+    // ==================== إنشاء كرت الوظيفة (الزر في الهيدر) ====================
     createJobPost(post) {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
@@ -890,20 +943,29 @@ const PostsSystem = {
             : '👤';
         
         const deleteBtn = isOwner 
-            ? `<button class="post-menu" onclick="event.stopPropagation(); PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
+            ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
             : '';
+        
+        // ✅ إنشاء HTML الزر
+        let actionBtnHTML = '';
+        if (post.userId && !isOwner) {
+            const actionBtn = this.createPostActionButton(post);
+            if (actionBtn.style.display !== 'none') {
+                actionBtnHTML = actionBtn.outerHTML;
+            }
+        }
         
         card.innerHTML = `
             <div class="post-header">
-                <div class="post-header-actions">
-                    ${deleteBtn}
-                    <span class="post-action-btn-slot"></span>
+                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
+                    ${avatarContent}
                 </div>
                 <div class="post-user">
                     <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
                 </div>
-                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
-                    ${avatarContent}
+                <div class="post-header-actions">
+                    ${actionBtnHTML}
+                    ${deleteBtn}
                 </div>
             </div>
             <div class="post-content">
@@ -920,15 +982,8 @@ const PostsSystem = {
             </div>
         `;
         
-        if (post.userId) {
-            const slot = card.querySelector('.post-action-btn-slot');
-            const actionBtn = this.createPostActionButton(post);
-            if (slot && actionBtn.style.display !== 'none') {
-                slot.replaceWith(actionBtn);
-            } else if (slot) {
-                slot.remove();
-            }
-        }
+        // ✅ ربط الأحداث
+        this.bindActionButton(card, post);
         
         if (post.image) {
             card.setAttribute('data-post-image', post.image);
@@ -938,7 +993,7 @@ const PostsSystem = {
         return card;
     },
     
-    // ==================== كرت الزواج ====================
+    // ==================== إنشاء كرت الزواج (الزر في الهيدر) ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -958,8 +1013,17 @@ const PostsSystem = {
             : '👤';
         
         const deleteBtn = isOwner 
-            ? `<button class="post-menu" onclick="event.stopPropagation(); PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
+            ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
             : '';
+        
+        // ✅ إنشاء HTML الزر
+        let actionBtnHTML = '';
+        if (post.userId && !isOwner) {
+            const actionBtn = this.createPostActionButton(post);
+            if (actionBtn.style.display !== 'none') {
+                actionBtnHTML = actionBtn.outerHTML;
+            }
+        }
         
         const childrenRow = post.married === 'no' 
             ? '' 
@@ -967,15 +1031,15 @@ const PostsSystem = {
         
         card.innerHTML = `
             <div class="post-header">
-                <div class="post-header-actions">
-                    ${deleteBtn}
-                    <span class="post-action-btn-slot"></span>
+                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
+                    ${avatarContent}
                 </div>
                 <div class="post-user">
                     <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
                 </div>
-                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
-                    ${avatarContent}
+                <div class="post-header-actions">
+                    ${actionBtnHTML}
+                    ${deleteBtn}
                 </div>
             </div>
             <div class="post-content">
@@ -991,15 +1055,8 @@ const PostsSystem = {
             </div>
         `;
         
-        if (post.userId) {
-            const slot = card.querySelector('.post-action-btn-slot');
-            const actionBtn = this.createPostActionButton(post);
-            if (slot && actionBtn.style.display !== 'none') {
-                slot.replaceWith(actionBtn);
-            } else if (slot) {
-                slot.remove();
-            }
-        }
+        // ✅ ربط الأحداث
+        this.bindActionButton(card, post);
         
         if (post.image) {
             card.setAttribute('data-post-image', post.image);
@@ -1413,7 +1470,6 @@ function clearMarriageForm() {
     if (input) input.value = '';
 }
 
-// ✅ تصدير الدوال العامة
 window.PostsSystem = PostsSystem;
 window.previewJobImage = (e) => PostsSystem.previewJobImage(e);
 window.previewMarriageImage = (e) => PostsSystem.previewMarriageImage(e);
@@ -1433,4 +1489,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - مع زر الصداقة في الهيدر');
+console.log('✅ posts-system.js تم تحميله - مع زر طلب الصداقة في الهيدر');
