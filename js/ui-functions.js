@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (مع إصلاحات التمركز) ==========
+// ========== ui-functions.js - النسخة النهائية المحسّنة ==========
 
 window._pageStack = [];
 
@@ -586,6 +586,7 @@ function setupNavigation() {
             pageTitle.setAttribute('data-i18n', id);
         }
         
+        // ✅ تحميل الدردشة فقط عند الحاجة
         if (id === 'chat') {
             const list = document.getElementById('chatsList');
             if (chatsLoaded && list && list.children.length > 0) {
@@ -648,7 +649,7 @@ window.updateCharCounter = function() {
     }
 };
 
-// ==================== ✅ فتح نافذة تعديل الملف الشخصي (مُصلّح - تمركز) ====================
+// ==================== فتح نافذة تعديل الملف الشخصي ====================
 window.openEditProfileModal = function() {
     const modal = document.getElementById('editProfileModal');
     if (!modal) return;
@@ -666,13 +667,9 @@ window.openEditProfileModal = function() {
     const avatarPreview = document.getElementById('currentAvatarEmoji');
     if (avatarPreview) avatarPreview.textContent = currentEmoji || '🧔🏻‍♂️';
     
-    // ✅ تحديث عداد الأحرف
     window.updateCharCounter();
-    
-    // ✅ إظهار النافذة
     modal.classList.add('active');
     
-    // ✅ تأخير بسيط لضمان التمركز
     setTimeout(() => {
         if (nameInput) {
             nameInput.style.textAlign = 'center';
@@ -721,7 +718,7 @@ document.addEventListener('DOMContentLoaded', function() {
     ensureSinglePage();
     setupNavigation();
     setupModals();
-    loadChats();
+    // ✅ إزالة loadChats() — ستُستدعى عند الدخول إلى تبويب الدردشة
     setupChatListeners();
     
     const nameInput = document.getElementById('editName');
@@ -730,13 +727,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// ✅ authReady — فقط تحميل حالة غير المقروء (SecureChatSystem موجود في auth.js)
 window.addEventListener('authReady', function() {
     console.log('✅ authReady - تحميل حالة غير المقروء');
     setTimeout(() => {
         loadUnreadMessages();
-        if (window.auth?.currentUser && typeof SecureChatSystem !== 'undefined') {
-            SecureChatSystem.init();
-        }
     }, 100);
 });
 
