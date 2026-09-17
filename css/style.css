@@ -86,7 +86,107 @@ body.conversation-open {
 .nav-item i { font-size: 1.2rem; }
 .nav-item.active { color: var(--primary); }
 
-/* ==================== القسم 7: تبويبات الرئيسية (وظائف / زواج) ==================== */
+/* ==================== القسم 7: منتقي البلد ==================== */
+.country-selector-container {
+    position: relative;
+    margin-bottom: 1rem;
+    z-index: 50;
+}
+
+.country-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: var(--shadow);
+}
+
+.country-btn:hover {
+    border-color: var(--primary);
+}
+
+.country-btn .country-flag {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.country-btn .country-name {
+    flex: 1;
+    text-align: right;
+}
+
+.country-btn i {
+    color: var(--primary);
+    transition: transform 0.2s;
+}
+
+.country-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-height: 400px;
+    overflow-y: auto;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    z-index: 100;
+    padding: 6px;
+    animation: dropdownSlide 0.2s ease;
+}
+
+@keyframes dropdownSlide {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.country-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-align: right;
+    transition: background 0.15s;
+}
+
+.country-option:hover {
+    background: var(--light);
+}
+
+.country-option.active {
+    background: rgba(100, 181, 246, 0.15);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.country-option .country-flag {
+    font-size: 1.3rem;
+    line-height: 1;
+}
+
+.country-option .country-name {
+    flex: 1;
+    text-align: right;
+}
+
+/* ==================== القسم 8: تبويبات الرئيسية ==================== */
 .home-tabs {
     display: flex;
     gap: 8px;
@@ -131,11 +231,67 @@ body.conversation-open {
 .home-content { display: none; }
 .home-content.active { display: block; }
 
-/* ==================== القسم 8: بطاقات المنشورات ==================== */
+/* ==================== القسم 9: أقسام الوظائف (Scroll أفقي) ==================== */
+.categories-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 2px 12px 2px;
+    margin-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-behavior: smooth;
+}
+
+.categories-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.category-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    color: var(--text-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.category-tab:hover {
+    border-color: var(--primary);
+    color: var(--text);
+}
+
+.category-tab.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+    box-shadow: 0 2px 10px rgba(100, 181, 246, 0.4);
+}
+
+.category-tab .category-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* ==================== القسم 10: بطاقات المنشورات ==================== */
+.posts-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
 .post-card {
     background: var(--card-bg);
     border-radius: var(--radius);
-    margin-bottom: 1rem;
     overflow: hidden;
     box-shadow: var(--shadow);
     transition: box-shadow 0.2s ease;
@@ -271,6 +427,12 @@ body.conversation-open {
     font-size: 0.8rem;
 }
 
+.post-info-row span span {
+    padding: 0;
+    background: transparent;
+    line-height: 1;
+}
+
 /* ✅ السيرة الذاتية */
 .post-bio {
     background: var(--light);
@@ -311,7 +473,7 @@ body.conversation-open {
     border-right-color: #e91e63;
 }
 
-/* ==================== القسم 9: نافذة معاينة صورة المنشور ==================== */
+/* ==================== القسم 11: نافذة معاينة صورة المنشور ==================== */
 #postImagePreviewModal {
     animation: fadeIn 0.2s ease;
 }
@@ -326,7 +488,7 @@ body.conversation-open {
     backface-visibility: hidden;
 }
 
-/* ==================== القسم 10: أزرار النشر في الملف الشخصي ==================== */
+/* ==================== القسم 12: أزرار النشر في الملف الشخصي ==================== */
 .publish-buttons {
     display: flex;
     gap: 10px;
@@ -374,7 +536,7 @@ body.conversation-open {
 
 .publish-btn:active { transform: scale(0.98); }
 
-/* ==================== القسم 11: صفحة الدردشة ==================== */
+/* ==================== القسم 13: صفحة الدردشة ==================== */
 .search-box { display: flex; align-items: center; background: var(--light); border-radius: 25px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; }
@@ -525,7 +687,7 @@ body.conversation-open {
 
 .remove-friend-btn:active { transform: scale(0.95); }
 
-/* ==================== القسم 12: الملف الشخصي ==================== */
+/* ==================== القسم 14: الملف الشخصي ==================== */
 .profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
 .profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
 .profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
@@ -540,7 +702,7 @@ body.conversation-open {
 .id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
 .profile-bio { padding: 0 1rem 1rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
 
-/* ==================== القسم 13: النوافذ المنبثقة ==================== */
+/* ==================== القسم 15: النوافذ المنبثقة ==================== */
 .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s; }
 .modal.active { opacity: 1; visibility: visible; }
 .modal-content { background: var(--card-bg); border-radius: var(--radius); padding: 2rem; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
@@ -594,7 +756,7 @@ body.conversation-open {
     border-radius: 50%;
 }
 
-/* ==================== القسم 14: الحالة الفارغة ==================== */
+/* ==================== القسم 16: الحالة الفارغة ==================== */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -610,7 +772,7 @@ body.conversation-open {
 .empty-state h3 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--text); font-weight: 600; }
 .empty-state p { font-size: 1rem; max-width: 300px; margin: 0 auto; line-height: 1.6; color: var(--text-light); }
 
-/* ==================== القسم 15: استعلامات الوسائط ==================== */
+/* ==================== القسم 17: استعلامات الوسائط ==================== */
 @media (min-width: 768px) { .bottom-nav { display: none; } }
 @media (max-width: 480px) {
     .profile-cover { height: 120px; }
@@ -626,9 +788,27 @@ body.conversation-open {
     .post-info-row { gap: 8px; font-size: 0.8rem; }
     .post-info-row span { padding: 3px 8px; }
     .post-bio { font-size: 0.85rem; padding: 10px 12px; }
+    
+    .country-btn {
+        padding: 10px 14px;
+        font-size: 0.9rem;
+    }
+    
+    .country-btn .country-flag {
+        font-size: 1.3rem;
+    }
+    
+    .category-tab {
+        padding: 7px 12px;
+        font-size: 0.75rem;
+    }
+    
+    .category-tab .category-icon {
+        font-size: 0.9rem;
+    }
 }
 
-/* ==================== القسم 16: أنماط المحادثة ==================== */
+/* ==================== القسم 18: أنماط المحادثة ==================== */
 body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
 .conversation-page { display: none !important; }
 
@@ -695,7 +875,7 @@ body.conversation-open .conversation-page {
 .messages-container::-webkit-scrollbar-track { background: transparent; }
 .messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* ==================== القسم 17: فوتر الإدخال ==================== */
+/* ==================== القسم 19: فوتر الإدخال ==================== */
 .message-input-container { 
     background: var(--card-bg); 
     border-top: 1px solid var(--border); 
@@ -769,7 +949,7 @@ body.conversation-open .conversation-page {
     .message { max-width: 85%; }
 }
 
-/* ==================== القسم 18: إصلاح الإيموجي ==================== */
+/* ==================== القسم 20: إصلاح الإيموجي ==================== */
 .profile-avatar-emoji,
 .conversation-avatar-emoji,
 .chat-avatar-emoji,
@@ -783,7 +963,7 @@ body.conversation-open .conversation-page {
     justify-content: center;
 }
 
-/* ==================== القسم 19: إصلاح تداخل الصفحات ==================== */
+/* ==================== القسم 21: إصلاح تداخل الصفحات ==================== */
 body.conversation-open .page:not(.conversation-page) { display: none !important; }
 body.conversation-open .profile-pages,
 body.conversation-open .profile-subpage { display: none !important; }
@@ -797,7 +977,7 @@ body.profile-subpage-open .profile-pages { display: block !important; }
 
 body:not(.conversation-open) .conversation-page { display: none !important; }
 
-/* ==================== القسم 20: تحسين المظهر على الهواتف ==================== */
+/* ==================== القسم 22: تحسين المظهر على الهواتف ==================== */
 .app-header { height: 50px !important; padding: 0 0.75rem !important; }
 .app-header h1 { font-size: 1rem !important; font-weight: 600 !important; }
 .bottom-nav { height: 50px !important; }
