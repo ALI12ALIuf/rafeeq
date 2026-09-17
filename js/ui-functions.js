@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (كامل) ==========
+// ========== ui-functions.js - النسخة النهائية ==========
 
 window._pageStack = [];
 
@@ -597,6 +597,11 @@ function setupNavigation() {
             }
         }
         
+        // ✅ إظهار/إخفاء منتقي البلد حسب الصفحة
+        if (typeof PostsSystem !== 'undefined' && PostsSystem.updateCountrySelectorVisibility) {
+            PostsSystem.updateCountrySelectorVisibility();
+        }
+        
         nav.forEach(n => n.classList.toggle('active', n.dataset.page === id)); 
     } 
     
@@ -615,7 +620,7 @@ function setupModals() {
     }); 
 }
 
-// ==================== ✅ دالة closeModal المحسّنة (تقبل ID) ====================
+// ==================== دالة closeModal المحسّنة (تقبل ID) ====================
 window.closeModal = function(modalId) {
     if (modalId) {
         const modal = document.getElementById(modalId);
