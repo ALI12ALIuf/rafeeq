@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية ==========
+// ========== posts-system.js - النسخة النهائية مع زر طلب الصداقة في الهيدر ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -104,7 +104,7 @@ const PostsSystem = {
         }
     },
     
-    // ✅ تحديد حالة العلاقة
+    // ✅ تحديد حالة العلاقة مع مستخدم معين
     getRelationshipState(targetUserId) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return 'guest';
@@ -234,7 +234,7 @@ const PostsSystem = {
         return btn;
     },
     
-    // ✅ ربط أحداث الزر
+    // ✅ ربط أحداث الزر بعد إدراج HTML
     bindActionButton(card, post) {
         if (!post.userId) return;
         const isOwner = window.auth?.currentUser?.uid === post.userId;
@@ -269,7 +269,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== إرسال طلب صداقة ====================
+    // ==================== إرسال طلب صداقة من المنشور ====================
     async sendFriendRequestFromPost(targetUserId, btnElement) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) {
@@ -991,7 +991,7 @@ const PostsSystem = {
         return card;
     },
     
-    // ==================== ✅ إنشاء كرت الزواج (مُعدّل) ====================
+    // ==================== ✅ إنشاء كرت الزواج (سطر واحد للعمر/البلد/الحالة/الأطفال) ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -1022,25 +1022,10 @@ const PostsSystem = {
             }
         }
         
-        // ✅ بناء صف الحالة الاجتماعية + الأطفال في نفس السطر
-        const marriedLabel = marriedText[post.married] || post.married || '';
-        
-        let statusRowHTML = '';
-        if (post.married === 'no') {
-            // ✅ أعزب → صف واحد فقط للحالة
-            statusRowHTML = `
-                <div class="post-info-row">
-                    <span><i class="fas fa-heart"></i> ${marriedLabel}</span>
-                </div>
-            `;
-        } else {
-            // ✅ متزوج/مطلق/أرمل → صف واحد يجمع الحالة + الأطفال
-            statusRowHTML = `
-                <div class="post-info-row">
-                    <span><i class="fas fa-heart"></i> ${marriedLabel}</span>
-                    <span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>
-                </div>
-            `;
+        // ✅ سطر واحد يجمع: العمر + البلد + الحالة الاجتماعية + الأطفال
+        let childrenSpan = '';
+        if (post.married !== 'no') {
+            childrenSpan = `<span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>`;
         }
         
         card.innerHTML = `
@@ -1060,8 +1045,9 @@ const PostsSystem = {
                 <div class="post-info-row">
                     <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
                     <span><span style="font-size:1.1rem;">${flag}</span> ${this.escapeHtml(post.country || '')}</span>
+                    <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married || ''}</span>
+                    ${childrenSpan}
                 </div>
-                ${statusRowHTML}
                 <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
             </div>
         `;
@@ -1499,4 +1485,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله');
+console.log('✅ posts-system.js تم تحميله - سطر واحد للعمر/البلد/الحالة/الأطفال');
