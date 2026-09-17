@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية (حفظ حالة غير المقروء) ==========
+// ========== ui-functions.js - النسخة النهائية (كامل) ==========
 
 window._pageStack = [];
 
@@ -39,7 +39,6 @@ function saveUnreadMessages() {
             data[fid] = count;
         });
         localStorage.setItem(`unread_${uid}`, JSON.stringify(data));
-        console.log(`💾 تم حفظ ${_unreadMessages.size} محادثة غير مقروءة`);
     } catch (e) {
         console.warn('⚠️ فشل حفظ حالة غير المقروء:', e);
     }
@@ -97,7 +96,6 @@ async function loadChats(force = false) {
         }
         const friends = udoc.data().friends || []; 
         
-        // ✅ تحميل حالة غير المقروء من localStorage
         loadUnreadMessages();
         
         _currentChatsElements.requests.clear();
@@ -354,7 +352,6 @@ window.markMessageAsUnread = function(friendId) {
     const currentCount = _unreadMessages.get(friendId) || 0;
     _unreadMessages.set(friendId, currentCount + 1);
     
-    // ✅ حفظ في localStorage
     saveUnreadMessages();
     
     console.log(`📩 رسالة جديدة من ${friendId} - عدد غير المقروء: ${currentCount + 1}`);
@@ -371,10 +368,7 @@ window.clearUnreadStatus = function(friendId) {
     
     if (_unreadMessages.has(friendId)) {
         _unreadMessages.delete(friendId);
-        
-        // ✅ حفظ في localStorage
         saveUnreadMessages();
-        
         console.log(`✅ تم مسح حالة غير المقروء لـ ${friendId}`);
     }
     
@@ -424,7 +418,6 @@ function updateEmptyState(list) {
 function resetChatsCache() {
     _currentChatsElements.requests.clear();
     _currentChatsElements.friends.clear();
-    // ❌ لا تمسح _unreadMessages هنا!
 }
 
 // ==================== تأكيد حذف الصديق ====================
@@ -475,7 +468,7 @@ window.removeFriend = async function(friendId) {
     }
 };
 
-// ==================== باقي الدوال ====================
+// ==================== مستمعو النقرات ====================
 function setupChatListeners() { 
     document.addEventListener('click', e => { 
         const m = document.getElementById('attachmentMenu'); 
@@ -486,6 +479,7 @@ function setupChatListeners() {
     }); 
 }
 
+// ==================== اختيار الأفاتار ====================
 window.selectAvatar = function(type) {
     const emojiMap = {
         'man_light': '🧔🏻‍♂️', 'man_medium': '🧔🏼‍♂️', 'man_dark': '🧔🏽‍♂️',
@@ -512,7 +506,7 @@ window.selectAvatar = function(type) {
     
     if (auth?.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
-            .then(() => { setTimeout(() => closeModal(), 500); })
+            .then(() => { setTimeout(() => window.closeModal('avatarModal'), 500); })
             .catch(() => {});
     }
 };
@@ -560,6 +554,7 @@ function ensureSinglePage() {
     }); 
 }
 
+// ==================== التنقل ====================
 function setupNavigation() { 
     const nav = document.querySelectorAll('.nav-item'); 
     const pages = document.querySelectorAll('.page'); 
@@ -611,7 +606,7 @@ function setupNavigation() {
 
 function setupModals() { 
     window.openLanguageModal = () => document.getElementById('languageModal')?.classList.add('active'); 
-    window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); 
+    
     document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { 
         if (e.target === m) m.classList.remove('active'); 
     })); 
@@ -620,6 +615,17 @@ function setupModals() {
     }); 
 }
 
+// ==================== ✅ دالة closeModal المحسّنة (تقبل ID) ====================
+window.closeModal = function(modalId) {
+    if (modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.classList.remove('active');
+    } else {
+        document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+    }
+};
+
+// ==================== عداد الاسم ====================
 window.updateCharCounter = function() {
     const nameInput = document.getElementById('editName');
     const counter = document.getElementById('charCounter');
@@ -666,7 +672,7 @@ window.saveProfile = function() {
             .then(() => {
                 const nameEl = document.getElementById('profileName');
                 if (nameEl) nameEl.textContent = n;
-                closeModal();
+                window.closeModal('editProfileModal');
             })
             .catch(() => alert('فشل حفظ التغييرات'));
     }
@@ -689,6 +695,7 @@ window.goBack = function() {
     });
 };
 
+// ==================== تهيئة الصفحة ====================
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 تهيئة ui-functions...');
     ensureSinglePage();
@@ -705,7 +712,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 window.addEventListener('authReady', function() {
     console.log('✅ authReady - تحميل حالة غير المقروء');
-    // ✅ تحميل الحالة عند تسجيل الدخول
     setTimeout(() => {
         loadUnreadMessages();
         if (window.auth?.currentUser && typeof SecureChatSystem !== 'undefined') {
@@ -726,6 +732,7 @@ window.addEventListener('unhandledrejection', function(event) {
     console.error('❌ خطأ غير معالج:', event.reason);
 });
 
+// ✅ تصدير الدوال
 window.smartUpdateChatsList = smartUpdateChatsList;
 window.resetChatsCache = resetChatsCache;
 window.reorderChatsList = reorderChatsList;
