@@ -5,9 +5,6 @@ const PostsSystem = {
     selectedCountry: 'IQ',
     selectedCategory: 'all',
     showAllCountries: false,
-    _countryDropdownOpen: false,
-    _publishDropdowns: {},
-    _publishCategoryDropdowns: {},
     
     IMAGE_MAX_WIDTH: 600,
     IMAGE_QUALITY: 0.65,
@@ -55,10 +52,13 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== ✅ منتقي البلد في الرأس ====================
+    // ==================== ✅ منتقي البلد في الرأس (يظهر فقط في الرئيسية) ====================
     renderCountryHeaderSelector() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
+        
+        // ✅ إظهار فقط في الصفحة الرئيسية
+        this.updateCountrySelectorVisibility();
         
         const currentFlag = window.Countries.getFlag(this.selectedCountry);
         const currentName = this.showAllCountries ? 'الكل' : window.Countries.getName(this.selectedCountry);
@@ -66,7 +66,6 @@ const PostsSystem = {
         container.innerHTML = `
             <div class="country-header-inline">
                 <button class="country-header-btn" onclick="PostsSystem.toggleHeaderCountryDropdown(event)">
-                    <span class="country-header-title" id="pageTitle">الرئيسية</span>
                     <span class="country-header-flag">${this.showAllCountries ? '🌍' : currentFlag}</span>
                     <span class="country-header-name">${currentName}</span>
                     <i class="fas fa-chevron-down country-header-arrow"></i>
@@ -90,6 +89,16 @@ const PostsSystem = {
                 </div>
             </div>
         `;
+    },
+    
+    // ✅ دالة جديدة: التحكم في ظهور منتقي البلد
+    updateCountrySelectorVisibility() {
+        const container = document.getElementById('countryHeaderSelector');
+        if (!container) return;
+        
+        const homePage = document.querySelector('.page.home-page');
+        const isHomeActive = homePage && homePage.classList.contains('active');
+        container.style.display = isHomeActive ? 'block' : 'none';
     },
     
     toggleHeaderCountryDropdown(event) {
@@ -188,7 +197,7 @@ const PostsSystem = {
         return cat ? cat.color : '#64B5F6';
     },
     
-    // ==================== ✅ منتقي القسم الداخلي (للنشر) ====================
+    // ==================== منتقي القسم (للنشر) ====================
     renderPublishCategoryDropdown() {
         const container = document.getElementById('jobCategorySelector');
         const input = document.getElementById('jobCategory');
@@ -226,14 +235,12 @@ const PostsSystem = {
         const dropdown = document.getElementById('jobCategoryDropdown');
         if (!dropdown) return;
         
-        // ✅ إغلاق باقي القوائم
         document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
             if (d.id !== 'jobCategoryDropdown') d.style.display = 'none';
         });
         
         if (dropdown.style.display === 'none' || !dropdown.style.display) {
             dropdown.style.display = 'block';
-            
             setTimeout(() => {
                 const closeHandler = (e) => {
                     const container = document.getElementById('jobCategorySelector');
@@ -259,7 +266,7 @@ const PostsSystem = {
         this.renderPublishCategoryDropdown();
     },
     
-    // ==================== منتقي البلد الداخلي (للنشر) ====================
+    // ==================== منتقي البلد (للنشر) ====================
     renderPublishCountryDropdown(publishType) {
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const containerId = `${prefix}CountrySelector`;
@@ -305,7 +312,6 @@ const PostsSystem = {
         
         if (dropdown.style.display === 'none' || !dropdown.style.display) {
             dropdown.style.display = 'block';
-            
             setTimeout(() => {
                 const closeHandler = (e) => {
                     const container = document.getElementById(`${prefix}CountrySelector`);
@@ -335,6 +341,13 @@ const PostsSystem = {
     // ==================== التبديل بين التبويبات ====================
     switchTab(tab) {
         this.currentTab = tab;
+        
+        // ✅ إغلاق القوائم المنسدلة
+        const dropdown = document.getElementById('countryHeaderDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        const arrow = document.querySelector('.country-header-arrow');
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+        
         document.querySelectorAll('.home-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tab);
         });
