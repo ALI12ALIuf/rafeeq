@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية ==========
+// ========== posts-system.js - النسخة النهائية (إصلاح قائمة البلد) ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -8,6 +8,8 @@ const PostsSystem = {
     
     IMAGE_TARGET_SIZE: 400,
     IMAGE_QUALITY: 0.75,
+    
+    _countryCloseHandler: null,
     
     jobCategories: [
         { code: 'all', name: 'الكل', icon: 'fas fa-layer-group', color: '#64B5F6' },
@@ -82,11 +84,34 @@ const PostsSystem = {
         container.style.display = isHomeActive ? 'block' : 'none';
     },
     
-    toggleHeaderCountryDropdown(event) {
-        if (event) event.stopPropagation();
+    // ✅ دالة إغلاق القائمة (مشتركة)
+    closeCountryDropdown() {
+        const dd = document.getElementById('countryHeaderDropdown');
+        if (dd) dd.remove();
         
+        const arrow = document.querySelector('.country-header-arrow');
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+        
+        // إزالة المستمع
+        if (this._countryCloseHandler) {
+            document.removeEventListener('pointerdown', this._countryCloseHandler);
+            document.removeEventListener('click', this._countryCloseHandler);
+            this._countryCloseHandler = null;
+        }
+    },
+    
+    toggleHeaderCountryDropdown(event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        
+        // ✅ إذا كانت القائمة مفتوحة → أغلقها
         const existing = document.getElementById('countryHeaderDropdown');
-        if (existing) existing.remove();
+        if (existing) {
+            this.closeCountryDropdown();
+            return;
+        }
         
         const wrapper = document.querySelector('.country-header-inline');
         if (!wrapper) return;
@@ -96,6 +121,7 @@ const PostsSystem = {
         
         const rect = btn.getBoundingClientRect();
         
+        // ✅ إنشاء القائمة
         const dropdown = document.createElement('div');
         dropdown.className = 'country-header-dropdown';
         dropdown.id = 'countryHeaderDropdown';
@@ -104,6 +130,15 @@ const PostsSystem = {
         dropdown.style.right = '10px';
         dropdown.style.left = 'auto';
         dropdown.style.zIndex = '99999';
+        dropdown.style.minWidth = '200px';
+        dropdown.style.maxWidth = '240px';
+        dropdown.style.maxHeight = '50vh';
+        dropdown.style.overflowY = 'auto';
+        dropdown.style.background = 'var(--card-bg)';
+        dropdown.style.border = '1px solid var(--border)';
+        dropdown.style.borderRadius = '12px';
+        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
+        dropdown.style.padding = '6px';
         
         dropdown.innerHTML = `
             <button class="country-mini-option ${this.showAllCountries ? 'active' : ''}" 
@@ -125,31 +160,51 @@ const PostsSystem = {
         
         document.body.appendChild(dropdown);
         
+        // ✅ تدوير السهم
         const arrow = btn.querySelector('.country-header-arrow');
         if (arrow) arrow.style.transform = 'rotate(180deg)';
         
+        // ✅ ربط مستمع الإغلاق (بدون setTimeout)
+        const self = this;
+        this._countryCloseHandler = (e) => {
+            const dd = document.getElementById('countryHeaderDropdown');
+            if (!dd) {
+                self.closeCountryDropdown();
+                return;
+            }
+            // ✅ إذا كان النقر داخل القائمة → لا تغلق
+            if (dd.contains(e.target)) return;
+            // ✅ إذا كان النقر على الزر → لا تغلق (toggle سيتعامل)
+            if (btn.contains(e.target)) return;
+            
+            self.closeCountryDropdown();
+        };
+        
+        // ✅ استخدام pointerdown للاستجابة الأسرع + click كاحتياطي
         setTimeout(() => {
-            const closeHandler = (e) => {
-                const dd = document.getElementById('countryHeaderDropdown');
-                if (dd && !dd.contains(e.target) && !btn.contains(e.target)) {
-                    dd.remove();
-                    if (arrow) arrow.style.transform = 'rotate(0deg)';
-                    document.removeEventListener('click', closeHandler);
-                }
-            };
-            document.addEventListener('click', closeHandler);
-        }, 100);
+            document.addEventListener('pointerdown', this._countryCloseHandler);
+            document.addEventListener('click', this._countryCloseHandler);
+        }, 0);
     },
     
     selectCountry(code) {
         this.selectedCountry = code;
         this.showAllCountries = false;
         this.saveSettings();
-        this.renderCountryHeaderSelector();
-        this.loadAllPosts();
         
-        const dropdown = document.getElementById('countryHeaderDropdown');
-        if (dropdown) dropdown.remove();
+        // ✅ إغلاق القائمة أولاً
+        this.closeCountryDropdown();
+        
+        // ✅ تحديث الزر بدون إعادة رسم (فقط النصوص)
+        const btn = document.querySelector('.country-header-btn');
+        if (btn) {
+            const flagSpan = btn.querySelector('.country-header-flag');
+            const nameSpan = btn.querySelector('.country-header-name');
+            if (flagSpan) flagSpan.textContent = window.Countries.getFlag(code);
+            if (nameSpan) nameSpan.textContent = window.Countries.getName(code);
+        }
+        
+        this.loadAllPosts();
         
         console.log(`🌍 تم اختيار: ${window.Countries.getName(code)}`);
     },
@@ -157,11 +212,20 @@ const PostsSystem = {
     selectAllCountries() {
         this.showAllCountries = true;
         this.saveSettings();
-        this.renderCountryHeaderSelector();
-        this.loadAllPosts();
         
-        const dropdown = document.getElementById('countryHeaderDropdown');
-        if (dropdown) dropdown.remove();
+        // ✅ إغلاق القائمة أولاً
+        this.closeCountryDropdown();
+        
+        // ✅ تحديث الزر
+        const btn = document.querySelector('.country-header-btn');
+        if (btn) {
+            const flagSpan = btn.querySelector('.country-header-flag');
+            const nameSpan = btn.querySelector('.country-header-name');
+            if (flagSpan) flagSpan.textContent = '🌍';
+            if (nameSpan) nameSpan.textContent = 'الكل';
+        }
+        
+        this.loadAllPosts();
         
         console.log('🌍 عرض جميع الدول');
     },
@@ -346,7 +410,7 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
-    // ==================== ✅ قوائم الزواج المخصصة (position: fixed) ====================
+    // ==================== قوائم الزواج المخصصة ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -362,7 +426,6 @@ const PostsSystem = {
         
         const containerId = field === 'married' ? 'marriageMarriedSelector' : 'marriageChildrenSelector';
         const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
-        const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         
         const container = document.getElementById(containerId);
         const input = document.getElementById(inputId);
@@ -391,13 +454,11 @@ const PostsSystem = {
         const existing = document.getElementById(dropdownId);
         if (existing) existing.remove();
         
-        // ✅ البحث عن الزر المرتبط
         const btn = document.querySelector(`.publish-category-btn[data-field="${field}"]`);
         if (!btn) return;
         
         const rect = btn.getBoundingClientRect();
         
-        // ✅ بناء الخيارات
         const options = field === 'married'
             ? [
                 { value: 'no', label: 'لا، أعزب/عزباء' },
@@ -414,7 +475,6 @@ const PostsSystem = {
         const input = document.getElementById(inputId);
         const current = input ? input.value : 'no';
         
-        // ✅ إنشاء القائمة
         const dropdown = document.createElement('div');
         dropdown.className = 'publish-category-dropdown';
         dropdown.id = dropdownId;
@@ -463,25 +523,21 @@ const PostsSystem = {
         const dropdown = document.getElementById(dropdownId);
         if (dropdown) dropdown.remove();
         
-        // ✅ التحكم بحقل الأطفال
         if (field === 'married') {
             const childrenField = document.getElementById('marriageChildrenField');
             if (childrenField) {
                 if (value === 'no') {
-                    // أعزب → إخفاء
                     childrenField.style.display = 'none';
                     const childrenInput = document.getElementById('marriageChildren');
                     if (childrenInput) childrenInput.value = 'no';
                     this.renderMarriageDropdown('children', 'no');
                 } else {
-                    // متزوج/مطلق/أرمل → إظهار
                     childrenField.style.display = 'block';
                     this.renderMarriageDropdown('children', 'no');
                 }
             }
         }
         
-        // ✅ إعادة رسم القائمة
         this.renderMarriageDropdown(field, value);
     },
     
@@ -489,8 +545,7 @@ const PostsSystem = {
     switchTab(tab) {
         this.currentTab = tab;
         
-        const dropdown = document.getElementById('countryHeaderDropdown');
-        if (dropdown) dropdown.remove();
+        this.closeCountryDropdown();
         
         document.querySelectorAll('.home-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tab);
@@ -958,7 +1013,6 @@ PostsSystem.fillPublishMarriageForm = function() {
     this.renderMarriageDropdown('married', 'no');
     this.renderMarriageDropdown('children', 'no');
     
-    // ✅ إخفاء حقل الأطفال افتراضياً (لأن الحالة "أعزب")
     const childrenField = document.getElementById('marriageChildrenField');
     if (childrenField) childrenField.style.display = 'none';
     
@@ -1119,4 +1173,4 @@ window.addEventListener('authReady', () => {
     setTimeout(() => PostsSystem.init(), 300);
 });
 
-console.log('✅ posts-system.js تم تحميله - مع القص المربع للصور والقوائم المخصصة');
+console.log('✅ posts-system.js تم تحميله - مع إصلاح قائمة البلد');
