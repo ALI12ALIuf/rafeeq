@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع زر الصداقة في الهيدر ==========
+// ========== posts-system.js - النسخة النهائية ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -33,7 +33,6 @@ const PostsSystem = {
         { code: 'other', name: 'أخرى', icon: 'fas fa-th-large', color: '#9E9E9E' }
     ],
     
-    // ==================== init ====================
     init() {
         console.log('🚀 تهيئة نظام المنشورات...');
         this.loadSavedSettings();
@@ -60,15 +59,12 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== تحميل حالات العلاقات (Batch) ====================
     async loadRelationshipCache(force = false) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
         
         const now = Date.now();
-        if (!force && (now - this._relationshipCache.lastUpdate) < 30000) {
-            return;
-        }
+        if (!force && (now - this._relationshipCache.lastUpdate) < 30000) return;
         
         try {
             const userDoc = await window.db.collection('users').doc(uid).get();
@@ -114,7 +110,6 @@ const PostsSystem = {
         return 'none';
     },
     
-    // ==================== ✅ زر الإجراء (أيقونة فقط - في الهيدر) ====================
     createPostActionButton(post) {
         const state = this.getRelationshipState(post.userId);
         const btn = document.createElement('button');
@@ -227,18 +222,10 @@ const PostsSystem = {
         return btn;
     },
     
-    // ==================== ✅ إرسال طلب صداقة ====================
     async sendFriendRequestFromPost(targetUserId, btnElement) {
         const uid = window.auth?.currentUser?.uid;
-        if (!uid) {
-            alert('يجب تسجيل الدخول أولاً');
-            return;
-        }
-        
-        if (uid === targetUserId) {
-            alert('لا يمكنك إضافة نفسك');
-            return;
-        }
+        if (!uid) { alert('يجب تسجيل الدخول أولاً'); return; }
+        if (uid === targetUserId) { alert('لا يمكنك إضافة نفسك'); return; }
         
         try {
             const exist = await window.db.collection('friendRequests')
@@ -247,15 +234,11 @@ const PostsSystem = {
                 .where('status', '==', 'pending')
                 .get();
             
-            if (!exist.empty) {
-                alert('أرسلت طلباً مسبقاً');
-                return;
-            }
+            if (!exist.empty) { alert('أرسلت طلباً مسبقاً'); return; }
             
             const me = await window.db.collection('users').doc(uid).get();
             if (me.exists && (me.data().friends || []).includes(targetUserId)) {
-                alert('صديقك بالفعل');
-                return;
+                alert('صديقك بالفعل'); return;
             }
             
             await window.db.collection('friendRequests').add({
@@ -269,7 +252,6 @@ const PostsSystem = {
             this._relationshipCache.sentRequests.add(targetUserId);
             this._relationshipCache.lastUpdate = Date.now();
             
-            // ✅ تحديث الزر فوراً
             if (btnElement) {
                 btnElement.innerHTML = `<i class="fas fa-clock"></i>`;
                 btnElement.title = 'طلب معلق';
@@ -282,7 +264,6 @@ const PostsSystem = {
             }
             
             alert('✅ تم إرسال طلب الصداقة');
-            
         } catch (e) {
             console.error('خطأ في إرسال طلب الصداقة:', e);
             alert('حدث خطأ في إرسال الطلب');
@@ -339,16 +320,10 @@ const PostsSystem = {
     },
     
     toggleHeaderCountryDropdown(event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const existing = document.getElementById('countryHeaderDropdown');
-        if (existing) {
-            this.closeCountryDropdown();
-            return;
-        }
+        if (existing) { this.closeCountryDropdown(); return; }
         
         const wrapper = document.querySelector('.country-header-inline');
         if (!wrapper) return;
@@ -402,13 +377,9 @@ const PostsSystem = {
         const self = this;
         this._countryCloseHandler = (e) => {
             const dd = document.getElementById('countryHeaderDropdown');
-            if (!dd) {
-                self.closeCountryDropdown();
-                return;
-            }
+            if (!dd) { self.closeCountryDropdown(); return; }
             if (dd.contains(e.target)) return;
             if (btn.contains(e.target)) return;
-            
             self.closeCountryDropdown();
         };
         
@@ -422,7 +393,6 @@ const PostsSystem = {
         this.selectedCountry = code;
         this.showAllCountries = false;
         this.saveSettings();
-        
         this.closeCountryDropdown();
         
         const btn = document.querySelector('.country-header-btn');
@@ -434,14 +404,11 @@ const PostsSystem = {
         }
         
         this.loadAllPosts();
-        
-        console.log(`🌍 تم اختيار: ${window.Countries.getName(code)}`);
     },
     
     selectAllCountries() {
         this.showAllCountries = true;
         this.saveSettings();
-        
         this.closeCountryDropdown();
         
         const btn = document.querySelector('.country-header-btn');
@@ -453,11 +420,8 @@ const PostsSystem = {
         }
         
         this.loadAllPosts();
-        
-        console.log('🌍 عرض جميع الدول');
     },
     
-    // ==================== أقسام الوظائف ====================
     renderJobCategories() {
         const container = document.getElementById('jobCategories');
         if (!container) return;
@@ -496,7 +460,6 @@ const PostsSystem = {
         return cat ? cat.color : '#64B5F6';
     },
     
-    // ==================== منتقي القسم (للنشر) ====================
     renderPublishCategoryDropdown() {
         const container = document.getElementById('jobCategorySelector');
         const input = document.getElementById('jobCategory');
@@ -565,7 +528,6 @@ const PostsSystem = {
         this.renderPublishCategoryDropdown();
     },
     
-    // ==================== منتقي البلد (للنشر) ====================
     renderPublishCountryDropdown(publishType) {
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const containerId = `${prefix}CountrySelector`;
@@ -637,7 +599,6 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
-    // ==================== قوائم الزواج المخصصة ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -672,10 +633,7 @@ const PostsSystem = {
     },
     
     toggleMarriageDropdown(field, event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const existing = document.getElementById(dropdownId);
@@ -768,10 +726,8 @@ const PostsSystem = {
         this.renderMarriageDropdown(field, value);
     },
     
-    // ==================== التبديل بين التبويبات ====================
     switchTab(tab) {
         this.currentTab = tab;
-        
         this.closeCountryDropdown();
         
         document.querySelectorAll('.home-tab').forEach(t => {
@@ -875,7 +831,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== ✅ كرت الوظيفة (الزر في الهيدر) ====================
+    // ==================== كرت الوظيفة ====================
     createJobPost(post) {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
@@ -921,7 +877,6 @@ const PostsSystem = {
             </div>
         `;
         
-        // ✅ إدراج زر الإجراء في الهيدر
         if (post.userId) {
             const slot = card.querySelector('.post-action-btn-slot');
             const actionBtn = this.createPostActionButton(post);
@@ -940,7 +895,7 @@ const PostsSystem = {
         return card;
     },
     
-    // ==================== ✅ كرت الزواج (الزر في الهيدر) ====================
+    // ==================== ✅ كرت الزواج (الحالة الاجتماعية + الأطفال في نفس الصف) ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -963,7 +918,8 @@ const PostsSystem = {
             ? `<button class="post-menu" onclick="event.stopPropagation(); PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
             : '';
         
-        const childrenRow = post.married === 'no' 
+        // ✅ سطر الحالة الاجتماعية + الأطفال (يظهر فقط إذا لم يكن "أعزب")
+        const childrenSpan = post.married === 'no' 
             ? '' 
             : `<span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>`;
         
@@ -981,19 +937,17 @@ const PostsSystem = {
                 </div>
             </div>
             <div class="post-content">
+                <!-- ✅ كل المعلومات في صف واحد -->
                 <div class="post-info-row">
                     <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
                     <span><span style="font-size:1.1rem;">${flag}</span> ${this.escapeHtml(post.country || '')}</span>
-                </div>
-                <div class="post-info-row">
                     <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married || ''}</span>
-                    ${childrenRow}
+                    ${childrenSpan}
                 </div>
                 <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
             </div>
         `;
         
-        // ✅ إدراج زر الإجراء في الهيدر
         if (post.userId) {
             const slot = card.querySelector('.post-action-btn-slot');
             const actionBtn = this.createPostActionButton(post);
@@ -1131,17 +1085,10 @@ const PostsSystem = {
             .onSnapshot(() => this.loadMarriagePosts(), error => console.warn('⚠️', error.message));
     },
     
-    // ==================== قص الصورة مربعة + ضغط ====================
     async compressImage(file) {
         return new Promise((resolve, reject) => {
-            if (!file.type.startsWith('image/')) { 
-                reject(new Error('الملف ليس صورة')); 
-                return; 
-            }
-            if (file.size > 10 * 1024 * 1024) { 
-                reject(new Error('الصورة كبيرة جداً (الحد 10MB)')); 
-                return; 
-            }
+            if (!file.type.startsWith('image/')) { reject(new Error('الملف ليس صورة')); return; }
+            if (file.size > 10 * 1024 * 1024) { reject(new Error('الصورة كبيرة جداً (الحد 10MB)')); return; }
             
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -1162,10 +1109,7 @@ const PostsSystem = {
                     ctx.drawImage(img, sx, sy, side, side, 0, 0, TARGET, TARGET);
                     
                     canvas.toBlob((blob) => {
-                        if (!blob) { 
-                            reject(new Error('فشل ضغط الصورة')); 
-                            return; 
-                        }
+                        if (!blob) { reject(new Error('فشل ضغط الصورة')); return; }
                         const reader2 = new FileReader();
                         reader2.onload = () => {
                             const compressedKB = Math.round(reader2.result.length / 1024);
@@ -1416,7 +1360,6 @@ function clearMarriageForm() {
     if (input) input.value = '';
 }
 
-// ✅ تصدير الدوال العامة
 window.PostsSystem = PostsSystem;
 window.previewJobImage = (e) => PostsSystem.previewJobImage(e);
 window.previewMarriageImage = (e) => PostsSystem.previewMarriageImage(e);
@@ -1436,4 +1379,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - مع زر الصداقة في الهيدر');
+console.log('✅ posts-system.js تم تحميله');
