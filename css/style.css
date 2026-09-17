@@ -86,20 +86,295 @@ body.conversation-open {
 .nav-item i { font-size: 1.2rem; }
 .nav-item.active { color: var(--primary); }
 
-/* ==================== القسم 7: بطاقات المنشورات ==================== */
-.post-card { background: var(--card-bg); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; box-shadow: var(--shadow); }
-.post-header { display: flex; align-items: center; padding: 1rem; gap: 0.75rem; }
-.post-avatar-emoji { width: 40px; height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden; line-height: 1; }
+/* ==================== القسم 7: تبويبات الرئيسية (وظائف / زواج) ==================== */
+.home-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+    background: var(--card-bg);
+    padding: 6px;
+    border-radius: 50px;
+    box-shadow: var(--shadow);
+}
+
+.home-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 50px;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.home-tab i { font-size: 1.1rem; }
+
+.home-tab.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4);
+}
+
+.home-tab:not(.active):hover {
+    background: var(--light);
+    color: var(--text);
+}
+
+.home-content { display: none; }
+.home-content.active { display: block; }
+
+/* ==================== القسم 8: بطاقات المنشورات ==================== */
+.post-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.2s ease;
+}
+
+.post-card:hover {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    gap: 0.75rem;
+}
+
+/* ✅ الصورة قابلة للنقر */
+.post-avatar-emoji {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    min-height: 50px;
+    border-radius: 50%;
+    background: var(--light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    overflow: hidden;
+    line-height: 1;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.post-avatar-emoji:hover {
+    transform: scale(1.05);
+}
+
+.post-avatar-emoji img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* ✅ أيقونة تكبير صغيرة على الصورة */
+.post-avatar-emoji::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    background: var(--primary);
+    border-radius: 50%;
+    opacity: 0.8;
+    border: 1.5px solid var(--card-bg);
+    pointer-events: none;
+}
+
+.post-avatar-emoji:not(:has(img))::after {
+    display: none;
+}
+
 .post-user { flex: 1; }
 .post-user h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
-.post-time { font-size: 0.8rem; color: var(--text-light); }
-.post-menu { background: none; border: none; color: var(--text-light); cursor: pointer; }
-.post-content { padding: 0 1rem 1rem; }
-.post-location { display: flex; align-items: center; gap: 0.5rem; color: var(--text-light); font-size: 0.9rem; margin-bottom: 0.5rem; }
-.post-actions { display: flex; gap: 1rem; padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--border); }
-.post-action { background: none; border: none; color: var(--text); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
 
-/* ==================== القسم 8: صفحة الدردشة ==================== */
+/* ✅ إخفاء وقت المنشور */
+.post-time {
+    display: none !important;
+}
+
+.post-menu {
+    background: none;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.post-menu:hover {
+    background: rgba(244, 67, 54, 0.1);
+    color: var(--danger);
+}
+
+.post-content {
+    padding: 0 1rem 1rem;
+}
+
+/* ✅ عنوان الوظيفة */
+.post-job-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+    color: var(--primary);
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: rgba(100, 181, 246, 0.1);
+    border-radius: 10px;
+}
+
+.post-job-title i { font-size: 1.1rem; }
+
+/* ✅ معلومات المنشور */
+.post-info-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.post-info-row span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--light);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.post-info-row i {
+    color: var(--primary);
+    font-size: 0.8rem;
+}
+
+/* ✅ السيرة الذاتية */
+.post-bio {
+    background: var(--light);
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--text);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 100%;
+    margin-top: 8px;
+    border-right: 3px solid var(--primary);
+}
+
+/* ✅ بطاقات الوظائف */
+.job-post-card {
+    border-right: 3px solid var(--primary);
+}
+
+/* ✅ بطاقات الزواج */
+.marriage-post-card {
+    border-right: 3px solid #e91e63;
+}
+
+.marriage-post-card .post-job-title {
+    color: #e91e63;
+    background: rgba(233, 30, 99, 0.1);
+}
+
+.marriage-post-card .post-info-row i {
+    color: #e91e63;
+}
+
+.marriage-post-card .post-bio {
+    border-right-color: #e91e63;
+}
+
+/* ==================== القسم 9: نافذة معاينة صورة المنشور ==================== */
+#postImagePreviewModal {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#postPreviewImage {
+    will-change: transform;
+    backface-visibility: hidden;
+}
+
+/* ==================== القسم 10: أزرار النشر في الملف الشخصي ==================== */
+.publish-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.publish-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
+    color: white;
+}
+
+.publish-btn i { font-size: 1.1rem; }
+
+.publish-btn-jobs {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    box-shadow: 0 4px 15px rgba(100, 181, 246, 0.3);
+}
+
+.publish-btn-jobs:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(100, 181, 246, 0.4);
+}
+
+.publish-btn-marriage {
+    background: linear-gradient(135deg, #e91e63, #c2185b);
+    box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+}
+
+.publish-btn-marriage:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+}
+
+.publish-btn:active { transform: scale(0.98); }
+
+/* ==================== القسم 11: صفحة الدردشة ==================== */
 .search-box { display: flex; align-items: center; background: var(--light); border-radius: 25px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; }
@@ -133,7 +408,6 @@ body.conversation-open {
     flex-shrink: 0;
 }
 
-/* ==================== القسم 8.1: chat-info و ID ==================== */
 .chat-info {
     flex: 1;
     min-width: 0;
@@ -153,11 +427,8 @@ body.conversation-open {
     transition: color 0.3s ease;
 }
 
-.chat-info .last-message {
-    display: none !important;
-}
+.chat-info .last-message { display: none !important; }
 
-/* ✅ صف ID */
 .chat-id-row {
     display: flex;
     align-items: center;
@@ -215,17 +486,14 @@ body.conversation-open {
     transform: scale(1.15);
 }
 
-.copy-chat-id-btn:active {
-    transform: scale(0.9);
-}
+.copy-chat-id-btn:active { transform: scale(0.9); }
 
-/* ✅ تمييز البطاقة للرسائل غير المقروءة (بدون شارة) */
 .chat-item.unread-dot {
     border-right: 3px solid var(--primary);
     background: linear-gradient(90deg, var(--card-bg), rgba(33, 150, 243, 0.05));
+    transition: all 0.3s ease;
 }
 
-/* ==================== زر حذف الصديق ==================== */
 .chat-meta {
     display: flex;
     align-items: center;
@@ -255,11 +523,9 @@ body.conversation-open {
     transform: scale(1.05);
 }
 
-.remove-friend-btn:active {
-    transform: scale(0.95);
-}
+.remove-friend-btn:active { transform: scale(0.95); }
 
-/* ==================== القسم 9: صفحة الملف الشخصي ==================== */
+/* ==================== القسم 12: الملف الشخصي ==================== */
 .profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
 .profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
 .profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
@@ -274,59 +540,22 @@ body.conversation-open {
 .id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
 .profile-bio { padding: 0 1rem 1rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
 
-/* ==================== القسم 10: الصفحات الفرعية ==================== */
-.profile-subpage { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 1000; overflow-y: auto; padding: 0; }
-.subpage-header { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow); }
-.back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.back-btn:hover { background: var(--primary); color: white; }
-.subpage-header h3 { flex: 1; text-align: center; font-size: 1.2rem; font-weight: 600; color: var(--primary); }
-
-/* ==================== القسم 11: الحالة الفارغة ==================== */
-.empty-state { 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    justify-content: center; 
-    min-height: 60vh; 
-    text-align: center; 
-    padding: 2rem; 
-    color: var(--text-light); 
-}
-
-.empty-state i { 
-    font-size: 4rem; 
-    margin-bottom: 1rem; 
-    color: var(--primary); 
-    opacity: 0.5; 
-}
-
-.empty-state h3 { 
-    font-size: 1.5rem; 
-    margin-bottom: 0.5rem; 
-    color: var(--text); 
-    font-weight: 600; 
-}
-
-.empty-state p { 
-    font-size: 1rem; 
-    max-width: 300px; 
-    margin: 0 auto; 
-    line-height: 1.6; 
-    color: var(--text-light); 
-}
-
-/* ==================== القسم 12: النوافذ المنبثقة ==================== */
+/* ==================== القسم 13: النوافذ المنبثقة ==================== */
 .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s; }
 .modal.active { opacity: 1; visibility: visible; }
 .modal-content { background: var(--card-bg); border-radius: var(--radius); padding: 2rem; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
-.modal-content h3 { margin-bottom: 1.5rem; color: var(--primary); text-align: center; }
-.edit-field { margin-bottom: 1.5rem; text-align: center; }
-.edit-field label { display: block; margin-bottom: 0.5rem; color: var(--text-light); font-size: 0.9rem; }
+.modal-content h3 { margin-bottom: 1.5rem; color: var(--primary); text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.edit-field { margin-bottom: 1rem; text-align: right; }
+.edit-field label { display: block; margin-bottom: 6px; color: var(--text); font-size: 0.85rem; font-weight: 600; text-align: right; }
 .input-wrapper { position: relative; width: 100%; max-width: 300px; margin: 0 auto; direction: ltr; }
-.edit-field input { width: 100%; padding: 0.75rem; padding-left: 55px; padding-right: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--light); color: var(--text); font-size: 1rem; text-align: center; }
-.edit-field input:focus { outline: none; border-color: var(--primary); }
+.edit-field input,
+.edit-field textarea,
+.edit-field select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--light); color: var(--text); font-size: 0.95rem; font-family: inherit; text-align: right; transition: all 0.2s; box-sizing: border-box; }
+.edit-field input:focus,
+.edit-field textarea:focus,
+.edit-field select:focus { outline: none; border-color: var(--primary); background: var(--card-bg); }
+.edit-field textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
 
-/* ✅ عداد الأحرف */
 .char-counter {
     position: absolute;
     left: 10px;
@@ -337,28 +566,12 @@ body.conversation-open {
     font-weight: 500;
     direction: ltr;
     opacity: 0.7;
-    transition: all 0.2s ease;
     pointer-events: none;
     font-family: monospace;
 }
 
-.char-counter.warning {
-    color: #FFC107;
-    opacity: 1;
-    font-weight: 700;
-}
-
-.char-counter.full {
-    color: #f44336;
-    opacity: 1;
-    font-weight: 700;
-    animation: counterPulse 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes counterPulse {
-    from { transform: translateY(-50%) scale(1); }
-    to { transform: translateY(-50%) scale(1.05); }
-}
+.char-counter.warning { color: #FFC107; opacity: 1; font-weight: 700; }
+.char-counter.full { color: #f44336; opacity: 1; font-weight: 700; }
 
 .current-avatar { width: 80px; height: 80px; min-width: 80px; min-height: 80px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 4rem; margin: 0 auto 1rem; overflow: hidden; line-height: 1; }
 .change-avatar-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 0 auto; padding: 0.5rem 1rem; background: var(--light); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; cursor: pointer; }
@@ -373,7 +586,31 @@ body.conversation-open {
 .settings-item-left { display: flex; align-items: center; gap: 1rem; }
 .settings-item-left i { font-size: 1.2rem; color: var(--primary); }
 
-/* ==================== القسم 13: استعلامات الوسائط ==================== */
+#jobImagePreview img,
+#marriageImagePreview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* ==================== القسم 14: الحالة الفارغة ==================== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+}
+
+.empty-state i { font-size: 4rem; margin-bottom: 1rem; color: var(--primary); opacity: 0.5; }
+.empty-state h3 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--text); font-weight: 600; }
+.empty-state p { font-size: 1rem; max-width: 300px; margin: 0 auto; line-height: 1.6; color: var(--text-light); }
+
+/* ==================== القسم 15: استعلامات الوسائط ==================== */
 @media (min-width: 768px) { .bottom-nav { display: none; } }
 @media (max-width: 480px) {
     .profile-cover { height: 120px; }
@@ -381,9 +618,17 @@ body.conversation-open {
     .profile-avatar-emoji { font-size: 4rem; }
     .edit-profile-btn-left { width: 36px; height: 36px; top: 10px; left: 10px; font-size: 1.1rem; }
     .profile-id-row { width: 100%; min-width: auto; }
+    
+    .home-tab { padding: 10px 12px; font-size: 0.85rem; }
+    .home-tab i { font-size: 1rem; }
+    .publish-btn { padding: 12px 14px; font-size: 0.85rem; }
+    .publish-btn i { font-size: 1rem; }
+    .post-info-row { gap: 8px; font-size: 0.8rem; }
+    .post-info-row span { padding: 3px 8px; }
+    .post-bio { font-size: 0.85rem; padding: 10px 12px; }
 }
 
-/* ==================== القسم 14: أنماط المحادثة ==================== */
+/* ==================== القسم 16: أنماط المحادثة ==================== */
 body.conversation-open .bottom-nav, body.conversation-open .app-header { display: none !important; }
 .conversation-page { display: none !important; }
 
@@ -450,7 +695,7 @@ body.conversation-open .conversation-page {
 .messages-container::-webkit-scrollbar-track { background: transparent; }
 .messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* ==================== القسم 15: فوتر الإدخال ==================== */
+/* ==================== القسم 17: فوتر الإدخال ==================== */
 .message-input-container { 
     background: var(--card-bg); 
     border-top: 1px solid var(--border); 
@@ -475,8 +720,47 @@ body.conversation-open .conversation-page {
 
 .message-input-wrapper:focus-within { border-color: var(--primary); }
 .input-area { flex: 1; display: flex; align-items: center; gap: 4px; }
-#messageInput { flex: 1; background: transparent; border: none; padding: 8px 4px; color: var(--text); font-size: 0.95rem; outline: none; min-height: 36px; max-height: 120px; }
-#actionBtn { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; transition: all 0.3s ease; }
+#messageInput { flex: 1; background: transparent; border: none; padding: 8px 4px; color: var(--text); font-size: 0.95rem; outline: none; min-height: 36px; max-height: 120px; transition: color 0.2s ease; }
+
+#messageCharCounter {
+    display: none;
+    font-size: 0.7rem;
+    color: var(--text-light);
+    font-family: monospace;
+    padding: 2px 6px;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    align-self: center;
+    margin-left: 4px;
+    direction: ltr;
+}
+
+#messageCharCounter.show { display: inline-block; }
+#messageCharCounter.warning { color: #FFC107; background: rgba(255, 193, 7, 0.15); font-weight: 700; }
+#messageCharCounter.full { color: #f44336; background: rgba(244, 67, 54, 0.2); font-weight: 700; animation: counterPulse 0.5s ease-in-out infinite alternate; }
+
+@keyframes counterPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+}
+
+#actionBtn { 
+    width: 38px; 
+    height: 38px; 
+    border-radius: 50%; 
+    border: none; 
+    background: var(--primary); 
+    color: white; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-size: 1.2rem; 
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
 #actionBtn:hover { background: var(--primary-dark); }
 .conversation-header, .message-input-container { pointer-events: auto !important; }
 
@@ -485,7 +769,7 @@ body.conversation-open .conversation-page {
     .message { max-width: 85%; }
 }
 
-/* ==================== القسم 16: إصلاح الإيموجي ==================== */
+/* ==================== القسم 18: إصلاح الإيموجي ==================== */
 .profile-avatar-emoji,
 .conversation-avatar-emoji,
 .chat-avatar-emoji,
@@ -499,7 +783,7 @@ body.conversation-open .conversation-page {
     justify-content: center;
 }
 
-/* ==================== القسم 17: إصلاح تداخل الصفحات ==================== */
+/* ==================== القسم 19: إصلاح تداخل الصفحات ==================== */
 body.conversation-open .page:not(.conversation-page) { display: none !important; }
 body.conversation-open .profile-pages,
 body.conversation-open .profile-subpage { display: none !important; }
@@ -513,7 +797,7 @@ body.profile-subpage-open .profile-pages { display: block !important; }
 
 body:not(.conversation-open) .conversation-page { display: none !important; }
 
-/* ==================== القسم 18: تحسين المظهر على الهواتف ==================== */
+/* ==================== القسم 20: تحسين المظهر على الهواتف ==================== */
 .app-header { height: 50px !important; padding: 0 0.75rem !important; }
 .app-header h1 { font-size: 1rem !important; font-weight: 600 !important; }
 .bottom-nav { height: 50px !important; }
@@ -535,429 +819,3 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 .input-area { flex: 1 !important; display: flex !important; align-items: flex-start !important; min-width: 0 !important; overflow: hidden !important; padding: 2px 0 !important; }
 #messageInput { padding: 10px 8px !important; font-size: 1rem !important; min-height: 40px !important; max-height: 120px !important; width: 100% !important; resize: none !important; word-wrap: break-word !important; white-space: pre-wrap !important; overflow-wrap: break-word !important; word-break: break-word !important; line-height: 1.5 !important; flex: 1 !important; min-width: 0 !important; background: transparent !important; border: none !important; outline: none !important; color: var(--text) !important; overflow-y: auto !important; display: block !important; box-sizing: border-box !important; font-family: inherit !important; }
 #actionBtn { width: 36px !important; height: 36px !important; font-size: 1.1rem !important; flex-shrink: 0 !important; }
-
-
-
-
-/* ==================== علامة الرسائل غير المقروءة ==================== */
-.chat-item.unread-dot {
-    border-right: 3px solid var(--primary);
-    background: linear-gradient(90deg, var(--card-bg), rgba(33, 150, 243, 0.05));
-    transition: all 0.3s ease;
-}
-
-.chat-info h4 {
-    transition: color 0.3s ease;
-}
-
-/* ==================== طلب الصداقة - ID تحت الاسم على اليمين ==================== */
-.friend-request-item .chat-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    align-items: flex-end;
-}
-
-.friend-request-item .chat-info h4 {
-    margin: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text);
-    text-align: right;
-    width: 100%;
-}
-
-.friend-request-item .chat-id-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 5px;
-    margin-top: 3px;
-    direction: ltr;
-    width: 100%;
-    padding-right: 0;
-    flex-direction: row-reverse;
-}
-
-.friend-request-item .chat-id-label {
-    font-size: 0.78rem;
-    color: var(--primary);
-    font-weight: 700;
-    font-family: sans-serif;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
-    line-height: 1;
-    order: 3;
-}
-
-.friend-request-item .friend-request-id {
-    font-size: 0.78rem;
-    color: var(--text-light);
-    font-family: monospace;
-    direction: ltr;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
-    line-height: 1;
-    opacity: 0.9;
-    order: 2;
-}
-
-.friend-request-item .copy-id-btn {
-    background: transparent;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    font-size: 0.78rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px 3px;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-    line-height: 1;
-    order: 1;
-}
-
-.friend-request-item .copy-id-btn:hover {
-    background: rgba(33, 150, 243, 0.15);
-    transform: scale(1.15);
-}
-
-/* ==================== عداد الأحرف ==================== */
-.char-counter {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.75rem;
-    color: var(--text-light);
-    font-weight: 500;
-    direction: ltr;
-    opacity: 0.7;
-    pointer-events: none;
-    font-family: monospace;
-}
-
-.char-counter.warning {
-    color: #FFC107;
-    opacity: 1;
-    font-weight: 700;
-}
-
-.char-counter.full {
-    color: #f44336;
-    opacity: 1;
-    font-weight: 700;
-}
-
-
-
-
-/* ==================== عداد الرسالة (حد 200 حرف) ==================== */
-#messageInput {
-    transition: color 0.2s ease;
-}
-
-#messageCharCounter {
-    display: none;
-    font-size: 0.7rem;
-    color: var(--text-light);
-    font-family: monospace;
-    padding: 2px 6px;
-    border-radius: 10px;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-    align-self: center;
-    margin-left: 4px;
-    direction: ltr;
-}
-
-#messageCharCounter.show {
-    display: inline-block;
-}
-
-#messageCharCounter.warning {
-    color: #FFC107;
-    background: rgba(255, 193, 7, 0.15);
-    font-weight: 700;
-}
-
-#messageCharCounter.full {
-    color: #f44336;
-    background: rgba(244, 67, 54, 0.2);
-    font-weight: 700;
-    animation: counterPulse 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes counterPulse {
-    from { transform: scale(1); }
-    to { transform: scale(1.05); }
-}
-
-
-/* ==================== تبويبات الرئيسية (وظائف / زواج) ==================== */
-.home-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 1rem;
-    background: var(--card-bg);
-    padding: 6px;
-    border-radius: 50px;
-    box-shadow: var(--shadow);
-}
-
-.home-tab {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background: transparent;
-    border: none;
-    border-radius: 50px;
-    color: var(--text-light);
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.home-tab i {
-    font-size: 1.1rem;
-}
-
-.home-tab.active {
-    background: var(--primary);
-    color: white;
-    box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4);
-}
-
-.home-tab:not(.active):hover {
-    background: var(--light);
-    color: var(--text);
-}
-
-/* ==================== محتوى التبويبات ==================== */
-.home-content {
-    display: none;
-}
-
-.home-content.active {
-    display: block;
-}
-
-/* ==================== بطاقات الوظائف ==================== */
-.job-post-card {
-    border-right: 3px solid var(--primary);
-}
-
-.post-job-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 1rem;
-    color: var(--primary);
-    margin-bottom: 10px;
-    padding: 8px 12px;
-    background: rgba(100, 181, 246, 0.1);
-    border-radius: 10px;
-}
-
-.post-job-title i {
-    font-size: 1.1rem;
-}
-
-.post-info-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 10px;
-    font-size: 0.85rem;
-    color: var(--text-light);
-}
-
-.post-info-row span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--light);
-    padding: 4px 10px;
-    border-radius: 12px;
-}
-
-.post-info-row i {
-    color: var(--primary);
-    font-size: 0.8rem;
-}
-
-.post-bio {
-    background: var(--light);
-    padding: 12px;
-    border-radius: 10px;
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: var(--text);
-    word-wrap: break-word;
-    white-space: pre-wrap;
-}
-
-/* ==================== بطاقات الزواج ==================== */
-.marriage-post-card {
-    border-right: 3px solid #e91e63;
-}
-
-.marriage-post-card .post-job-title {
-    color: #e91e63;
-    background: rgba(233, 30, 99, 0.1);
-}
-
-.marriage-post-card .post-info-row i {
-    color: #e91e63;
-}
-
-/* ==================== أزرار النشر في الملف الشخصي ==================== */
-.publish-buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 1rem;
-}
-
-.publish-btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 14px 16px;
-    border: none;
-    border-radius: var(--radius);
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    -webkit-tap-highlight-color: transparent;
-    color: white;
-}
-
-.publish-btn i {
-    font-size: 1.1rem;
-}
-
-.publish-btn-jobs {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    box-shadow: 0 4px 15px rgba(100, 181, 246, 0.3);
-}
-
-.publish-btn-jobs:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(100, 181, 246, 0.4);
-}
-
-.publish-btn-marriage {
-    background: linear-gradient(135deg, #e91e63, #c2185b);
-    box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
-}
-
-.publish-btn-marriage:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
-}
-
-.publish-btn:active {
-    transform: scale(0.98);
-}
-
-/* ==================== حقول نماذج النشر ==================== */
-#publishJobModal .edit-field,
-#publishMarriageModal .edit-field {
-    margin-bottom: 1rem;
-    text-align: right;
-}
-
-#publishJobModal .edit-field label,
-#publishMarriageModal .edit-field label {
-    display: block;
-    margin-bottom: 6px;
-    color: var(--text);
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-align: right;
-}
-
-#publishJobModal .edit-field input,
-#publishJobModal .edit-field textarea,
-#publishMarriageModal .edit-field input,
-#publishMarriageModal .edit-field textarea {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--light);
-    color: var(--text);
-    font-size: 0.95rem;
-    font-family: inherit;
-    text-align: right;
-    transition: all 0.2s;
-    box-sizing: border-box;
-}
-
-#publishJobModal .edit-field input:focus,
-#publishJobModal .edit-field textarea:focus,
-#publishMarriageModal .edit-field input:focus,
-#publishMarriageModal .edit-field textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    background: var(--card-bg);
-}
-
-#publishJobModal .edit-field textarea,
-#publishMarriageModal .edit-field textarea {
-    resize: vertical;
-    min-height: 80px;
-    line-height: 1.5;
-}
-
-/* ✅ الصورة المعاينة */
-#jobImagePreview img,
-#marriageImagePreview img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 50%;
-}
-
-/* ✅ استعلامات للهواتف */
-@media (max-width: 480px) {
-    .home-tab {
-        padding: 10px 12px;
-        font-size: 0.85rem;
-    }
-    
-    .home-tab i {
-        font-size: 1rem;
-    }
-    
-    .publish-btn {
-        padding: 12px 14px;
-        font-size: 0.85rem;
-    }
-    
-    .publish-btn i {
-        font-size: 1rem;
-    }
-    
-    .post-info-row {
-        gap: 8px;
-        font-size: 0.8rem;
-    }
-    
-    .post-info-row span {
-        padding: 3px 8px;
-    }
-}
-
