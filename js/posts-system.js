@@ -1,10 +1,12 @@
-// ========== posts-system.js - نظام منشورات الوظائف والزواج ==========
+// ========== posts-system.js - نظام المنشورات (وظائف + زواج) ==========
+// نسخة كاملة بدون orderBy (لتجنب مشاكل فهرس Firebase)
 
 const PostsSystem = {
-    currentTab: 'jobs', // 'jobs' أو 'marriage'
+    currentTab: 'jobs',
     
     // ==================== القسم 1: init ====================
     init() {
+        console.log('🚀 تهيئة نظام المنشورات...');
         this.loadAllPosts();
         this.setupRealtimeListeners();
         console.log('✅ تم تهيئة نظام المنشورات');
@@ -14,19 +16,21 @@ const PostsSystem = {
     switchTab(tab) {
         this.currentTab = tab;
         
-        // ✅ تحديث التبويبات
+        // تحديث التبويبات
         document.querySelectorAll('.home-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tab);
         });
         
-        // ✅ تحديث المحتوى
+        // تحديث المحتوى
         document.querySelectorAll('.home-content').forEach(c => c.classList.remove('active'));
         
         if (tab === 'jobs') {
-            document.getElementById('jobsContent')?.classList.add('active');
+            const jobsContent = document.getElementById('jobsContent');
+            if (jobsContent) jobsContent.classList.add('active');
             this.loadJobsPosts();
         } else {
-            document.getElementById('marriageContent')?.classList.add('active');
+            const marriageContent = document.getElementById('marriageContent');
+            if (marriageContent) marriageContent.classList.add('active');
             this.loadMarriagePosts();
         }
     },
@@ -44,9 +48,9 @@ const PostsSystem = {
         if (!container) return;
         
         try {
+            // ✅ بدون orderBy (لتجنب مشكلة الفهرس)
             const snapshot = await window.db.collection('posts')
                 .where('type', '==', 'job')
-                .orderBy('timestamp', 'desc')
                 .limit(50)
                 .get();
             
@@ -59,13 +63,20 @@ const PostsSystem = {
             
             if (emptyState) emptyState.style.display = 'none';
             
-            for (const doc of snapshot.docs) {
-                const post = { id: doc.id, ...doc.data() };
+            // ✅ ترتيب في JavaScript
+            const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            posts.sort((a, b) => {
+                const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
+                const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
+                return timeB - timeA;
+            });
+            
+            for (const post of posts) {
                 const postEl = this.createJobPost(post);
                 if (postEl) container.appendChild(postEl);
             }
             
-            console.log(`✅ تم تحميل ${snapshot.size} وظيفة`);
+            console.log(`✅ تم تحميل ${posts.length} وظيفة`);
         } catch (e) {
             console.error('❌ خطأ في تحميل الوظائف:', e);
         }
@@ -78,9 +89,9 @@ const PostsSystem = {
         if (!container) return;
         
         try {
+            // ✅ بدون orderBy
             const snapshot = await window.db.collection('posts')
                 .where('type', '==', 'marriage')
-                .orderBy('timestamp', 'desc')
                 .limit(50)
                 .get();
             
@@ -93,13 +104,20 @@ const PostsSystem = {
             
             if (emptyState) emptyState.style.display = 'none';
             
-            for (const doc of snapshot.docs) {
-                const post = { id: doc.id, ...doc.data() };
+            // ✅ ترتيب في JavaScript
+            const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            posts.sort((a, b) => {
+                const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
+                const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
+                return timeB - timeA;
+            });
+            
+            for (const post of posts) {
                 const postEl = this.createMarriagePost(post);
                 if (postEl) container.appendChild(postEl);
             }
             
-            console.log(`✅ تم تحميل ${snapshot.size} إعلان زواج`);
+            console.log(`✅ تم تحميل ${posts.length} إعلان زواج`);
         } catch (e) {
             console.error('❌ خطأ في تحميل إعلانات الزواج:', e);
         }
@@ -112,28 +130,34 @@ const PostsSystem = {
         
         const isOwner = window.auth?.currentUser?.uid === post.userId;
         
+        const avatarContent = post.image 
+            ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` 
+            : '👤';
+        
+        const deleteBtn = isOwner 
+            ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
+            : '';
+        
         card.innerHTML = `
             <div class="post-header">
-                <div class="post-avatar-emoji">
-                    ${post.image ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '👤'}
-                </div>
+                <div class="post-avatar-emoji">${avatarContent}</div>
                 <div class="post-user">
-                    <h4>${this.escapeHtml(post.name)}</h4>
+                    <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
                     <span class="post-time">${this.formatTime(post.timestamp)}</span>
                 </div>
-                ${isOwner ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')"><i class="fas fa-trash"></i></button>` : ''}
+                ${deleteBtn}
             </div>
             <div class="post-content">
                 <div class="post-job-title">
                     <i class="fas fa-briefcase"></i>
-                    <strong>${this.escapeHtml(post.jobTitle)}</strong>
+                    <strong>${this.escapeHtml(post.jobTitle || '')}</strong>
                 </div>
                 <div class="post-info-row">
-                    <span><i class="fas fa-user"></i> ${post.age} سنة</span>
-                    <span><i class="fas fa-map-marker-alt"></i> ${this.escapeHtml(post.country)}</span>
+                    <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
+                    <span><i class="fas fa-map-marker-alt"></i> ${this.escapeHtml(post.country || '')}</span>
                 </div>
                 <div class="post-bio">
-                    ${this.escapeHtml(post.bio)}
+                    ${this.escapeHtml(post.bio || '')}
                 </div>
             </div>
         `;
@@ -158,28 +182,34 @@ const PostsSystem = {
         
         const childrenText = post.children === 'yes' ? 'نعم' : 'لا';
         
+        const avatarContent = post.image 
+            ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` 
+            : '👤';
+        
+        const deleteBtn = isOwner 
+            ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
+            : '';
+        
         card.innerHTML = `
             <div class="post-header">
-                <div class="post-avatar-emoji">
-                    ${post.image ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '👤'}
-                </div>
+                <div class="post-avatar-emoji">${avatarContent}</div>
                 <div class="post-user">
-                    <h4>${this.escapeHtml(post.name)}</h4>
+                    <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
                     <span class="post-time">${this.formatTime(post.timestamp)}</span>
                 </div>
-                ${isOwner ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')"><i class="fas fa-trash"></i></button>` : ''}
+                ${deleteBtn}
             </div>
             <div class="post-content">
                 <div class="post-info-row">
-                    <span><i class="fas fa-user"></i> ${post.age} سنة</span>
-                    <span><i class="fas fa-map-marker-alt"></i> ${this.escapeHtml(post.country)}</span>
+                    <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
+                    <span><i class="fas fa-map-marker-alt"></i> ${this.escapeHtml(post.country || '')}</span>
                 </div>
                 <div class="post-info-row">
-                    <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married}</span>
+                    <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married || ''}</span>
                     <span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>
                 </div>
                 <div class="post-bio">
-                    ${this.escapeHtml(post.bio)}
+                    ${this.escapeHtml(post.bio || '')}
                 </div>
             </div>
         `;
@@ -194,12 +224,10 @@ const PostsSystem = {
         try {
             await window.db.collection('posts').doc(postId).delete();
             console.log(`✅ تم حذف المنشور ${postId}`);
-            
-            // ✅ إعادة تحميل
             this.loadAllPosts();
         } catch (e) {
             console.error('❌ خطأ في الحذف:', e);
-            alert('حدث خطأ');
+            alert('حدث خطأ في الحذف');
         }
     },
     
@@ -208,26 +236,22 @@ const PostsSystem = {
         // ✅ مستمع للوظائف
         window.db.collection('posts')
             .where('type', '==', 'job')
-            .orderBy('timestamp', 'desc')
-            .limit(50)
             .onSnapshot(snapshot => {
                 console.log(`📊 تحديث الوظائف: ${snapshot.size}`);
-                if (this.currentTab === 'jobs') {
-                    this.loadJobsPosts();
-                }
-            }, error => console.warn('خطأ في مستمع الوظائف:', error));
+                this.loadJobsPosts();
+            }, error => {
+                console.warn('⚠️ خطأ في مستمع الوظائف:', error.message);
+            });
         
         // ✅ مستمع للزواج
         window.db.collection('posts')
             .where('type', '==', 'marriage')
-            .orderBy('timestamp', 'desc')
-            .limit(50)
             .onSnapshot(snapshot => {
                 console.log(`📊 تحديث الزواج: ${snapshot.size}`);
-                if (this.currentTab === 'marriage') {
-                    this.loadMarriagePosts();
-                }
-            }, error => console.warn('خطأ في مستمع الزواج:', error));
+                this.loadMarriagePosts();
+            }, error => {
+                console.warn('⚠️ خطأ في مستمع الزواج:', error.message);
+            });
     },
     
     // ==================== القسم 10: دوال مساعدة ====================
@@ -264,12 +288,14 @@ window.switchHomeTab = function(tab) {
     PostsSystem.switchTab(tab);
 };
 
-// ✅ فتح نافذة نشر
+// ✅ فتح نافذة النشر
 window.openPublishModal = function(type) {
     if (type === 'jobs') {
-        document.getElementById('publishJobModal').classList.add('active');
+        const modal = document.getElementById('publishJobModal');
+        if (modal) modal.classList.add('active');
     } else if (type === 'marriage') {
-        document.getElementById('publishMarriageModal').classList.add('active');
+        const modal = document.getElementById('publishMarriageModal');
+        if (modal) modal.classList.add('active');
     }
 };
 
@@ -282,7 +308,7 @@ window.previewJobImage = function(event) {
     reader.onload = (e) => {
         const preview = document.getElementById('jobImagePreview');
         if (preview) {
-            preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+            preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         }
     };
     reader.readAsDataURL(file);
@@ -297,7 +323,7 @@ window.previewMarriageImage = function(event) {
     reader.onload = (e) => {
         const preview = document.getElementById('marriageImagePreview');
         if (preview) {
-            preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+            preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         }
     };
     reader.readAsDataURL(file);
@@ -335,6 +361,8 @@ window.publishJob = async function() {
             imageBase64 = await fileToBase64(imageInput.files[0]);
         }
         
+        console.log('📤 جاري نشر الوظيفة...');
+        
         // ✅ حفظ في Firebase
         await window.db.collection('posts').add({
             type: 'job',
@@ -348,20 +376,28 @@ window.publishJob = async function() {
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         
+        console.log('✅ تم نشر الوظيفة');
+        
         // ✅ إغلاق + تفريغ
-        closeModal('publishJobModal');
+        window.closeModal('publishJobModal');
         clearJobForm();
         
         alert('✅ تم نشر الوظيفة بنجاح');
         
-        // ✅ الانتقال للرئيسية + تحديث
-        if (typeof switchPage === 'function') switchPage('home');
-        PostsSystem.switchTab('jobs');
-        PostsSystem.loadJobsPosts();
+        // ✅ الانتقال للرئيسية
+        if (typeof switchPage === 'function') {
+            switchPage('home');
+        }
+        
+        // ✅ الانتقال لتبويب الوظائف وتحديث
+        setTimeout(() => {
+            PostsSystem.switchTab('jobs');
+            PostsSystem.loadJobsPosts();
+        }, 100);
         
     } catch (e) {
         console.error('❌ خطأ في النشر:', e);
-        alert('حدث خطأ في النشر');
+        alert('حدث خطأ في النشر: ' + e.message);
     }
 };
 
@@ -398,6 +434,8 @@ window.publishMarriage = async function() {
             imageBase64 = await fileToBase64(imageInput.files[0]);
         }
         
+        console.log('📤 جاري نشر إعلان الزواج...');
+        
         // ✅ حفظ في Firebase
         await window.db.collection('posts').add({
             type: 'marriage',
@@ -412,24 +450,33 @@ window.publishMarriage = async function() {
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         
+        console.log('✅ تم نشر إعلان الزواج');
+        
         // ✅ إغلاق + تفريغ
-        closeModal('publishMarriageModal');
+        window.closeModal('publishMarriageModal');
         clearMarriageForm();
         
         alert('✅ تم نشر إعلان الزواج بنجاح');
         
-        // ✅ الانتقال للرئيسية + تحديث
-        if (typeof switchPage === 'function') switchPage('home');
-        PostsSystem.switchTab('marriage');
-        PostsSystem.loadMarriagePosts();
+        // ✅ الانتقال للرئيسية
+        if (typeof switchPage === 'function') {
+            switchPage('home');
+        }
+        
+        // ✅ الانتقال لتبويب الزواج وتحديث
+        setTimeout(() => {
+            PostsSystem.switchTab('marriage');
+            PostsSystem.loadMarriagePosts();
+        }, 100);
         
     } catch (e) {
         console.error('❌ خطأ في النشر:', e);
-        alert('حدث خطأ في النشر');
+        alert('حدث خطأ في النشر: ' + e.message);
     }
 };
 
-// ✅ تفريغ نماذج
+// ==================== دوال مساعدة ====================
+
 function clearJobForm() {
     ['jobName', 'jobAge', 'jobCountry', 'jobTitle', 'jobBio'].forEach(id => {
         const el = document.getElementById(id);
@@ -452,7 +499,6 @@ function clearMarriageForm() {
     if (input) input.value = '';
 }
 
-// ✅ تحويل ملف إلى base64
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -462,13 +508,9 @@ function fileToBase64(file) {
     });
 }
 
-// ✅ إغلاق نافذة
-window.closeModal = function(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) modal.classList.remove('active');
-};
-
 // ==================== تشغيل النظام ====================
+
+// ✅ عند تحميل الصفحة
 window.addEventListener('load', () => {
     setTimeout(() => {
         if (window.auth?.currentUser) {
@@ -477,6 +519,12 @@ window.addEventListener('load', () => {
     }, 500);
 });
 
+// ✅ عند تسجيل الدخول
 window.addEventListener('authReady', () => {
-    PostsSystem.init();
+    console.log('✅ authReady - تهيئة المنشورات');
+    setTimeout(() => {
+        PostsSystem.init();
+    }, 300);
 });
+
+console.log('✅ posts-system.js تم تحميله');
