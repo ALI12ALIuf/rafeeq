@@ -387,7 +387,6 @@ body.conversation-open {
     gap: 0.75rem;
 }
 
-/* ✅ حاوية أزرار الهيدر (زر الصداقة + زر الحذف) */
 .post-header-actions {
     display: flex;
     align-items: center;
@@ -453,7 +452,6 @@ body.conversation-open {
 
 .post-time { display: none !important; }
 
-/* ✅ زر طلب الصداقة (دائري صغير) */
 .post-action-btn {
     width: 36px;
     height: 36px;
@@ -781,7 +779,7 @@ body.conversation-open {
 .id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
 .profile-bio { padding: 0 1rem 1rem; color: var(--text-light); font-size: 0.9rem; text-align: center; }
 
-/* ==================== القسم 15: النوافذ المنبثقة ==================== */
+/* ==================== القسم 15: النوافذ المنبثقة (مع العدادات) ==================== */
 .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: all 0.3s; }
 .modal.active { opacity: 1; visibility: visible; }
 
@@ -817,14 +815,56 @@ body.conversation-open {
     text-align: center;
 }
 
+/* ✅ الـ label كـ flex: النص في الوسط + العداد على اليسار */
 .edit-field label { 
-    display: block; 
+    display: flex; 
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 6px; 
     color: var(--text); 
     font-size: 0.85rem; 
     font-weight: 600; 
-    text-align: center;
     width: 100%;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+    position: relative;
+    text-align: center;
+}
+
+/* ✅ عداد الأحرف - أعلى الحقل على اليسار */
+.field-counter {
+    font-size: 0.7rem;
+    color: var(--text-light);
+    font-family: monospace;
+    font-weight: 500;
+    direction: ltr;
+    opacity: 0.6;
+    pointer-events: none;
+    padding: 0;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    order: 1;
+}
+
+/* ✅ النص في المنتصف بين العداد والحقل */
+.edit-field label > *:not(.field-counter) {
+    order: 2;
+    flex: 1;
+    text-align: center;
+    padding-right: 55px; /* إزاحة لتعويض العداد */
+}
+
+.field-counter.warning {
+    color: #FFC107;
+    opacity: 1;
+    font-weight: 700;
+}
+
+.field-counter.full {
+    color: #f44336;
+    opacity: 1;
+    font-weight: 700;
 }
 
 .input-wrapper { 
@@ -1406,4 +1446,40 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 #marriageChildrenField {
     transition: opacity 0.3s ease, max-height 0.3s ease;
     overflow: hidden;
+}
+
+/* ==================== القسم 26: عدادات حقول النشر (أعلى يسار) ==================== */
+.edit-field label {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+}
+
+.field-counter {
+    font-size: 0.7rem;
+    color: var(--text-light);
+    font-family: monospace;
+    font-weight: 500;
+    direction: ltr;
+    opacity: 0.55;
+    pointer-events: none;
+    padding: 0 4px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    order: 1;
+    line-height: 1;
+}
+
+.field-counter.warning {
+    color: #FFC107;
+    opacity: 1;
+    font-weight: 700;
+}
+
+.field-counter.full {
+    color: #f44336;
+    opacity: 1;
+    font-weight: 700;
 }
