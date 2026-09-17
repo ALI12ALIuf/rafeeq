@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية ==========
+// ========== ui-functions.js - النسخة النهائية (مع إصلاحات التمركز) ==========
 
 window._pageStack = [];
 
@@ -28,7 +28,7 @@ let _currentChatsElements = {
 let _updateLock = false;
 let _unreadMessages = new Map();
 
-// ==================== ✅ دوال حفظ/تحميل حالة غير المقروء ====================
+// ==================== دوال حفظ/تحميل حالة غير المقروء ====================
 function saveUnreadMessages() {
     const uid = window.auth?.currentUser?.uid;
     if (!uid) return;
@@ -597,7 +597,6 @@ function setupNavigation() {
             }
         }
         
-        // ✅ إظهار/إخفاء منتقي البلد حسب الصفحة
         if (typeof PostsSystem !== 'undefined' && PostsSystem.updateCountrySelectorVisibility) {
             PostsSystem.updateCountrySelectorVisibility();
         }
@@ -620,7 +619,7 @@ function setupModals() {
     }); 
 }
 
-// ==================== دالة closeModal المحسّنة (تقبل ID) ====================
+// ==================== دالة closeModal ====================
 window.closeModal = function(modalId) {
     if (modalId) {
         const modal = document.getElementById(modalId);
@@ -649,6 +648,7 @@ window.updateCharCounter = function() {
     }
 };
 
+// ==================== ✅ فتح نافذة تعديل الملف الشخصي (مُصلّح - تمركز) ====================
 window.openEditProfileModal = function() {
     const modal = document.getElementById('editProfileModal');
     if (!modal) return;
@@ -657,13 +657,28 @@ window.openEditProfileModal = function() {
     const currentName = document.getElementById('profileName')?.textContent;
     const currentEmoji = document.getElementById('profileAvatarEmoji')?.textContent;
     
-    if (nameInput) nameInput.value = currentName || '';
+    if (nameInput) {
+        nameInput.value = currentName || '';
+        nameInput.style.textAlign = 'center';
+        nameInput.style.direction = 'rtl';
+    }
     
     const avatarPreview = document.getElementById('currentAvatarEmoji');
     if (avatarPreview) avatarPreview.textContent = currentEmoji || '🧔🏻‍♂️';
     
+    // ✅ تحديث عداد الأحرف
     window.updateCharCounter();
+    
+    // ✅ إظهار النافذة
     modal.classList.add('active');
+    
+    // ✅ تأخير بسيط لضمان التمركز
+    setTimeout(() => {
+        if (nameInput) {
+            nameInput.style.textAlign = 'center';
+            nameInput.style.direction = 'rtl';
+        }
+    }, 50);
 };
 
 window.saveProfile = function() {
