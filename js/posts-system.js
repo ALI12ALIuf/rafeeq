@@ -855,13 +855,11 @@ const PostsSystem = {
                     ${deleteBtn}
                     <span class="post-action-btn-slot"></span>
                 </div>
-                <div class="post-user-group">
-                    <div class="post-user">
-                        <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
-                    </div>
-                    <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
-                        ${avatarContent}
-                    </div>
+                <div class="post-user">
+                    <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
+                </div>
+                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
+                    ${avatarContent}
                 </div>
             </div>
             <div class="post-content">
@@ -929,13 +927,11 @@ const PostsSystem = {
                     ${deleteBtn}
                     <span class="post-action-btn-slot"></span>
                 </div>
-                <div class="post-user-group">
-                    <div class="post-user">
-                        <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
-                    </div>
-                    <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
-                        ${avatarContent}
-                    </div>
+                <div class="post-user">
+                    <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
+                </div>
+                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
+                    ${avatarContent}
                 </div>
             </div>
             <div class="post-content">
