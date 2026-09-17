@@ -40,6 +40,12 @@
         <!-- ===== صفحة الرئيسية (وظائف + زواج) ===== -->
         <div class="page home-page active">
             
+            <!-- ✅ اختيار البلد -->
+            <div class="country-selector-container">
+                <div id="countrySelector"></div>
+            </div>
+            
+            <!-- ✅ تبويبات (وظائف / زواج) -->
             <div class="home-tabs">
                 <button class="home-tab active" data-tab="jobs" onclick="switchHomeTab('jobs')">
                     <i class="fas fa-briefcase"></i>
@@ -51,7 +57,10 @@
                 </button>
             </div>
             
+            <!-- ✅ محتوى الوظائف -->
             <div class="home-content active" id="jobsContent">
+                <div class="categories-scroll" id="jobCategories"></div>
+                
                 <div class="posts-container" id="jobsPostsContainer"></div>
                 <div class="empty-state" id="jobsEmptyState">
                     <i class="fas fa-briefcase"></i>
@@ -60,6 +69,7 @@
                 </div>
             </div>
             
+            <!-- ✅ محتوى الزواج -->
             <div class="home-content" id="marriageContent">
                 <div class="posts-container" id="marriagePostsContainer"></div>
                 <div class="empty-state" id="marriageEmptyState">
@@ -262,7 +272,16 @@
         
         <div class="edit-field">
             <label>البلد</label>
-            <input type="text" id="jobCountry" maxlength="30" placeholder="مثال: العراق">
+            <select id="jobCountryCode" style="width: 100%; padding: 10px; border-radius: 8px; background: var(--light); color: var(--text); border: 1px solid var(--border); text-align: right; direction: rtl; font-size: 0.95rem;">
+                <!-- تُملأ تلقائياً من countries.js -->
+            </select>
+        </div>
+        
+        <div class="edit-field">
+            <label>القسم</label>
+            <select id="jobCategory" style="width: 100%; padding: 10px; border-radius: 8px; background: var(--light); color: var(--text); border: 1px solid var(--border); text-align: right; direction: rtl; font-size: 0.95rem;">
+                <!-- تُملأ تلقائياً من posts-system.js -->
+            </select>
         </div>
         
         <div class="edit-field">
@@ -311,7 +330,9 @@
         
         <div class="edit-field">
             <label>البلد</label>
-            <input type="text" id="marriageCountry" maxlength="30" placeholder="مثال: العراق">
+            <select id="marriageCountryCode" style="width: 100%; padding: 10px; border-radius: 8px; background: var(--light); color: var(--text); border: 1px solid var(--border); text-align: right; direction: rtl; font-size: 0.95rem;">
+                <!-- تُملأ تلقائياً من countries.js -->
+            </select>
         </div>
         
         <div class="edit-field">
@@ -469,13 +490,14 @@
     window.googleProvider = new firebase.auth.GoogleAuthProvider();
 </script>
 
-<script src="js/i18n.js?v=20"></script>
-<script src="js/secure-chat.js?v=20"></script>
-<script src="js/chat-system.js?v=20"></script>
-<script src="js/ui-functions.js?v=20"></script>
-<script src="js/posts-system.js?v=20"></script>
-<script src="js/auth.js?v=20"></script>
-<script src="js/friends.js?v=20"></script>
+<script src="js/i18n.js?v=21"></script>
+<script src="js/countries.js?v=21"></script>
+<script src="js/secure-chat.js?v=21"></script>
+<script src="js/chat-system.js?v=21"></script>
+<script src="js/ui-functions.js?v=21"></script>
+<script src="js/posts-system.js?v=21"></script>
+<script src="js/auth.js?v=21"></script>
+<script src="js/friends.js?v=21"></script>
 
 <script>
 window.addEventListener('load', function() {
