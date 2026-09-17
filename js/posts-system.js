@@ -69,23 +69,6 @@ const PostsSystem = {
                     <span class="country-header-name">${currentName}</span>
                     <i class="fas fa-chevron-down country-header-arrow"></i>
                 </button>
-                <div class="country-header-dropdown" id="countryHeaderDropdown" style="display: none;">
-                    <button class="country-mini-option ${this.showAllCountries ? 'active' : ''}" 
-                            onclick="PostsSystem.selectAllCountries()">
-                        <span class="country-mini-flag">🌍</span>
-                        <span class="country-mini-name">جميع الدول</span>
-                        ${this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
-                    </button>
-                    <div class="country-mini-divider"></div>
-                    ${window.Countries.list.map(c => `
-                        <button class="country-mini-option ${c.code === this.selectedCountry && !this.showAllCountries ? 'active' : ''}" 
-                                onclick="PostsSystem.selectCountry('${c.code}')">
-                            <span class="country-mini-flag">${c.flag}</span>
-                            <span class="country-mini-name">${c.name}</span>
-                            ${c.code === this.selectedCountry && !this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
-                        </button>
-                    `).join('')}
-                </div>
             </div>
         `;
     },
@@ -102,29 +85,65 @@ const PostsSystem = {
     toggleHeaderCountryDropdown(event) {
         if (event) event.stopPropagation();
         
-        const dropdown = document.getElementById('countryHeaderDropdown');
-        const arrow = document.querySelector('.country-header-arrow');
-        if (!dropdown) return;
+        // ✅ حذف أي قائمة سابقة
+        const existing = document.getElementById('countryHeaderDropdown');
+        if (existing) existing.remove();
         
-        if (dropdown.style.display === 'none' || !dropdown.style.display) {
-            dropdown.style.display = 'block';
-            if (arrow) arrow.style.transform = 'rotate(180deg)';
-            
-            setTimeout(() => {
-                const closeHandler = (e) => {
-                    const wrapper = document.getElementById('countryHeaderSelector');
-                    if (wrapper && !wrapper.contains(e.target)) {
-                        dropdown.style.display = 'none';
-                        if (arrow) arrow.style.transform = 'rotate(0deg)';
-                        document.removeEventListener('click', closeHandler);
-                    }
-                };
-                document.addEventListener('click', closeHandler);
-            }, 100);
-        } else {
-            dropdown.style.display = 'none';
-            if (arrow) arrow.style.transform = 'rotate(0deg)';
-        }
+        const wrapper = document.querySelector('.country-header-inline');
+        if (!wrapper) return;
+        
+        const btn = wrapper.querySelector('.country-header-btn');
+        if (!btn) return;
+        
+        // ✅ حساب موقع الزر
+        const rect = btn.getBoundingClientRect();
+        
+        // ✅ إنشاء القائمة
+        const dropdown = document.createElement('div');
+        dropdown.className = 'country-header-dropdown';
+        dropdown.id = 'countryHeaderDropdown';
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 8) + 'px';
+        dropdown.style.right = '10px';
+        dropdown.style.left = 'auto';
+        dropdown.style.zIndex = '99999';
+        
+        dropdown.innerHTML = `
+            <button class="country-mini-option ${this.showAllCountries ? 'active' : ''}" 
+                    onclick="PostsSystem.selectAllCountries()">
+                <span class="country-mini-flag">🌍</span>
+                <span class="country-mini-name">جميع الدول</span>
+                ${this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
+            </button>
+            <div class="country-mini-divider"></div>
+            ${window.Countries.list.map(c => `
+                <button class="country-mini-option ${c.code === this.selectedCountry && !this.showAllCountries ? 'active' : ''}" 
+                        onclick="PostsSystem.selectCountry('${c.code}')">
+                    <span class="country-mini-flag">${c.flag}</span>
+                    <span class="country-mini-name">${c.name}</span>
+                    ${c.code === this.selectedCountry && !this.showAllCountries ? '<i class="fas fa-check"></i>' : ''}
+                </button>
+            `).join('')}
+        `;
+        
+        document.body.appendChild(dropdown);
+        
+        // ✅ تدوير السهم
+        const arrow = btn.querySelector('.country-header-arrow');
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+        
+        // ✅ إغلاق عند النقر خارج القائمة
+        setTimeout(() => {
+            const closeHandler = (e) => {
+                const dd = document.getElementById('countryHeaderDropdown');
+                if (dd && !dd.contains(e.target) && !btn.contains(e.target)) {
+                    dd.remove();
+                    if (arrow) arrow.style.transform = 'rotate(0deg)';
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            document.addEventListener('click', closeHandler);
+        }, 100);
     },
     
     selectCountry(code) {
@@ -134,10 +153,9 @@ const PostsSystem = {
         this.renderCountryHeaderSelector();
         this.loadAllPosts();
         
+        // ✅ إزالة القائمة
         const dropdown = document.getElementById('countryHeaderDropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        const arrow = document.querySelector('.country-header-arrow');
-        if (arrow) arrow.style.transform = 'rotate(0deg)';
+        if (dropdown) dropdown.remove();
         
         console.log(`🌍 تم اختيار: ${window.Countries.getName(code)}`);
     },
@@ -148,10 +166,9 @@ const PostsSystem = {
         this.renderCountryHeaderSelector();
         this.loadAllPosts();
         
+        // ✅ إزالة القائمة
         const dropdown = document.getElementById('countryHeaderDropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        const arrow = document.querySelector('.country-header-arrow');
-        if (arrow) arrow.style.transform = 'rotate(0deg)';
+        if (dropdown) dropdown.remove();
         
         console.log('🌍 عرض جميع الدول');
     },
@@ -336,7 +353,7 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
-    // ==================== ✅ قوائم الزواج المخصصة ====================
+    // ==================== قوائم الزواج المخصصة ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -439,9 +456,7 @@ const PostsSystem = {
         this.currentTab = tab;
         
         const dropdown = document.getElementById('countryHeaderDropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        const arrow = document.querySelector('.country-header-arrow');
-        if (arrow) arrow.style.transform = 'rotate(0deg)';
+        if (dropdown) dropdown.remove();
         
         document.querySelectorAll('.home-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tab);
@@ -770,7 +785,7 @@ const PostsSystem = {
             .onSnapshot(() => this.loadMarriagePosts(), error => console.warn('⚠️', error.message));
     },
     
-    // ==================== ✅ قص الصورة مربعة + ضغط (مثل واتساب) ====================
+    // ==================== قص الصورة مربعة + ضغط (مثل واتساب) ====================
     async compressImage(file) {
         return new Promise((resolve, reject) => {
             if (!file.type.startsWith('image/')) { 
@@ -827,7 +842,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== ✅ معاينة صورة الوظيفة ====================
+    // ==================== معاينة صورة الوظيفة ====================
     async previewJobImage(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
@@ -847,7 +862,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== ✅ معاينة صورة الزواج ====================
+    // ==================== معاينة صورة الزواج ====================
     async previewMarriageImage(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
@@ -1025,7 +1040,7 @@ window.publishMarriage = async function() {
             name, age: parseInt(age),
             country: window.Countries.getName(countryCode),
             countryCode,
-            bio, married, 
+            bio, married,
             children: (married === 'no') ? 'no' : children,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
