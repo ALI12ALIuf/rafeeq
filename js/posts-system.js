@@ -275,7 +275,6 @@ const PostsSystem = {
         this.loadAllPosts();
     },
     
-    // ==================== منتقي البلد في الرأس ====================
     renderCountryHeaderSelector() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
@@ -831,7 +830,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== كرت الوظيفة ====================
+    // ==================== ✅ كرت الوظيفة ====================
     createJobPost(post) {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
@@ -856,11 +855,13 @@ const PostsSystem = {
                     ${deleteBtn}
                     <span class="post-action-btn-slot"></span>
                 </div>
-                <div class="post-user">
-                    <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
-                </div>
-                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
-                    ${avatarContent}
+                <div class="post-user-group">
+                    <div class="post-user">
+                        <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
+                    </div>
+                    <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
+                        ${avatarContent}
+                    </div>
                 </div>
             </div>
             <div class="post-content">
@@ -895,7 +896,7 @@ const PostsSystem = {
         return card;
     },
     
-    // ==================== ✅ كرت الزواج (الحالة الاجتماعية + الأطفال في نفس الصف) ====================
+    // ==================== ✅ كرت الزواج ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -918,7 +919,6 @@ const PostsSystem = {
             ? `<button class="post-menu" onclick="event.stopPropagation(); PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
             : '';
         
-        // ✅ سطر الحالة الاجتماعية + الأطفال (يظهر فقط إذا لم يكن "أعزب")
         const childrenSpan = post.married === 'no' 
             ? '' 
             : `<span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>`;
@@ -929,15 +929,16 @@ const PostsSystem = {
                     ${deleteBtn}
                     <span class="post-action-btn-slot"></span>
                 </div>
-                <div class="post-user">
-                    <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
-                </div>
-                <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
-                    ${avatarContent}
+                <div class="post-user-group">
+                    <div class="post-user">
+                        <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
+                    </div>
+                    <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
+                        ${avatarContent}
+                    </div>
                 </div>
             </div>
             <div class="post-content">
-                <!-- ✅ كل المعلومات في صف واحد -->
                 <div class="post-info-row">
                     <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
                     <span><span style="font-size:1.1rem;">${flag}</span> ${this.escapeHtml(post.country || '')}</span>
