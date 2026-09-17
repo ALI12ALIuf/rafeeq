@@ -87,10 +87,13 @@ body.conversation-open {
     gap: 8px;
 }
 
+/* ✅ في RTL: header-left يظهر على اليمين، header-right على اليسار */
 .header-left { 
     display: flex; 
     gap: 0.5rem; 
     min-width: 45px;
+    justify-content: flex-start;
+    align-items: center;
 }
 
 .header-right { 
@@ -133,7 +136,7 @@ body.conversation-open {
 .country-header-wrapper {
     position: relative;
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     align-items: center;
 }
 
@@ -192,8 +195,8 @@ body.conversation-open {
 .country-header-dropdown {
     position: absolute;
     top: calc(100% + 8px);
-    right: 0;
-    left: auto;
+    left: 0;
+    right: auto;
     transform: translateX(0);
     min-width: 220px;
     max-height: 60vh;
