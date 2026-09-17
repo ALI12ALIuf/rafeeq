@@ -72,6 +72,7 @@ body.conversation-open {
 
 /* ==================== القسم 5: الحاوية الرئيسية ==================== */
 .app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+
 .app-header { 
     height: var(--header-height); 
     background: var(--card-bg); 
@@ -79,20 +80,37 @@ body.conversation-open {
     display: flex; 
     align-items: center; 
     justify-content: space-between; 
-    padding: 0 1rem; 
+    padding: 0 0.75rem; 
     position: sticky; 
     top: 0; 
     z-index: 100; 
+    gap: 8px;
 }
-.header-left, .header-right { display: flex; gap: 0.5rem; width: 50px; }
+
+.header-left { 
+    display: flex; 
+    gap: 0.5rem; 
+    min-width: 45px;
+}
+
+.header-right { 
+    display: flex; 
+    gap: 0.5rem; 
+    min-width: 45px; 
+    justify-content: flex-end; 
+    align-items: center;
+}
+
 .header-title { 
     flex: 1; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center;
-    position: relative;
+    text-align: center;
 }
-.header-title h1 { font-size: 1.2rem; font-weight: 600; }
+
+.header-title h1 { 
+    font-size: 1.1rem; 
+    font-weight: 600;
+    color: var(--text);
+}
 
 .icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
@@ -111,12 +129,12 @@ body.conversation-open {
 .nav-item i { font-size: 1.2rem; }
 .nav-item.active { color: var(--primary); }
 
-/* ==================== القسم 7: منتقي البلد في الرأس ==================== */
+/* ==================== القسم 7: منتقي البلد (على اليمين) ==================== */
 .country-header-wrapper {
     position: relative;
     display: flex;
-    justify-content: center;
-    width: 100%;
+    justify-content: flex-end;
+    align-items: center;
 }
 
 .country-header-inline {
@@ -128,7 +146,7 @@ body.conversation-open {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 12px;
+    padding: 5px 10px;
     background: transparent;
     border: 1.5px solid var(--border);
     border-radius: 20px;
@@ -150,22 +168,19 @@ body.conversation-open {
     background: rgba(100, 181, 246, 0.08);
 }
 
-.country-header-title {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--primary);
-    display: none;
-}
-
 .country-header-flag {
     font-size: 1.15rem;
     line-height: 1;
 }
 
 .country-header-name {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--text);
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .country-header-arrow {
@@ -177,8 +192,9 @@ body.conversation-open {
 .country-header-dropdown {
     position: absolute;
     top: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
+    right: 0;
+    left: auto;
+    transform: translateX(0);
     min-width: 220px;
     max-height: 60vh;
     overflow-y: auto;
@@ -192,8 +208,8 @@ body.conversation-open {
 }
 
 @keyframes dropdownSlide {
-    from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .country-mini-option {
@@ -994,12 +1010,13 @@ body.conversation-open {
     .category-name { font-size: 0.72rem; }
     
     .country-header-btn {
-        padding: 4px 10px;
-        font-size: 0.75rem;
+        padding: 4px 8px;
+        font-size: 0.72rem;
     }
     
     .country-header-flag { font-size: 1rem; }
-    .country-header-name { font-size: 0.72rem; }
+    .country-header-name { font-size: 0.68rem; max-width: 55px; }
+    .country-header-arrow { font-size: 0.55rem; }
 }
 
 /* ==================== القسم 20: أنماط المحادثة ==================== */
