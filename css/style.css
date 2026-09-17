@@ -696,3 +696,268 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     from { transform: scale(1); }
     to { transform: scale(1.05); }
 }
+
+
+/* ==================== تبويبات الرئيسية (وظائف / زواج) ==================== */
+.home-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+    background: var(--card-bg);
+    padding: 6px;
+    border-radius: 50px;
+    box-shadow: var(--shadow);
+}
+
+.home-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 50px;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.home-tab i {
+    font-size: 1.1rem;
+}
+
+.home-tab.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4);
+}
+
+.home-tab:not(.active):hover {
+    background: var(--light);
+    color: var(--text);
+}
+
+/* ==================== محتوى التبويبات ==================== */
+.home-content {
+    display: none;
+}
+
+.home-content.active {
+    display: block;
+}
+
+/* ==================== بطاقات الوظائف ==================== */
+.job-post-card {
+    border-right: 3px solid var(--primary);
+}
+
+.post-job-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+    color: var(--primary);
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: rgba(100, 181, 246, 0.1);
+    border-radius: 10px;
+}
+
+.post-job-title i {
+    font-size: 1.1rem;
+}
+
+.post-info-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.post-info-row span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--light);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.post-info-row i {
+    color: var(--primary);
+    font-size: 0.8rem;
+}
+
+.post-bio {
+    background: var(--light);
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text);
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* ==================== بطاقات الزواج ==================== */
+.marriage-post-card {
+    border-right: 3px solid #e91e63;
+}
+
+.marriage-post-card .post-job-title {
+    color: #e91e63;
+    background: rgba(233, 30, 99, 0.1);
+}
+
+.marriage-post-card .post-info-row i {
+    color: #e91e63;
+}
+
+/* ==================== أزرار النشر في الملف الشخصي ==================== */
+.publish-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.publish-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
+    color: white;
+}
+
+.publish-btn i {
+    font-size: 1.1rem;
+}
+
+.publish-btn-jobs {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    box-shadow: 0 4px 15px rgba(100, 181, 246, 0.3);
+}
+
+.publish-btn-jobs:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(100, 181, 246, 0.4);
+}
+
+.publish-btn-marriage {
+    background: linear-gradient(135deg, #e91e63, #c2185b);
+    box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+}
+
+.publish-btn-marriage:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+}
+
+.publish-btn:active {
+    transform: scale(0.98);
+}
+
+/* ==================== حقول نماذج النشر ==================== */
+#publishJobModal .edit-field,
+#publishMarriageModal .edit-field {
+    margin-bottom: 1rem;
+    text-align: right;
+}
+
+#publishJobModal .edit-field label,
+#publishMarriageModal .edit-field label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: right;
+}
+
+#publishJobModal .edit-field input,
+#publishJobModal .edit-field textarea,
+#publishMarriageModal .edit-field input,
+#publishMarriageModal .edit-field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--light);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: inherit;
+    text-align: right;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+#publishJobModal .edit-field input:focus,
+#publishJobModal .edit-field textarea:focus,
+#publishMarriageModal .edit-field input:focus,
+#publishMarriageModal .edit-field textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--card-bg);
+}
+
+#publishJobModal .edit-field textarea,
+#publishMarriageModal .edit-field textarea {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.5;
+}
+
+/* ✅ الصورة المعاينة */
+#jobImagePreview img,
+#marriageImagePreview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* ✅ استعلامات للهواتف */
+@media (max-width: 480px) {
+    .home-tab {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+    }
+    
+    .home-tab i {
+        font-size: 1rem;
+    }
+    
+    .publish-btn {
+        padding: 12px 14px;
+        font-size: 0.85rem;
+    }
+    
+    .publish-btn i {
+        font-size: 1rem;
+    }
+    
+    .post-info-row {
+        gap: 8px;
+        font-size: 0.8rem;
+    }
+    
+    .post-info-row span {
+        padding: 3px 8px;
+    }
+}
+
