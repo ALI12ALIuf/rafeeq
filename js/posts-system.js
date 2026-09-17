@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع زر طلب الصداقة في الهيدر ==========
+// ========== posts-system.js - النسخة النهائية ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -104,7 +104,7 @@ const PostsSystem = {
         }
     },
     
-    // ✅ تحديد حالة العلاقة مع مستخدم معين
+    // ✅ تحديد حالة العلاقة
     getRelationshipState(targetUserId) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return 'guest';
@@ -234,7 +234,7 @@ const PostsSystem = {
         return btn;
     },
     
-    // ✅ ربط أحداث الزر بعد إدراج HTML
+    // ✅ ربط أحداث الزر
     bindActionButton(card, post) {
         if (!post.userId) return;
         const isOwner = window.auth?.currentUser?.uid === post.userId;
@@ -269,7 +269,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== إرسال طلب صداقة من المنشور ====================
+    // ==================== إرسال طلب صداقة ====================
     async sendFriendRequestFromPost(targetUserId, btnElement) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) {
@@ -927,7 +927,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== إنشاء كرت الوظيفة (الزر في الهيدر) ====================
+    // ==================== إنشاء كرت الوظيفة ====================
     createJobPost(post) {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
@@ -946,7 +946,6 @@ const PostsSystem = {
             ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
             : '';
         
-        // ✅ إنشاء HTML الزر
         let actionBtnHTML = '';
         if (post.userId && !isOwner) {
             const actionBtn = this.createPostActionButton(post);
@@ -982,7 +981,6 @@ const PostsSystem = {
             </div>
         `;
         
-        // ✅ ربط الأحداث
         this.bindActionButton(card, post);
         
         if (post.image) {
@@ -993,7 +991,7 @@ const PostsSystem = {
         return card;
     },
     
-    // ==================== إنشاء كرت الزواج (الزر في الهيدر) ====================
+    // ==================== ✅ إنشاء كرت الزواج (مُعدّل) ====================
     createMarriagePost(post) {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
@@ -1016,7 +1014,6 @@ const PostsSystem = {
             ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
             : '';
         
-        // ✅ إنشاء HTML الزر
         let actionBtnHTML = '';
         if (post.userId && !isOwner) {
             const actionBtn = this.createPostActionButton(post);
@@ -1025,9 +1022,26 @@ const PostsSystem = {
             }
         }
         
-        const childrenRow = post.married === 'no' 
-            ? '' 
-            : `<span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>`;
+        // ✅ بناء صف الحالة الاجتماعية + الأطفال في نفس السطر
+        const marriedLabel = marriedText[post.married] || post.married || '';
+        
+        let statusRowHTML = '';
+        if (post.married === 'no') {
+            // ✅ أعزب → صف واحد فقط للحالة
+            statusRowHTML = `
+                <div class="post-info-row">
+                    <span><i class="fas fa-heart"></i> ${marriedLabel}</span>
+                </div>
+            `;
+        } else {
+            // ✅ متزوج/مطلق/أرمل → صف واحد يجمع الحالة + الأطفال
+            statusRowHTML = `
+                <div class="post-info-row">
+                    <span><i class="fas fa-heart"></i> ${marriedLabel}</span>
+                    <span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>
+                </div>
+            `;
+        }
         
         card.innerHTML = `
             <div class="post-header">
@@ -1047,15 +1061,11 @@ const PostsSystem = {
                     <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
                     <span><span style="font-size:1.1rem;">${flag}</span> ${this.escapeHtml(post.country || '')}</span>
                 </div>
-                <div class="post-info-row">
-                    <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married || ''}</span>
-                    ${childrenRow}
-                </div>
+                ${statusRowHTML}
                 <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
             </div>
         `;
         
-        // ✅ ربط الأحداث
         this.bindActionButton(card, post);
         
         if (post.image) {
@@ -1489,4 +1499,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - مع زر طلب الصداقة في الهيدر');
+console.log('✅ posts-system.js تم تحميله');
