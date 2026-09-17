@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية ==========
+// ========== posts-system.js - النسخة النهائية (مع القص المربع والقوائم المخصصة) ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -6,8 +6,8 @@ const PostsSystem = {
     selectedCategory: 'all',
     showAllCountries: false,
     
-    IMAGE_MAX_WIDTH: 600,
-    IMAGE_QUALITY: 0.65,
+    IMAGE_TARGET_SIZE: 400,
+    IMAGE_QUALITY: 0.75,
     
     jobCategories: [
         { code: 'all', name: 'الكل', icon: 'fas fa-layer-group', color: '#64B5F6' },
@@ -52,12 +52,11 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== ✅ منتقي البلد في الرأس (يظهر فقط في الرئيسية) ====================
+    // ==================== منتقي البلد في الرأس ====================
     renderCountryHeaderSelector() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
         
-        // ✅ إظهار فقط في الصفحة الرئيسية
         this.updateCountrySelectorVisibility();
         
         const currentFlag = window.Countries.getFlag(this.selectedCountry);
@@ -91,7 +90,6 @@ const PostsSystem = {
         `;
     },
     
-    // ✅ دالة جديدة: التحكم في ظهور منتقي البلد
     updateCountrySelectorVisibility() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
@@ -338,11 +336,108 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
+    // ==================== ✅ قوائم الزواج المخصصة ====================
+    renderMarriageDropdown(field, selectedValue) {
+        const options = field === 'married'
+            ? [
+                { value: 'no', label: 'لا، أعزب/عزباء' },
+                { value: 'yes', label: 'نعم، متزوج/متزوجة' },
+                { value: 'divorced', label: 'مطلق/مطلقة' },
+                { value: 'widowed', label: 'أرمل/أرملة' }
+              ]
+            : [
+                { value: 'no', label: 'لا' },
+                { value: 'yes', label: 'نعم' }
+              ];
+        
+        const containerId = field === 'married' ? 'marriageMarriedSelector' : 'marriageChildrenSelector';
+        const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
+        const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
+        
+        const container = document.getElementById(containerId);
+        const input = document.getElementById(inputId);
+        if (!container || !input) return;
+        
+        const current = selectedValue || input.value || 'no';
+        const currentOption = options.find(o => o.value === current);
+        
+        container.innerHTML = `
+            <button type="button" class="publish-category-btn" onclick="PostsSystem.toggleMarriageDropdown('${field}', event)">
+                <span class="publish-category-name">${currentOption ? currentOption.label : 'اختر'}</span>
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <div class="publish-category-dropdown" id="${dropdownId}" style="display: none;">
+                ${options.map(opt => `
+                    <button type="button" class="publish-category-option ${opt.value === current ? 'active' : ''}" 
+                            onclick="PostsSystem.selectMarriageOption('${field}', '${opt.value}')">
+                        <span class="publish-category-name">${opt.label}</span>
+                        ${opt.value === current ? '<i class="fas fa-check"></i>' : ''}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+    },
+    
+    toggleMarriageDropdown(field, event) {
+        if (event) event.stopPropagation();
+        
+        const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
+        const dropdown = document.getElementById(dropdownId);
+        if (!dropdown) return;
+        
+        document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
+            if (d.id !== dropdownId) d.style.display = 'none';
+        });
+        
+        if (dropdown.style.display === 'none' || !dropdown.style.display) {
+            dropdown.style.display = 'block';
+            setTimeout(() => {
+                const closeHandler = (e) => {
+                    const containerId = field === 'married' ? 'marriageMarriedSelector' : 'marriageChildrenSelector';
+                    const container = document.getElementById(containerId);
+                    if (container && !container.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                        document.removeEventListener('click', closeHandler);
+                    }
+                };
+                document.addEventListener('click', closeHandler);
+            }, 100);
+        } else {
+            dropdown.style.display = 'none';
+        }
+    },
+    
+    selectMarriageOption(field, value) {
+        const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
+        const input = document.getElementById(inputId);
+        if (input) input.value = value;
+        
+        const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown) dropdown.style.display = 'none';
+        
+        // ✅ إذا كان married = no → إخفاء حقل الأطفال
+        if (field === 'married') {
+            const childrenField = document.getElementById('marriageChildrenField');
+            if (childrenField) {
+                if (value === 'no') {
+                    childrenField.style.display = 'none';
+                    const childrenInput = document.getElementById('marriageChildren');
+                    if (childrenInput) childrenInput.value = 'no';
+                    this.renderMarriageDropdown('children', 'no');
+                } else {
+                    childrenField.style.display = 'block';
+                }
+            }
+        }
+        
+        this.renderMarriageDropdown(field, value);
+    },
+    
     // ==================== التبديل بين التبويبات ====================
     switchTab(tab) {
         this.currentTab = tab;
         
-        // ✅ إغلاق القوائم المنسدلة
         const dropdown = document.getElementById('countryHeaderDropdown');
         if (dropdown) dropdown.style.display = 'none';
         const arrow = document.querySelector('.country-header-arrow');
@@ -520,6 +615,11 @@ const PostsSystem = {
             ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
             : '';
         
+        // ✅ إخفاء سطر الأطفال إذا كان أعزب
+        const childrenRow = post.married === 'no' 
+            ? '' 
+            : `<span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>`;
+        
         card.innerHTML = `
             <div class="post-header">
                 <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
@@ -537,7 +637,7 @@ const PostsSystem = {
                 </div>
                 <div class="post-info-row">
                     <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married || ''}</span>
-                    <span><i class="fas fa-child"></i> أطفال: ${childrenText}</span>
+                    ${childrenRow}
                 </div>
                 <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
             </div>
@@ -670,38 +770,50 @@ const PostsSystem = {
             .onSnapshot(() => this.loadMarriagePosts(), error => console.warn('⚠️', error.message));
     },
     
+    // ==================== ✅ قص الصورة مربعة + ضغط (مثل واتساب) ====================
     async compressImage(file) {
         return new Promise((resolve, reject) => {
-            if (!file.type.startsWith('image/')) { reject(new Error('الملف ليس صورة')); return; }
-            if (file.size > 10 * 1024 * 1024) { reject(new Error('الصورة كبيرة جداً')); return; }
+            if (!file.type.startsWith('image/')) { 
+                reject(new Error('الملف ليس صورة')); 
+                return; 
+            }
+            if (file.size > 10 * 1024 * 1024) { 
+                reject(new Error('الصورة كبيرة جداً (الحد 10MB)')); 
+                return; 
+            }
             
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
+                    // ✅ القص بشكل مربع (1:1) - نأخذ أصغر بُعد
+                    const side = Math.min(img.width, img.height);
+                    const sx = (img.width - side) / 2;
+                    const sy = (img.height - side) / 2;
+                    
+                    // ✅ الحجم النهائي 400x400
+                    const TARGET = this.IMAGE_TARGET_SIZE;
                     const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    if (width > this.IMAGE_MAX_WIDTH) {
-                        height = Math.round((height * this.IMAGE_MAX_WIDTH) / width);
-                        width = this.IMAGE_MAX_WIDTH;
-                    }
-                    if (height > this.IMAGE_MAX_WIDTH) {
-                        width = Math.round((width * this.IMAGE_MAX_WIDTH) / height);
-                        height = this.IMAGE_MAX_WIDTH;
-                    }
-                    canvas.width = width; canvas.height = height;
+                    canvas.width = TARGET;
+                    canvas.height = TARGET;
                     const ctx = canvas.getContext('2d');
                     ctx.imageSmoothingEnabled = true;
                     ctx.imageSmoothingQuality = 'high';
-                    ctx.drawImage(img, 0, 0, width, height);
                     
+                    // ✅ قص + رسم في نفس الوقت
+                    ctx.drawImage(img, sx, sy, side, side, 0, 0, TARGET, TARGET);
+                    
+                    // ✅ ضغط JPEG
                     canvas.toBlob((blob) => {
-                        if (!blob) { reject(new Error('فشل ضغط الصورة')); return; }
+                        if (!blob) { 
+                            reject(new Error('فشل ضغط الصورة')); 
+                            return; 
+                        }
                         const reader2 = new FileReader();
                         reader2.onload = () => {
-                            const compressedSize = Math.round(reader2.result.length / 1024);
-                            const originalSize = Math.round(file.size / 1024);
-                            console.log(`📸 ضغط: ${originalSize} KB → ${compressedSize} KB`);
+                            const compressedKB = Math.round(reader2.result.length / 1024);
+                            const originalKB = Math.round(file.size / 1024);
+                            console.log(`📸 قص مربع + ضغط: ${originalKB} KB → ${compressedKB} KB (${TARGET}x${TARGET})`);
                             resolve(reader2.result);
                         };
                         reader2.readAsDataURL(blob);
@@ -713,6 +825,46 @@ const PostsSystem = {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
+    },
+    
+    // ==================== ✅ معاينة صورة الوظيفة ====================
+    async previewJobImage(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        
+        const preview = document.getElementById('jobImagePreview');
+        if (!preview) return;
+        
+        preview.innerHTML = '<div style="color:#888;font-size:0.7rem;text-align:center;line-height:1.2;">جاري<br>المعالجة...</div>';
+        
+        try {
+            const compressed = await this.compressImage(file);
+            preview.innerHTML = `<img src="${compressed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        } catch (err) {
+            alert('فشل معالجة الصورة: ' + err.message);
+            preview.innerHTML = '👤';
+            event.target.value = '';
+        }
+    },
+    
+    // ==================== ✅ معاينة صورة الزواج ====================
+    async previewMarriageImage(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        
+        const preview = document.getElementById('marriageImagePreview');
+        if (!preview) return;
+        
+        preview.innerHTML = '<div style="color:#888;font-size:0.7rem;text-align:center;line-height:1.2;">جاري<br>المعالجة...</div>';
+        
+        try {
+            const compressed = await this.compressImage(file);
+            preview.innerHTML = `<img src="${compressed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        } catch (err) {
+            alert('فشل معالجة الصورة: ' + err.message);
+            preview.innerHTML = '👤';
+            event.target.value = '';
+        }
     },
     
     escapeHtml(text) {
@@ -744,12 +896,37 @@ PostsSystem.fillPublishJobForm = function() {
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('jobs');
     this.renderPublishCategoryDropdown();
+    
+    // ✅ إعادة تعيين معاينة الصورة
+    const preview = document.getElementById('jobImagePreview');
+    if (preview) preview.innerHTML = '👤';
+    const input = document.getElementById('jobImage');
+    if (input) input.value = '';
 };
 
 PostsSystem.fillPublishMarriageForm = function() {
     const countryInput = document.getElementById('marriageCountryCode');
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('marriage');
+    
+    // ✅ رسم القوائم المنسدلة المخصصة
+    const marriedInput = document.getElementById('marriageMarried');
+    const childrenInput = document.getElementById('marriageChildren');
+    if (marriedInput) marriedInput.value = 'no';
+    if (childrenInput) childrenInput.value = 'no';
+    
+    this.renderMarriageDropdown('married', 'no');
+    this.renderMarriageDropdown('children', 'no');
+    
+    // ✅ إخفاء حقل الأطفال افتراضياً
+    const childrenField = document.getElementById('marriageChildrenField');
+    if (childrenField) childrenField.style.display = 'none';
+    
+    // ✅ إعادة تعيين معاينة الصورة
+    const preview = document.getElementById('marriageImagePreview');
+    if (preview) preview.innerHTML = '👤';
+    const input = document.getElementById('marriageImage');
+    if (input) input.value = '';
 };
 
 window.closePostImagePreview = function() {
@@ -848,7 +1025,8 @@ window.publishMarriage = async function() {
             name, age: parseInt(age),
             country: window.Countries.getName(countryCode),
             countryCode,
-            bio, married, children,
+            bio, married, 
+            children: (married === 'no') ? 'no' : children,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -887,6 +1065,11 @@ function clearMarriageForm() {
     if (input) input.value = '';
 }
 
+// ✅ تصدير الدوال العامة
+window.PostsSystem = PostsSystem;
+window.previewJobImage = (e) => PostsSystem.previewJobImage(e);
+window.previewMarriageImage = (e) => PostsSystem.previewMarriageImage(e);
+
 window.addEventListener('load', () => {
     setTimeout(() => {
         if (window.auth?.currentUser) PostsSystem.init();
@@ -897,4 +1080,4 @@ window.addEventListener('authReady', () => {
     setTimeout(() => PostsSystem.init(), 300);
 });
 
-console.log('✅ posts-system.js تم تحميله');
+console.log('✅ posts-system.js تم تحميله - مع القص المربع للصور والقوائم المخصصة');
