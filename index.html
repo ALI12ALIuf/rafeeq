@@ -37,28 +37,45 @@
 
     <main class="app-content" id="mainContent">
         
-        <!-- ===== صفحة الرئيسية ===== -->
+        <!-- ===== صفحة الرئيسية (وظائف + زواج) ===== -->
         <div class="page home-page active">
-            <div class="posts-section">
-                <div class="posts-container" id="postsContainer">
-                    <div class="post-card">
-                        <div class="post-header">
-                            <div class="post-avatar-emoji" id="postAvatarEmoji">👤</div>
-                            <div class="post-user"><h4>أحمد</h4><span class="post-time">منذ ساعتين</span></div>
-                            <button class="post-menu"><i class="fas fa-ellipsis-v"></i></button>
-                        </div>
-                        <div class="post-content">
-                            <div class="post-location"><i class="fas fa-map-marker-alt"></i><span>بغداد - أربيل</span></div>
-                            <div class="post-map-placeholder"><i class="fas fa-map"></i><span data-i18n="location_sharing">مشاركة الموقع</span></div>
-                        </div>
-                        <div class="post-actions">
-                            <button class="post-action"><i class="far fa-heart"></i> 24</button>
-                            <button class="post-action"><i class="far fa-comment"></i> 5</button>
-                            <button class="post-action"><i class="far fa-share-square"></i></button>
-                        </div>
-                    </div>
+            
+            <!-- ✅ تبويبات (وظائف / زواج) -->
+            <div class="home-tabs">
+                <button class="home-tab active" data-tab="jobs" onclick="switchHomeTab('jobs')">
+                    <i class="fas fa-briefcase"></i>
+                    <span>وظائف</span>
+                </button>
+                <button class="home-tab" data-tab="marriage" onclick="switchHomeTab('marriage')">
+                    <i class="fas fa-heart"></i>
+                    <span>زواج</span>
+                </button>
+            </div>
+            
+            <!-- ✅ محتوى الوظائف -->
+            <div class="home-content active" id="jobsContent">
+                <div class="posts-container" id="jobsPostsContainer">
+                    <!-- تُضاف المنشورات هنا تلقائياً -->
+                </div>
+                <div class="empty-state" id="jobsEmptyState">
+                    <i class="fas fa-briefcase"></i>
+                    <h3>لا توجد وظائف</h3>
+                    <p>انشر وظيفتك من الملف الشخصي</p>
                 </div>
             </div>
+            
+            <!-- ✅ محتوى الزواج -->
+            <div class="home-content" id="marriageContent">
+                <div class="posts-container" id="marriagePostsContainer">
+                    <!-- تُضاف المنشورات هنا تلقائياً -->
+                </div>
+                <div class="empty-state" id="marriageEmptyState">
+                    <i class="fas fa-heart"></i>
+                    <h3>لا توجد إعلانات زواج</h3>
+                    <p>انشر إعلانك من الملف الشخصي</p>
+                </div>
+            </div>
+            
         </div>
 
         <!-- ===== صفحة الدردشة ===== -->
@@ -155,7 +172,6 @@
 
             <div class="message-input-container">
                 <div class="message-input-wrapper">
-                    <!-- ✅ عداد الأحرف (يظهر عند 180+) -->
                     <span id="messageCharCounter">0/200</span>
                     
                     <div class="input-area" style="flex:1;display:flex;align-items:center;gap:4px;width:100%;">
@@ -176,7 +192,7 @@
             </div>
         </div>
 
-        <!-- ===== صفحة الملف الشخصي ===== -->
+        <!-- ===== صفحة الملف الشخصي (مع أزرار النشر) ===== -->
         <div class="page profile-page">
             <div class="profile-header">
                 <div class="profile-cover">
@@ -192,6 +208,18 @@
                     </div>
                 </div>
                 <p class="profile-bio" id="profileBio"></p>
+            </div>
+            
+            <!-- ✅ أزرار النشر -->
+            <div class="publish-buttons">
+                <button class="publish-btn publish-btn-jobs" onclick="openPublishModal('jobs')">
+                    <i class="fas fa-briefcase"></i>
+                    <span>نشر وظيفة</span>
+                </button>
+                <button class="publish-btn publish-btn-marriage" onclick="openPublishModal('marriage')">
+                    <i class="fas fa-heart"></i>
+                    <span>نشر إعلان زواج</span>
+                </button>
             </div>
             
             <div class="profile-settings-btn" style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; border: 1px solid var(--border);" onclick="switchPage('settings')">
@@ -225,11 +253,124 @@
 
 <!-- ==================== العناصر الثابتة ==================== -->
 
+<!-- ✅ نافذة نشر وظيفة -->
+<div class="modal" id="publishJobModal">
+    <div class="modal-content">
+        <h3><i class="fas fa-briefcase" style="color: var(--primary);"></i> نشر وظيفة</h3>
+        
+        <div class="edit-field">
+            <label>الاسم الكامل</label>
+            <input type="text" id="jobName" maxlength="30" placeholder="اسمك الكامل">
+        </div>
+        
+        <div class="edit-field">
+            <label>العمر</label>
+            <input type="number" id="jobAge" min="15" max="80" placeholder="مثال: 25">
+        </div>
+        
+        <div class="edit-field">
+            <label>البلد</label>
+            <input type="text" id="jobCountry" maxlength="30" placeholder="مثال: العراق">
+        </div>
+        
+        <div class="edit-field">
+            <label>عنوان الوظيفة</label>
+            <input type="text" id="jobTitle" maxlength="50" placeholder="مثال: مهندس برمجيات">
+        </div>
+        
+        <div class="edit-field">
+            <label>السيرة الذاتية</label>
+            <textarea id="jobBio" maxlength="300" rows="4" placeholder="اكتب نبذة عن مؤهلاتك وخبراتك..." style="resize: vertical; min-height: 80px;"></textarea>
+        </div>
+        
+        <div class="edit-field">
+            <label>الصورة الشخصية</label>
+            <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+                <div id="jobImagePreview" style="width: 80px; height: 80px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 3rem; overflow: hidden;">👤</div>
+                <input type="file" id="jobImage" accept="image/*" style="display: none;" onchange="previewJobImage(event)">
+                <button type="button" class="change-avatar-btn" onclick="document.getElementById('jobImage').click()">
+                    <i class="fas fa-camera"></i> اختر صورة
+                </button>
+            </div>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="modal-btn modal-btn-outline" onclick="closeModal('publishJobModal')">إلغاء</button>
+            <button class="modal-btn modal-btn-outline" onclick="publishJob()">نشر</button>
+        </div>
+        <button class="close-modal" onclick="closeModal('publishJobModal')"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- ✅ نافذة نشر إعلان زواج -->
+<div class="modal" id="publishMarriageModal">
+    <div class="modal-content">
+        <h3><i class="fas fa-heart" style="color: var(--primary);"></i> نشر إعلان زواج</h3>
+        
+        <div class="edit-field">
+            <label>الاسم الكامل</label>
+            <input type="text" id="marriageName" maxlength="30" placeholder="اسمك الكامل">
+        </div>
+        
+        <div class="edit-field">
+            <label>العمر</label>
+            <input type="number" id="marriageAge" min="15" max="80" placeholder="مثال: 25">
+        </div>
+        
+        <div class="edit-field">
+            <label>البلد</label>
+            <input type="text" id="marriageCountry" maxlength="30" placeholder="مثال: العراق">
+        </div>
+        
+        <div class="edit-field">
+            <label>السيرة الذاتية</label>
+            <textarea id="marriageBio" maxlength="300" rows="4" placeholder="اكتب نبذة عن نفسك..." style="resize: vertical; min-height: 80px;"></textarea>
+        </div>
+        
+        <div class="edit-field">
+            <label>هل أنت متزوج؟</label>
+            <select id="marriageMarried" style="width: 100%; padding: 10px; border-radius: 8px; background: var(--light); color: var(--text); border: 1px solid var(--border); text-align: center;">
+                <option value="no">لا، أعزب/عزباء</option>
+                <option value="yes">نعم، متزوج/متزوجة</option>
+                <option value="divorced">مطلق/مطلقة</option>
+                <option value="widowed">أرمل/أرملة</option>
+            </select>
+        </div>
+        
+        <div class="edit-field">
+            <label>هل لديك أطفال؟</label>
+            <select id="marriageChildren" style="width: 100%; padding: 10px; border-radius: 8px; background: var(--light); color: var(--text); border: 1px solid var(--border); text-align: center;">
+                <option value="no">لا</option>
+                <option value="yes">نعم</option>
+            </select>
+        </div>
+        
+        <div class="edit-field">
+            <label>الصورة الشخصية</label>
+            <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+                <div id="marriageImagePreview" style="width: 80px; height: 80px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 3rem; overflow: hidden;">👤</div>
+                <input type="file" id="marriageImage" accept="image/*" style="display: none;" onchange="previewMarriageImage(event)">
+                <button type="button" class="change-avatar-btn" onclick="document.getElementById('marriageImage').click()">
+                    <i class="fas fa-camera"></i> اختر صورة
+                </button>
+            </div>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="modal-btn modal-btn-outline" onclick="closeModal('publishMarriageModal')">إلغاء</button>
+            <button class="modal-btn modal-btn-outline" onclick="publishMarriage()">نشر</button>
+        </div>
+        <button class="close-modal" onclick="closeModal('publishMarriageModal')"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- شريط التقدم -->
 <div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
     <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
     <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
 </div>
 
+<!-- شاشة تسجيل الدخول -->
 <div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
     <div style="text-align:center;padding:20px;max-width:350px;">
         <div style="font-size:5rem;">🛡️</div>
@@ -242,18 +383,14 @@
 </div>
 
 <!-- ==================== قوالب الرسائل ==================== -->
-
-<template id="messageWrapperTemplate">
-    <div class="message"></div>
-</template>
-
+<template id="messageWrapperTemplate"><div class="message"></div></template>
 <template id="textMessageTemplate">
     <div class="message-content" style="border:1.5px solid var(--border-color);background:var(--bg);color:var(--text);border-radius:18px;padding:10px 14px;max-width:100%;word-wrap:break-word;position:relative;">
         <span style="font-size:1rem;line-height:1.4;display:block;"></span>
     </div>
 </template>
 
-<!-- ==================== النوافذ المنبثقة ==================== -->
+<!-- ==================== النوافذ المنبثقة الأخرى ==================== -->
 
 <div class="modal" id="editProfileModal">
     <div class="modal-content">
@@ -271,10 +408,10 @@
             <button class="change-avatar-btn" onclick="openAvatarModal()"><i class="fas fa-smile"></i> <span data-i18n="change_avatar">تغيير</span></button>
         </div>
         <div class="modal-actions">
-            <button class="modal-btn modal-btn-outline" onclick="closeModal()" data-i18n="cancel">إلغاء</button>
+            <button class="modal-btn modal-btn-outline" onclick="closeModal('editProfileModal')" data-i18n="cancel">إلغاء</button>
             <button class="modal-btn modal-btn-outline" onclick="saveProfile()" data-i18n="save">حفظ</button>
         </div>
-        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+        <button class="close-modal" onclick="closeModal('editProfileModal')"><i class="fas fa-times"></i></button>
     </div>
 </div>
 
@@ -282,26 +419,14 @@
     <div class="modal-content">
         <h3 data-i18n="choose_avatar">اختر صورتك الرمزية</h3>
         <div class="avatar-options-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:15px 0;">
-            <button class="avatar-option-btn" data-type="man_light" onclick="selectAvatar('man_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
-                <span style="font-size:2.8rem;">🧔🏻‍♂️</span>
-            </button>
-            <button class="avatar-option-btn" data-type="man_medium" onclick="selectAvatar('man_medium')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
-                <span style="font-size:2.8rem;">🧔🏼‍♂️</span>
-            </button>
-            <button class="avatar-option-btn" data-type="man_dark" onclick="selectAvatar('man_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
-                <span style="font-size:2.8rem;">🧔🏽‍♂️</span>
-            </button>
-            <button class="avatar-option-btn" data-type="woman_light" onclick="selectAvatar('woman_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
-                <span style="font-size:2.8rem;">👩🏻</span>
-            </button>
-            <button class="avatar-option-btn" data-type="woman_medium" onclick="selectAvatar('woman_medium')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
-                <span style="font-size:2.8rem;">👩🏼</span>
-            </button>
-            <button class="avatar-option-btn" data-type="woman_dark" onclick="selectAvatar('woman_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;">
-                <span style="font-size:2.8rem;">👩🏽</span>
-            </button>
+            <button class="avatar-option-btn" data-type="man_light" onclick="selectAvatar('man_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;"><span style="font-size:2.8rem;">🧔🏻‍♂️</span></button>
+            <button class="avatar-option-btn" data-type="man_medium" onclick="selectAvatar('man_medium')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;"><span style="font-size:2.8rem;">🧔🏼‍♂️</span></button>
+            <button class="avatar-option-btn" data-type="man_dark" onclick="selectAvatar('man_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;"><span style="font-size:2.8rem;">🧔🏽‍♂️</span></button>
+            <button class="avatar-option-btn" data-type="woman_light" onclick="selectAvatar('woman_light')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;"><span style="font-size:2.8rem;">👩🏻</span></button>
+            <button class="avatar-option-btn" data-type="woman_medium" onclick="selectAvatar('woman_medium')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;"><span style="font-size:2.8rem;">👩🏼</span></button>
+            <button class="avatar-option-btn" data-type="woman_dark" onclick="selectAvatar('woman_dark')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;background:var(--light);border:3px solid transparent;border-radius:16px;cursor:pointer;transition:all 0.25s ease;min-height:70px;"><span style="font-size:2.8rem;">👩🏽</span></button>
         </div>
-        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+        <button class="close-modal" onclick="closeModal('avatarModal')"><i class="fas fa-times"></i></button>
     </div>
 </div>
 
@@ -312,7 +437,7 @@
             <button class="language-option" onclick="changeLanguage('ar')"><span class="flag">🇮🇶</span><span data-i18n="arabic">العربية</span></button>
             <button class="language-option" onclick="changeLanguage('en')"><span class="flag">🇬🇧</span><span data-i18n="english">English</span></button>
         </div>
-        <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+        <button class="close-modal" onclick="closeModal('languageModal')"><i class="fas fa-times"></i></button>
     </div>
 </div>
 
@@ -336,13 +461,13 @@
     window.googleProvider = new firebase.auth.GoogleAuthProvider();
 </script>
 
-<!-- ==================== ملفات الجافاسكريبت ==================== -->
-<script src="js/i18n.js?v=16"></script>
-<script src="js/secure-chat.js?v=16"></script>
-<script src="js/chat-system.js?v=16"></script>
-<script src="js/ui-functions.js?v=16"></script>
-<script src="js/auth.js?v=16"></script>
-<script src="js/friends.js?v=16"></script>
+<script src="js/i18n.js?v=17"></script>
+<script src="js/secure-chat.js?v=17"></script>
+<script src="js/chat-system.js?v=17"></script>
+<script src="js/ui-functions.js?v=17"></script>
+<script src="js/posts-system.js?v=17"></script>
+<script src="js/auth.js?v=17"></script>
+<script src="js/friends.js?v=17"></script>
 
 <script>
 window.addEventListener('load', function() {
