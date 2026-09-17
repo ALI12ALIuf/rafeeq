@@ -1,7 +1,5 @@
-// ========== auth.js - النسخة النهائية (تحديث فوري) ==========
-// Firebase Auth الأساسي
+// ========== auth.js - النسخة المحسّنة (بدون authReady مكرر) ==========
 
-// ==================== القسم 1: دوال مساعدة ====================
 function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
@@ -31,38 +29,41 @@ function getEmojiForUser(userData) {
 
 const FieldValue = firebase.firestore.FieldValue;
 
-// ==================== القسم 2: showApp ====================
+// ✅ منع التشغيل المزدوج لـ authReady
+let _authReadyFired = false;
+function fireAuthReady() {
+    if (_authReadyFired) return;
+    _authReadyFired = true;
+    console.log('🔔 إطلاق authReady (مرة واحدة)');
+    window.dispatchEvent(new Event('authReady'));
+}
+
 function showApp() {
     const splash = document.getElementById('splash'), app = document.getElementById('app');
     const loginScreen = document.getElementById('loginScreen');
     if (loginScreen) loginScreen.style.display = 'none';
-    if (splash) { splash.style.display = 'none'; }
-    if (app) { app.style.display = 'flex'; }
+    if (splash) splash.style.display = 'none';
+    if (app) app.style.display = 'flex';
 }
 
-// ==================== القسم 3: showLoginScreen ====================
 function showLoginScreen() {
     const loginScreen = document.getElementById('loginScreen');
     if (loginScreen) loginScreen.style.display = 'flex';
 }
 
-// ==================== القسم 4: startGoogleLogin ====================
 async function startGoogleLogin() {
     try {
         if (!window.auth || !window.googleProvider) {
             alert('مكتبة Firebase لم يتم تحميلها بعد.');
             return;
         }
-        
         const splash = document.getElementById('splash');
-        if (splash) { splash.style.display = 'none'; }
-        
+        if (splash) splash.style.display = 'none';
         const loginScreen = document.getElementById('loginScreen');
-        if (loginScreen) { loginScreen.style.display = 'none'; }
+        if (loginScreen) loginScreen.style.display = 'none';
         
         const result = await window.auth.signInWithPopup(window.googleProvider);
         await saveUserAndEnter(result.user);
-        
     } catch (error) {
         let msg = 'حدث خطأ في تسجيل الدخول';
         if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
@@ -71,64 +72,58 @@ async function startGoogleLogin() {
     }
 }
 
-// ==================== القسم 5: saveUserAndEnter ====================
+// ✅ saveUserAndEnter — بدون dispatchEvent (authReady يُطلق من onAuthStateChanged فقط)
 async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
         
         let shortName = (user.displayName || 'مستخدم').trim();
-        if (shortName.length > 15) {
-            shortName = shortName.substring(0, 15);
-        }
+        if (shortName.length > 15) shortName = shortName.substring(0, 15);
         
         if (!userDoc.exists) {
             await window.db.collection('users').doc(user.uid).set({
-                uid: user.uid, 
+                uid: user.uid,
                 name: shortName,
-                email: user.email || '', 
+                email: user.email || '',
                 shareableId: generateShareableId(),
-                bio: '', 
+                bio: '',
                 avatarType: 'man_light',
-                friends: [], 
-                blocked: [], 
+                friends: [],
+                blocked: [],
                 createdAt: new Date()
             });
             console.log('✅ مستخدم جديد - تم حفظ الاسم:', shortName);
         } else {
-            const userData = userDoc.data(); 
+            const userData = userDoc.data();
             const updates = {};
-            
             if (userData.name && userData.name.length > 15) {
                 updates.name = userData.name.substring(0, 15);
-                console.log('✅ تم قص الاسم القديم:', updates.name);
             }
-            
             if (!userData.friends) updates.friends = [];
             if (userData.followers) updates.followers = [];
             if (userData.following) updates.following = [];
             if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
                 updates.avatarType = 'man_light';
             }
-            
             if (Object.keys(updates).length > 0) {
                 await window.db.collection('users').doc(user.uid).update(updates);
-                console.log('✅ تم تحديث بيانات المستخدم');
             }
         }
         
-        // ✅ إعداد المستمعين (للتحديث الفوري)
-        if (typeof setupFriendRequestsListener === 'function') {
-            setupFriendRequestsListener(user.uid);
-        }
-        if (typeof setupFriendsListener === 'function') {
-            setupFriendsListener(user.uid);
-        }
+        // ✅ إعداد المستمعين
+        if (typeof setupFriendRequestsListener === 'function') setupFriendRequestsListener(user.uid);
+        if (typeof setupFriendsListener === 'function') setupFriendsListener(user.uid);
         
-        // ✅ إشعار باقي النظام
-        window.dispatchEvent(new Event('authReady'));
+        // ✅ إشعار واحد فقط
+        fireAuthReady();
         
         await loadUserData(user.uid);
-        if (typeof SecureChatSystem !== 'undefined') { await SecureChatSystem.init(); }
+        
+        // ✅ SecureChatSystem بدون انتظار (في الخلفية)
+        if (typeof SecureChatSystem !== 'undefined') {
+            SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
+        }
+        
         showApp();
     } catch (error) {
         console.error('خطأ في حفظ المستخدم:', error);
@@ -136,22 +131,20 @@ async function saveUserAndEnter(user) {
     }
 }
 
-// ==================== القسم 6: دوال إضافية ====================
 async function signInWithGoogle() { await startGoogleLogin(); }
 
-function updateUserUI() { 
-    const splash = document.getElementById('splash'), app = document.getElementById('app'); 
-    if (splash) { 
-        splash.classList.add('hide'); 
-        setTimeout(() => { 
-            splash.style.display = 'none'; 
-            if (app) app.style.display = 'flex'; 
-        }, 500); 
-    } 
+function updateUserUI() {
+    const splash = document.getElementById('splash'), app = document.getElementById('app');
+    if (splash) {
+        splash.classList.add('hide');
+        setTimeout(() => {
+            splash.style.display = 'none';
+            if (app) app.style.display = 'flex';
+        }, 500);
+    }
 }
 
-// ==================== القسم 7: logout ====================
-async function logout() { 
+async function logout() {
     try {
         if (window.auth?.currentUser) {
             await window.db.collection('users').doc(window.auth.currentUser.uid).update({
@@ -160,14 +153,11 @@ async function logout() {
             });
         }
     } catch (e) {}
-    
     try { await window.auth.signOut(); } catch (e) {}
-    
     console.log('🔓 تم تسجيل الخروج');
-    window.location.reload(); 
+    window.location.reload();
 }
 
-// ==================== القسم 8: loadUserData ====================
 async function loadUserData(uid) {
     try {
         const doc = await window.db.collection('users').doc(uid).get();
@@ -184,16 +174,14 @@ async function loadUserData(uid) {
                 displayName = displayName.substring(0, 15);
                 try {
                     await window.db.collection('users').doc(uid).update({ name: displayName });
-                    console.log('✅ تم قص الاسم في Firebase');
                 } catch (e) {}
             }
             if (pn) pn.textContent = displayName;
-            
             if (pb) pb.textContent = d.bio || '';
             if (si) si.textContent = d.shareableId || '0000000000';
             
             const emoji = getEmojiForUser(d);
-            if (pa) pa.textContent = emoji; 
+            if (pa) pa.textContent = emoji;
             if (ca) ca.textContent = emoji;
         }
     } catch (e) {
@@ -201,40 +189,40 @@ async function loadUserData(uid) {
     }
 }
 
-// ==================== القسم 9: مراقب حالة تسجيل الدخول ====================
+// ==================== ✅ onAuthStateChanged — المُشغِّل الوحيد ====================
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            // ✅ إعداد المستمعين (للتحديث الفوري)
-            if (typeof setupFriendRequestsListener === 'function') {
-                setupFriendRequestsListener(user.uid);
-            }
-            if (typeof setupFriendsListener === 'function') {
-                setupFriendsListener(user.uid);
-            }
+            // ✅ إعداد المستمعين
+            if (typeof setupFriendRequestsListener === 'function') setupFriendRequestsListener(user.uid);
+            if (typeof setupFriendsListener === 'function') setupFriendsListener(user.uid);
             
-            // ✅ إشعار باقي النظام
-            window.dispatchEvent(new Event('authReady'));
+            // ✅ إطلاق authReady
+            fireAuthReady();
             
             await loadUserData(user.uid);
-            if (typeof SecureChatSystem !== 'undefined') await SecureChatSystem.init();
+            
+            // ✅ SecureChatSystem في الخلفية
+            if (typeof SecureChatSystem !== 'undefined') {
+                SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
+            }
+            
             showApp();
         } else {
+            _authReadyFired = false;
             if (app) app.style.display = 'none';
-            if (splash) { splash.style.display = 'flex'; }
-            
+            if (splash) splash.style.display = 'flex';
             setTimeout(() => {
-                if (splash) { splash.style.display = 'none'; }
+                if (splash) splash.style.display = 'none';
                 showLoginScreen();
             }, 2500);
         }
     });
 }
 
-// ==================== القسم 10: copyId ====================
-function copyId() { 
-    const el = document.getElementById('shareableId'); 
-    if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ')); 
+function copyId() {
+    const el = document.getElementById('shareableId');
+    if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ'));
 }
