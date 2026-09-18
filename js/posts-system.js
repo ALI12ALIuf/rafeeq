@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة المحسّنة للأداء ==========
+// ========== posts-system.js - النسخة النهائية مع العدادات ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -9,7 +9,6 @@ const PostsSystem = {
     IMAGE_TARGET_SIZE: 400,
     IMAGE_QUALITY: 0.75,
     
-    // ✅ منع التشغيل المزدوج
     _isInitialized: false,
     _isLoadingPosts: false,
     
@@ -37,7 +36,7 @@ const PostsSystem = {
         { code: 'other', name: 'أخرى', icon: 'fas fa-th-large', color: '#9E9E9E' }
     ],
     
-    // ==================== ✅ init محسّن ====================
+    // ==================== init ====================
     init() {
         if (this._isInitialized) {
             console.log('⏭️ PostsSystem مُهيّأ بالفعل - تخطي');
@@ -48,7 +47,9 @@ const PostsSystem = {
         console.log('🚀 تهيئة نظام المنشورات...');
         this.loadSavedSettings();
         
-        // ✅ تحميل فوري بدون انتظار
+        // ✅ إعداد العدادات عند البدء
+        this.setupFieldCounters();
+        
         this.loadAllPosts();
         this.setupRealtimeListeners();
         this.renderCountryHeaderSelector();
@@ -73,19 +74,132 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== ✅ تحميل حالات العلاقات (كاش 5 دقائق) ====================
+    // ==================== ✅ إعداد عدادات الحقول ====================
+    setupFieldCounters() {
+        const fields = [
+            { inputId: 'jobName', counterId: 'jobNameCounter', max: 15 },
+            { inputId: 'jobAge', counterId: 'jobAgeCounter', max: 3 },
+            { inputId: 'jobTitle', counterId: 'jobTitleCounter', max: 10 },
+            { inputId: 'marriageName', counterId: 'marriageNameCounter', max: 15 },
+            { inputId: 'marriageAge', counterId: 'marriageAgeCounter', max: 3 }
+        ];
+        
+        fields.forEach(({ inputId, counterId, max }) => {
+            const input = document.getElementById(inputId);
+            const counter = document.getElementById(counterId);
+            if (!input || !counter) return;
+            
+            // ✅ إزالة المستمعين القدامى إن وجدوا
+            if (input._counterHandler) {
+                input.removeEventListener('input', input._counterHandler);
+            }
+            
+            // ✅ إضافة maxlength
+            input.setAttribute('maxlength', max);
+            
+            // ✅ معالج الإدخال
+            const handler = (e) => {
+                let value = e.target.value;
+                
+                // ✅ للعمر: أرقام فقط
+                if (inputId === 'jobAge' || inputId === 'marriageAge') {
+                    value = value.replace(/[^0-9]/g, '');
+                }
+                
+                // ✅ منع تجاوز الحد (احتياط)
+                if (value.length > max) {
+                    value = value.substring(0, max);
+                }
+                
+                // ✅ تحديث القيمة
+                if (e.target.value !== value) {
+                    e.target.value = value;
+                }
+                
+                // ✅ تحديث العداد
+                const len = value.length;
+                counter.textContent = `${len}/${max}`;
+                counter.classList.remove('warning', 'full');
+                input.classList.remove('limit-reached');
+                
+                if (len >= max) {
+                    counter.classList.add('full');
+                    input.classList.add('limit-reached');
+                } else if (len >= max - 3) {
+                    counter.classList.add('warning');
+                }
+            };
+            
+            input._counterHandler = handler;
+            input.addEventListener('input', handler);
+            
+            // ✅ منع لصق نص أطول من الحد
+            if (!input._pasteHandler) {
+                const pasteHandler = (e) => {
+                    e.preventDefault();
+                    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+                    let value = input.value + pasted;
+                    
+                    if (inputId === 'jobAge' || inputId === 'marriageAge') {
+                        value = value.replace(/[^0-9]/g, '');
+                    }
+                    value = value.substring(0, max);
+                    input.value = value;
+                    input.dispatchEvent(new Event('input'));
+                };
+                input._pasteHandler = pasteHandler;
+                input.addEventListener('paste', pasteHandler);
+            }
+            
+            // ✅ منع الكتابة عند الوصول للحد (keypress)
+            if (!input._keypressHandler) {
+                const keypressHandler = (e) => {
+                    if (e.target.value.length >= max && e.key.length === 1) {
+                        e.preventDefault();
+                    }
+                };
+                input._keypressHandler = keypressHandler;
+                input.addEventListener('keypress', keypressHandler);
+            }
+            
+            // ✅ تهيئة العداد
+            handler({ target: input });
+        });
+    },
+    
+    // ✅ إعادة تهيئة العدادات
+    resetFieldCounters() {
+        const fields = [
+            { inputId: 'jobName', counterId: 'jobNameCounter', max: 15 },
+            { inputId: 'jobAge', counterId: 'jobAgeCounter', max: 3 },
+            { inputId: 'jobTitle', counterId: 'jobTitleCounter', max: 10 },
+            { inputId: 'marriageName', counterId: 'marriageNameCounter', max: 15 },
+            { inputId: 'marriageAge', counterId: 'marriageAgeCounter', max: 3 }
+        ];
+        
+        fields.forEach(({ inputId, counterId, max }) => {
+            const input = document.getElementById(inputId);
+            const counter = document.getElementById(counterId);
+            if (!input || !counter) return;
+            
+            input.value = '';
+            counter.textContent = `0/${max}`;
+            counter.classList.remove('warning', 'full');
+            input.classList.remove('limit-reached');
+        });
+    },
+    
+    // ==================== تحميل حالات العلاقات (Batch) ====================
     async loadRelationshipCache(force = false) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
         
         const now = Date.now();
-        // ✅ 5 دقائق بدلاً من 30 ثانية
         if (!force && (now - this._relationshipCache.lastUpdate) < 300000) {
             return;
         }
         
         try {
-            // ✅ استخدام Promise.all لجلب البيانات بالتوازي
             const [userDoc, sentSnap, receivedSnap] = await Promise.all([
                 window.db.collection('users').doc(uid).get(),
                 window.db.collection('friendRequests')
@@ -131,6 +245,7 @@ const PostsSystem = {
         return 'none';
     },
     
+    // ==================== إنشاء زر الإجراء ====================
     createPostActionButton(post) {
         const state = this.getRelationshipState(post.userId);
         const btn = document.createElement('button');
@@ -258,6 +373,7 @@ const PostsSystem = {
         this.loadAllPosts();
     },
     
+    // ==================== منتقي البلد ====================
     renderCountryHeaderSelector() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
@@ -697,21 +813,17 @@ const PostsSystem = {
         }
     },
     
-    // ==================== ✅ loadAllPosts محسّن ====================
     async loadAllPosts() {
-        // ✅ تحميل المنشورات أولاً (لا انتظار للعلاقات)
         await Promise.all([
             this.loadJobsPosts(),
             this.loadMarriagePosts()
         ]);
         
-        // ✅ تحديث العلاقات في الخلفية (بدون await)
         this.loadRelationshipCache().then(() => {
             this.refreshActionButtons();
         }).catch(() => {});
     },
     
-    // ✅ تحديث الأزرار فقط بعد تحديث العلاقات
     refreshActionButtons() {
         document.querySelectorAll('.post-card').forEach(card => {
             const oldBtn = card.querySelector('.post-action-btn');
@@ -767,7 +879,6 @@ const PostsSystem = {
                 return timeB - timeA;
             });
             
-            // ✅ استخدام DocumentFragment
             const fragment = document.createDocumentFragment();
             for (const post of posts) {
                 const el = this.createJobPost(post);
@@ -1052,9 +1163,7 @@ const PostsSystem = {
         }
     },
     
-    // ==================== ✅ setupRealtimeListeners محسّن ====================
     setupRealtimeListeners() {
-        // ✅ تحديث فقط عند وجود تغييرات فعلية
         this._jobsUnsubscribe = window.db.collection('posts')
             .where('type', '==', 'job')
             .onSnapshot(snapshot => {
@@ -1176,6 +1285,10 @@ PostsSystem.fillPublishJobForm = function() {
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('jobs');
     this.renderPublishCategoryDropdown();
+    
+    // ✅ إعداد العدادات
+    this.setupFieldCounters();
+    
     const preview = document.getElementById('jobImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('jobImage');
@@ -1186,14 +1299,21 @@ PostsSystem.fillPublishMarriageForm = function() {
     const countryInput = document.getElementById('marriageCountryCode');
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('marriage');
+    
     const marriedInput = document.getElementById('marriageMarried');
     const childrenInput = document.getElementById('marriageChildren');
     if (marriedInput) marriedInput.value = 'no';
     if (childrenInput) childrenInput.value = 'no';
+    
     this.renderMarriageDropdown('married', 'no');
     this.renderMarriageDropdown('children', 'no');
+    
     const childrenField = document.getElementById('marriageChildrenField');
     if (childrenField) childrenField.style.display = 'none';
+    
+    // ✅ إعداد العدادات
+    this.setupFieldCounters();
+    
     const preview = document.getElementById('marriageImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('marriageImage');
@@ -1213,6 +1333,7 @@ window.closePostImagePreview = function() {
 
 window.publishJob = async function() {
     if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول'); return; }
+    
     const name = document.getElementById('jobName')?.value?.trim();
     const age = document.getElementById('jobAge')?.value;
     const countryCode = document.getElementById('jobCountryCode')?.value;
@@ -1224,7 +1345,12 @@ window.publishJob = async function() {
     if (!name || !age || !countryCode || !category || !jobTitle || !bio) {
         alert('يرجى تعبئة جميع الحقول'); return;
     }
-    if (age < 15 || age > 80) { alert('العمر بين 15 و 80'); return; }
+    if (name.length > 15) { alert('الاسم لا يزيد عن 15 حرف'); return; }
+    if (age.length > 3) { alert('العمر لا يزيد عن 3 أرقام'); return; }
+    if (jobTitle.length > 10) { alert('عنوان الوظيفة لا يزيد عن 10 أحرف'); return; }
+    
+    const ageNum = parseInt(age);
+    if (ageNum < 15 || ageNum > 80) { alert('العمر بين 15 و 80'); return; }
     
     try {
         let imageBase64 = null;
@@ -1235,7 +1361,7 @@ window.publishJob = async function() {
         
         await window.db.collection('posts').add({
             type: 'job', userId: window.auth.currentUser.uid,
-            name, age: parseInt(age),
+            name, age: ageNum,
             country: window.Countries.getName(countryCode),
             countryCode, category, jobTitle, bio,
             image: imageBase64,
@@ -1253,6 +1379,7 @@ window.publishJob = async function() {
 
 window.publishMarriage = async function() {
     if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول'); return; }
+    
     const name = document.getElementById('marriageName')?.value?.trim();
     const age = document.getElementById('marriageAge')?.value;
     const countryCode = document.getElementById('marriageCountryCode')?.value;
@@ -1262,7 +1389,11 @@ window.publishMarriage = async function() {
     const imageInput = document.getElementById('marriageImage');
     
     if (!name || !age || !countryCode || !bio) { alert('يرجى تعبئة جميع الحقول'); return; }
-    if (age < 15 || age > 80) { alert('العمر بين 15 و 80'); return; }
+    if (name.length > 15) { alert('الاسم لا يزيد عن 15 حرف'); return; }
+    if (age.length > 3) { alert('العمر لا يزيد عن 3 أرقام'); return; }
+    
+    const ageNum = parseInt(age);
+    if (ageNum < 15 || ageNum > 80) { alert('العمر بين 15 و 80'); return; }
     
     try {
         let imageBase64 = null;
@@ -1273,7 +1404,7 @@ window.publishMarriage = async function() {
         
         await window.db.collection('posts').add({
             type: 'marriage', userId: window.auth.currentUser.uid,
-            name, age: parseInt(age),
+            name, age: ageNum,
             country: window.Countries.getName(countryCode),
             countryCode, bio, married,
             children: (married === 'no') ? 'no' : children,
@@ -1291,6 +1422,9 @@ window.publishMarriage = async function() {
 };
 
 function clearJobForm() {
+    if (window.PostsSystem && PostsSystem.resetFieldCounters) {
+        PostsSystem.resetFieldCounters();
+    }
     ['jobName', 'jobAge', 'jobTitle', 'jobBio'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -1302,6 +1436,9 @@ function clearJobForm() {
 }
 
 function clearMarriageForm() {
+    if (window.PostsSystem && PostsSystem.resetFieldCounters) {
+        PostsSystem.resetFieldCounters();
+    }
     ['marriageName', 'marriageAge', 'marriageBio'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -1316,7 +1453,6 @@ window.PostsSystem = PostsSystem;
 window.previewJobImage = (e) => PostsSystem.previewJobImage(e);
 window.previewMarriageImage = (e) => PostsSystem.previewMarriageImage(e);
 
-// ✅ إزالة load listener القديم (authReady يكفي)
 window.addEventListener('authReady', () => {
     setTimeout(() => PostsSystem.init(), 100);
 });
@@ -1326,4 +1462,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - نسخة محسّنة للأداء');
+console.log('✅ posts-system.js تم تحميله - مع العدادات المحسّنة');
