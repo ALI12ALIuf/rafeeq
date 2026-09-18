@@ -452,7 +452,6 @@ body.conversation-open {
 
 .post-time { display: none !important; }
 
-/* زر طلب الصداقة */
 .post-action-btn {
     width: 36px;
     height: 36px;
@@ -1407,17 +1406,63 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     overflow: hidden;
 }
 
-/* ==================== القسم 26: حقول الإدخال مع العداد ==================== */
-.input-wrapper-with-counter {
-    position: relative;
+/* ==================== القسم 26: حقول الإدخال مع العداد بجانب الـ Label ==================== */
+
+/* ✅ صف الـ Label + العداد */
+.label-with-counter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto 6px auto;
+    gap: 8px;
+    direction: rtl;
+}
+
+.label-with-counter label {
+    margin: 0 !important;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ✅ العداد - على اليسار (نهاية الصف) */
+.inline-counter {
+    font-size: 0.72rem;
+    color: var(--text-light);
+    font-weight: 500;
+    direction: ltr;
+    opacity: 0.75;
+    pointer-events: none;
+    font-family: monospace;
+    line-height: 1;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    text-align: left;
+}
+
+.inline-counter.warning {
+    color: #FFC107;
+    opacity: 1;
+    font-weight: 700;
+}
+
+.inline-counter.full {
+    color: #f44336;
+    opacity: 1;
+    font-weight: 700;
+}
+
+/* ✅ حقول الإدخال - بدون padding إضافي (العداد خارجها) */
+.edit-field input[data-maxlength],
+.edit-field textarea[data-maxlength] {
     width: 100%;
     max-width: 300px;
     margin: 0 auto;
-}
-
-.input-wrapper-with-counter input {
-    width: 100%;
-    padding: 10px 12px 24px 12px;
+    padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--light);
@@ -1427,42 +1472,24 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     text-align: center;
     transition: all 0.2s;
     box-sizing: border-box;
+    display: block;
 }
 
-.input-wrapper-with-counter input:focus {
+.edit-field textarea[data-maxlength] {
+    text-align: right;
+    resize: vertical;
+    line-height: 1.6;
+}
+
+.edit-field input[data-maxlength]:focus,
+.edit-field textarea[data-maxlength]:focus {
     outline: none;
     border-color: var(--primary);
     background: var(--card-bg);
 }
 
-.input-wrapper-with-counter input.limit-reached {
+.edit-field input[data-maxlength].limit-reached,
+.edit-field textarea[data-maxlength].limit-reached {
     border-color: #FFC107;
-}
-
-/* ✅ العداد في أسفل اليمين داخل الحقل */
-.field-counter {
-    position: absolute;
-    bottom: 5px;
-    right: 12px;
-    font-size: 0.7rem;
-    color: var(--text-light);
-    font-weight: 500;
-    direction: ltr;
-    opacity: 0.7;
-    pointer-events: none;
-    font-family: monospace;
-    line-height: 1;
-    transition: all 0.2s ease;
-}
-
-.field-counter.warning {
-    color: #FFC107;
-    opacity: 1;
-    font-weight: 700;
-}
-
-.field-counter.full {
-    color: #f44336;
-    opacity: 1;
-    font-weight: 700;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.15);
 }
