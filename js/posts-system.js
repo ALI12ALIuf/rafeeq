@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع عدادات الحقول ==========
+// ========== posts-system.js - النسخة المحسّنة للأداء ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -9,6 +9,7 @@ const PostsSystem = {
     IMAGE_TARGET_SIZE: 400,
     IMAGE_QUALITY: 0.75,
     
+    // ✅ منع التشغيل المزدوج
     _isInitialized: false,
     _isLoadingPosts: false,
     
@@ -36,7 +37,7 @@ const PostsSystem = {
         { code: 'other', name: 'أخرى', icon: 'fas fa-th-large', color: '#9E9E9E' }
     ],
     
-    // ==================== init ====================
+    // ==================== ✅ init محسّن ====================
     init() {
         if (this._isInitialized) {
             console.log('⏭️ PostsSystem مُهيّأ بالفعل - تخطي');
@@ -46,10 +47,13 @@ const PostsSystem = {
         
         console.log('🚀 تهيئة نظام المنشورات...');
         this.loadSavedSettings();
+        
+        // ✅ تحميل فوري بدون انتظار
         this.loadAllPosts();
         this.setupRealtimeListeners();
         this.renderCountryHeaderSelector();
         this.renderJobCategories();
+        
         console.log('✅ تم تهيئة نظام المنشورات');
     },
     
@@ -69,120 +73,19 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== ✅ عدادات الحقول (أعلى يسار) ====================
-    setupFieldCounters() {
-        // ✅ عدّاد الاسم (15 حرف)
-        const nameInputs = ['jobName', 'marriageName'];
-        nameInputs.forEach(id => {
-            const input = document.getElementById(id);
-            if (!input || input.dataset.counterSetup) return;
-            input.dataset.counterSetup = 'true';
-            
-            // ✅ البحث عن الـ label أو إنشاء حاوية
-            const fieldDiv = input.closest('.edit-field');
-            if (!fieldDiv) return;
-            
-            const label = fieldDiv.querySelector('label');
-            if (!label) return;
-            
-            // ✅ إضافة العداد بجانب الـ label
-            if (!label.querySelector('.field-counter')) {
-                const counter = document.createElement('span');
-                counter.className = 'field-counter';
-                counter.id = `${id}Counter`;
-                counter.textContent = `0/15`;
-                label.appendChild(counter);
-            }
-            
-            input.addEventListener('input', () => {
-                const counter = document.getElementById(`${id}Counter`);
-                if (!counter) return;
-                const len = input.value.length;
-                counter.textContent = `${len}/15`;
-                counter.classList.remove('warning', 'full');
-                if (len >= 15) counter.classList.add('full');
-                else if (len >= 12) counter.classList.add('warning');
-            });
-        });
-        
-        // ✅ عدّاد العمر (3 أرقام)
-        const ageInputs = ['jobAge', 'marriageAge'];
-        ageInputs.forEach(id => {
-            const input = document.getElementById(id);
-            if (!input || input.dataset.counterSetup) return;
-            input.dataset.counterSetup = 'true';
-            
-            const fieldDiv = input.closest('.edit-field');
-            if (!fieldDiv) return;
-            
-            const label = fieldDiv.querySelector('label');
-            if (!label) return;
-            
-            if (!label.querySelector('.field-counter')) {
-                const counter = document.createElement('span');
-                counter.className = 'field-counter';
-                counter.id = `${id}Counter`;
-                counter.textContent = `0/3`;
-                label.appendChild(counter);
-            }
-            
-            input.addEventListener('input', () => {
-                const counter = document.getElementById(`${id}Counter`);
-                if (!counter) return;
-                // ✅ إزالة أي حرف غير رقمي
-                input.value = input.value.replace(/\D/g, '');
-                // ✅ الحد الأقصى 3 أرقام
-                if (input.value.length > 3) {
-                    input.value = input.value.slice(0, 3);
-                }
-                const len = input.value.length;
-                counter.textContent = `${len}/3`;
-                counter.classList.remove('warning', 'full');
-                if (len >= 3) counter.classList.add('full');
-                else if (len >= 2) counter.classList.add('warning');
-            });
-        });
-        
-        // ✅ عدّاد عنوان الوظيفة (10 أحرف)
-        const titleInput = document.getElementById('jobTitle');
-        if (titleInput && !titleInput.dataset.counterSetup) {
-            titleInput.dataset.counterSetup = 'true';
-            
-            const fieldDiv = titleInput.closest('.edit-field');
-            if (fieldDiv) {
-                const label = fieldDiv.querySelector('label');
-                if (label && !label.querySelector('.field-counter')) {
-                    const counter = document.createElement('span');
-                    counter.className = 'field-counter';
-                    counter.id = 'jobTitleCounter';
-                    counter.textContent = `0/10`;
-                    label.appendChild(counter);
-                }
-            }
-            
-            titleInput.addEventListener('input', () => {
-                const counter = document.getElementById('jobTitleCounter');
-                if (!counter) return;
-                const len = titleInput.value.length;
-                counter.textContent = `${len}/10`;
-                counter.classList.remove('warning', 'full');
-                if (len >= 10) counter.classList.add('full');
-                else if (len >= 8) counter.classList.add('warning');
-            });
-        }
-    },
-    
-    // ==================== تحميل حالات العلاقات (كاش 5 دقائق) ====================
+    // ==================== ✅ تحميل حالات العلاقات (كاش 5 دقائق) ====================
     async loadRelationshipCache(force = false) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
         
         const now = Date.now();
+        // ✅ 5 دقائق بدلاً من 30 ثانية
         if (!force && (now - this._relationshipCache.lastUpdate) < 300000) {
             return;
         }
         
         try {
+            // ✅ استخدام Promise.all لجلب البيانات بالتوازي
             const [userDoc, sentSnap, receivedSnap] = await Promise.all([
                 window.db.collection('users').doc(uid).get(),
                 window.db.collection('friendRequests')
@@ -794,21 +697,26 @@ const PostsSystem = {
         }
     },
     
+    // ==================== ✅ loadAllPosts محسّن ====================
     async loadAllPosts() {
+        // ✅ تحميل المنشورات أولاً (لا انتظار للعلاقات)
         await Promise.all([
             this.loadJobsPosts(),
             this.loadMarriagePosts()
         ]);
         
+        // ✅ تحديث العلاقات في الخلفية (بدون await)
         this.loadRelationshipCache().then(() => {
             this.refreshActionButtons();
         }).catch(() => {});
     },
     
+    // ✅ تحديث الأزرار فقط بعد تحديث العلاقات
     refreshActionButtons() {
         document.querySelectorAll('.post-card').forEach(card => {
             const oldBtn = card.querySelector('.post-action-btn');
             if (!oldBtn) return;
+            
             const userId = oldBtn.getAttribute('data-user-id');
             if (!userId) return;
             
@@ -859,6 +767,7 @@ const PostsSystem = {
                 return timeB - timeA;
             });
             
+            // ✅ استخدام DocumentFragment
             const fragment = document.createDocumentFragment();
             for (const post of posts) {
                 const el = this.createJobPost(post);
@@ -1143,7 +1052,9 @@ const PostsSystem = {
         }
     },
     
+    // ==================== ✅ setupRealtimeListeners محسّن ====================
     setupRealtimeListeners() {
+        // ✅ تحديث فقط عند وجود تغييرات فعلية
         this._jobsUnsubscribe = window.db.collection('posts')
             .where('type', '==', 'job')
             .onSnapshot(snapshot => {
@@ -1260,70 +1171,33 @@ window.openPublishModal = function(type) {
     }
 };
 
-// ✅ fillPublishJobForm مع العدادات
 PostsSystem.fillPublishJobForm = function() {
     const countryInput = document.getElementById('jobCountryCode');
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('jobs');
     this.renderPublishCategoryDropdown();
-    
     const preview = document.getElementById('jobImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('jobImage');
     if (input) input.value = '';
-    
-    // ✅ إعداد العدادات
-    setTimeout(() => this.setupFieldCounters(), 50);
-    
-    // ✅ إعادة تعيين العدادات
-    setTimeout(() => {
-        ['jobName', 'jobAge', 'jobTitle'].forEach(id => {
-            const counter = document.getElementById(`${id}Counter`);
-            if (counter) {
-                const max = id === 'jobTitle' ? 10 : (id === 'jobAge' ? 3 : 15);
-                counter.textContent = `0/${max}`;
-                counter.classList.remove('warning', 'full');
-            }
-        });
-    }, 100);
 };
 
-// ✅ fillPublishMarriageForm مع العدادات
 PostsSystem.fillPublishMarriageForm = function() {
     const countryInput = document.getElementById('marriageCountryCode');
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('marriage');
-    
     const marriedInput = document.getElementById('marriageMarried');
     const childrenInput = document.getElementById('marriageChildren');
     if (marriedInput) marriedInput.value = 'no';
     if (childrenInput) childrenInput.value = 'no';
-    
     this.renderMarriageDropdown('married', 'no');
     this.renderMarriageDropdown('children', 'no');
-    
     const childrenField = document.getElementById('marriageChildrenField');
     if (childrenField) childrenField.style.display = 'none';
-    
     const preview = document.getElementById('marriageImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('marriageImage');
     if (input) input.value = '';
-    
-    // ✅ إعداد العدادات
-    setTimeout(() => this.setupFieldCounters(), 50);
-    
-    // ✅ إعادة تعيين العدادات
-    setTimeout(() => {
-        ['marriageName', 'marriageAge'].forEach(id => {
-            const counter = document.getElementById(`${id}Counter`);
-            if (counter) {
-                const max = id === 'marriageAge' ? 3 : 15;
-                counter.textContent = `0/${max}`;
-                counter.classList.remove('warning', 'full');
-            }
-        });
-    }, 100);
 };
 
 window.closePostImagePreview = function() {
@@ -1425,16 +1299,6 @@ function clearJobForm() {
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('jobImage');
     if (input) input.value = '';
-    
-    // ✅ إعادة تعيين العدادات
-    ['jobName', 'jobAge', 'jobTitle'].forEach(id => {
-        const counter = document.getElementById(`${id}Counter`);
-        if (counter) {
-            const max = id === 'jobTitle' ? 10 : (id === 'jobAge' ? 3 : 15);
-            counter.textContent = `0/${max}`;
-            counter.classList.remove('warning', 'full');
-        }
-    });
 }
 
 function clearMarriageForm() {
@@ -1446,22 +1310,13 @@ function clearMarriageForm() {
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('marriageImage');
     if (input) input.value = '';
-    
-    // ✅ إعادة تعيين العدادات
-    ['marriageName', 'marriageAge'].forEach(id => {
-        const counter = document.getElementById(`${id}Counter`);
-        if (counter) {
-            const max = id === 'marriageAge' ? 3 : 15;
-            counter.textContent = `0/${max}`;
-            counter.classList.remove('warning', 'full');
-        }
-    });
 }
 
 window.PostsSystem = PostsSystem;
 window.previewJobImage = (e) => PostsSystem.previewJobImage(e);
 window.previewMarriageImage = (e) => PostsSystem.previewMarriageImage(e);
 
+// ✅ إزالة load listener القديم (authReady يكفي)
 window.addEventListener('authReady', () => {
     setTimeout(() => PostsSystem.init(), 100);
 });
@@ -1471,4 +1326,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - مع العدادات فوق الحقول على اليسار');
+console.log('✅ posts-system.js تم تحميله - نسخة محسّنة للأداء');
