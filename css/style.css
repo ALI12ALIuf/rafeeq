@@ -1408,97 +1408,94 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 
 /* ==================== القسم 26: حقول الإدخال مع العداد ==================== */
 
-/* ✅ الصف كاملاً - يوسّط الكتلة */
+/* ✅ الصف - يجمع الاسم والعداد في المنتصف */
 .label-with-counter {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 4px !important;
-    direction: rtl !important;
-    width: 100% !important;
-    max-width: 300px !important;
-    margin: 0 auto 6px auto !important;
-    padding: 0 !important;
-    text-align: center !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto 6px auto;
+    direction: rtl;
+    text-align: center;
 }
 
-/* ✅ الاسم */
+/* ✅ الاسم الكامل */
 .label-with-counter label {
-    margin: 0 !important;
-    padding: 0 !important;
-    color: var(--text) !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
-    text-align: center !important;
-    flex-shrink: 0 !important;
-    line-height: 1.2 !important;
-    display: inline-block !important;
+    margin: 0;
+    padding: 0;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    flex-shrink: 0;
+    line-height: 1.2;
 }
 
 /* ✅ العداد - ملاصق للاسم */
 .inline-counter {
-    font-size: 0.72rem !important;
-    color: var(--text-light) !important;
-    font-weight: 500 !important;
-    direction: ltr !important;
-    opacity: 0.75 !important;
-    pointer-events: none !important;
-    font-family: monospace !important;
-    line-height: 1 !important;
-    transition: all 0.2s ease !important;
-    flex-shrink: 0 !important;
-    text-align: center !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    display: inline-block !important;
+    font-size: 0.72rem;
+    color: var(--text-light);
+    font-weight: 500;
+    direction: ltr;
+    opacity: 0.75;
+    pointer-events: none;
+    font-family: monospace;
+    line-height: 1;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    text-align: center;
+    margin: 0;
+    padding: 0;
 }
 
 .inline-counter.warning {
-    color: #FFC107 !important;
-    opacity: 1 !important;
-    font-weight: 700 !important;
+    color: #FFC107;
+    opacity: 1;
+    font-weight: 700;
 }
 
 .inline-counter.full {
-    color: #f44336 !important;
-    opacity: 1 !important;
-    font-weight: 700 !important;
+    color: #f44336;
+    opacity: 1;
+    font-weight: 700;
 }
 
 /* ✅ حقول الإدخال */
 .edit-field input[data-maxlength],
 .edit-field textarea[data-maxlength] {
-    width: 100% !important;
-    max-width: 300px !important;
-    margin: 0 auto !important;
-    padding: 10px 12px !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 10px !important;
-    background: var(--light) !important;
-    color: var(--text) !important;
-    font-size: 0.95rem !important;
-    font-family: inherit !important;
-    text-align: center !important;
-    transition: all 0.2s !important;
-    box-sizing: border-box !important;
-    display: block !important;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--light);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: inherit;
+    text-align: center;
+    transition: all 0.2s;
+    box-sizing: border-box;
+    display: block;
 }
 
 .edit-field textarea[data-maxlength] {
-    text-align: right !important;
-    resize: vertical !important;
-    line-height: 1.6 !important;
+    text-align: right;
+    resize: vertical;
+    line-height: 1.6;
 }
 
 .edit-field input[data-maxlength]:focus,
 .edit-field textarea[data-maxlength]:focus {
-    outline: none !important;
-    border-color: var(--primary) !important;
-    background: var(--card-bg) !important;
+    outline: none;
+    border-color: var(--primary);
+    background: var(--card-bg);
 }
 
 .edit-field input[data-maxlength].limit-reached,
 .edit-field textarea[data-maxlength].limit-reached {
-    border-color: #FFC107 !important;
-    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.15) !important;
+    border-color: #FFC107;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.15);
 }
