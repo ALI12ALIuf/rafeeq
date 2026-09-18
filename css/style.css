@@ -1406,34 +1406,35 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     overflow: hidden;
 }
 
-/* ==================== القسم 26: حقول الإدخال مع العداد ==================== */
+/* ==================== القسم 26: حقول الإدخال مع العداد بجانب الـ Label ==================== */
 
-/* ✅ الصف - يجمع الاسم والعداد في المنتصف */
+/* ✅ صف الـ Label + العداد - بنفس عرض الحقل */
 .label-with-counter {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
+    justify-content: space-between;
     width: 100%;
     max-width: 300px;
     margin: 0 auto 6px auto;
+    padding: 0 2px;
+    gap: 6px;
     direction: rtl;
-    text-align: center;
+    box-sizing: border-box;
 }
 
-/* ✅ الاسم الكامل */
 .label-with-counter label {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
     color: var(--text);
     font-size: 0.85rem;
     font-weight: 600;
-    text-align: center;
-    flex-shrink: 0;
-    line-height: 1.2;
+    text-align: right;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* ✅ العداد - ملاصق للاسم */
+/* ✅ العداد - على اليسار (نهاية الصف) */
 .inline-counter {
     font-size: 0.72rem;
     color: var(--text-light);
@@ -1445,9 +1446,8 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     line-height: 1;
     transition: all 0.2s ease;
     flex-shrink: 0;
-    text-align: center;
-    margin: 0;
-    padding: 0;
+    text-align: left;
+    white-space: nowrap;
 }
 
 .inline-counter.warning {
