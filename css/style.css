@@ -1407,17 +1407,63 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 }
 
 /* ==================== القسم 26: حقول الإدخال مع العداد ==================== */
-.input-wrapper-with-counter {
-    position: relative;
+
+/* ✅ صف العنوان + العداد (في المنتصف معاً) */
+.field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto 6px auto;
+    padding: 0;
+    gap: 6px;
+}
+
+.field-label-row label {
+    margin: 0 !important;
+    padding: 0;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    flex: 0 0 auto;
+    width: auto !important;
+}
+
+.field-counter-label {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-weight: 500;
+    direction: ltr;
+    opacity: 0.7;
+    font-family: monospace;
+    line-height: 1;
+    flex: 0 0 auto;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.field-counter-label.warning {
+    color: #FFC107;
+    opacity: 1;
+    font-weight: 700;
+}
+
+.field-counter-label.full {
+    color: #f44336;
+    opacity: 1;
+    font-weight: 700;
+}
+
+/* ✅ حقول الإدخال الموحدة */
+.edit-field input[type="text"],
+.edit-field textarea {
     width: 100%;
     max-width: 300px;
     margin: 0 auto;
-}
-
-.input-wrapper-with-counter input,
-.input-wrapper-with-counter textarea {
-    width: 100%;
-    padding: 10px 12px 24px 12px;
+    display: block;
+    padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--light);
@@ -1429,50 +1475,24 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     box-sizing: border-box;
 }
 
-.input-wrapper-with-counter textarea {
+.edit-field textarea {
     text-align: right;
     resize: vertical;
     min-height: 100px;
     line-height: 1.6;
 }
 
-.input-wrapper-with-counter input:focus,
-.input-wrapper-with-counter textarea:focus {
+.edit-field input[type="text"]:focus,
+.edit-field textarea:focus {
     outline: none;
     border-color: var(--primary);
     background: var(--card-bg);
 }
 
-.input-wrapper-with-counter input.limit-reached,
-.input-wrapper-with-counter textarea.limit-reached {
+.edit-field input.limit-reached {
     border-color: #FFC107;
 }
 
-/* ✅ العداد في أسفل اليسار داخل الحقل */
-.field-counter {
-    position: absolute;
-    bottom: 6px;
-    left: 12px;
-    right: auto;
-    font-size: 0.7rem;
-    color: var(--text-light);
-    font-weight: 500;
-    direction: ltr;
-    opacity: 0.7;
-    pointer-events: none;
-    font-family: monospace;
-    line-height: 1;
-    transition: all 0.2s ease;
-}
-
-.field-counter.warning {
-    color: #FFC107;
-    opacity: 1;
-    font-weight: 700;
-}
-
-.field-counter.full {
-    color: #f44336;
-    opacity: 1;
-    font-weight: 700;
+.edit-field textarea.limit-reached {
+    border-color: #FFC107;
 }
