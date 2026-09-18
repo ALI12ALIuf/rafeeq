@@ -253,12 +253,18 @@
         
         <div class="edit-field">
             <label>الاسم الكامل</label>
-            <input type="text" id="jobName" maxlength="30" placeholder="اسمك الكامل">
+            <div class="input-wrapper-with-counter">
+                <input type="text" id="jobName" maxlength="15" placeholder="اسمك الكامل" data-maxlength="15">
+                <span class="field-counter" id="jobNameCounter">0/15</span>
+            </div>
         </div>
         
         <div class="edit-field">
-            <label>العمر</label>
-            <input type="number" id="jobAge" min="15" max="80" placeholder="مثال: 25">
+            <label>العمر (18 - 99)</label>
+            <div class="input-wrapper-with-counter">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="jobAge" maxlength="2" placeholder="مثال: 25" data-maxlength="2" data-min="18">
+                <span class="field-counter" id="jobAgeCounter">0/2</span>
+            </div>
         </div>
         
         <div class="edit-field">
@@ -275,12 +281,18 @@
         
         <div class="edit-field">
             <label>عنوان الوظيفة</label>
-            <input type="text" id="jobTitle" maxlength="50" placeholder="مثال: مهندس برمجيات">
+            <div class="input-wrapper-with-counter">
+                <input type="text" id="jobTitle" maxlength="15" placeholder="مثال: مهندس برمجيات" data-maxlength="15">
+                <span class="field-counter" id="jobTitleCounter">0/15</span>
+            </div>
         </div>
         
         <div class="edit-field">
             <label>السيرة الذاتية</label>
-            <textarea id="jobBio" maxlength="300" rows="4" placeholder="اكتب نبذة عن مؤهلاتك وخبراتك..." style="resize: vertical; min-height: 80px;"></textarea>
+            <div class="input-wrapper-with-counter">
+                <textarea id="jobBio" maxlength="400" rows="5" placeholder="اكتب نبذة عن مؤهلاتك وخبراتك..." data-maxlength="400"></textarea>
+                <span class="field-counter" id="jobBioCounter">0/400</span>
+            </div>
         </div>
         
         <div class="edit-field">
@@ -309,12 +321,18 @@
         
         <div class="edit-field">
             <label>الاسم الكامل</label>
-            <input type="text" id="marriageName" maxlength="30" placeholder="اسمك الكامل">
+            <div class="input-wrapper-with-counter">
+                <input type="text" id="marriageName" maxlength="15" placeholder="اسمك الكامل" data-maxlength="15">
+                <span class="field-counter" id="marriageNameCounter">0/15</span>
+            </div>
         </div>
         
         <div class="edit-field">
-            <label>العمر</label>
-            <input type="number" id="marriageAge" min="15" max="80" placeholder="مثال: 25">
+            <label>العمر (18 - 99)</label>
+            <div class="input-wrapper-with-counter">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="marriageAge" maxlength="2" placeholder="مثال: 25" data-maxlength="2" data-min="18">
+                <span class="field-counter" id="marriageAgeCounter">0/2</span>
+            </div>
         </div>
         
         <div class="edit-field">
@@ -325,17 +343,18 @@
         
         <div class="edit-field">
             <label>السيرة الذاتية</label>
-            <textarea id="marriageBio" maxlength="300" rows="4" placeholder="اكتب نبذة عن نفسك..." style="resize: vertical; min-height: 80px;"></textarea>
+            <div class="input-wrapper-with-counter">
+                <textarea id="marriageBio" maxlength="400" rows="5" placeholder="اكتب نبذة عن نفسك..." data-maxlength="400"></textarea>
+                <span class="field-counter" id="marriageBioCounter">0/400</span>
+            </div>
         </div>
         
-        <!-- ✅ قائمة "هل أنت متزوج؟" المخصصة -->
         <div class="edit-field">
             <label>هل أنت متزوج؟</label>
             <input type="hidden" id="marriageMarried" value="no">
             <div class="publish-category-container" id="marriageMarriedSelector"></div>
         </div>
         
-        <!-- ✅ حقل "هل لديك أطفال؟" - يظهر فقط عند "متزوج/مطلق/أرمل" -->
         <div class="edit-field" id="marriageChildrenField" style="display: none;">
             <label>هل لديك أطفال؟</label>
             <input type="hidden" id="marriageChildren" value="no">
@@ -474,14 +493,14 @@
     window.googleProvider = new firebase.auth.GoogleAuthProvider();
 </script>
 
-<script src="js/i18n.js?v=28"></script>
-<script src="js/countries.js?v=28"></script>
-<script src="js/secure-chat.js?v=28"></script>
-<script src="js/chat-system.js?v=28"></script>
-<script src="js/ui-functions.js?v=28"></script>
-<script src="js/posts-system.js?v=28"></script>
-<script src="js/auth.js?v=28"></script>
-<script src="js/friends.js?v=28"></script>
+<script src="js/i18n.js?v=30"></script>
+<script src="js/countries.js?v=30"></script>
+<script src="js/secure-chat.js?v=30"></script>
+<script src="js/chat-system.js?v=30"></script>
+<script src="js/ui-functions.js?v=30"></script>
+<script src="js/posts-system.js?v=30"></script>
+<script src="js/auth.js?v=30"></script>
+<script src="js/friends.js?v=30"></script>
 
 <script>
 window.addEventListener('load', function() {
