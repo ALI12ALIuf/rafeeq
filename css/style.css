@@ -1408,12 +1408,12 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 
 /* ==================== القسم 26: حقول الإدخال مع العداد - في المنتصف ==================== */
 
-/* ✅ صف الـ Label + العداد - كلاهما في المنتصف */
+/* ✅ صف الـ Label + العداد - كلاهما في المنتصف وملاصقين */
 .label-with-counter {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 5px;
     width: 100%;
     max-width: 300px;
     margin: 0 auto 6px auto;
@@ -1427,9 +1427,11 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     font-weight: 600;
     text-align: center;
     flex-shrink: 0;
+    line-height: 1;
+    display: inline-block;
 }
 
-/* ✅ العداد - بجانب الـ Label في المنتصف */
+/* ✅ العداد - ملاصق للـ Label */
 .inline-counter {
     font-size: 0.72rem;
     color: var(--text-light);
@@ -1441,7 +1443,9 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     line-height: 1;
     transition: all 0.2s ease;
     flex-shrink: 0;
+    display: inline-block;
     text-align: center;
+    vertical-align: middle;
 }
 
 .inline-counter.warning {
