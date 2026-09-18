@@ -1413,11 +1413,12 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 6px;
     width: 100%;
     max-width: 300px;
     margin: 0 auto 6px auto;
     direction: rtl;
+    text-align: center;
 }
 
 .label-with-counter label {
@@ -1429,9 +1430,10 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-shrink: 0;
     line-height: 1;
     display: inline-block;
+    white-space: nowrap;
 }
 
-/* ✅ العداد - ملاصق للـ Label */
+/* ✅ العداد - ملاصق للـ Label في المنتصف */
 .inline-counter {
     font-size: 0.72rem;
     color: var(--text-light);
@@ -1445,7 +1447,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-shrink: 0;
     display: inline-block;
     text-align: center;
-    vertical-align: middle;
+    white-space: nowrap;
 }
 
 .inline-counter.warning {
