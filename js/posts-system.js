@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع العدادات ==========
+// ========== posts-system.js - النسخة النهائية مع العدادات الجديدة ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -73,60 +73,49 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== إعداد عدادات الحقول ====================
+    // ==================== ✅ إعداد عدادات الحقول ====================
     setupFieldCounters() {
         const fields = [
             { inputId: 'jobName', counterId: 'jobNameCounter', max: 15, type: 'text' },
-            { inputId: 'jobAge', counterId: 'jobAgeCounter', max: 2, type: 'number', min: 18 },
+            { inputId: 'jobAge', counterId: 'jobAgeCounter', max: 2, type: 'number' },
             { inputId: 'jobTitle', counterId: 'jobTitleCounter', max: 15, type: 'text' },
             { inputId: 'jobBio', counterId: 'jobBioCounter', max: 400, type: 'textarea' },
             { inputId: 'marriageName', counterId: 'marriageNameCounter', max: 15, type: 'text' },
-            { inputId: 'marriageAge', counterId: 'marriageAgeCounter', max: 2, type: 'number', min: 18 },
+            { inputId: 'marriageAge', counterId: 'marriageAgeCounter', max: 2, type: 'number' },
             { inputId: 'marriageBio', counterId: 'marriageBioCounter', max: 400, type: 'textarea' }
         ];
         
-        fields.forEach(({ inputId, counterId, max, type, min }) => {
+        fields.forEach(({ inputId, counterId, max, type }) => {
             const input = document.getElementById(inputId);
             const counter = document.getElementById(counterId);
             if (!input || !counter) return;
             
-            // ✅ إزالة المستمعين القدامى
             if (input._counterHandler) {
                 input.removeEventListener('input', input._counterHandler);
-            }
-            if (input._pasteHandler) {
-                input.removeEventListener('paste', input._pasteHandler);
-            }
-            if (input._keypressHandler) {
-                input.removeEventListener('keypress', input._keypressHandler);
             }
             
             input.setAttribute('maxlength', max);
             
-            // ✅ معالج الإدخال
             const handler = (e) => {
                 let value = e.target.value;
                 
-                // ✅ للعمر: أرقام فقط
                 if (type === 'number') {
                     value = value.replace(/[^0-9]/g, '');
-                }
-                
-                // ✅ للسيرة الذاتية: تنظيف المسافات المتعددة
-                if (type === 'textarea') {
-                    value = value.replace(/\n{3,}/g, '\n\n');
-                    value = value.replace(/[ \t]{3,}/g, '  ');
                 }
                 
                 if (value.length > max) {
                     value = value.substring(0, max);
                 }
                 
+                if (type === 'textarea') {
+                    value = value.replace(/ {3,}/g, ' ');
+                    value = value.replace(/\n{3,}/g, '\n\n');
+                }
+                
                 if (e.target.value !== value) {
                     e.target.value = value;
                 }
                 
-                // ✅ تحديث العداد
                 const len = value.length;
                 counter.textContent = `${len}/${max}`;
                 counter.classList.remove('warning', 'full');
@@ -135,7 +124,7 @@ const PostsSystem = {
                 if (len >= max) {
                     counter.classList.add('full');
                     input.classList.add('limit-reached');
-                } else if (len >= max - 5) {
+                } else if (len >= max - Math.ceil(max * 0.1)) {
                     counter.classList.add('warning');
                 }
             };
@@ -143,36 +132,39 @@ const PostsSystem = {
             input._counterHandler = handler;
             input.addEventListener('input', handler);
             
-            // ✅ منع اللصق الذي يتجاوز الحد
-            const pasteHandler = (e) => {
-                e.preventDefault();
-                const pasted = (e.clipboardData || window.clipboardData).getData('text');
-                let value = input.value + pasted;
-                
-                if (type === 'number') {
-                    value = value.replace(/[^0-9]/g, '');
-                }
-                if (type === 'textarea') {
-                    value = value.replace(/\n{3,}/g, '\n\n');
-                    value = value.replace(/[ \t]{3,}/g, '  ');
-                }
-                value = value.substring(0, max);
-                input.value = value;
-                input.dispatchEvent(new Event('input'));
-            };
-            input._pasteHandler = pasteHandler;
-            input.addEventListener('paste', pasteHandler);
-            
-            // ✅ منع الكتابة عند الحد
-            const keypressHandler = (e) => {
-                if (e.target.value.length >= max && e.key.length === 1) {
+            if (!input._pasteHandler) {
+                const pasteHandler = (e) => {
                     e.preventDefault();
-                }
-            };
-            input._keypressHandler = keypressHandler;
-            input.addEventListener('keypress', keypressHandler);
+                    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+                    let value = input.value + pasted;
+                    
+                    if (type === 'number') {
+                        value = value.replace(/[^0-9]/g, '');
+                    }
+                    
+                    if (type === 'textarea') {
+                        value = value.replace(/ {3,}/g, ' ');
+                        value = value.replace(/\n{3,}/g, '\n\n');
+                    }
+                    
+                    value = value.substring(0, max);
+                    input.value = value;
+                    input.dispatchEvent(new Event('input'));
+                };
+                input._pasteHandler = pasteHandler;
+                input.addEventListener('paste', pasteHandler);
+            }
             
-            // ✅ تهيئة العداد
+            if (!input._keypressHandler) {
+                const keypressHandler = (e) => {
+                    if (e.target.value.length >= max && e.key.length === 1) {
+                        e.preventDefault();
+                    }
+                };
+                input._keypressHandler = keypressHandler;
+                input.addEventListener('keypress', keypressHandler);
+            }
+            
             handler({ target: input });
         });
     },
@@ -201,7 +193,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== تحميل حالات العلاقات ====================
+    // ==================== تحميل حالات العلاقات (Batch) ====================
     async loadRelationshipCache(force = false) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
@@ -1298,6 +1290,7 @@ PostsSystem.fillPublishJobForm = function() {
     this.renderPublishCountryDropdown('jobs');
     this.renderPublishCategoryDropdown();
     this.setupFieldCounters();
+    
     const preview = document.getElementById('jobImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('jobImage');
@@ -1350,20 +1343,15 @@ window.publishJob = async function() {
     const bio = document.getElementById('jobBio')?.value?.trim();
     const imageInput = document.getElementById('jobImage');
     
-    if (!name) { alert('الاسم مطلوب'); return; }
-    if (name.length > 15) { alert('الاسم لا يزيد عن 15 حرف'); return; }
-    if (!age) { alert('العمر مطلوب'); return; }
-    if (!countryCode) { alert('البلد مطلوب'); return; }
-    if (!category) { alert('القسم مطلوب'); return; }
-    if (!jobTitle) { alert('عنوان الوظيفة مطلوب'); return; }
-    if (jobTitle.length > 15) { alert('عنوان الوظيفة لا يزيد عن 15 حرف'); return; }
-    if (!bio) { alert('السيرة الذاتية مطلوبة'); return; }
-    if (bio.length > 400) { alert('السيرة الذاتية لا تزيد عن 400 حرف'); return; }
+    if (!name || !age || !countryCode || !category || !jobTitle || !bio) {
+        alert('يرجى تعبئة جميع الحقول'); return;
+    }
     
     const ageNum = parseInt(age);
-    if (isNaN(ageNum)) { alert('العمر غير صالح'); return; }
-    if (ageNum < 18) { alert('❌ العمر يجب أن يكون 18 سنة على الأقل'); return; }
-    if (ageNum > 99) { alert('❌ العمر غير صالح (الحد الأقصى 99)'); return; }
+    if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) {
+        alert('العمر يجب أن يكون بين 18 و 99');
+        return;
+    }
     
     try {
         let imageBase64 = null;
@@ -1401,17 +1389,15 @@ window.publishMarriage = async function() {
     const children = document.getElementById('marriageChildren')?.value;
     const imageInput = document.getElementById('marriageImage');
     
-    if (!name) { alert('الاسم مطلوب'); return; }
-    if (name.length > 15) { alert('الاسم لا يزيد عن 15 حرف'); return; }
-    if (!age) { alert('العمر مطلوب'); return; }
-    if (!countryCode) { alert('البلد مطلوب'); return; }
-    if (!bio) { alert('السيرة الذاتية مطلوبة'); return; }
-    if (bio.length > 400) { alert('السيرة الذاتية لا تزيد عن 400 حرف'); return; }
+    if (!name || !age || !countryCode || !bio) {
+        alert('يرجى تعبئة جميع الحقول'); return;
+    }
     
     const ageNum = parseInt(age);
-    if (isNaN(ageNum)) { alert('العمر غير صالح'); return; }
-    if (ageNum < 18) { alert('❌ العمر يجب أن يكون 18 سنة على الأقل'); return; }
-    if (ageNum > 99) { alert('❌ العمر غير صالح (الحد الأقصى 99)'); return; }
+    if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) {
+        alert('العمر يجب أن يكون بين 18 و 99');
+        return;
+    }
     
     try {
         let imageBase64 = null;
@@ -1480,4 +1466,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - مع العدادات المحسّنة');
+console.log('✅ posts-system.js تم تحميله - النسخة النهائية');
