@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع العدادات ==========
+// ========== posts-system.js - النسخة النهائية مع العدادات بجانب Labels ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -46,10 +46,7 @@ const PostsSystem = {
         
         console.log('🚀 تهيئة نظام المنشورات...');
         this.loadSavedSettings();
-        
-        // ✅ إعداد العدادات عند البدء
         this.setupFieldCounters();
-        
         this.loadAllPosts();
         this.setupRealtimeListeners();
         this.renderCountryHeaderSelector();
@@ -74,49 +71,50 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== ✅ إعداد عدادات الحقول ====================
+    // ==================== ✅ إعداد عدادات الحقول (العداد بجانب الـ Label) ====================
     setupFieldCounters() {
         const fields = [
-            { inputId: 'jobName', counterId: 'jobNameCounter', max: 15 },
-            { inputId: 'jobAge', counterId: 'jobAgeCounter', max: 3 },
-            { inputId: 'jobTitle', counterId: 'jobTitleCounter', max: 10 },
-            { inputId: 'marriageName', counterId: 'marriageNameCounter', max: 15 },
-            { inputId: 'marriageAge', counterId: 'marriageAgeCounter', max: 3 }
+            { inputId: 'jobName', counterId: 'jobNameCounter', max: 15, numericOnly: false },
+            { inputId: 'jobAge', counterId: 'jobAgeCounter', max: 3, numericOnly: true },
+            { inputId: 'jobTitle', counterId: 'jobTitleCounter', max: 10, numericOnly: false },
+            { inputId: 'jobBio', counterId: 'jobBioCounter', max: 400, numericOnly: false, multiline: true },
+            { inputId: 'marriageName', counterId: 'marriageNameCounter', max: 15, numericOnly: false },
+            { inputId: 'marriageAge', counterId: 'marriageAgeCounter', max: 3, numericOnly: true },
+            { inputId: 'marriageBio', counterId: 'marriageBioCounter', max: 400, numericOnly: false, multiline: true }
         ];
         
-        fields.forEach(({ inputId, counterId, max }) => {
+        fields.forEach(({ inputId, counterId, max, numericOnly, multiline }) => {
             const input = document.getElementById(inputId);
             const counter = document.getElementById(counterId);
             if (!input || !counter) return;
             
-            // ✅ إزالة المستمعين القدامى إن وجدوا
             if (input._counterHandler) {
                 input.removeEventListener('input', input._counterHandler);
             }
             
-            // ✅ إضافة maxlength
             input.setAttribute('maxlength', max);
+            input.setAttribute('data-maxlength', max);
             
-            // ✅ معالج الإدخال
             const handler = (e) => {
                 let value = e.target.value;
                 
-                // ✅ للعمر: أرقام فقط
-                if (inputId === 'jobAge' || inputId === 'marriageAge') {
+                if (numericOnly) {
                     value = value.replace(/[^0-9]/g, '');
                 }
                 
-                // ✅ منع تجاوز الحد (احتياط)
+                if (multiline) {
+                    value = value.replace(/ {3,}/g, '  ');
+                    value = value.replace(/\n{3,}/g, '\n\n');
+                }
+                
                 if (value.length > max) {
                     value = value.substring(0, max);
                 }
                 
-                // ✅ تحديث القيمة
                 if (e.target.value !== value) {
                     e.target.value = value;
                 }
                 
-                // ✅ تحديث العداد
                 const len = value.length;
                 counter.textContent = `${len}/${max}`;
                 counter.classList.remove('warning', 'full');
@@ -125,7 +123,7 @@ const PostsSystem = {
                 if (len >= max) {
                     counter.classList.add('full');
                     input.classList.add('limit-reached');
-                } else if (len >= max - 3) {
+                } else if (len >= max - Math.max(3, Math.floor(max * 0.05))) {
                     counter.classList.add('warning');
                 }
             };
@@ -133,15 +131,18 @@ const PostsSystem = {
             input._counterHandler = handler;
             input.addEventListener('input', handler);
             
-            // ✅ منع لصق نص أطول من الحد
             if (!input._pasteHandler) {
                 const pasteHandler = (e) => {
                     e.preventDefault();
                     const pasted = (e.clipboardData || window.clipboardData).getData('text');
                     let value = input.value + pasted;
                     
-                    if (inputId === 'jobAge' || inputId === 'marriageAge') {
+                    if (numericOnly) {
                         value = value.replace(/[^0-9]/g, '');
+                    }
+                    if (multiline) {
+                        value = value.replace(/ {3,}/g, '  ');
+                        value = value.replace(/\n{3,}/g, '\n\n');
                     }
                     value = value.substring(0, max);
                     input.value = value;
@@ -151,7 +152,6 @@ const PostsSystem = {
                 input.addEventListener('paste', pasteHandler);
             }
             
-            // ✅ منع الكتابة عند الوصول للحد (keypress)
             if (!input._keypressHandler) {
                 const keypressHandler = (e) => {
                     if (e.target.value.length >= max && e.key.length === 1) {
@@ -162,7 +162,6 @@ const PostsSystem = {
                 input.addEventListener('keypress', keypressHandler);
             }
             
-            // ✅ تهيئة العداد
             handler({ target: input });
         });
     },
@@ -173,8 +172,10 @@ const PostsSystem = {
             { inputId: 'jobName', counterId: 'jobNameCounter', max: 15 },
             { inputId: 'jobAge', counterId: 'jobAgeCounter', max: 3 },
             { inputId: 'jobTitle', counterId: 'jobTitleCounter', max: 10 },
+            { inputId: 'jobBio', counterId: 'jobBioCounter', max: 400 },
             { inputId: 'marriageName', counterId: 'marriageNameCounter', max: 15 },
-            { inputId: 'marriageAge', counterId: 'marriageAgeCounter', max: 3 }
+            { inputId: 'marriageAge', counterId: 'marriageAgeCounter', max: 3 },
+            { inputId: 'marriageBio', counterId: 'marriageBioCounter', max: 400 }
         ];
         
         fields.forEach(({ inputId, counterId, max }) => {
@@ -189,7 +190,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== تحميل حالات العلاقات (Batch) ====================
+    // ==================== تحميل حالات العلاقات ====================
     async loadRelationshipCache(force = false) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
@@ -1285,8 +1286,6 @@ PostsSystem.fillPublishJobForm = function() {
     if (countryInput) countryInput.value = this.selectedCountry;
     this.renderPublishCountryDropdown('jobs');
     this.renderPublishCategoryDropdown();
-    
-    // ✅ إعداد العدادات
     this.setupFieldCounters();
     
     const preview = document.getElementById('jobImagePreview');
@@ -1311,7 +1310,6 @@ PostsSystem.fillPublishMarriageForm = function() {
     const childrenField = document.getElementById('marriageChildrenField');
     if (childrenField) childrenField.style.display = 'none';
     
-    // ✅ إعداد العدادات
     this.setupFieldCounters();
     
     const preview = document.getElementById('marriageImagePreview');
@@ -1348,6 +1346,7 @@ window.publishJob = async function() {
     if (name.length > 15) { alert('الاسم لا يزيد عن 15 حرف'); return; }
     if (age.length > 3) { alert('العمر لا يزيد عن 3 أرقام'); return; }
     if (jobTitle.length > 10) { alert('عنوان الوظيفة لا يزيد عن 10 أحرف'); return; }
+    if (bio.length > 400) { alert('السيرة الذاتية لا تزيد عن 400 حرف'); return; }
     
     const ageNum = parseInt(age);
     if (ageNum < 15 || ageNum > 80) { alert('العمر بين 15 و 80'); return; }
@@ -1391,6 +1390,7 @@ window.publishMarriage = async function() {
     if (!name || !age || !countryCode || !bio) { alert('يرجى تعبئة جميع الحقول'); return; }
     if (name.length > 15) { alert('الاسم لا يزيد عن 15 حرف'); return; }
     if (age.length > 3) { alert('العمر لا يزيد عن 3 أرقام'); return; }
+    if (bio.length > 400) { alert('السيرة الذاتية لا تزيد عن 400 حرف'); return; }
     
     const ageNum = parseInt(age);
     if (ageNum < 15 || ageNum > 80) { alert('العمر بين 15 و 80'); return; }
@@ -1462,4 +1462,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - مع العدادات المحسّنة');
+console.log('✅ posts-system.js تم تحميله - مع العدادات بجانب Labels');
