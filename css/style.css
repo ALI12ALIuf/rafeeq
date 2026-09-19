@@ -40,6 +40,9 @@ html, body {
     --radius: 12px;
     --header-height: 60px;
     --nav-height: 60px;
+    --whatsapp: #25D366;
+    --phone: #2196F3;
+    --email: #FF9800;
 }
 
 /* ==================== القسم 3: أنماط الجسم ==================== */
@@ -162,19 +165,10 @@ body.conversation-open {
     white-space: nowrap;
 }
 
-.country-header-btn:active {
-    transform: scale(0.96);
-}
+.country-header-btn:active { transform: scale(0.96); }
+.country-header-btn:hover { border-color: var(--primary); background: rgba(100, 181, 246, 0.08); }
 
-.country-header-btn:hover {
-    border-color: var(--primary);
-    background: rgba(100, 181, 246, 0.08);
-}
-
-.country-header-flag {
-    font-size: 1.15rem;
-    line-height: 1;
-}
+.country-header-flag { font-size: 1.15rem; line-height: 1; }
 
 .country-header-name {
     font-size: 0.75rem;
@@ -232,21 +226,11 @@ body.conversation-open {
 }
 
 .country-mini-option:hover { background: var(--light); }
-.country-mini-option.active {
-    background: rgba(100, 181, 246, 0.15);
-    color: var(--primary);
-    font-weight: 700;
-}
-
+.country-mini-option.active { background: rgba(100, 181, 246, 0.15); color: var(--primary); font-weight: 700; }
 .country-mini-flag { font-size: 1.2rem; line-height: 1; }
 .country-mini-name { flex: 1; text-align: right; }
 .country-mini-option i { font-size: 0.8rem; color: var(--primary); }
-
-.country-mini-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 4px 6px;
-}
+.country-mini-divider { height: 1px; background: var(--border); margin: 4px 6px; }
 
 /* ==================== القسم 8: تبويبات الرئيسية ==================== */
 .home-tabs {
@@ -279,18 +263,8 @@ body.conversation-open {
 }
 
 .home-tab i { font-size: 1.1rem; }
-
-.home-tab.active {
-    background: var(--primary);
-    color: white;
-    box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4);
-}
-
-.home-tab:not(.active):hover {
-    background: var(--light);
-    color: var(--text);
-}
-
+.home-tab.active { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4); }
+.home-tab:not(.active):hover { background: var(--light); color: var(--text); }
 .home-content { display: none; }
 .home-content.active { display: block; }
 
@@ -327,23 +301,9 @@ body.conversation-open {
     font-family: inherit;
 }
 
-.category-tab:hover {
-    border-color: var(--cat-color, var(--primary));
-    color: var(--text);
-    transform: translateY(-1px);
-}
-
-.category-tab.active {
-    background: var(--cat-color, var(--primary));
-    border-color: var(--cat-color, var(--primary));
-    color: white;
-    box-shadow: 0 4px 12px var(--cat-color, rgba(100, 181, 246, 0.4));
-}
-
-.category-tab.active .category-icon-wrapper {
-    background: rgba(255,255,255,0.25) !important;
-    color: white !important;
-}
+.category-tab:hover { border-color: var(--cat-color, var(--primary)); color: var(--text); transform: translateY(-1px); }
+.category-tab.active { background: var(--cat-color, var(--primary)); border-color: var(--cat-color, var(--primary)); color: white; box-shadow: 0 4px 12px var(--cat-color, rgba(100, 181, 246, 0.4)); }
+.category-tab.active .category-icon-wrapper { background: rgba(255,255,255,0.25) !important; color: white !important; }
 
 .category-icon-wrapper {
     width: 26px;
@@ -472,8 +432,37 @@ body.conversation-open {
     box-shadow: 0 4px 12px rgba(100, 181, 246, 0.35);
 }
 
-.post-action-btn:not(:disabled):active {
-    transform: scale(0.95);
+.post-action-btn:not(:disabled):active { transform: scale(0.95); }
+
+/* ✅ أزرار طريقة التواصل بألوان مميزة */
+.post-action-btn.contact-whatsapp {
+    background: var(--whatsapp) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.post-action-btn.contact-whatsapp:hover {
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.5) !important;
+}
+
+.post-action-btn.contact-phone {
+    background: var(--phone) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.post-action-btn.contact-phone:hover {
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.5) !important;
+}
+
+.post-action-btn.contact-email {
+    background: var(--email) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.post-action-btn.contact-email:hover {
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.5) !important;
 }
 
 .post-menu {
@@ -494,10 +483,7 @@ body.conversation-open {
     flex-shrink: 0;
 }
 
-.post-menu:hover {
-    background: rgba(244, 67, 54, 0.1);
-    color: var(--danger);
-}
+.post-menu:hover { background: rgba(244, 67, 54, 0.1); color: var(--danger); }
 
 .post-content { padding: 0 1rem 1rem; }
 
@@ -596,20 +582,14 @@ body.conversation-open {
     box-shadow: 0 4px 15px rgba(100, 181, 246, 0.3);
 }
 
-.publish-btn-jobs:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(100, 181, 246, 0.4);
-}
+.publish-btn-jobs:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(100, 181, 246, 0.4); }
 
 .publish-btn-marriage {
     background: linear-gradient(135deg, #e91e63, #c2185b);
     box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
 }
 
-.publish-btn-marriage:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
-}
+.publish-btn-marriage:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4); }
 
 .publish-btn:active { transform: scale(0.98); }
 
@@ -720,11 +700,7 @@ body.conversation-open {
     order: 1;
 }
 
-.copy-chat-id-btn:hover {
-    background: rgba(33, 150, 243, 0.15);
-    transform: scale(1.15);
-}
-
+.copy-chat-id-btn:hover { background: rgba(33, 150, 243, 0.15); transform: scale(1.15); }
 .copy-chat-id-btn:active { transform: scale(0.9); }
 
 .chat-item.unread-dot {
@@ -757,11 +733,7 @@ body.conversation-open {
     flex-shrink: 0;
 }
 
-.remove-friend-btn:hover {
-    background: rgba(244, 67, 54, 0.3);
-    transform: scale(1.05);
-}
-
+.remove-friend-btn:hover { background: rgba(244, 67, 54, 0.3); transform: scale(1.05); }
 .remove-friend-btn:active { transform: scale(0.95); }
 
 /* ==================== القسم 14: الملف الشخصي ==================== */
@@ -1042,11 +1014,7 @@ body.conversation-open {
 }
 
 .publish-category-option:hover { background: var(--light); }
-.publish-category-option.active {
-    background: rgba(100, 181, 246, 0.15);
-    color: var(--primary);
-    font-weight: 700;
-}
+.publish-category-option.active { background: rgba(100, 181, 246, 0.15); color: var(--primary); font-weight: 700; }
 
 .publish-category-option .publish-category-name { flex: 1; }
 .publish-category-option i.fa-check { font-size: 0.8rem; color: var(--primary); }
@@ -1122,11 +1090,7 @@ body.conversation-open {
 }
 
 .publish-country-option:hover { background: var(--light); }
-.publish-country-option.active {
-    background: rgba(100, 181, 246, 0.15);
-    color: var(--primary);
-    font-weight: 700;
-}
+.publish-country-option.active { background: rgba(100, 181, 246, 0.15); color: var(--primary); font-weight: 700; }
 
 .publish-country-option .publish-country-flag { font-size: 1.2rem; }
 .publish-country-option .publish-country-name { flex: 1; }
@@ -1165,24 +1129,12 @@ body.conversation-open {
     .post-info-row span { padding: 3px 8px; }
     .post-bio { font-size: 0.85rem; padding: 10px 12px; }
     
-    .category-tab {
-        padding: 5px 10px 5px 5px;
-        font-size: 0.72rem;
-    }
-    
-    .category-icon-wrapper {
-        width: 24px;
-        height: 24px;
-    }
-    
+    .category-tab { padding: 5px 10px 5px 5px; font-size: 0.72rem; }
+    .category-icon-wrapper { width: 24px; height: 24px; }
     .category-icon-wrapper i { font-size: 0.7rem; }
     .category-name { font-size: 0.72rem; }
     
-    .country-header-btn {
-        padding: 4px 8px;
-        font-size: 0.72rem;
-    }
-    
+    .country-header-btn { padding: 4px 8px; font-size: 0.72rem; }
     .country-header-flag { font-size: 1rem; }
     .country-header-name { font-size: 0.68rem; max-width: 55px; }
     .country-header-arrow { font-size: 0.55rem; }
@@ -1496,3 +1448,30 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 .edit-field textarea.limit-reached {
     border-color: #FFC107;
 }
+
+/* ==================== القسم 27: طريقة التواصل ==================== */
+
+/* ✅ قائمة طريقة التواصل */
+#jobContactSelector .publish-category-btn,
+#marriageContactSelector .publish-category-btn {
+    background: var(--light);
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+#jobContactSelector .publish-category-btn:active,
+#marriageContactSelector .publish-category-btn:active {
+    transform: scale(0.98);
+}
+
+/* ✅ حقل الإدخال الديناميكي */
+#jobContactValueField,
+#marriageContactValueField {
+    transition: opacity 0.3s ease, max-height 0.3s ease;
+    overflow: hidden;
+}
+
+/* ✅ أيقونات طريقة التواصل (للاستخدام المستقبلي) */
+.contact-icon-whatsapp { color: var(--whatsapp); }
+.contact-icon-phone { color: var(--phone); }
+.contact-icon-email { color: var(--email); }
