@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع العدادات الجديدة ==========
+// ========== posts-system.js - النسخة النهائية مع طريقة التواصل ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -193,7 +193,226 @@ const PostsSystem = {
         });
     },
     
-    // ==================== تحميل حالات العلاقات (Batch) ====================
+    // ==================== ✅ قائمة طريقة التواصل ====================
+    renderContactMethodDropdown(type) {
+        const isJob = type === 'job';
+        const containerId = isJob ? 'jobContactSelector' : 'marriageContactSelector';
+        const inputId = isJob ? 'jobContactMethod' : 'marriageContactMethod';
+        
+        const container = document.getElementById(containerId);
+        const input = document.getElementById(inputId);
+        if (!container || !input) return;
+        
+        const current = input.value || 'none';
+        
+        const options = [
+            { value: 'none', label: 'لا شيء (طلب صداقة)', icon: 'fas fa-user-plus', color: '#64B5F6' },
+            { value: 'whatsapp', label: 'رابط واتساب', icon: 'fab fa-whatsapp', color: '#25D366' },
+            { value: 'phone', label: 'رقم الهاتف', icon: 'fas fa-phone', color: '#2196F3' },
+            { value: 'email', label: 'البريد الإلكتروني', icon: 'fas fa-envelope', color: '#FF9800' }
+        ];
+        
+        const currentOption = options.find(o => o.value === current) || options[0];
+        
+        container.innerHTML = `
+            <button type="button" class="publish-category-btn" 
+                    data-contact-type="${type}"
+                    onclick="PostsSystem.toggleContactDropdown('${type}', event)">
+                <span class="publish-category-icon" style="background: ${currentOption.color}20; color: ${currentOption.color};">
+                    <i class="${currentOption.icon}"></i>
+                </span>
+                <span class="publish-category-name">${currentOption.label}</span>
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        `;
+    },
+    
+    toggleContactDropdown(type, event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        
+        const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
+        const existing = document.getElementById(dropdownId);
+        if (existing) existing.remove();
+        
+        const btn = document.querySelector(`.publish-category-btn[data-contact-type="${type}"]`);
+        if (!btn) return;
+        
+        const rect = btn.getBoundingClientRect();
+        
+        const options = [
+            { value: 'none', label: 'لا شيء (طلب صداقة)', icon: 'fas fa-user-plus', color: '#64B5F6' },
+            { value: 'whatsapp', label: 'رابط واتساب', icon: 'fab fa-whatsapp', color: '#25D366' },
+            { value: 'phone', label: 'رقم الهاتف', icon: 'fas fa-phone', color: '#2196F3' },
+            { value: 'email', label: 'البريد الإلكتروني', icon: 'fas fa-envelope', color: '#FF9800' }
+        ];
+        
+        const inputId = type === 'job' ? 'jobContactMethod' : 'marriageContactMethod';
+        const input = document.getElementById(inputId);
+        const current = input ? input.value : 'none';
+        
+        const dropdown = document.createElement('div');
+        dropdown.className = 'publish-category-dropdown';
+        dropdown.id = dropdownId;
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 6) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.width = rect.width + 'px';
+        dropdown.style.maxHeight = '280px';
+        dropdown.style.overflowY = 'auto';
+        dropdown.style.background = 'var(--card-bg)';
+        dropdown.style.border = '1px solid var(--border)';
+        dropdown.style.borderRadius = '10px';
+        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
+        dropdown.style.zIndex = '99999';
+        dropdown.style.padding = '6px';
+        
+        dropdown.innerHTML = options.map(opt => `
+            <button type="button" class="publish-category-option ${opt.value === current ? 'active' : ''}" 
+                    onclick="PostsSystem.selectContactMethod('${type}', '${opt.value}')">
+                <span class="publish-category-icon" style="background: ${opt.color}20; color: ${opt.color};">
+                    <i class="${opt.icon}"></i>
+                </span>
+                <span class="publish-category-name">${opt.label}</span>
+                ${opt.value === current ? '<i class="fas fa-check"></i>' : ''}
+            </button>
+        `).join('');
+        
+        document.body.appendChild(dropdown);
+        
+        setTimeout(() => {
+            const closeHandler = (e) => {
+                const dd = document.getElementById(dropdownId);
+                if (dd && !dd.contains(e.target) && !btn.contains(e.target)) {
+                    dd.remove();
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            document.addEventListener('click', closeHandler);
+        }, 100);
+    },
+    
+    selectContactMethod(type, value) {
+        const inputId = type === 'job' ? 'jobContactMethod' : 'marriageContactMethod';
+        const input = document.getElementById(inputId);
+        if (input) input.value = value;
+        
+        const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown) dropdown.remove();
+        
+        this.renderContactValueField(type, value);
+        this.renderContactMethodDropdown(type);
+    },
+    
+    // ==================== ✅ حقل الإدخال الديناميكي ====================
+    renderContactValueField(type, method) {
+        const isJob = type === 'job';
+        const fieldId = isJob ? 'jobContactValueField' : 'marriageContactValueField';
+        const labelId = isJob ? 'jobContactValueLabel' : 'marriageContactValueLabel';
+        const inputId = isJob ? 'jobContactValue' : 'marriageContactValue';
+        const counterId = isJob ? 'jobContactValueCounter' : 'marriageContactValueCounter';
+        
+        const field = document.getElementById(fieldId);
+        const label = document.getElementById(labelId);
+        const input = document.getElementById(inputId);
+        const counter = document.getElementById(counterId);
+        
+        if (!field || !label || !input) return;
+        
+        if (method === 'none' || !method) {
+            field.style.display = 'none';
+            input.value = '';
+            if (counter) counter.textContent = '0/200';
+            return;
+        }
+        
+        field.style.display = 'flex';
+        
+        const config = {
+            whatsapp: {
+                label: 'رابط واتساب',
+                placeholder: 'https://wa.me/9647701234567',
+                max: 200
+            },
+            phone: {
+                label: 'رقم الهاتف',
+                placeholder: '07701234567',
+                max: 15
+            },
+            email: {
+                label: 'البريد الإلكتروني',
+                placeholder: 'example@gmail.com',
+                max: 100
+            }
+        };
+        
+        const cfg = config[method];
+        if (!cfg) return;
+        
+        label.textContent = cfg.label;
+        input.placeholder = cfg.placeholder;
+        input.setAttribute('maxlength', cfg.max);
+        input.value = '';
+        if (counter) counter.textContent = `0/${cfg.max}`;
+        
+        if (input._contactCounterHandler) {
+            input.removeEventListener('input', input._contactCounterHandler);
+        }
+        
+        const handler = (e) => {
+            let value = e.target.value;
+            if (value.length > cfg.max) {
+                value = value.substring(0, cfg.max);
+                e.target.value = value;
+            }
+            if (counter) counter.textContent = `${value.length}/${cfg.max}`;
+        };
+        
+        input._contactCounterHandler = handler;
+        input.addEventListener('input', handler);
+    },
+    
+    // ==================== ✅ التحقق من قيمة التواصل ====================
+    validateContactValue(method, value) {
+        if (!method || method === 'none') return { valid: true };
+        
+        const v = (value || '').trim();
+        if (!v) {
+            return { valid: false, error: 'يرجى إدخال قيمة طريقة التواصل' };
+        }
+        
+        if (method === 'whatsapp') {
+            if (!/^https?:\/\//i.test(v)) {
+                return { valid: false, error: 'رابط واتساب يجب أن يبدأ بـ http:// أو https://' };
+            }
+            if (!/wa\.me|api\.whatsapp\.com|web\.whatsapp\.com|whatsapp/i.test(v)) {
+                return { valid: false, error: 'رابط واتساب غير صحيح. مثال: https://wa.me/9647701234567' };
+            }
+            return { valid: true };
+        }
+        
+        if (method === 'phone') {
+            const digits = v.replace(/[^0-9]/g, '');
+            if (digits.length < 7 || digits.length > 15) {
+                return { valid: false, error: 'رقم الهاتف يجب أن يحتوي على 7-15 رقم' };
+            }
+            return { valid: true };
+        }
+        
+        if (method === 'email') {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+                return { valid: false, error: 'البريد الإلكتروني غير صحيح' };
+            }
+            return { valid: true };
+        }
+        
+        return { valid: true };
+    },
+    
+    // ==================== تحميل حالات العلاقات ====================
     async loadRelationshipCache(force = false) {
         const uid = window.auth?.currentUser?.uid;
         if (!uid) return;
@@ -251,21 +470,56 @@ const PostsSystem = {
     
     // ==================== إنشاء زر الإجراء ====================
     createPostActionButton(post) {
-        const state = this.getRelationshipState(post.userId);
+        const uid = window.auth?.currentUser?.uid;
+        const isOwner = uid === post.userId;
+        
+        if (isOwner) {
+            const btn = document.createElement('button');
+            btn.style.display = 'none';
+            return btn;
+        }
+        
         const btn = document.createElement('button');
         btn.className = 'post-action-btn';
         btn.setAttribute('data-user-id', post.userId);
         
+        if (!uid) {
+            btn.innerHTML = `<i class="fas fa-lock"></i>`;
+            btn.style.cssText = `background: transparent; color: var(--text-light); border: 1.5px solid var(--border); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
+            btn.title = 'سجل الدخول';
+            btn.disabled = true;
+            return btn;
+        }
+        
+        const contactMethod = post.contactMethod && post.contactMethod !== 'none' ? post.contactMethod : null;
+        
+        if (contactMethod === 'whatsapp') {
+            btn.innerHTML = `<i class="fab fa-whatsapp"></i>`;
+            btn.classList.add('contact-whatsapp');
+            btn.style.cssText = `background: #25D366; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; padding: 0; flex-shrink: 0;`;
+            btn.title = 'تواصل عبر واتساب';
+            return btn;
+        }
+        
+        if (contactMethod === 'phone') {
+            btn.innerHTML = `<i class="fas fa-phone"></i>`;
+            btn.classList.add('contact-phone');
+            btn.style.cssText = `background: #2196F3; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
+            btn.title = 'اتصال هاتفي';
+            return btn;
+        }
+        
+        if (contactMethod === 'email') {
+            btn.innerHTML = `<i class="fas fa-envelope"></i>`;
+            btn.classList.add('contact-email');
+            btn.style.cssText = `background: #FF9800; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
+            btn.title = 'إرسال بريد';
+            return btn;
+        }
+        
+        const state = this.getRelationshipState(post.userId);
+        
         switch(state) {
-            case 'self':
-                btn.style.display = 'none';
-                return btn;
-            case 'guest':
-                btn.innerHTML = `<i class="fas fa-lock"></i>`;
-                btn.style.cssText = `background: transparent; color: var(--text-light); border: 1.5px solid var(--border); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-                btn.title = 'سجل الدخول';
-                btn.disabled = true;
-                break;
             case 'friend':
                 btn.innerHTML = `<i class="fas fa-comment"></i>`;
                 btn.style.cssText = `background: var(--primary); color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
@@ -299,6 +553,36 @@ const PostsSystem = {
         
         const newBtn = card.querySelector('.post-action-btn');
         if (!newBtn) return;
+        
+        const uid = window.auth?.currentUser?.uid;
+        if (!uid) return;
+        
+        const contactMethod = post.contactMethod && post.contactMethod !== 'none' ? post.contactMethod : null;
+        
+        if (contactMethod === 'whatsapp' && post.contactValue) {
+            newBtn.onclick = () => {
+                let url = post.contactValue.trim();
+                if (!/^https?:\/\//i.test(url)) {
+                    url = 'https://' + url;
+                }
+                window.open(url, '_blank', 'noopener,noreferrer');
+            };
+            return;
+        }
+        
+        if (contactMethod === 'phone' && post.contactValue) {
+            newBtn.onclick = () => {
+                window.location.href = `tel:${post.contactValue.trim()}`;
+            };
+            return;
+        }
+        
+        if (contactMethod === 'email' && post.contactValue) {
+            newBtn.onclick = () => {
+                window.location.href = `mailto:${post.contactValue.trim()}`;
+            };
+            return;
+        }
         
         const state = this.getRelationshipState(post.userId);
         
@@ -1291,6 +1575,11 @@ PostsSystem.fillPublishJobForm = function() {
     this.renderPublishCategoryDropdown();
     this.setupFieldCounters();
     
+    const contactInput = document.getElementById('jobContactMethod');
+    if (contactInput) contactInput.value = 'none';
+    this.renderContactMethodDropdown('job');
+    this.renderContactValueField('job', 'none');
+    
     const preview = document.getElementById('jobImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('jobImage');
@@ -1314,6 +1603,11 @@ PostsSystem.fillPublishMarriageForm = function() {
     if (childrenField) childrenField.style.display = 'none';
     
     this.setupFieldCounters();
+    
+    const contactInput = document.getElementById('marriageContactMethod');
+    if (contactInput) contactInput.value = 'none';
+    this.renderContactMethodDropdown('marriage');
+    this.renderContactValueField('marriage', 'none');
     
     const preview = document.getElementById('marriageImagePreview');
     if (preview) preview.innerHTML = '👤';
@@ -1341,6 +1635,8 @@ window.publishJob = async function() {
     const category = document.getElementById('jobCategory')?.value;
     const jobTitle = document.getElementById('jobTitle')?.value?.trim();
     const bio = document.getElementById('jobBio')?.value?.trim();
+    const contactMethod = document.getElementById('jobContactMethod')?.value || 'none';
+    const contactValue = document.getElementById('jobContactValue')?.value?.trim() || '';
     const imageInput = document.getElementById('jobImage');
     
     if (!name || !age || !countryCode || !category || !jobTitle || !bio) {
@@ -1350,6 +1646,12 @@ window.publishJob = async function() {
     const ageNum = parseInt(age);
     if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) {
         alert('العمر يجب أن يكون بين 18 و 99');
+        return;
+    }
+    
+    const validation = PostsSystem.validateContactValue(contactMethod, contactValue);
+    if (!validation.valid) {
+        alert(validation.error);
         return;
     }
     
@@ -1365,6 +1667,8 @@ window.publishJob = async function() {
             name, age: ageNum,
             country: window.Countries.getName(countryCode),
             countryCode, category, jobTitle, bio,
+            contactMethod: contactMethod,
+            contactValue: (contactMethod === 'none') ? '' : contactValue,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -1387,6 +1691,8 @@ window.publishMarriage = async function() {
     const bio = document.getElementById('marriageBio')?.value?.trim();
     const married = document.getElementById('marriageMarried')?.value;
     const children = document.getElementById('marriageChildren')?.value;
+    const contactMethod = document.getElementById('marriageContactMethod')?.value || 'none';
+    const contactValue = document.getElementById('marriageContactValue')?.value?.trim() || '';
     const imageInput = document.getElementById('marriageImage');
     
     if (!name || !age || !countryCode || !bio) {
@@ -1396,6 +1702,12 @@ window.publishMarriage = async function() {
     const ageNum = parseInt(age);
     if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) {
         alert('العمر يجب أن يكون بين 18 و 99');
+        return;
+    }
+    
+    const validation = PostsSystem.validateContactValue(contactMethod, contactValue);
+    if (!validation.valid) {
+        alert(validation.error);
         return;
     }
     
@@ -1412,6 +1724,8 @@ window.publishMarriage = async function() {
             country: window.Countries.getName(countryCode),
             countryCode, bio, married,
             children: (married === 'no') ? 'no' : children,
+            contactMethod: contactMethod,
+            contactValue: (contactMethod === 'none') ? '' : contactValue,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -1429,10 +1743,12 @@ function clearJobForm() {
     if (window.PostsSystem && PostsSystem.resetFieldCounters) {
         PostsSystem.resetFieldCounters();
     }
-    ['jobName', 'jobAge', 'jobTitle', 'jobBio'].forEach(id => {
+    ['jobName', 'jobAge', 'jobTitle', 'jobBio', 'jobContactValue'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
+    const contactInput = document.getElementById('jobContactMethod');
+    if (contactInput) contactInput.value = 'none';
     const preview = document.getElementById('jobImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('jobImage');
@@ -1443,10 +1759,12 @@ function clearMarriageForm() {
     if (window.PostsSystem && PostsSystem.resetFieldCounters) {
         PostsSystem.resetFieldCounters();
     }
-    ['marriageName', 'marriageAge', 'marriageBio'].forEach(id => {
+    ['marriageName', 'marriageAge', 'marriageBio', 'marriageContactValue'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
+    const contactInput = document.getElementById('marriageContactMethod');
+    if (contactInput) contactInput.value = 'none';
     const preview = document.getElementById('marriageImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('marriageImage');
@@ -1466,4 +1784,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - النسخة النهائية');
+console.log('✅ posts-system.js تم تحميله - النسخة النهائية مع طريقة التواصل');
