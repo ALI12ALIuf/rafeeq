@@ -234,18 +234,11 @@ const PostsSystem = {
     },
     
     toggleContactDropdown(type, event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
-        // ✅ إغلاق كل القوائم الأخرى
         this.closeAllPublishDropdowns();
         
         const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
-        const existing = document.getElementById(dropdownId);
-        if (existing) { existing.remove(); return; }
-        
         const btn = document.querySelector(`.publish-category-btn[data-contact-type="${type}"]`);
         if (!btn) return;
         
@@ -833,9 +826,6 @@ const PostsSystem = {
         this.closeAllPublishDropdowns();
         
         const dropdownId = 'jobCategoryDropdown';
-        const existing = document.getElementById(dropdownId);
-        if (existing) { existing.remove(); return; }
-        
         const btn = document.querySelector('.publish-category-btn[data-publish-category="job"]');
         if (!btn) return;
         const container = btn.parentElement;
@@ -922,9 +912,6 @@ const PostsSystem = {
         
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const dropdownId = `${prefix}CountryDropdown`;
-        const existing = document.getElementById(dropdownId);
-        if (existing) { existing.remove(); return; }
-        
         const btn = document.querySelector(`.publish-country-btn[data-publish-country="${publishType}"]`);
         if (!btn) return;
         const container = btn.parentElement;
@@ -983,6 +970,7 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
+    // ==================== ✅ قائمة الزواج ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -1015,17 +1003,31 @@ const PostsSystem = {
         `;
     },
     
+    // ✅ دالة محسّنة لفتح/إغلاق قوائم الزواج
     toggleMarriageDropdown(field, event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
         
-        this.closeAllPublishDropdowns();
-        
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const existing = document.getElementById(dropdownId);
-        if (existing) { existing.remove(); return; }
         
+        // ✅ إذا كانت القائمة مفتوحة → أغلقها
+        if (existing) {
+            existing.remove();
+            return;
+        }
+        
+        // ✅ إغلاق باقي القوائم فقط
+        document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
+            if (d.id !== dropdownId) d.remove();
+        });
+        
+        // ✅ ابحث عن الزر
         const btn = document.querySelector(`.publish-category-btn[data-field="${field}"]`);
-        if (!btn) return;
+        if (!btn) {
+            console.warn('⚠️ لم يتم العثور على الزر:', field);
+            return;
+        }
+        
         const container = btn.parentElement;
         if (!container) return;
         
@@ -1086,12 +1088,24 @@ const PostsSystem = {
         }, 100);
     },
     
+    // ✅ دالة محسّنة لاختيار خيار الزواج
     selectMarriageOption(field, value) {
         const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
         const input = document.getElementById(inputId);
         if (input) input.value = value;
+        
+        // ✅ إغلاق القائمة الحالية
+        const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown) dropdown.remove();
+        
+        // ✅ إغلاق باقي القوائم
         this.closeAllPublishDropdowns();
         
+        // ✅ إعادة رسم القائمة المختارة
+        this.renderMarriageDropdown(field, value);
+        
+        // ✅ التحكم بحقل الأطفال
         if (field === 'married') {
             const childrenField = document.getElementById('marriageChildrenField');
             if (childrenField) {
@@ -1106,7 +1120,6 @@ const PostsSystem = {
                 }
             }
         }
-        this.renderMarriageDropdown(field, value);
     },
     
     switchTab(tab) {
