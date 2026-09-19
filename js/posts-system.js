@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع طريقة التواصل ==========
+// ========== posts-system.js - النسخة النهائية المُصححة ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -71,6 +71,27 @@ const PostsSystem = {
             localStorage.setItem('selected_country', this.selectedCountry);
             localStorage.setItem('selected_job_category', this.selectedCategory);
         } catch (e) {}
+    },
+    
+    // ==================== ✅ إغلاق كل القوائم المنسدلة ====================
+    closeAllDropdowns() {
+        // إغلاق قوائم طريقة التواصل
+        document.querySelectorAll('[id$="ContactDropdown"]').forEach(d => d.remove());
+        
+        // إغلاق قوائم الزواج
+        const marriedDd = document.getElementById('marriageMarriedDropdown');
+        if (marriedDd) marriedDd.remove();
+        const childrenDd = document.getElementById('marriageChildrenDropdown');
+        if (childrenDd) childrenDd.remove();
+        
+        // إغلاق قوائم القسم/البلد (التي display: block)
+        document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
+            if (d.style.display !== 'none') d.style.display = 'none';
+        });
+        
+        // إغلاق قائمة البلد في الرأس
+        const headerDd = document.getElementById('countryHeaderDropdown');
+        if (headerDd) headerDd.remove();
     },
     
     // ==================== ✅ إعداد عدادات الحقول ====================
@@ -169,7 +190,6 @@ const PostsSystem = {
         });
     },
     
-    // ✅ إعادة تهيئة العدادات
     resetFieldCounters() {
         const fields = [
             { inputId: 'jobName', counterId: 'jobNameCounter', max: 15 },
@@ -233,6 +253,9 @@ const PostsSystem = {
             event.preventDefault();
         }
         
+        // ✅ إغلاق كل القوائم الأخرى أولاً
+        this.closeAllDropdowns();
+        
         const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
         const existing = document.getElementById(dropdownId);
         if (existing) existing.remove();
@@ -240,7 +263,10 @@ const PostsSystem = {
         const btn = document.querySelector(`.publish-category-btn[data-contact-type="${type}"]`);
         if (!btn) return;
         
-        const rect = btn.getBoundingClientRect();
+        // ✅ استخدام parentElement كحاوية
+        const wrapper = btn.parentElement;
+        if (!wrapper) return;
+        wrapper.style.position = 'relative';
         
         const options = [
             { value: 'none', label: 'لا شيء (طلب صداقة)', icon: 'fas fa-user-plus', color: '#64B5F6' },
@@ -256,10 +282,12 @@ const PostsSystem = {
         const dropdown = document.createElement('div');
         dropdown.className = 'publish-category-dropdown';
         dropdown.id = dropdownId;
-        dropdown.style.position = 'fixed';
-        dropdown.style.top = (rect.bottom + 6) + 'px';
-        dropdown.style.left = rect.left + 'px';
-        dropdown.style.width = rect.width + 'px';
+        
+        // ✅ position: absolute داخل الحاوية
+        dropdown.style.position = 'absolute';
+        dropdown.style.top = 'calc(100% + 6px)';
+        dropdown.style.left = '0';
+        dropdown.style.right = '0';
         dropdown.style.maxHeight = '280px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.background = 'var(--card-bg)';
@@ -280,7 +308,7 @@ const PostsSystem = {
             </button>
         `).join('');
         
-        document.body.appendChild(dropdown);
+        wrapper.appendChild(dropdown);
         
         setTimeout(() => {
             const closeHandler = (e) => {
@@ -452,7 +480,6 @@ const PostsSystem = {
             });
             
             this._relationshipCache.lastUpdate = now;
-            console.log(`📊 حالة العلاقات: ${this._relationshipCache.friends.size} صديق، ${this._relationshipCache.sentRequests.size} مرسل، ${this._relationshipCache.receivedRequests.size} مستلم`);
         } catch (e) {
             console.warn('⚠️ خطأ في حالات العلاقات:', e);
         }
@@ -703,8 +730,12 @@ const PostsSystem = {
     
     toggleHeaderCountryDropdown(event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
+        
         const existing = document.getElementById('countryHeaderDropdown');
         if (existing) { this.closeCountryDropdown(); return; }
+        
+        // ✅ إغلاق كل القوائم الأخرى
+        this.closeAllDropdowns();
         
         const wrapper = document.querySelector('.country-header-inline');
         if (!wrapper) return;
@@ -866,12 +897,16 @@ const PostsSystem = {
     
     togglePublishCategoryDropdown(event) {
         if (event) event.stopPropagation();
+        
         const dropdown = document.getElementById('jobCategoryDropdown');
         if (!dropdown) return;
-        document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
-            if (d.id !== 'jobCategoryDropdown') d.style.display = 'none';
-        });
-        if (dropdown.style.display === 'none' || !dropdown.style.display) {
+        
+        const isCurrentlyOpen = dropdown.style.display !== 'none' && dropdown.style.display !== '';
+        
+        // ✅ إغلاق كل القوائم الأخرى
+        this.closeAllDropdowns();
+        
+        if (!isCurrentlyOpen) {
             dropdown.style.display = 'block';
             setTimeout(() => {
                 const closeHandler = (e) => {
@@ -883,8 +918,6 @@ const PostsSystem = {
                 };
                 document.addEventListener('click', closeHandler);
             }, 100);
-        } else {
-            dropdown.style.display = 'none';
         }
     },
     
@@ -928,14 +961,18 @@ const PostsSystem = {
     
     togglePublishCountryDropdown(publishType, event) {
         if (event) event.stopPropagation();
+        
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const dropdownId = `${prefix}CountryDropdown`;
         const dropdown = document.getElementById(dropdownId);
         if (!dropdown) return;
-        document.querySelectorAll('.publish-country-dropdown, .publish-category-dropdown').forEach(d => {
-            if (d.id !== dropdownId) d.style.display = 'none';
-        });
-        if (dropdown.style.display === 'none' || !dropdown.style.display) {
+        
+        const isCurrentlyOpen = dropdown.style.display !== 'none' && dropdown.style.display !== '';
+        
+        // ✅ إغلاق كل القوائم الأخرى
+        this.closeAllDropdowns();
+        
+        if (!isCurrentlyOpen) {
             dropdown.style.display = 'block';
             setTimeout(() => {
                 const closeHandler = (e) => {
@@ -947,8 +984,6 @@ const PostsSystem = {
                 };
                 document.addEventListener('click', closeHandler);
             }, 100);
-        } else {
-            dropdown.style.display = 'none';
         }
     },
     
@@ -995,13 +1030,20 @@ const PostsSystem = {
     
     toggleMarriageDropdown(field, event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
+        
+        // ✅ إغلاق كل القوائم الأخرى
+        this.closeAllDropdowns();
+        
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const existing = document.getElementById(dropdownId);
         if (existing) existing.remove();
         
         const btn = document.querySelector(`.publish-category-btn[data-field="${field}"]`);
         if (!btn) return;
-        const rect = btn.getBoundingClientRect();
+        
+        const wrapper = btn.parentElement;
+        if (!wrapper) return;
+        wrapper.style.position = 'relative';
         
         const options = field === 'married'
             ? [
@@ -1022,10 +1064,10 @@ const PostsSystem = {
         const dropdown = document.createElement('div');
         dropdown.className = 'publish-category-dropdown';
         dropdown.id = dropdownId;
-        dropdown.style.position = 'fixed';
-        dropdown.style.top = (rect.bottom + 6) + 'px';
-        dropdown.style.left = rect.left + 'px';
-        dropdown.style.width = rect.width + 'px';
+        dropdown.style.position = 'absolute';
+        dropdown.style.top = 'calc(100% + 6px)';
+        dropdown.style.left = '0';
+        dropdown.style.right = '0';
         dropdown.style.maxHeight = '280px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.background = 'var(--card-bg)';
@@ -1043,7 +1085,7 @@ const PostsSystem = {
             </button>
         `).join('');
         
-        document.body.appendChild(dropdown);
+        wrapper.appendChild(dropdown);
         
         setTimeout(() => {
             const closeHandler = (e) => {
@@ -1456,7 +1498,6 @@ const PostsSystem = {
             .where('type', '==', 'job')
             .onSnapshot(snapshot => {
                 if (snapshot.docChanges().length > 0) {
-                    console.log('🔄 تحديث الوظائف...');
                     this.loadJobsPosts();
                 }
             }, error => console.warn('⚠️', error.message));
@@ -1465,7 +1506,6 @@ const PostsSystem = {
             .where('type', '==', 'marriage')
             .onSnapshot(snapshot => {
                 if (snapshot.docChanges().length > 0) {
-                    console.log('🔄 تحديث الزواج...');
                     this.loadMarriagePosts();
                 }
             }, error => console.warn('⚠️', error.message));
@@ -1496,9 +1536,6 @@ const PostsSystem = {
                         if (!blob) { reject(new Error('فشل ضغط الصورة')); return; }
                         const reader2 = new FileReader();
                         reader2.onload = () => {
-                            const compressedKB = Math.round(reader2.result.length / 1024);
-                            const originalKB = Math.round(file.size / 1024);
-                            console.log(`📸 قص مربع + ضغط: ${originalKB} KB → ${compressedKB} KB`);
                             resolve(reader2.result);
                         };
                         reader2.readAsDataURL(blob);
@@ -1784,4 +1821,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - النسخة النهائية مع طريقة التواصل');
+console.log('✅ posts-system.js تم تحميله - النسخة المُصححة');
