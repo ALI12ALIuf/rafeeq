@@ -71,7 +71,7 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== ✅ إغلاق كل القوائم ====================
+    // ==================== إغلاق كل القوائم ====================
     closeAllPublishDropdowns() {
         document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
             d.remove();
@@ -81,7 +81,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== ✅ إعداد عدادات الحقول ====================
+    // ==================== إعداد عدادات الحقول ====================
     setupFieldCounters() {
         const fields = [
             { inputId: 'jobName', counterId: 'jobNameCounter', max: 15, type: 'text' },
@@ -146,9 +146,7 @@ const PostsSystem = {
                     const pasted = (e.clipboardData || window.clipboardData).getData('text');
                     let value = input.value + pasted;
                     
-                    if (type === 'number') {
-                        value = value.replace(/[^0-9]/g, '');
-                    }
+                    if (type === 'number') value = value.replace(/[^0-9]/g, '');
                     if (type === 'textarea') {
                         value = value.replace(/ {3,}/g, ' ');
                         value = value.replace(/\n{3,}/g, '\n\n');
@@ -199,7 +197,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== ✅ قائمة طريقة التواصل ====================
+    // ==================== قائمة طريقة التواصل ====================
     renderContactMethodDropdown(type) {
         const isJob = type === 'job';
         const containerId = isJob ? 'jobContactSelector' : 'marriageContactSelector';
@@ -236,15 +234,17 @@ const PostsSystem = {
     toggleContactDropdown(type, event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
         
+        const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
+        const existing = document.getElementById(dropdownId);
+        if (existing) { existing.remove(); return; }
+        
         this.closeAllPublishDropdowns();
         
-        const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
         const btn = document.querySelector(`.publish-category-btn[data-contact-type="${type}"]`);
         if (!btn) return;
         
         const container = btn.parentElement;
         if (!container) return;
-        
         container.style.position = 'relative';
         
         const options = [
@@ -310,7 +310,7 @@ const PostsSystem = {
         this.renderContactMethodDropdown(type);
     },
     
-    // ==================== ✅ حقل الإدخال الديناميكي ====================
+    // ==================== حقل الإدخال الديناميكي ====================
     renderContactValueField(type, method) {
         const isJob = type === 'job';
         const fieldId = isJob ? 'jobContactValueField' : 'marriageContactValueField';
@@ -366,7 +366,7 @@ const PostsSystem = {
         input.addEventListener('input', handler);
     },
     
-    // ==================== ✅ التحقق من قيمة التواصل ====================
+    // ==================== التحقق من قيمة التواصل ====================
     validateContactValue(method, value) {
         if (!method || method === 'none') return { valid: true };
         
@@ -823,9 +823,12 @@ const PostsSystem = {
     togglePublishCategoryDropdown(event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
         
+        const dropdownId = 'jobCategoryDropdown';
+        const existing = document.getElementById(dropdownId);
+        if (existing) { existing.remove(); return; }
+        
         this.closeAllPublishDropdowns();
         
-        const dropdownId = 'jobCategoryDropdown';
         const btn = document.querySelector('.publish-category-btn[data-publish-category="job"]');
         if (!btn) return;
         const container = btn.parentElement;
@@ -908,10 +911,13 @@ const PostsSystem = {
     togglePublishCountryDropdown(publishType, event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
         
-        this.closeAllPublishDropdowns();
-        
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const dropdownId = `${prefix}CountryDropdown`;
+        const existing = document.getElementById(dropdownId);
+        if (existing) { existing.remove(); return; }
+        
+        this.closeAllPublishDropdowns();
+        
         const btn = document.querySelector(`.publish-country-btn[data-publish-country="${publishType}"]`);
         if (!btn) return;
         const container = btn.parentElement;
@@ -970,7 +976,7 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
-    // ==================== ✅ قائمة الزواج ====================
+    // ==================== ✅ قوائم الزواج (مُصلَّحة) ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -991,59 +997,54 @@ const PostsSystem = {
         if (!container || !input) return;
         
         const current = selectedValue !== undefined ? selectedValue : (input.value || 'no');
-        const currentOption = options.find(o => o.value === current);
+        const currentOption = options.find(o => o.value === current) || options[0];
         
         container.innerHTML = `
             <button type="button" class="publish-category-btn" 
-                    data-field="${field}"
+                    data-marriage-field="${field}"
                     onclick="PostsSystem.toggleMarriageDropdown('${field}', event)">
-                <span class="publish-category-name">${currentOption ? currentOption.label : 'اختر'}</span>
+                <span class="publish-category-name">${currentOption.label}</span>
                 <i class="fas fa-chevron-down"></i>
             </button>
         `;
     },
     
-    // ✅ دالة محسّنة لفتح/إغلاق قوائم الزواج
     toggleMarriageDropdown(field, event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const existing = document.getElementById(dropdownId);
         
-        // ✅ إذا كانت القائمة مفتوحة → أغلقها
-        if (existing) {
-            existing.remove();
-            return;
-        }
+        // ✅ إذا كانت مفتوحة → أغلقها
+        if (existing) { existing.remove(); return; }
         
-        // ✅ إغلاق باقي القوائم فقط
-        document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
+        // ✅ إغلاق كل القوائم الأخرى
+        document.querySelectorAll('.publish-category-dropdown').forEach(d => {
             if (d.id !== dropdownId) d.remove();
         });
         
-        // ✅ ابحث عن الزر
-        const btn = document.querySelector(`.publish-category-btn[data-field="${field}"]`);
-        if (!btn) {
-            console.warn('⚠️ لم يتم العثور على الزر:', field);
-            return;
-        }
+        const btn = document.querySelector(`.publish-category-btn[data-marriage-field="${field}"]`);
+        if (!btn) return;
         
         const container = btn.parentElement;
         if (!container) return;
-        
         container.style.position = 'relative';
         
-        const options = field === 'married'
-            ? [
+        // ✅ الخيارات
+        let options;
+        if (field === 'married') {
+            options = [
                 { value: 'no', label: 'لا، أعزب/عزباء' },
                 { value: 'yes', label: 'نعم، متزوج/متزوجة' },
                 { value: 'divorced', label: 'مطلق/مطلقة' },
                 { value: 'widowed', label: 'أرمل/أرملة' }
-              ]
-            : [
+            ];
+        } else {
+            options = [
                 { value: 'no', label: 'لا' },
                 { value: 'yes', label: 'نعم' }
-              ];
+            ];
+        }
         
         const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
         const input = document.getElementById(inputId);
@@ -1088,24 +1089,17 @@ const PostsSystem = {
         }, 100);
     },
     
-    // ✅ دالة محسّنة لاختيار خيار الزواج
     selectMarriageOption(field, value) {
         const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
         const input = document.getElementById(inputId);
         if (input) input.value = value;
         
-        // ✅ إغلاق القائمة الحالية
+        // ✅ إزالة القائمة المفتوحة
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const dropdown = document.getElementById(dropdownId);
         if (dropdown) dropdown.remove();
         
-        // ✅ إغلاق باقي القوائم
-        this.closeAllPublishDropdowns();
-        
-        // ✅ إعادة رسم القائمة المختارة
-        this.renderMarriageDropdown(field, value);
-        
-        // ✅ التحكم بحقل الأطفال
+        // ✅ إذا كان "married" → التحكم بحقل الأطفال
         if (field === 'married') {
             const childrenField = document.getElementById('marriageChildrenField');
             if (childrenField) {
@@ -1120,6 +1114,9 @@ const PostsSystem = {
                 }
             }
         }
+        
+        // ✅ إعادة رسم القائمة المختارة
+        this.renderMarriageDropdown(field, value);
     },
     
     switchTab(tab) {
