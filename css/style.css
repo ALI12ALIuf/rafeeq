@@ -974,20 +974,18 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ✅ القائمة المنسدلة - position absolute داخل الحاوية */
 .publish-category-dropdown {
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
     right: 0;
-    width: 100%;
-    max-height: 280px;
+    max-height: 300px;
     overflow-y: auto;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-    z-index: 9999;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    z-index: 3000;
     padding: 6px;
     animation: dropdownSlide2 0.2s ease;
 }
@@ -1057,20 +1055,18 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ✅ القائمة المنسدلة */
 .publish-country-dropdown {
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
     right: 0;
-    width: 100%;
-    max-height: 280px;
+    max-height: 300px;
     overflow-y: auto;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-    z-index: 9999;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    z-index: 3000;
     padding: 6px;
     animation: dropdownSlide2 0.2s ease;
 }
@@ -1400,8 +1396,17 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     transition: all 0.2s ease;
 }
 
-.field-counter-label.warning { color: #FFC107; opacity: 1; font-weight: 700; }
-.field-counter-label.full { color: #f44336; opacity: 1; font-weight: 700; }
+.field-counter-label.warning {
+    color: #FFC107;
+    opacity: 1;
+    font-weight: 700;
+}
+
+.field-counter-label.full {
+    color: #f44336;
+    opacity: 1;
+    font-weight: 700;
+}
 
 /* ✅ حقول الإدخال الموحدة */
 .edit-field input[type="text"],
@@ -1436,11 +1441,17 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     background: var(--card-bg);
 }
 
-.edit-field input.limit-reached { border-color: #FFC107; }
-.edit-field textarea.limit-reached { border-color: #FFC107; }
+.edit-field input.limit-reached {
+    border-color: #FFC107;
+}
+
+.edit-field textarea.limit-reached {
+    border-color: #FFC107;
+}
 
 /* ==================== القسم 27: طريقة التواصل ==================== */
 
+/* ✅ قائمة طريقة التواصل */
 #jobContactSelector .publish-category-btn,
 #marriageContactSelector .publish-category-btn {
     background: var(--light);
@@ -1453,8 +1464,14 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     transform: scale(0.98);
 }
 
+/* ✅ حقل الإدخال الديناميكي */
 #jobContactValueField,
 #marriageContactValueField {
     transition: opacity 0.3s ease, max-height 0.3s ease;
     overflow: hidden;
 }
+
+/* ✅ أيقونات طريقة التواصل (للاستخدام المستقبلي) */
+.contact-icon-whatsapp { color: var(--whatsapp); }
+.contact-icon-phone { color: var(--phone); }
+.contact-icon-email { color: var(--email); }
