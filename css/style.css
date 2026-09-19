@@ -434,7 +434,6 @@ body.conversation-open {
 
 .post-action-btn:not(:disabled):active { transform: scale(0.95); }
 
-/* ✅ أزرار طريقة التواصل بألوان مميزة */
 .post-action-btn.contact-whatsapp {
     background: var(--whatsapp) !important;
     color: white !important;
@@ -979,13 +978,13 @@ body.conversation-open {
     top: calc(100% + 6px);
     left: 0;
     right: 0;
-    max-height: 300px;
+    max-height: 280px;
     overflow-y: auto;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    z-index: 3000;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    z-index: 99999;
     padding: 6px;
     animation: dropdownSlide2 0.2s ease;
 }
@@ -1060,13 +1059,13 @@ body.conversation-open {
     top: calc(100% + 6px);
     left: 0;
     right: 0;
-    max-height: 300px;
+    max-height: 280px;
     overflow-y: auto;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    z-index: 3000;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    z-index: 99999;
     padding: 6px;
     animation: dropdownSlide2 0.2s ease;
 }
@@ -1360,7 +1359,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 
 /* ==================== القسم 26: حقول الإدخال مع العداد ==================== */
 
-/* ✅ صف العنوان + العداد (في المنتصف معاً) */
 .field-label-row {
     display: flex;
     align-items: center;
@@ -1408,7 +1406,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     font-weight: 700;
 }
 
-/* ✅ حقول الإدخال الموحدة */
 .edit-field input[type="text"],
 .edit-field textarea {
     width: 100%;
@@ -1451,7 +1448,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 
 /* ==================== القسم 27: طريقة التواصل ==================== */
 
-/* ✅ قائمة طريقة التواصل */
 #jobContactSelector .publish-category-btn,
 #marriageContactSelector .publish-category-btn {
     background: var(--light);
@@ -1464,14 +1460,202 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     transform: scale(0.98);
 }
 
-/* ✅ حقل الإدخال الديناميكي */
+.publish-category-container {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.publish-country-container {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.publish-category-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    z-index: 99999;
+    padding: 6px;
+    animation: dropdownSlide2 0.2s ease;
+}
+
+.publish-country-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    z-index: 99999;
+    padding: 6px;
+    animation: dropdownSlide2 0.2s ease;
+}
+
 #jobContactValueField,
 #marriageContactValueField {
     transition: opacity 0.3s ease, max-height 0.3s ease;
     overflow: hidden;
 }
 
-/* ✅ أيقونات طريقة التواصل (للاستخدام المستقبلي) */
-.contact-icon-whatsapp { color: var(--whatsapp); }
-.contact-icon-phone { color: var(--phone); }
-.contact-icon-email { color: var(--email); }
+/* ==================== القسم 28: إصلاح طلب الصداقة ==================== */
+.friend-request-item {
+    border: 2px solid var(--primary);
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    direction: rtl;
+    position: relative;
+}
+
+.friend-request-item .chat-avatar-emoji {
+    order: 3;
+}
+
+.friend-request-item .chat-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-end;
+    order: 2;
+}
+
+.friend-request-item .chat-info h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+    width: 100%;
+}
+
+.friend-request-item .chat-id-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    margin-top: 3px;
+    direction: ltr;
+    width: 100%;
+    padding-right: 0;
+    flex-direction: row-reverse;
+}
+
+.friend-request-item .chat-id-label {
+    font-size: 0.78rem;
+    color: var(--primary);
+    font-weight: 700;
+    font-family: sans-serif;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    line-height: 1;
+    order: 3;
+}
+
+.friend-request-item .friend-request-id {
+    font-size: 0.78rem;
+    color: var(--text-light);
+    font-family: monospace;
+    direction: ltr;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    line-height: 1;
+    opacity: 0.9;
+    order: 2;
+}
+
+.friend-request-item .copy-id-btn {
+    background: transparent;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 3px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    line-height: 1;
+    order: 1;
+}
+
+.friend-request-item .friend-request-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-right: auto;
+    order: 1;
+    position: relative;
+    padding-top: 18px;
+}
+
+.friend-request-item .request-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 0.6rem;
+    color: #fff;
+    background: var(--primary);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.friend-request-item .accept-friend-btn,
+.friend-request-item .reject-friend-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.friend-request-item .accept-friend-btn {
+    background: #4CAF50;
+}
+
+.friend-request-item .accept-friend-btn:hover {
+    background: #43A047;
+    transform: scale(1.08);
+}
+
+.friend-request-item .reject-friend-btn {
+    background: #f44336;
+}
+
+.friend-request-item .reject-friend-btn:hover {
+    background: #e53935;
+    transform: scale(1.08);
+}
