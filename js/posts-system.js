@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية المُصلحة ==========
+// ========== posts-system.js - النسخة النهائية ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -245,7 +245,6 @@ const PostsSystem = {
         const existing = document.getElementById(dropdownId);
         if (existing) { existing.remove(); return; }
         
-        // ✅ إغلاق كل القوائم الأخرى
         document.querySelectorAll('.publish-category-dropdown').forEach(d => {
             if (d.id !== dropdownId) d.remove();
         });
@@ -253,9 +252,7 @@ const PostsSystem = {
         const btn = document.getElementById(`${type}ContactBtn`);
         if (!btn) return;
         
-        const container = btn.parentElement;
-        if (!container) return;
-        container.style.position = 'relative';
+        const rect = btn.getBoundingClientRect();
         
         const options = [
             { value: 'none', label: 'لا شيء (طلب صداقة)', icon: 'fas fa-user-plus', color: '#64B5F6' },
@@ -271,18 +268,17 @@ const PostsSystem = {
         const dropdown = document.createElement('div');
         dropdown.className = 'publish-category-dropdown';
         dropdown.id = dropdownId;
-        dropdown.style.position = 'absolute';
-        dropdown.style.top = 'calc(100% + 6px)';
-        dropdown.style.left = '0';
-        dropdown.style.right = '0';
-        dropdown.style.width = '100%';
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 6) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.width = rect.width + 'px';
         dropdown.style.maxHeight = '280px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.background = 'var(--card-bg)';
         dropdown.style.border = '1px solid var(--border)';
         dropdown.style.borderRadius = '10px';
-        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
-        dropdown.style.zIndex = '9999';
+        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.9)';
+        dropdown.style.zIndex = '999999';
         dropdown.style.padding = '6px';
         
         dropdown.innerHTML = options.map(opt => `
@@ -296,17 +292,15 @@ const PostsSystem = {
             </button>
         `).join('');
         
-        // ✅ ربط الأحداث بعد الرسم
         dropdown.querySelectorAll('.publish-category-option').forEach(optBtn => {
             optBtn.onclick = (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                const value = optBtn.getAttribute('data-value');
-                PostsSystem.selectContactMethod(type, value);
+                PostsSystem.selectContactMethod(type, optBtn.getAttribute('data-value'));
             };
         });
         
-        container.appendChild(dropdown);
+        document.body.appendChild(dropdown);
         
         setTimeout(() => {
             const closeHandler = (e) => {
@@ -325,7 +319,6 @@ const PostsSystem = {
         const input = document.getElementById(inputId);
         if (input) input.value = value;
         
-        // ✅ إزالة القائمة المفتوحة فقط
         const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
         const dropdown = document.getElementById(dropdownId);
         if (dropdown) dropdown.remove();
@@ -710,7 +703,7 @@ const PostsSystem = {
         dropdown.style.position = 'fixed';
         dropdown.style.top = (rect.bottom + 8) + 'px';
         dropdown.style.right = '10px';
-        dropdown.style.zIndex = '99999';
+        dropdown.style.zIndex = '999999';
         dropdown.style.minWidth = '200px';
         dropdown.style.maxWidth = '240px';
         dropdown.style.maxHeight = '50vh';
@@ -867,10 +860,8 @@ const PostsSystem = {
         
         const btn = document.getElementById('jobCategoryBtn');
         if (!btn) return;
-        const container = btn.parentElement;
-        if (!container) return;
         
-        container.style.position = 'relative';
+        const rect = btn.getBoundingClientRect();
         
         const input = document.getElementById('jobCategory');
         const selectedCode = input ? input.value : 'it';
@@ -878,18 +869,17 @@ const PostsSystem = {
         const dropdown = document.createElement('div');
         dropdown.className = 'publish-category-dropdown';
         dropdown.id = dropdownId;
-        dropdown.style.position = 'absolute';
-        dropdown.style.top = 'calc(100% + 6px)';
-        dropdown.style.left = '0';
-        dropdown.style.right = '0';
-        dropdown.style.width = '100%';
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 6) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.width = rect.width + 'px';
         dropdown.style.maxHeight = '280px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.background = 'var(--card-bg)';
         dropdown.style.border = '1px solid var(--border)';
         dropdown.style.borderRadius = '10px';
-        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
-        dropdown.style.zIndex = '9999';
+        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.9)';
+        dropdown.style.zIndex = '999999';
         dropdown.style.padding = '6px';
         
         dropdown.innerHTML = this.jobCategories.filter(c => c.code !== 'all').map(cat => `
@@ -907,12 +897,11 @@ const PostsSystem = {
             optBtn.onclick = (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                const value = optBtn.getAttribute('data-value');
-                PostsSystem.selectPublishCategory(value);
+                PostsSystem.selectPublishCategory(optBtn.getAttribute('data-value'));
             };
         });
         
-        container.appendChild(dropdown);
+        document.body.appendChild(dropdown);
         
         setTimeout(() => {
             const closeHandler = (e) => {
@@ -980,10 +969,8 @@ const PostsSystem = {
         
         const btn = document.getElementById(`${prefix}CountryBtn`);
         if (!btn) return;
-        const container = btn.parentElement;
-        if (!container) return;
         
-        container.style.position = 'relative';
+        const rect = btn.getBoundingClientRect();
         
         const input = document.getElementById(`${prefix}CountryCode`);
         const selectedCode = input ? input.value : this.selectedCountry;
@@ -991,18 +978,17 @@ const PostsSystem = {
         const dropdown = document.createElement('div');
         dropdown.className = 'publish-country-dropdown';
         dropdown.id = dropdownId;
-        dropdown.style.position = 'absolute';
-        dropdown.style.top = 'calc(100% + 6px)';
-        dropdown.style.left = '0';
-        dropdown.style.right = '0';
-        dropdown.style.width = '100%';
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 6) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.width = rect.width + 'px';
         dropdown.style.maxHeight = '280px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.background = 'var(--card-bg)';
         dropdown.style.border = '1px solid var(--border)';
         dropdown.style.borderRadius = '10px';
-        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
-        dropdown.style.zIndex = '9999';
+        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.9)';
+        dropdown.style.zIndex = '999999';
         dropdown.style.padding = '6px';
         
         dropdown.innerHTML = window.Countries.list.map(c => `
@@ -1018,12 +1004,11 @@ const PostsSystem = {
             optBtn.onclick = (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                const value = optBtn.getAttribute('data-value');
-                PostsSystem.selectPublishCountry(publishType, value);
+                PostsSystem.selectPublishCountry(publishType, optBtn.getAttribute('data-value'));
             };
         });
         
-        container.appendChild(dropdown);
+        document.body.appendChild(dropdown);
         
         setTimeout(() => {
             const closeHandler = (e) => {
@@ -1048,7 +1033,7 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
-    // ==================== ✅ قوائم الزواج (مُصلَّحة بالكامل) ====================
+    // ==================== قوائم الزواج ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -1078,7 +1063,6 @@ const PostsSystem = {
             </button>
         `;
         
-        // ✅ ربط الحدث برمجياً
         const btn = document.getElementById(`marriage_${field}_btn`);
         if (btn) {
             btn.onclick = (e) => {
@@ -1095,10 +1079,8 @@ const PostsSystem = {
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const existing = document.getElementById(dropdownId);
         
-        // ✅ إذا كانت مفتوحة → أغلقها
         if (existing) { existing.remove(); return; }
         
-        // ✅ إغلاق كل القوائم الأخرى
         document.querySelectorAll('.publish-category-dropdown').forEach(d => {
             if (d.id !== dropdownId) d.remove();
         });
@@ -1106,11 +1088,8 @@ const PostsSystem = {
         const btn = document.getElementById(`marriage_${field}_btn`);
         if (!btn) return;
         
-        const container = btn.parentElement;
-        if (!container) return;
-        container.style.position = 'relative';
+        const rect = btn.getBoundingClientRect();
         
-        // ✅ الخيارات
         let options;
         if (field === 'married') {
             options = [
@@ -1133,21 +1112,19 @@ const PostsSystem = {
         const dropdown = document.createElement('div');
         dropdown.className = 'publish-category-dropdown';
         dropdown.id = dropdownId;
-        dropdown.style.position = 'absolute';
-        dropdown.style.top = 'calc(100% + 6px)';
-        dropdown.style.left = '0';
-        dropdown.style.right = '0';
-        dropdown.style.width = '100%';
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 6) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.width = rect.width + 'px';
         dropdown.style.maxHeight = '280px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.background = 'var(--card-bg)';
         dropdown.style.border = '1px solid var(--border)';
         dropdown.style.borderRadius = '10px';
-        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
-        dropdown.style.zIndex = '9999';
+        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.9)';
+        dropdown.style.zIndex = '999999';
         dropdown.style.padding = '6px';
         
-        // ✅ بناء الخيارات
         dropdown.innerHTML = options.map(opt => `
             <button type="button" class="publish-category-option ${opt.value === current ? 'active' : ''}" 
                     data-value="${opt.value}">
@@ -1156,17 +1133,15 @@ const PostsSystem = {
             </button>
         `).join('');
         
-        // ✅ ربط الأحداث برمجياً (الحل الأساسي)
         dropdown.querySelectorAll('.publish-category-option').forEach(optBtn => {
             optBtn.onclick = (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                const value = optBtn.getAttribute('data-value');
-                PostsSystem.selectMarriageOption(field, value);
+                PostsSystem.selectMarriageOption(field, optBtn.getAttribute('data-value'));
             };
         });
         
-        container.appendChild(dropdown);
+        document.body.appendChild(dropdown);
         
         setTimeout(() => {
             const closeHandler = (e) => {
@@ -1185,30 +1160,29 @@ const PostsSystem = {
         const input = document.getElementById(inputId);
         if (input) input.value = value;
         
-        // ✅ إزالة القائمة المفتوحة
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         const dropdown = document.getElementById(dropdownId);
         if (dropdown) dropdown.remove();
         
-        // ✅ إذا كان "married" → التحكم بحقل الأطفال
         if (field === 'married') {
             const childrenField = document.getElementById('marriageChildrenField');
             if (childrenField) {
                 if (value === 'no') {
-                    // أعزب/عزباء → إخفاء حقل الأطفال
                     childrenField.style.display = 'none';
                     const childrenInput = document.getElementById('marriageChildren');
                     if (childrenInput) childrenInput.value = 'no';
-                    this.renderMarriageDropdown('children', 'no');
                 } else {
-                    // متزوج/مطلق/أرمل → إظهار حقل الأطفال
                     childrenField.style.display = 'block';
-                    this.renderMarriageDropdown('children', 'no');
+                    const childrenInput = document.getElementById('marriageChildren');
+                    if (childrenInput) childrenInput.value = 'no';
+                    
+                    setTimeout(() => {
+                        PostsSystem.renderMarriageDropdown('children', 'no');
+                    }, 50);
                 }
             }
         }
         
-        // ✅ إعادة رسم القائمة المختارة
         this.renderMarriageDropdown(field, value);
     },
     
@@ -1878,4 +1852,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - النسخة النهائية المُصلحة');
+console.log('✅ posts-system.js تم تحميله - النسخة النهائية');
