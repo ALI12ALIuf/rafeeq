@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية مع طريقة التواصل ==========
+// ========== posts-system.js - النسخة النهائية الكاملة ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -71,6 +71,26 @@ const PostsSystem = {
             localStorage.setItem('selected_country', this.selectedCountry);
             localStorage.setItem('selected_job_category', this.selectedCategory);
         } catch (e) {}
+    },
+    
+    // ==================== ✅ إغلاق جميع القوائم المنسدلة ====================
+    closeAllDropdowns(exceptId = null) {
+        const dropdownIds = [
+            'jobContactDropdown',
+            'marriageContactDropdown',
+            'jobCategoryDropdown',
+            'jobCountryDropdown',
+            'marriageCountryDropdown',
+            'marriageMarriedDropdown',
+            'marriageChildrenDropdown',
+            'countryHeaderDropdown'
+        ];
+        
+        dropdownIds.forEach(id => {
+            if (id === exceptId) return;
+            const dd = document.getElementById(id);
+            if (dd) dd.remove();
+        });
     },
     
     // ==================== ✅ إعداد عدادات الحقول ====================
@@ -169,7 +189,6 @@ const PostsSystem = {
         });
     },
     
-    // ✅ إعادة تهيئة العدادات
     resetFieldCounters() {
         const fields = [
             { inputId: 'jobName', counterId: 'jobNameCounter', max: 15 },
@@ -193,7 +212,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== ✅ قائمة طريقة التواصل ====================
+    // ==================== ✅ طريقة التواصل ====================
     renderContactMethodDropdown(type) {
         const isJob = type === 'job';
         const containerId = isJob ? 'jobContactSelector' : 'marriageContactSelector';
@@ -234,8 +253,14 @@ const PostsSystem = {
         }
         
         const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
+        
+        this.closeAllDropdowns(dropdownId);
+        
         const existing = document.getElementById(dropdownId);
-        if (existing) existing.remove();
+        if (existing) {
+            existing.remove();
+            return;
+        }
         
         const btn = document.querySelector(`.publish-category-btn[data-contact-type="${type}"]`);
         if (!btn) return;
@@ -287,11 +312,11 @@ const PostsSystem = {
                 const dd = document.getElementById(dropdownId);
                 if (dd && !dd.contains(e.target) && !btn.contains(e.target)) {
                     dd.remove();
-                    document.removeEventListener('click', closeHandler);
+                    document.removeEventListener('pointerdown', closeHandler);
                 }
             };
-            document.addEventListener('click', closeHandler);
-        }, 100);
+            document.addEventListener('pointerdown', closeHandler);
+        }, 0);
     },
     
     selectContactMethod(type, value) {
@@ -307,7 +332,6 @@ const PostsSystem = {
         this.renderContactMethodDropdown(type);
     },
     
-    // ==================== ✅ حقل الإدخال الديناميكي ====================
     renderContactValueField(type, method) {
         const isJob = type === 'job';
         const fieldId = isJob ? 'jobContactValueField' : 'marriageContactValueField';
@@ -375,7 +399,6 @@ const PostsSystem = {
         input.addEventListener('input', handler);
     },
     
-    // ==================== ✅ التحقق من قيمة التواصل ====================
     validateContactValue(method, value) {
         if (!method || method === 'none') return { valid: true };
         
@@ -703,8 +726,15 @@ const PostsSystem = {
     
     toggleHeaderCountryDropdown(event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
+        
+        // ✅ إغلاق كل القوائم الأخرى
+        this.closeAllDropdowns('countryHeaderDropdown');
+        
         const existing = document.getElementById('countryHeaderDropdown');
-        if (existing) { this.closeCountryDropdown(); return; }
+        if (existing) { 
+            this.closeCountryDropdown(); 
+            return; 
+        }
         
         const wrapper = document.querySelector('.country-header-inline');
         if (!wrapper) return;
@@ -849,50 +879,77 @@ const PostsSystem = {
                 <span class="publish-category-name">${selectedCat ? selectedCat.name : 'اختر القسم'}</span>
                 <i class="fas fa-chevron-down"></i>
             </button>
-            <div class="publish-category-dropdown" id="jobCategoryDropdown" style="display: none;">
-                ${this.jobCategories.filter(c => c.code !== 'all').map(cat => `
-                    <button type="button" class="publish-category-option ${cat.code === selectedCode ? 'active' : ''}" 
-                            onclick="PostsSystem.selectPublishCategory('${cat.code}')">
-                        <span class="publish-category-icon" style="background: ${cat.color}20; color: ${cat.color};">
-                            <i class="${cat.icon}"></i>
-                        </span>
-                        <span class="publish-category-name">${cat.name}</span>
-                        ${cat.code === selectedCode ? '<i class="fas fa-check"></i>' : ''}
-                    </button>
-                `).join('')}
-            </div>
         `;
     },
     
     togglePublishCategoryDropdown(event) {
         if (event) event.stopPropagation();
-        const dropdown = document.getElementById('jobCategoryDropdown');
-        if (!dropdown) return;
-        document.querySelectorAll('.publish-category-dropdown, .publish-country-dropdown').forEach(d => {
-            if (d.id !== 'jobCategoryDropdown') d.style.display = 'none';
-        });
-        if (dropdown.style.display === 'none' || !dropdown.style.display) {
-            dropdown.style.display = 'block';
-            setTimeout(() => {
-                const closeHandler = (e) => {
-                    const container = document.getElementById('jobCategorySelector');
-                    if (container && !container.contains(e.target)) {
-                        dropdown.style.display = 'none';
-                        document.removeEventListener('click', closeHandler);
-                    }
-                };
-                document.addEventListener('click', closeHandler);
-            }, 100);
-        } else {
-            dropdown.style.display = 'none';
+        
+        const dropdownId = 'jobCategoryDropdown';
+        this.closeAllDropdowns(dropdownId);
+        
+        const existing = document.getElementById(dropdownId);
+        if (existing) {
+            existing.remove();
+            return;
         }
+        
+        const container = document.getElementById('jobCategorySelector');
+        const input = document.getElementById('jobCategory');
+        if (!container || !input) return;
+        
+        const btn = container.querySelector('.publish-category-btn');
+        if (!btn) return;
+        
+        const rect = btn.getBoundingClientRect();
+        const selectedCode = input.value || 'it';
+        
+        const dropdown = document.createElement('div');
+        dropdown.className = 'publish-category-dropdown';
+        dropdown.id = dropdownId;
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 6) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.width = rect.width + 'px';
+        dropdown.style.maxHeight = '280px';
+        dropdown.style.overflowY = 'auto';
+        dropdown.style.background = 'var(--card-bg)';
+        dropdown.style.border = '1px solid var(--border)';
+        dropdown.style.borderRadius = '10px';
+        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
+        dropdown.style.zIndex = '99999';
+        dropdown.style.padding = '6px';
+        
+        dropdown.innerHTML = this.jobCategories.filter(c => c.code !== 'all').map(cat => `
+            <button type="button" class="publish-category-option ${cat.code === selectedCode ? 'active' : ''}" 
+                    onclick="PostsSystem.selectPublishCategory('${cat.code}')">
+                <span class="publish-category-icon" style="background: ${cat.color}20; color: ${cat.color};">
+                    <i class="${cat.icon}"></i>
+                </span>
+                <span class="publish-category-name">${cat.name}</span>
+                ${cat.code === selectedCode ? '<i class="fas fa-check"></i>' : ''}
+            </button>
+        `).join('');
+        
+        document.body.appendChild(dropdown);
+        
+        setTimeout(() => {
+            const closeHandler = (e) => {
+                const dd = document.getElementById(dropdownId);
+                if (dd && !dd.contains(e.target) && !btn.contains(e.target)) {
+                    dd.remove();
+                    document.removeEventListener('pointerdown', closeHandler);
+                }
+            };
+            document.addEventListener('pointerdown', closeHandler);
+        }, 0);
     },
     
     selectPublishCategory(code) {
         const input = document.getElementById('jobCategory');
         if (input) input.value = code;
         const dropdown = document.getElementById('jobCategoryDropdown');
-        if (dropdown) dropdown.style.display = 'none';
+        if (dropdown) dropdown.remove();
         this.renderPublishCategoryDropdown();
     },
     
@@ -913,43 +970,70 @@ const PostsSystem = {
                 <span class="publish-country-name">${selectedCountry ? selectedCountry.name : 'اختر البلد'}</span>
                 <i class="fas fa-chevron-down"></i>
             </button>
-            <div class="publish-country-dropdown" id="${prefix}CountryDropdown" style="display: none;">
-                ${window.Countries.list.map(c => `
-                    <button type="button" class="publish-country-option ${c.code === selectedCode ? 'active' : ''}" 
-                            onclick="PostsSystem.selectPublishCountry('${publishType}', '${c.code}')">
-                        <span class="publish-country-flag">${c.flag}</span>
-                        <span class="publish-country-name">${c.name}</span>
-                        ${c.code === selectedCode ? '<i class="fas fa-check"></i>' : ''}
-                    </button>
-                `).join('')}
-            </div>
         `;
     },
     
     togglePublishCountryDropdown(publishType, event) {
         if (event) event.stopPropagation();
+        
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const dropdownId = `${prefix}CountryDropdown`;
-        const dropdown = document.getElementById(dropdownId);
-        if (!dropdown) return;
-        document.querySelectorAll('.publish-country-dropdown, .publish-category-dropdown').forEach(d => {
-            if (d.id !== dropdownId) d.style.display = 'none';
-        });
-        if (dropdown.style.display === 'none' || !dropdown.style.display) {
-            dropdown.style.display = 'block';
-            setTimeout(() => {
-                const closeHandler = (e) => {
-                    const container = document.getElementById(`${prefix}CountrySelector`);
-                    if (container && !container.contains(e.target)) {
-                        dropdown.style.display = 'none';
-                        document.removeEventListener('click', closeHandler);
-                    }
-                };
-                document.addEventListener('click', closeHandler);
-            }, 100);
-        } else {
-            dropdown.style.display = 'none';
+        
+        this.closeAllDropdowns(dropdownId);
+        
+        const existing = document.getElementById(dropdownId);
+        if (existing) {
+            existing.remove();
+            return;
         }
+        
+        const container = document.getElementById(`${prefix}CountrySelector`);
+        const input = document.getElementById(`${prefix}CountryCode`);
+        if (!container || !input) return;
+        
+        const btn = container.querySelector('.publish-country-btn');
+        if (!btn) return;
+        
+        const rect = btn.getBoundingClientRect();
+        const selectedCode = input.value || this.selectedCountry;
+        
+        const dropdown = document.createElement('div');
+        dropdown.className = 'publish-country-dropdown';
+        dropdown.id = dropdownId;
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 6) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.width = rect.width + 'px';
+        dropdown.style.maxHeight = '280px';
+        dropdown.style.overflowY = 'auto';
+        dropdown.style.background = 'var(--card-bg)';
+        dropdown.style.border = '1px solid var(--border)';
+        dropdown.style.borderRadius = '10px';
+        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
+        dropdown.style.zIndex = '99999';
+        dropdown.style.padding = '6px';
+        
+        dropdown.innerHTML = window.Countries.list.map(c => `
+            <button type="button" class="publish-country-option ${c.code === selectedCode ? 'active' : ''}" 
+                    onclick="PostsSystem.selectPublishCountry('${publishType}', '${c.code}')">
+                <span class="publish-country-flag">${c.flag}</span>
+                <span class="publish-country-name">${c.name}</span>
+                ${c.code === selectedCode ? '<i class="fas fa-check"></i>' : ''}
+            </button>
+        `).join('');
+        
+        document.body.appendChild(dropdown);
+        
+        setTimeout(() => {
+            const closeHandler = (e) => {
+                const dd = document.getElementById(dropdownId);
+                if (dd && !dd.contains(e.target) && !btn.contains(e.target)) {
+                    dd.remove();
+                    document.removeEventListener('pointerdown', closeHandler);
+                }
+            };
+            document.addEventListener('pointerdown', closeHandler);
+        }, 0);
     },
     
     selectPublishCountry(publishType, code) {
@@ -957,7 +1041,7 @@ const PostsSystem = {
         const input = document.getElementById(`${prefix}CountryCode`);
         if (input) input.value = code;
         const dropdown = document.getElementById(`${prefix}CountryDropdown`);
-        if (dropdown) dropdown.style.display = 'none';
+        if (dropdown) dropdown.remove();
         this.renderPublishCountryDropdown(publishType);
     },
     
@@ -995,9 +1079,16 @@ const PostsSystem = {
     
     toggleMarriageDropdown(field, event) {
         if (event) { event.stopPropagation(); event.preventDefault(); }
+        
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
+        
+        this.closeAllDropdowns(dropdownId);
+        
         const existing = document.getElementById(dropdownId);
-        if (existing) existing.remove();
+        if (existing) {
+            existing.remove();
+            return;
+        }
         
         const btn = document.querySelector(`.publish-category-btn[data-field="${field}"]`);
         if (!btn) return;
@@ -1050,11 +1141,11 @@ const PostsSystem = {
                 const dd = document.getElementById(dropdownId);
                 if (dd && !dd.contains(e.target) && !btn.contains(e.target)) {
                     dd.remove();
-                    document.removeEventListener('click', closeHandler);
+                    document.removeEventListener('pointerdown', closeHandler);
                 }
             };
-            document.addEventListener('click', closeHandler);
-        }, 100);
+            document.addEventListener('pointerdown', closeHandler);
+        }, 0);
     },
     
     selectMarriageOption(field, value) {
@@ -1085,6 +1176,7 @@ const PostsSystem = {
     switchTab(tab) {
         this.currentTab = tab;
         this.closeCountryDropdown();
+        this.closeAllDropdowns();
         document.querySelectorAll('.home-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tab);
         });
@@ -1120,6 +1212,8 @@ const PostsSystem = {
             const userId = oldBtn.getAttribute('data-user-id');
             if (!userId) return;
             
+            // نحتاج المنشور الأصلي - نبحث عنه من قبل
+            // لكن للتبسيط: ننشئ زر جديد بنفس userId
             const post = { userId };
             const newBtn = this.createPostActionButton(post);
             
@@ -1132,8 +1226,6 @@ const PostsSystem = {
             oldBtn.style.cssText = newBtn.style.cssText;
             oldBtn.title = newBtn.title;
             oldBtn.disabled = newBtn.disabled;
-            
-            this.bindActionButton(card, post);
         });
     },
     
@@ -1784,4 +1876,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - النسخة النهائية مع طريقة التواصل');
+console.log('✅ posts-system.js تم تحميله - النسخة النهائية الكاملة');
