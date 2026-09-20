@@ -74,7 +74,12 @@ body.conversation-open {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==================== القسم 5: الحاوية الرئيسية ==================== */
-.app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+.app-container { 
+    height: 100vh; 
+    display: flex; 
+    flex-direction: column; 
+    background: var(--bg); 
+}
 
 .app-header { 
     height: var(--header-height); 
@@ -118,8 +123,21 @@ body.conversation-open {
     color: var(--text);
 }
 
-.icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.icon-btn { 
+    width: 40px; 
+    height: 40px; 
+    border: none; 
+    background: none; 
+    border-radius: 50%; 
+    color: var(--text); 
+    font-size: 1.2rem; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+}
 
+/* ✅ المحتوى الرئيسي: flex column */
 .app-content { 
     flex: 1; 
     overflow-y: auto; 
@@ -128,19 +146,52 @@ body.conversation-open {
     position: relative;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
-.page { display: none; padding: 0.5rem; }
+/* ✅ الصفحات: flex column */
+.page { 
+    display: none; 
+    padding: 0.5rem; 
+}
+
 .page.active { 
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 /* ==================== القسم 6: شريط التنقل السفلي ==================== */
-.bottom-nav { height: var(--nav-height); background: var(--card-bg); border-top: 1px solid var(--border); display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; }
-.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.15rem; background: none; border: none; color: var(--text-light); font-size: 0.65rem; cursor: pointer; -webkit-tap-highlight-color: transparent; padding: 4px 0; }
+.bottom-nav { 
+    height: var(--nav-height); 
+    background: var(--card-bg); 
+    border-top: 1px solid var(--border); 
+    display: flex; 
+    position: fixed; 
+    bottom: 0; 
+    left: 0; 
+    right: 0; 
+    z-index: 100; 
+}
+
+.nav-item { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 0.15rem; 
+    background: none; 
+    border: none; 
+    color: var(--text-light); 
+    font-size: 0.65rem; 
+    cursor: pointer; 
+    -webkit-tap-highlight-color: transparent; 
+    padding: 4px 0;
+}
+
 .nav-item i { font-size: 1.2rem; }
 .nav-item span { display: none; }
 .nav-item.active { color: var(--primary); }
@@ -239,12 +290,13 @@ body.conversation-open {
 .home-tab.active { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4); }
 .home-tab:not(.active):hover { background: var(--light); color: var(--text); }
 
-/* ✅ المحتوى: flex column ليتمدد */
+/* ✅ محتوى الرئيسية: flex column + position relative */
 .home-content { 
     display: none;
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 .home-content.active { 
@@ -304,6 +356,7 @@ body.conversation-open {
 .category-name { font-size: 0.72rem; line-height: 1; }
 
 /* ==================== القسم 10: بطاقات المنشورات ==================== */
+/* ✅ حاوية المنشورات: flex column + position relative */
 .posts-container {
     display: flex;
     flex-direction: column;
@@ -311,6 +364,7 @@ body.conversation-open {
     padding-bottom: 20px;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 .post-card {
@@ -579,12 +633,13 @@ body.conversation-open {
 .publish-btn:active { transform: scale(0.98); }
 
 /* ==================== القسم 13: صفحة الدردشة ==================== */
+/* ✅ صفحة الدردشة: flex column + position relative */
 .chat-page {
     display: none;
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    padding: 0.5rem;
+    position: relative;
 }
 
 .chat-page.active {
@@ -606,13 +661,14 @@ body.conversation-open {
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; font-family: inherit; }
 
-/* ✅ قائمة المحادثات: flex column */
+/* ✅ قائمة المحادثات: flex column + position relative */
 .chats-list { 
     display: flex; 
     flex-direction: column; 
     gap: 0.5rem;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 .chat-item { 
@@ -758,7 +814,7 @@ body.conversation-open {
     display: none;
     flex-direction: column;
     flex: 1;
-    padding: 0.5rem;
+    position: relative;
 }
 
 .profile-page.active {
@@ -1038,8 +1094,12 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== ✅ القسم 18: الحالة الفارغة (مُصلّح - في المنتصف دائماً) ==================== */
+/* ==================== ✅ القسم 18: الحالة الفارغة (في المنتصف تماماً) ==================== */
 .empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1047,10 +1107,10 @@ body.conversation-open {
     text-align: center;
     padding: 1rem;
     color: var(--text-light);
-    width: 100%;
-    flex: 1;
-    min-height: 100%;
-    margin: auto;
+    width: 90%;
+    max-width: 320px;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .empty-state i { 
