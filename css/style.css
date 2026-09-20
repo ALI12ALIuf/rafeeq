@@ -137,7 +137,6 @@ body.conversation-open {
     justify-content: center; 
 }
 
-/* ✅ الحاوية الرئيسية للمحتوى (مُحدّثة) */
 .app-content { 
     flex: 1; 
     overflow-y: auto; 
@@ -154,11 +153,14 @@ body.conversation-open {
     width: 100%;
     flex: 1;
     flex-direction: column;
+    min-height: 0;
 }
 
 .page.active { 
     display: flex; 
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 /* ==================== القسم 6: شريط التنقل السفلي ==================== */
@@ -288,17 +290,20 @@ body.conversation-open {
 .home-tab.active { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4); }
 .home-tab:not(.active):hover { background: var(--light); color: var(--text); }
 
-/* ✅ محتوى الرئيسية (مُحدّث) */
+/* ✅ محتوى الرئيسية (مُحدّث - يأخذ المساحة المتبقية فقط) */
 .home-content { 
     display: none; 
     width: 100%;
     flex: 1;
     flex-direction: column;
+    min-height: 0;
 }
 
 .home-content.active { 
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 /* ==================== القسم 9: أقسام الوظائف ==================== */
@@ -361,6 +366,7 @@ body.conversation-open {
     padding-bottom: 30px;
     width: 100%;
     flex: 1;
+    min-height: 0;
 }
 
 .post-card {
@@ -622,6 +628,11 @@ body.conversation-open {
     flex-direction: column;
     width: 100%;
     flex: 1;
+    min-height: 0;
+}
+
+.search-container {
+    flex-shrink: 0;
 }
 
 .search-box { 
@@ -637,13 +648,13 @@ body.conversation-open {
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; font-family: inherit; }
 
-/* ✅ قائمة الدردشة (مُحدّثة) */
 .chats-list { 
     display: flex; 
     flex-direction: column; 
     gap: 0.5rem;
     width: 100%;
     flex: 1;
+    min-height: 0;
 }
 
 .chat-item { 
@@ -1063,19 +1074,20 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== القسم 18: الحالة الفارغة (مُحدّث - في المنتصف) ==================== */
+/* ==================== القسم 18: الحالة الفارغة (مُصحّح) ==================== */
 .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: calc(100vh - var(--header-height) - var(--nav-height) - 120px);
     width: 100%;
+    flex: 1;
     text-align: center;
     padding: 2rem 1rem;
     color: var(--text-light);
     margin: 0 auto;
-    flex: 1;
+    min-height: 0;
+    align-self: stretch;
 }
 
 .empty-state i {
@@ -1578,6 +1590,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-direction: column;
     flex: 1;
     width: 100%;
+    min-height: 0;
 }
 
 /* ✅ حاوية الدردشة */
@@ -1586,6 +1599,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-direction: column;
     width: 100%;
     flex: 1;
+    min-height: 0;
 }
 
 .chats-list {
@@ -1594,6 +1608,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     gap: 0.5rem;
     width: 100%;
     flex: 1;
+    min-height: 0;
 }
 
 /* ✅ حاوية المنشورات */
@@ -1604,6 +1619,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     padding-bottom: 30px;
     width: 100%;
     flex: 1;
+    min-height: 0;
 }
 
 /* ✅ محتوى الرئيسية */
@@ -1612,14 +1628,17 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     width: 100%;
     flex: 1;
     flex-direction: column;
+    min-height: 0;
 }
 
 .home-content.active {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
-/* ✅ الحالة الفارغة تتمدد لملء المساحة */
+/* ✅ الحالة الفارغة (تأخذ المساحة المتبقية فقط) */
 .empty-state {
     flex: 1;
     display: flex;
@@ -1627,11 +1646,12 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     align-items: center;
     justify-content: center;
     width: 100%;
-    min-height: calc(100vh - var(--header-height) - var(--nav-height) - 120px);
+    min-height: 0;
     text-align: center;
     padding: 2rem 1rem;
     color: var(--text-light);
     margin: 0 auto;
+    align-self: stretch;
 }
 
 /* ✅ صفحة الإعدادات */
@@ -1639,6 +1659,8 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     display: flex;
     flex-direction: column;
     width: 100%;
+    flex: 1;
+    min-height: 0;
 }
 
 /* ✅ صفحة الملف الشخصي */
@@ -1648,7 +1670,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     width: 100%;
 }
 
-/* ✅ ضمان أن الحاويات تملأ المساحة */
+/* ✅ الحاوية الرئيسية للمحتوى */
 .app-content {
     flex: 1;
     overflow-y: auto;
