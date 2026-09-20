@@ -158,28 +158,6 @@ body.conversation-open {
     width: 100%;
 }
 
-/* ✅ الصفحة الرئيسية (وظائف + زواج) */
-.home-page.active {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-}
-
-/* ✅ المحتوى الرئيسي داخل الرئيسية (تبويب الوظائف أو الزواج) */
-.home-content { 
-    display: none;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-}
-
-.home-content.active { 
-    display: flex;
-    flex: 1;
-    min-height: 0;
-}
-
 /* ==================== القسم 6: شريط التنقل السفلي ==================== */
 .bottom-nav { 
     height: var(--nav-height); 
@@ -308,6 +286,30 @@ body.conversation-open {
 .home-tab i { font-size: 1rem; }
 .home-tab.active { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4); }
 .home-tab:not(.active):hover { background: var(--light); color: var(--text); }
+
+/* ✅ الصفحة الرئيسية (وظائف + زواج) */
+.home-page.active {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ✅ المحتوى الرئيسي داخل الرئيسية (تبويب الوظائف أو الزواج) */
+.home-content { 
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+.home-content.active { 
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
 
 /* ==================== القسم 9: أقسام الوظائف ==================== */
 .categories-scroll {
@@ -644,10 +646,13 @@ body.conversation-open {
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 .search-container {
     flex-shrink: 0;
+    position: relative;
+    z-index: 5;
 }
 
 .search-box { 
@@ -662,7 +667,7 @@ body.conversation-open {
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; font-family: inherit; }
 
-/* ✅ قائمة المحادثات: flex column يملأ المساحة */
+/* ✅ قائمة المحادثات: flex column */
 .chats-list { 
     display: flex; 
     flex-direction: column; 
@@ -1089,11 +1094,14 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== ✅ القسم 18: الحالة الفارغة - حل جذري 100% ==================== */
+/* ==================== ✅ القسم 18: الحالة الفارغة - في منتصف الشاشة الفعلي ==================== */
 
-/* ✅ الحالة الفارغة: تملأ المساحة المتبقية وتتمركز في المنتصف */
+/* ✅ الحالة الفارغة: في منتصف حاويتها بالضبط (بغض النظر عن العناصر الأخرى) */
 .empty-state {
-    flex: 1 1 auto;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1101,19 +1109,14 @@ body.conversation-open {
     text-align: center;
     padding: 1rem;
     color: var(--text-light);
-    width: 100%;
-    min-height: 100%;
-    margin: 0;
+    width: 90%;
+    max-width: 320px;
+    pointer-events: none;
 }
 
-/* ✅ في حالة وجود تبويبات (الوظائف): ملء ما تبقى */
-.home-content .empty-state {
-    min-height: calc(100vh - var(--header-height) - var(--nav-height) - 180px);
-}
-
-/* ✅ في حالة الدردشة (يوجد search-box): ملء ما تبقى */
-.chat-page .empty-state {
-    min-height: calc(100vh - var(--header-height) - var(--nav-height) - 100px);
+/* ✅ السماح بالتفاعل مع الأزرار داخل الحالة الفارغة (إن وُجدت) */
+.empty-state > * {
+    pointer-events: auto;
 }
 
 .empty-state i { 
@@ -1123,8 +1126,6 @@ body.conversation-open {
     opacity: 0.5;
     display: block;
     line-height: 1;
-    width: auto;
-    height: auto;
 }
 
 .empty-state h3 { 
@@ -1134,7 +1135,6 @@ body.conversation-open {
     font-weight: 600; 
     text-align: center;
     line-height: 1.3;
-    width: 100%;
 }
 
 .empty-state p { 
@@ -1179,14 +1179,6 @@ body.conversation-open {
         width: 34px;
         height: 34px;
         font-size: 0.85rem;
-    }
-    
-    .empty-state {
-        min-height: calc(100vh - var(--header-height) - var(--nav-height) - 170px);
-    }
-    
-    .chat-page .empty-state {
-        min-height: calc(100vh - var(--header-height) - var(--nav-height) - 90px);
     }
 }
 
