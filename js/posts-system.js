@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية (إصلاح كامل للقوائم) ==========
+// ========== posts-system.js - النسخة النهائية (قوائم dropdown-floating) ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -71,7 +71,7 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== ✅ إغلاق جميع القوائم ====================
+    // ==================== إغلاق جميع القوائم ====================
     closeAllDropdowns() {
         if (this._activeDropdown) {
             try { this._activeDropdown.remove(); } catch (e) {}
@@ -83,27 +83,16 @@ const PostsSystem = {
             this._activeDropdownHandler = null;
         }
         
-        // ✅ احتياط: إغلاق كل القوائم المعروفة
-        const allIds = [
-            'jobCategoryDropdown', 'jobCountryDropdown', 'marriageCountryDropdown',
-            'marriageMarriedDropdown', 'marriageChildrenDropdown',
-            'jobContactDropdown', 'marriageContactDropdown',
-            'countryHeaderDropdown'
-        ];
-        allIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                try { el.remove(); } catch (e) {}
-            }
+        document.querySelectorAll('.dropdown-floating').forEach(el => {
+            try { el.remove(); } catch (e) {}
         });
     },
     
-    // ==================== ✅ فتح القائمة المنسدلة (الحل النهائي) ====================
+    // ==================== فتح القائمة المنسدلة (حل جذري) ====================
     openDropdown({ id, html, anchorBtn, onClose = null }) {
         this.closeAllDropdowns();
         if (!anchorBtn) return null;
         
-        // ✅ العثور على modal-content الأب
         const modalContent = anchorBtn.closest('.modal-content');
         const isInModal = !!modalContent;
         
@@ -114,56 +103,68 @@ const PostsSystem = {
         const margin = 8;
         const offset = 6;
         
-        // ✅ إنشاء القائمة
         const dropdown = document.createElement('div');
-        dropdown.className = 'publish-category-dropdown';
+        dropdown.className = 'dropdown-floating';
         dropdown.id = id;
-        dropdown.style.zIndex = '99999';
-        dropdown.style.background = 'var(--card-bg)';
-        dropdown.style.border = '1px solid var(--border)';
-        dropdown.style.borderRadius = '10px';
-        dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
-        dropdown.style.padding = '6px';
-        dropdown.style.maxHeight = dropdownMaxHeight + 'px';
-        dropdown.style.overflowY = 'auto';
-        dropdown.style.width = rect.width + 'px';
+        
+        const baseStyles = {
+            position: 'absolute',
+            zIndex: '999999',
+            background: 'var(--card-bg)',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
+            borderRadius: '10px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+            padding: '6px',
+            maxHeight: dropdownMaxHeight + 'px',
+            overflowY: 'auto',
+            width: rect.width + 'px',
+            display: 'block',
+            visibility: 'visible',
+            opacity: '1',
+            pointerEvents: 'auto'
+        };
+        
+        Object.keys(baseStyles).forEach(key => {
+            dropdown.style.setProperty(
+                key.replace(/([A-Z])/g, '-$1').toLowerCase(),
+                baseStyles[key],
+                'important'
+            );
+        });
+        
         dropdown.innerHTML = html;
         
         if (isInModal) {
-            // ✅ داخل modal → absolute نسبة لـ modal-content
-            dropdown.style.position = 'absolute';
+            dropdown.style.setProperty('position', 'absolute', 'important');
             
             const modalRect = modalContent.getBoundingClientRect();
             const scrollTop = modalContent.scrollTop;
             const scrollLeft = modalContent.scrollLeft;
             
-            // ✅ الموقع الأفقي نسبة لـ modal-content
             let leftInModal = rect.left - modalRect.left + scrollLeft;
-            
-            // ✅ التحقق من الحدود
             const modalVisibleWidth = modalContent.clientWidth;
+            
             if (leftInModal + rect.width > modalVisibleWidth - margin) {
                 leftInModal = modalVisibleWidth - rect.width - margin;
             }
             if (leftInModal < margin) leftInModal = margin;
             
-            dropdown.style.left = leftInModal + 'px';
+            dropdown.style.setProperty('left', leftInModal + 'px', 'important');
+            dropdown.style.setProperty('right', 'auto', 'important');
             
-            // ✅ الموقع الرأسي
             const topInModal = rect.bottom - modalRect.top + scrollTop + offset;
             const spaceBelow = viewportH - rect.bottom;
             
             if (spaceBelow < dropdownMaxHeight + offset && rect.top > spaceBelow) {
-                // افتح فوق
                 const bottomInModal = modalRect.bottom - rect.top - scrollTop + offset;
-                dropdown.style.top = 'auto';
-                dropdown.style.bottom = bottomInModal + 'px';
+                dropdown.style.setProperty('top', 'auto', 'important');
+                dropdown.style.setProperty('bottom', bottomInModal + 'px', 'important');
             } else {
-                dropdown.style.top = topInModal + 'px';
-                dropdown.style.bottom = 'auto';
+                dropdown.style.setProperty('top', topInModal + 'px', 'important');
+                dropdown.style.setProperty('bottom', 'auto', 'important');
             }
             
-            // ✅ ضمان position: relative في modal-content
             if (getComputedStyle(modalContent).position === 'static') {
                 modalContent.style.position = 'relative';
             }
@@ -171,25 +172,26 @@ const PostsSystem = {
             modalContent.appendChild(dropdown);
             
         } else {
-            // ✅ خارج modal (قائمة البلد في الهيدر) → fixed
-            dropdown.style.position = 'fixed';
+            dropdown.style.setProperty('position', 'fixed', 'important');
             
             let left = rect.left;
             if (left + rect.width > viewportW - margin) {
                 left = viewportW - rect.width - margin;
             }
             if (left < margin) left = margin;
-            dropdown.style.left = left + 'px';
+            
+            dropdown.style.setProperty('left', left + 'px', 'important');
+            dropdown.style.setProperty('right', 'auto', 'important');
             
             const spaceBelow = viewportH - rect.bottom;
             const spaceAbove = rect.top;
             
             if (spaceBelow < dropdownMaxHeight + offset && spaceAbove > spaceBelow) {
-                dropdown.style.top = 'auto';
-                dropdown.style.bottom = (viewportH - rect.top + offset) + 'px';
+                dropdown.style.setProperty('top', 'auto', 'important');
+                dropdown.style.setProperty('bottom', (viewportH - rect.top + offset) + 'px', 'important');
             } else {
-                dropdown.style.top = (rect.bottom + offset) + 'px';
-                dropdown.style.bottom = 'auto';
+                dropdown.style.setProperty('top', (rect.bottom + offset) + 'px', 'important');
+                dropdown.style.setProperty('bottom', 'auto', 'important');
             }
             
             document.body.appendChild(dropdown);
@@ -197,7 +199,6 @@ const PostsSystem = {
         
         this._activeDropdown = dropdown;
         
-        // ✅ مستمع الإغلاق
         const self = this;
         const closeHandler = (e) => {
             const dd = document.getElementById(id);
@@ -807,9 +808,9 @@ const PostsSystem = {
         });
         
         if (dropdown) {
-            dropdown.style.minWidth = '200px';
-            dropdown.style.maxWidth = '240px';
-            dropdown.style.maxHeight = '50vh';
+            dropdown.style.setProperty('min-width', '200px', 'important');
+            dropdown.style.setProperty('max-width', '240px', 'important');
+            dropdown.style.setProperty('max-height', '50vh', 'important');
         }
         
         const arrow = btn.querySelector('.country-header-arrow');
@@ -1815,4 +1816,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - النسخة النهائية مع إصلاح القوائم');
+console.log('✅ posts-system.js تم تحميله - نسخة dropdown-floating النهائية');
