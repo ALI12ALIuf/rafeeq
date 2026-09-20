@@ -1094,26 +1094,28 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== ✅ القسم 18: الحالة الفارغة - في منتصف المساحة المتبقية ==================== */
+/* ==================== ✅ القسم 18: الحالة الفارغة - في منتصف المساحة المتبقية بالضبط ==================== */
 
 .empty-state {
-    /* إلغاء التمركز المطلق لضمان عدم التداخل */
+    /* إلغاء التمركز المطلق */
     position: static; 
     transform: none;
     
-    /* استخدام Flexbox لملء المساحة المتبقية تحت التبويبات */
+    /* استخدام Flexbox لملء المساحة المتبقية */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    flex: 1; /* يمتص المساحة المتبقية ويضع المحتوى في منتصفها */
+    
+    /* ✅ margin: auto يضع العنصر في منتصف المساحة المتاحة تماماً */
+    margin: auto;
     
     text-align: center;
     padding: 2rem 1rem;
     color: var(--text-light);
     width: 100%;
     pointer-events: none;
-    min-height: 200px; /* لضمان عدم انكماشها بشكل مبالغ فيه */
+    min-height: 200px;
 }
 
 /* ✅ السماح بالتفاعل مع الأزرار داخل الحالة الفارغة */
