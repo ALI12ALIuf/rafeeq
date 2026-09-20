@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية (قائمة البلد محاذاة يمين) ==========
+// ========== posts-system.js - النسخة النهائية (القوائم دائماً كاملة) ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -88,7 +88,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== فتح القائمة (تفتح دائماً للأسفل) ====================
+    // ==================== ✅ فتح القائمة (دائماً كاملة + تمرير تلقائي) ====================
     openDropdown({ id, html, anchorBtn, onClose = null }) {
         this.closeAllDropdowns();
         if (!anchorBtn) return null;
@@ -97,13 +97,12 @@ const PostsSystem = {
         const isInModal = !!modalContent;
         
         const rect = anchorBtn.getBoundingClientRect();
-        const viewportH = window.innerHeight;
         const viewportW = window.innerWidth;
         const margin = 8;
         const offset = 6;
         
-        const spaceBelow = viewportH - rect.bottom - margin;
-        const maxHeight = Math.min(260, Math.max(120, spaceBelow - offset));
+        // ✅ ارتفاع ثابت دائماً — بدون تصغير
+        const dropdownMaxHeight = 260;
         
         const dropdown = document.createElement('div');
         dropdown.className = 'dropdown-floating';
@@ -117,7 +116,7 @@ const PostsSystem = {
         dropdown.style.borderRadius = '10px';
         dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
         dropdown.style.padding = '6px';
-        dropdown.style.maxHeight = maxHeight + 'px';
+        dropdown.style.maxHeight = dropdownMaxHeight + 'px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.width = rect.width + 'px';
         dropdown.style.display = 'block';
@@ -142,6 +141,7 @@ const PostsSystem = {
             
             dropdown.style.left = leftInModal + 'px';
             
+            // ✅ دائماً تحت الزر (بالحجم الكامل)
             const topInModal = rect.bottom - modalRect.top + scrollTop + offset;
             dropdown.style.top = topInModal + 'px';
             dropdown.style.bottom = 'auto';
@@ -151,6 +151,17 @@ const PostsSystem = {
             }
             
             modalContent.appendChild(dropdown);
+            
+            // ✅ تمرير modal-content تلقائياً إذا كانت القائمة تتجاوز أسفله
+            setTimeout(() => {
+                const ddRect = dropdown.getBoundingClientRect();
+                const modalRect2 = modalContent.getBoundingClientRect();
+                
+                if (ddRect.bottom > modalRect2.bottom - 8) {
+                    const scrollAmount = ddRect.bottom - modalRect2.bottom + 20;
+                    modalContent.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+                }
+            }, 50);
             
         } else {
             dropdown.style.position = 'fixed';
@@ -162,10 +173,29 @@ const PostsSystem = {
             if (left < margin) left = margin;
             
             dropdown.style.left = left + 'px';
+            
+            // ✅ دائماً تحت الزر (بالحجم الكامل)
             dropdown.style.top = (rect.bottom + offset) + 'px';
             dropdown.style.bottom = 'auto';
             
             document.body.appendChild(dropdown);
+            
+            // ✅ تمرير الصفحة تلقائياً إذا كانت القائمة تتجاوز أسفل الشاشة
+            setTimeout(() => {
+                const ddRect = dropdown.getBoundingClientRect();
+                const viewportH = window.innerHeight;
+                
+                if (ddRect.bottom > viewportH - 8) {
+                    const scrollAmount = ddRect.bottom - viewportH + 20;
+                    const appContent = document.getElementById('mainContent') || document.querySelector('.app-content');
+                    
+                    if (appContent) {
+                        appContent.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+                    } else {
+                        window.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+                    }
+                }
+            }, 50);
         }
         
         this._activeDropdown = dropdown;
@@ -740,7 +770,6 @@ const PostsSystem = {
         container.style.display = isHomeActive ? 'block' : 'none';
     },
     
-    // ==================== ✅ قائمة البلد (محاذاة يمين) ====================
     toggleHeaderCountryDropdown(event) {
         if (event) {
             event.stopPropagation();
@@ -779,7 +808,6 @@ const PostsSystem = {
             anchorBtn: btn
         });
         
-        // ✅ تثبيت عرض القائمة + محاذاة يمين (RTL)
         if (dropdown) {
             const rect = btn.getBoundingClientRect();
             const viewportW = window.innerWidth;
@@ -791,11 +819,7 @@ const PostsSystem = {
             dropdown.style.width = dropdownWidth + 'px';
             dropdown.style.maxHeight = '50vh';
             
-            // ✅ في RTL: الزر على اليمين → القائمة تُحاذى يمين
-            // حساب المسافة من يمين الشاشة إلى يمين الزر
             let right = viewportW - rect.right;
-            
-            // التأكد من عدم تجاوز الحدود
             if (right < margin) right = margin;
             if (right + dropdownWidth > viewportW - margin) {
                 right = Math.max(margin, viewportW - dropdownWidth - margin);
@@ -1808,4 +1832,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - قائمة البلد محاذاة يمين');
+console.log('✅ posts-system.js تم تحميله - القوائم دائماً كاملة');
