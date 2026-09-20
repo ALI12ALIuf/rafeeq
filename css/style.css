@@ -149,13 +149,14 @@ body.conversation-open {
     width: 100%;
 }
 
-/* ✅ الصفحة النشطة: flex column يملأ المساحة */
+/* ✅ الصفحة النشطة: flex column يملأ المساحة + position relative */
 .page.active { 
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
     width: 100%;
+    position: relative;
 }
 
 /* ==================== القسم 6: شريط التنقل السفلي ==================== */
@@ -262,6 +263,8 @@ body.conversation-open {
     border-radius: 50px;
     box-shadow: var(--shadow);
     flex-shrink: 0;
+    position: relative;
+    z-index: 2;
 }
 
 .home-tab {
@@ -287,26 +290,29 @@ body.conversation-open {
 .home-tab.active { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4); }
 .home-tab:not(.active):hover { background: var(--light); color: var(--text); }
 
-/* ✅ الصفحة الرئيسية (وظائف + زواج): flex column */
+/* ✅ الصفحة الرئيسية (وظائف + زواج) */
 .home-page.active {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
-/* ✅ المحتوى الرئيسي داخل الرئيسية (تبويب الوظائف أو الزواج): flex column */
+/* ✅ المحتوى الرئيسي داخل الرئيسية - الأب المرجعي للحالة الفارغة */
 .home-content { 
     display: none;
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 .home-content.active { 
     display: flex;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 /* ==================== القسم 9: أقسام الوظائف ==================== */
@@ -320,6 +326,8 @@ body.conversation-open {
     scrollbar-width: none;
     scroll-behavior: smooth;
     flex-shrink: 0;
+    position: relative;
+    z-index: 2;
 }
 
 .categories-scroll::-webkit-scrollbar { display: none; }
@@ -644,10 +652,13 @@ body.conversation-open {
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 .search-container {
     flex-shrink: 0;
+    position: relative;
+    z-index: 2;
 }
 
 .search-box { 
@@ -1089,9 +1100,13 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== ✅ القسم 18: الحالة الفارغة - في المنتصف بدقة ==================== */
+/* ==================== ✅ القسم 18: الحالة الفارغة - في المنتصف الفعلي ==================== */
+
 .empty-state {
-    flex: 1;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1099,9 +1114,14 @@ body.conversation-open {
     text-align: center;
     padding: 1rem;
     color: var(--text-light);
-    width: 100%;
-    margin: auto 0;
-    min-height: 0;
+    width: 90%;
+    max-width: 320px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.empty-state > * {
+    pointer-events: auto;
 }
 
 .empty-state i { 
