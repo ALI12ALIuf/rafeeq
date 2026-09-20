@@ -129,7 +129,6 @@ body.conversation-open {
 
 .icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-/* ✅ الحاوية الرئيسية للمحتوى */
 .app-content { 
     flex: 1; 
     overflow-y: auto; 
@@ -142,14 +141,12 @@ body.conversation-open {
     min-height: 0;
 }
 
-/* ✅ الصفحات: مخفية افتراضياً */
 .page { 
     display: none; 
     padding: 0.5rem;
     width: 100%;
 }
 
-/* ✅ الصفحة النشطة: flex column يملأ المساحة + position relative */
 .page.active { 
     display: flex;
     flex-direction: column;
@@ -263,8 +260,6 @@ body.conversation-open {
     border-radius: 50px;
     box-shadow: var(--shadow);
     flex-shrink: 0;
-    position: relative;
-    z-index: 2;
 }
 
 .home-tab {
@@ -299,7 +294,7 @@ body.conversation-open {
     position: relative;
 }
 
-/* ✅ المحتوى الرئيسي داخل الرئيسية - الأب المرجعي للحالة الفارغة */
+/* ✅ المحتوى الرئيسي (تبويب الوظائف أو الزواج) */
 .home-content { 
     display: none;
     flex-direction: column;
@@ -326,8 +321,6 @@ body.conversation-open {
     scrollbar-width: none;
     scroll-behavior: smooth;
     flex-shrink: 0;
-    position: relative;
-    z-index: 2;
 }
 
 .categories-scroll::-webkit-scrollbar { display: none; }
@@ -658,7 +651,7 @@ body.conversation-open {
 .search-container {
     flex-shrink: 0;
     position: relative;
-    z-index: 2;
+    z-index: 5;
 }
 
 .search-box { 
@@ -673,7 +666,6 @@ body.conversation-open {
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; font-family: inherit; }
 
-/* ✅ قائمة المحادثات: flex column */
 .chats-list { 
     display: flex; 
     flex-direction: column; 
@@ -1100,7 +1092,7 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== ✅ القسم 18: الحالة الفارغة - في المنتصف الفعلي ==================== */
+/* ==================== ✅ القسم 18: الحالة الفارغة (مُصلَّح 100%) ==================== */
 
 .empty-state {
     position: absolute;
@@ -1117,7 +1109,6 @@ body.conversation-open {
     width: 90%;
     max-width: 320px;
     pointer-events: none;
-    z-index: 1;
 }
 
 .empty-state > * {
