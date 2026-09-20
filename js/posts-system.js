@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية (القوائم تفتح للأسفل دائماً) ==========
+// ========== posts-system.js - النسخة النهائية (قائمة البلد محاذاة يمين) ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -88,7 +88,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== ✅ فتح القائمة (تفتح دائماً للأسفل) ====================
+    // ==================== فتح القائمة (تفتح دائماً للأسفل) ====================
     openDropdown({ id, html, anchorBtn, onClose = null }) {
         this.closeAllDropdowns();
         if (!anchorBtn) return null;
@@ -102,7 +102,6 @@ const PostsSystem = {
         const margin = 8;
         const offset = 6;
         
-        // ✅ حساب المساحة المتاحة أسفل الزر
         const spaceBelow = viewportH - rect.bottom - margin;
         const maxHeight = Math.min(260, Math.max(120, spaceBelow - offset));
         
@@ -110,7 +109,6 @@ const PostsSystem = {
         dropdown.className = 'dropdown-floating';
         dropdown.id = id;
         
-        // ✅ الأنماط الأساسية
         dropdown.style.position = 'absolute';
         dropdown.style.zIndex = '999999';
         dropdown.style.background = 'var(--card-bg)';
@@ -130,7 +128,6 @@ const PostsSystem = {
         dropdown.innerHTML = html;
         
         if (isInModal) {
-            // ✅ داخل modal → absolute نسبة لـ modal-content
             const modalRect = modalContent.getBoundingClientRect();
             const scrollTop = modalContent.scrollTop;
             const scrollLeft = modalContent.scrollLeft;
@@ -145,7 +142,6 @@ const PostsSystem = {
             
             dropdown.style.left = leftInModal + 'px';
             
-            // ✅ دائماً تفتح للأسفل
             const topInModal = rect.bottom - modalRect.top + scrollTop + offset;
             dropdown.style.top = topInModal + 'px';
             dropdown.style.bottom = 'auto';
@@ -157,7 +153,6 @@ const PostsSystem = {
             modalContent.appendChild(dropdown);
             
         } else {
-            // ✅ خارج modal → fixed
             dropdown.style.position = 'fixed';
             
             let left = rect.left;
@@ -167,8 +162,6 @@ const PostsSystem = {
             if (left < margin) left = margin;
             
             dropdown.style.left = left + 'px';
-            
-            // ✅ دائماً تفتح للأسفل
             dropdown.style.top = (rect.bottom + offset) + 'px';
             dropdown.style.bottom = 'auto';
             
@@ -747,6 +740,7 @@ const PostsSystem = {
         container.style.display = isHomeActive ? 'block' : 'none';
     },
     
+    // ==================== ✅ قائمة البلد (محاذاة يمين) ====================
     toggleHeaderCountryDropdown(event) {
         if (event) {
             event.stopPropagation();
@@ -785,10 +779,30 @@ const PostsSystem = {
             anchorBtn: btn
         });
         
+        // ✅ تثبيت عرض القائمة + محاذاة يمين (RTL)
         if (dropdown) {
+            const rect = btn.getBoundingClientRect();
+            const viewportW = window.innerWidth;
+            const margin = 8;
+            const dropdownWidth = 220;
+            
             dropdown.style.minWidth = '200px';
             dropdown.style.maxWidth = '240px';
+            dropdown.style.width = dropdownWidth + 'px';
             dropdown.style.maxHeight = '50vh';
+            
+            // ✅ في RTL: الزر على اليمين → القائمة تُحاذى يمين
+            // حساب المسافة من يمين الشاشة إلى يمين الزر
+            let right = viewportW - rect.right;
+            
+            // التأكد من عدم تجاوز الحدود
+            if (right < margin) right = margin;
+            if (right + dropdownWidth > viewportW - margin) {
+                right = Math.max(margin, viewportW - dropdownWidth - margin);
+            }
+            
+            dropdown.style.left = 'auto';
+            dropdown.style.right = right + 'px';
         }
         
         const arrow = btn.querySelector('.country-header-arrow');
@@ -1794,4 +1808,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - القوائم تفتح للأسفل دائماً');
+console.log('✅ posts-system.js تم تحميله - قائمة البلد محاذاة يمين');
