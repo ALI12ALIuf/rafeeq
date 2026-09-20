@@ -1475,3 +1475,27 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 .contact-icon-whatsapp { color: var(--whatsapp); }
 .contact-icon-phone { color: var(--phone); }
 .contact-icon-email { color: var(--email); }
+
+
+
+/* ==================== القسم 28: ضمان ظهور القوائم بشكل صحيح ==================== */
+
+/* ✅ ضمان أن modal-content يحتوي القوائم */
+.modal-content {
+    position: relative !important;
+}
+
+/* ✅ القوائم داخل modal-content */
+.modal-content .publish-category-dropdown,
+.modal-content .publish-country-dropdown {
+    z-index: 99999;
+    pointer-events: auto;
+}
+
+/* ✅ القوائم المفتوحة دائماً فوق كل شيء */
+.publish-category-dropdown,
+.publish-country-dropdown,
+.country-header-dropdown {
+    z-index: 99999 !important;
+    pointer-events: auto !important;
+}
