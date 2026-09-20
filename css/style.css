@@ -38,8 +38,8 @@ html, body {
     --card-bg: #2d2d2d;
     --shadow: 0 2px 10px rgba(0,0,0,0.3);
     --radius: 12px;
-    --header-height: 60px;
-    --nav-height: 60px;
+    --header-height: 50px;
+    --nav-height: 50px;
     --whatsapp: #25D366;
     --phone: #2196F3;
     --email: #FF9800;
@@ -74,7 +74,12 @@ body.conversation-open {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==================== القسم 5: الحاوية الرئيسية ==================== */
-.app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+.app-container { 
+    height: 100vh; 
+    display: flex; 
+    flex-direction: column; 
+    background: var(--bg); 
+}
 
 .app-header { 
     height: var(--header-height); 
@@ -88,6 +93,7 @@ body.conversation-open {
     top: 0; 
     z-index: 100; 
     gap: 8px;
+    flex-shrink: 0;
 }
 
 .header-left { 
@@ -112,27 +118,82 @@ body.conversation-open {
 }
 
 .header-title h1 { 
-    font-size: 1.1rem; 
+    font-size: 1rem; 
     font-weight: 600;
     color: var(--text);
 }
 
-.icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.icon-btn { 
+    width: 40px; 
+    height: 40px; 
+    border: none; 
+    background: none; 
+    border-radius: 50%; 
+    color: var(--text); 
+    font-size: 1.2rem; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+}
 
+/* ✅ الحاوية الرئيسية للمحتوى (مُحدّثة) */
 .app-content { 
     flex: 1; 
     overflow-y: auto; 
     padding-bottom: calc(var(--nav-height) + 30px); 
-    -webkit-overflow-scrolling: touch; 
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
 }
-.page { display: none; padding: 1rem; }
-.page.active { display: block; }
+
+/* ✅ كل صفحة */
+.page { 
+    display: none; 
+    padding: 0.5rem;
+    width: 100%;
+    flex: 1;
+    flex-direction: column;
+}
+
+.page.active { 
+    display: flex; 
+    flex-direction: column;
+}
 
 /* ==================== القسم 6: شريط التنقل السفلي ==================== */
-.bottom-nav { height: var(--nav-height); background: var(--card-bg); border-top: 1px solid var(--border); display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; }
-.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; background: none; border: none; color: var(--text-light); font-size: 0.8rem; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.bottom-nav { 
+    height: var(--nav-height); 
+    background: var(--card-bg); 
+    border-top: 1px solid var(--border); 
+    display: flex; 
+    position: fixed; 
+    bottom: 0; 
+    left: 0; 
+    right: 0; 
+    z-index: 100; 
+}
+
+.nav-item { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 0.15rem; 
+    background: none; 
+    border: none; 
+    color: var(--text-light); 
+    font-size: 0.65rem; 
+    cursor: pointer; 
+    -webkit-tap-highlight-color: transparent; 
+    padding: 4px 0;
+}
+
 .nav-item i { font-size: 1.2rem; }
+.nav-item span { display: none; }
 .nav-item.active { color: var(--primary); }
+.nav-item.active i { color: var(--primary); }
 
 /* ==================== القسم 7: منتقي البلد ==================== */
 .country-header-wrapper {
@@ -151,12 +212,12 @@ body.conversation-open {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 10px;
+    padding: 4px 8px;
     background: transparent;
     border: 1.5px solid var(--border);
     border-radius: 20px;
     color: var(--text);
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -168,20 +229,20 @@ body.conversation-open {
 .country-header-btn:active { transform: scale(0.96); }
 .country-header-btn:hover { border-color: var(--primary); background: rgba(100, 181, 246, 0.08); }
 
-.country-header-flag { font-size: 1.15rem; line-height: 1; }
+.country-header-flag { font-size: 1rem; line-height: 1; }
 
 .country-header-name {
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 600;
     color: var(--text);
-    max-width: 70px;
+    max-width: 55px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .country-header-arrow {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     color: var(--primary);
     transition: transform 0.25s ease;
 }
@@ -201,6 +262,7 @@ body.conversation-open {
     padding: 6px;
     border-radius: 50px;
     box-shadow: var(--shadow);
+    flex-shrink: 0;
 }
 
 .home-tab {
@@ -209,12 +271,12 @@ body.conversation-open {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 12px 16px;
+    padding: 10px 12px;
     background: transparent;
     border: none;
     border-radius: 50px;
     color: var(--text-light);
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -222,11 +284,22 @@ body.conversation-open {
     font-family: inherit;
 }
 
-.home-tab i { font-size: 1.1rem; }
+.home-tab i { font-size: 1rem; }
 .home-tab.active { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(100, 181, 246, 0.4); }
 .home-tab:not(.active):hover { background: var(--light); color: var(--text); }
-.home-content { display: none; }
-.home-content.active { display: block; }
+
+/* ✅ محتوى الرئيسية (مُحدّث) */
+.home-content { 
+    display: none; 
+    width: 100%;
+    flex: 1;
+    flex-direction: column;
+}
+
+.home-content.active { 
+    display: flex;
+    flex-direction: column;
+}
 
 /* ==================== القسم 9: أقسام الوظائف ==================== */
 .categories-scroll {
@@ -238,6 +311,7 @@ body.conversation-open {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     scroll-behavior: smooth;
+    flex-shrink: 0;
 }
 
 .categories-scroll::-webkit-scrollbar { display: none; }
@@ -246,12 +320,12 @@ body.conversation-open {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px 6px 6px;
+    padding: 5px 10px 5px 5px;
     background: var(--card-bg);
     border: 1.5px solid var(--border);
     border-radius: 25px;
     color: var(--text-light);
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
@@ -266,8 +340,8 @@ body.conversation-open {
 .category-tab.active .category-icon-wrapper { background: rgba(255,255,255,0.25) !important; color: white !important; }
 
 .category-icon-wrapper {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -276,8 +350,8 @@ body.conversation-open {
     transition: all 0.2s;
 }
 
-.category-icon-wrapper i { font-size: 0.75rem; }
-.category-name { line-height: 1; }
+.category-icon-wrapper i { font-size: 0.7rem; }
+.category-name { line-height: 1; font-size: 0.72rem; }
 
 /* ==================== القسم 10: بطاقات المنشورات ==================== */
 .posts-container {
@@ -285,6 +359,8 @@ body.conversation-open {
     flex-direction: column;
     gap: 1rem;
     padding-bottom: 30px;
+    width: 100%;
+    flex: 1;
 }
 
 .post-card {
@@ -373,13 +449,13 @@ body.conversation-open {
 .post-time { display: none !important; }
 
 .post-action-btn {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     padding: 0;
     flex-shrink: 0;
     transition: all 0.2s ease;
@@ -400,28 +476,16 @@ body.conversation-open {
     border: none !important;
 }
 
-.post-action-btn.contact-whatsapp:hover {
-    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.5) !important;
-}
-
 .post-action-btn.contact-phone {
     background: var(--phone) !important;
     color: white !important;
     border: none !important;
 }
 
-.post-action-btn.contact-phone:hover {
-    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.5) !important;
-}
-
 .post-action-btn.contact-email {
     background: var(--email) !important;
     color: white !important;
     border: none !important;
-}
-
-.post-action-btn.contact-email:hover {
-    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.5) !important;
 }
 
 .post-menu {
@@ -434,8 +498,8 @@ body.conversation-open {
     border-radius: 50%;
     transition: all 0.2s;
     font-family: inherit;
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -465,7 +529,7 @@ body.conversation-open {
     flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 10px;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-light);
 }
 
@@ -474,7 +538,7 @@ body.conversation-open {
     align-items: center;
     gap: 4px;
     background: var(--light);
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: 12px;
 }
 
@@ -483,9 +547,9 @@ body.conversation-open {
 
 .post-bio {
     background: var(--light);
-    padding: 12px 14px;
+    padding: 10px 12px;
     border-radius: 12px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     line-height: 1.7;
     color: var(--text);
     word-wrap: break-word;
@@ -522,10 +586,10 @@ body.conversation-open {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 14px 16px;
+    padding: 12px 14px;
     border: none;
     border-radius: var(--radius);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -534,7 +598,7 @@ body.conversation-open {
     font-family: inherit;
 }
 
-.publish-btn i { font-size: 1.1rem; }
+.publish-btn i { font-size: 1rem; }
 
 .publish-btn-jobs {
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -553,10 +617,34 @@ body.conversation-open {
 .publish-btn:active { transform: scale(0.98); }
 
 /* ==================== القسم 13: صفحة الدردشة ==================== */
-.search-box { display: flex; align-items: center; background: var(--light); border-radius: 25px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
+.chat-page.active {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    flex: 1;
+}
+
+.search-box { 
+    display: flex; 
+    align-items: center; 
+    background: var(--light); 
+    border-radius: 25px; 
+    padding: 0.5rem 1rem; 
+    margin-bottom: 1rem; 
+    flex-shrink: 0;
+}
+
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; font-family: inherit; }
-.chats-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* ✅ قائمة الدردشة (مُحدّثة) */
+.chats-list { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 0.5rem;
+    width: 100%;
+    flex: 1;
+}
 
 .chat-item { 
     display: flex; 
@@ -696,15 +784,21 @@ body.conversation-open {
 .remove-friend-btn:active { transform: scale(0.95); }
 
 /* ==================== القسم 14: الملف الشخصي ==================== */
+.profile-page.active {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
 .profile-header { background: var(--card-bg); border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem; }
-.profile-cover { height: 150px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
-.profile-avatar-center { width: 100px; height: 100px; z-index: 5; }
-.profile-avatar-emoji { width: 100%; height: 100%; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 5rem; border: 4px solid white; box-shadow: var(--shadow); overflow: hidden; line-height: 1; }
-.edit-profile-btn-left { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; border-radius: 50%; background: white; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; box-shadow: var(--shadow); z-index: 10; }
+.profile-cover { height: 120px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); position: relative; display: flex; align-items: center; justify-content: center; }
+.profile-avatar-center { width: 80px; height: 80px; z-index: 5; }
+.profile-avatar-emoji { width: 100%; height: 100%; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 4rem; border: 4px solid white; box-shadow: var(--shadow); overflow: hidden; line-height: 1; }
+.edit-profile-btn-left { position: absolute; top: 10px; left: 10px; width: 36px; height: 36px; border-radius: 50%; background: white; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: var(--shadow); z-index: 10; }
 .profile-info-container { padding: 1rem; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
 .profile-name-wrapper { text-align: center; width: 100%; }
 .profile-name-wrapper h2 { font-size: 1.3rem; color: var(--text); margin: 0; }
-.profile-id-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--light); padding: 0.5rem 1rem; border-radius: 25px; width: fit-content; max-width: 100%; min-width: 250px; }
+.profile-id-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--light); padding: 0.5rem 1rem; border-radius: 25px; width: 100%; max-width: 100%; min-width: auto; }
 .copy-btn-left { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1.1rem; padding: 0 5px; -webkit-tap-highlight-color: transparent; }
 .id-value-numbers { font-family: monospace; font-size: 1.1rem; font-weight: 500; color: var(--primary); direction: ltr; letter-spacing: 1px; flex: 1; text-align: center; }
 .id-label-english { color: var(--primary); font-size: 0.9rem; font-weight: 500; }
@@ -969,21 +1063,44 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== القسم 18: الحالة الفارغة ==================== */
+/* ==================== القسم 18: الحالة الفارغة (مُحدّث - في المنتصف) ==================== */
 .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 40vh;
+    min-height: calc(100vh - var(--header-height) - var(--nav-height) - 120px);
+    width: 100%;
     text-align: center;
-    padding: 2rem;
+    padding: 2rem 1rem;
     color: var(--text-light);
+    margin: 0 auto;
+    flex: 1;
 }
 
-.empty-state i { font-size: 4rem; margin-bottom: 1rem; color: var(--primary); opacity: 0.5; }
-.empty-state h3 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--text); font-weight: 600; }
-.empty-state p { font-size: 1rem; max-width: 300px; margin: 0 auto; line-height: 1.6; color: var(--text-light); }
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+    opacity: 0.5;
+    display: block;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.empty-state p {
+    font-size: 1rem;
+    max-width: 300px;
+    margin: 0 auto;
+    line-height: 1.6;
+    color: var(--text-light);
+}
 
 /* ==================== القسم 19: استعلامات الوسائط ==================== */
 @media (min-width: 768px) { .bottom-nav { display: none; } }
@@ -1040,11 +1157,11 @@ body.conversation-open .conversation-page {
 .conversation-header { 
     display: flex; 
     align-items: center; 
-    padding: 12px 16px; 
+    padding: 8px 12px; 
     background: var(--card-bg); 
     border-bottom: 1px solid var(--border); 
     box-shadow: var(--shadow); 
-    height: 70px; 
+    height: 60px; 
     flex-shrink: 0 !important;
     position: relative !important;
     z-index: 2001 !important;
@@ -1052,12 +1169,12 @@ body.conversation-open .conversation-page {
     overscroll-behavior: none !important;
 }
 
-.conversation-header .back-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 12px; }
+.conversation-header .back-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--light); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 8px; }
 .conversation-header .back-btn:hover { background: var(--primary); color: white; }
 .conversation-user-info { display: flex; align-items: center; gap: 12px; flex: 1; padding: 4px 8px; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
-.conversation-avatar-emoji { width: 45px; height: 45px; min-width: 45px; min-height: 45px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; overflow: hidden; line-height: 1; }
+.conversation-avatar-emoji { width: 40px; height: 40px; min-width: 40px; min-height: 40px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden; line-height: 1; }
 .conversation-user-details { flex: 1; }
-.conversation-user-details h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.conversation-user-details h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 2px; }
 .conversation-status { font-size: 0.75rem; color: var(--text-light); }
 
 .messages-container { 
@@ -1074,7 +1191,7 @@ body.conversation-open .conversation-page {
     backface-visibility: hidden;
 }
 
-.message { max-width: 70%; margin-bottom: 4px; animation: messagePop 0.2s ease; }
+.message { max-width: 85%; margin-bottom: 4px; animation: messagePop 0.2s ease; }
 .message.sent { align-self: flex-end; }
 .message.received { align-self: flex-start; }
 .message-content { padding: 12px 16px; border-radius: 20px; background: var(--card-bg); color: var(--text); box-shadow: var(--shadow); word-wrap: break-word; -webkit-tap-highlight-color: transparent; }
@@ -1091,7 +1208,7 @@ body.conversation-open .conversation-page {
 .message-input-container { 
     background: var(--card-bg); 
     border-top: 1px solid var(--border); 
-    padding: 8px 12px; 
+    padding: 6px 10px; 
     flex-shrink: 0 !important;
     position: relative !important;
     bottom: 0 !important;
@@ -1103,16 +1220,41 @@ body.conversation-open .conversation-page {
 .message-input-wrapper { 
     display: flex; 
     align-items: center; 
-    gap: 6px; 
+    gap: 4px; 
     background: var(--light); 
     border-radius: 25px; 
     padding: 2px 6px; 
-    border: 1px solid var(--border); 
+    border: 1px solid var(--border);
+    flex-wrap: nowrap;
 }
 
 .message-input-wrapper:focus-within { border-color: var(--primary); }
-.input-area { flex: 1; display: flex; align-items: center; gap: 4px; }
-#messageInput { flex: 1; background: transparent; border: none; padding: 8px 4px; color: var(--text); font-size: 0.95rem; outline: none; min-height: 36px; max-height: 120px; transition: color 0.2s ease; font-family: inherit; }
+.input-area { flex: 1; display: flex; align-items: flex-start; gap: 4px; min-width: 0; overflow: hidden; padding: 2px 0; }
+
+#messageInput { 
+    padding: 10px 8px; 
+    font-size: 1rem; 
+    min-height: 40px; 
+    max-height: 120px; 
+    width: 100%; 
+    resize: none; 
+    word-wrap: break-word; 
+    white-space: pre-wrap; 
+    overflow-wrap: break-word; 
+    word-break: break-word; 
+    line-height: 1.5; 
+    flex: 1; 
+    min-width: 0; 
+    background: transparent; 
+    border: none; 
+    outline: none; 
+    color: var(--text); 
+    overflow-y: auto; 
+    display: block; 
+    box-sizing: border-box; 
+    font-family: inherit;
+    transition: color 0.2s ease;
+}
 
 #messageCharCounter {
     display: none;
@@ -1138,8 +1280,8 @@ body.conversation-open .conversation-page {
 }
 
 #actionBtn { 
-    width: 38px; 
-    height: 38px; 
+    width: 36px; 
+    height: 36px; 
     border-radius: 50%; 
     border: none; 
     background: var(--primary); 
@@ -1148,7 +1290,7 @@ body.conversation-open .conversation-page {
     display: flex; 
     align-items: center; 
     justify-content: center; 
-    font-size: 1.2rem; 
+    font-size: 1.1rem; 
     flex-shrink: 0;
     transition: all 0.3s ease;
     font-family: inherit;
@@ -1156,11 +1298,6 @@ body.conversation-open .conversation-page {
 
 #actionBtn:hover { background: var(--primary-dark); }
 .conversation-header, .message-input-container { pointer-events: auto !important; }
-
-@media (max-width: 480px) {
-    .conversation-header { padding: 8px 12px; height: 60px; }
-    .message { max-width: 85%; }
-}
 
 /* ==================== القسم 22: إصلاح الإيموجي ==================== */
 .profile-avatar-emoji,
@@ -1201,17 +1338,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 .nav-item.active i { color: var(--primary) !important; }
 .app-content { padding-top: 0.5rem !important; }
 .page { padding: 0.5rem !important; }
-
-.conversation-header { height: 50px !important; padding: 4px 10px !important; }
-.conversation-header .back-btn { width: 32px !important; height: 32px !important; font-size: 0.9rem !important; }
-.conversation-header .conversation-avatar-emoji { width: 36px !important; height: 36px !important; min-width: 36px !important; min-height: 36px !important; font-size: 1.6rem !important; }
-.conversation-header .conversation-user-details h3 { font-size: 0.85rem !important; }
-
-.message-input-container { padding: 6px 10px !important; }
-.message-input-wrapper { padding: 2px 6px !important; border-radius: 25px !important; display: flex !important; align-items: center !important; flex-wrap: nowrap !important; gap: 4px !important; }
-.input-area { flex: 1 !important; display: flex !important; align-items: flex-start !important; min-width: 0 !important; overflow: hidden !important; padding: 2px 0 !important; }
-#messageInput { padding: 10px 8px !important; font-size: 1rem !important; min-height: 40px !important; max-height: 120px !important; width: 100% !important; resize: none !important; word-wrap: break-word !important; white-space: pre-wrap !important; overflow-wrap: break-word !important; word-break: break-word !important; line-height: 1.5 !important; flex: 1 !important; min-width: 0 !important; background: transparent !important; border: none !important; outline: none !important; color: var(--text) !important; overflow-y: auto !important; display: block !important; box-sizing: border-box !important; font-family: inherit !important; }
-#actionBtn { width: 36px !important; height: 36px !important; font-size: 1.1rem !important; flex-shrink: 0 !important; }
 
 /* ==================== القسم 25: قوائم الزواج المخصصة ==================== */
 #marriageMarriedSelector .publish-category-btn,
@@ -1339,9 +1465,8 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     overflow: hidden;
 }
 
-/* ==================== ✅ القسم 28: القوائم المنسدلة الموحدة (dropdown-floating) ==================== */
+/* ==================== القسم 28: القوائم المنسدلة الموحدة (dropdown-floating) ==================== */
 
-/* ✅ كلاس جديد كلياً - لا يتأثر بأي CSS قديم */
 .dropdown-floating {
     position: absolute;
     z-index: 999999;
@@ -1365,7 +1490,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* ✅ الخيارات داخل القائمة */
 .dropdown-floating .publish-category-option,
 .dropdown-floating .publish-country-option,
 .dropdown-floating .country-mini-option {
@@ -1438,11 +1562,98 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     margin: 4px 6px;
 }
 
-/* ✅ ضمان أن modal-content يحتوي القوائم */
 .modal-content {
     position: relative !important;
 }
 
 .modal-content .dropdown-floating {
     z-index: 999999 !important;
+}
+
+/* ==================== القسم 29: توحيد حاويات المحتوى ==================== */
+
+/* ✅ كل صفحة نشطة */
+.page.active {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+}
+
+/* ✅ حاوية الدردشة */
+.chat-page.active {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    flex: 1;
+}
+
+.chats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+    flex: 1;
+}
+
+/* ✅ حاوية المنشورات */
+.posts-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-bottom: 30px;
+    width: 100%;
+    flex: 1;
+}
+
+/* ✅ محتوى الرئيسية */
+.home-content {
+    display: none;
+    width: 100%;
+    flex: 1;
+    flex-direction: column;
+}
+
+.home-content.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ✅ الحالة الفارغة تتمدد لملء المساحة */
+.empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: calc(100vh - var(--header-height) - var(--nav-height) - 120px);
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-light);
+    margin: 0 auto;
+}
+
+/* ✅ صفحة الإعدادات */
+.settings-page.active {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+/* ✅ صفحة الملف الشخصي */
+.profile-page.active {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+/* ✅ ضمان أن الحاويات تملأ المساحة */
+.app-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: calc(var(--nav-height) + 30px);
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
 }
