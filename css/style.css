@@ -969,7 +969,7 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== القسم 18: الحالة الفارغة (مُحسَّن) ==================== */
+/* ==================== القسم 18: الحالة الفارغة (بدون تمرير) ==================== */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -977,11 +977,10 @@ body.conversation-open {
     justify-content: center;
     text-align: center;
     color: var(--text-light);
-    min-height: calc(100vh - 200px);
-    padding: 2rem 1rem;
-    margin: 0 auto;
     width: 100%;
-    flex: 1;
+    padding: 2rem 1rem;
+    margin: 0;
+    min-height: 0;
 }
 
 .empty-state i {
@@ -1043,21 +1042,9 @@ body.conversation-open {
         font-size: 0.85rem;
     }
     
-    .empty-state {
-        min-height: calc(100vh - 180px);
-    }
-    
-    .empty-state i {
-        font-size: 3.5rem;
-    }
-    
-    .empty-state h3 {
-        font-size: 1.3rem;
-    }
-    
-    .empty-state p {
-        font-size: 0.9rem;
-    }
+    .empty-state i { font-size: 3.5rem; }
+    .empty-state h3 { font-size: 1.3rem; }
+    .empty-state p { font-size: 0.9rem; }
 }
 
 /* ==================== القسم 20: أنماط المحادثة ==================== */
@@ -1272,7 +1259,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 }
 
 /* ==================== القسم 26: حقول الإدخال مع العداد ==================== */
-
 .field-label-row {
     display: flex;
     align-items: center;
@@ -1379,7 +1365,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     overflow: hidden;
 }
 
-/* ==================== القسم 28: القوائم المنسدلة الموحدة (dropdown-floating) ==================== */
+/* ==================== القسم 28: القوائم المنسدلة الموحدة ==================== */
 .dropdown-floating {
     position: absolute;
     z-index: 999999;
@@ -1483,48 +1469,17 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: توسيط الحالات الفارغة في كل الصفحات ==================== */
+/* ==================== القسم 29: توسيط الحالات الفارغة بدون تمرير ==================== */
 
-/* ✅ صفحة الدردشة - توسيط مثالي */
-.chat-page {
-    display: none;
-    flex-direction: column;
-    min-height: calc(100vh - 100px);
-    padding: 0.5rem !important;
+/* ✅ إزالة scrollbar العمودي من app-content إذا لا حاجة */
+body {
+    overflow-x: hidden;
 }
 
-.chat-page.active {
-    display: flex !important;
-}
-
-.chat-page .search-container {
-    flex-shrink: 0;
-}
-
-.chat-page .chats-list {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
-.chat-page .chats-list:has(.empty-state) {
-    justify-content: center;
-    align-items: center;
-}
-
-.chat-page .chats-list .empty-state {
-    margin: 0;
-    min-height: auto;
-    flex: 0 0 auto;
-    padding: 1rem;
-}
-
-/* ✅ الصفحة الرئيسية - محتوى التبويبات */
+/* ✅ الصفحة الرئيسية */
 .home-content {
     display: none;
     flex-direction: column;
-    min-height: calc(100vh - 220px);
 }
 
 .home-content.active {
@@ -1532,18 +1487,49 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 }
 
 .home-content .posts-container {
-    flex: 1;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 .home-content .posts-container:has(.empty-state) {
     justify-content: center;
     align-items: center;
+    min-height: calc(100vh - 280px);
+    padding-bottom: 0;
 }
 
 .home-content .posts-container .empty-state {
     margin: 0;
-    min-height: auto;
-    flex: 0 0 auto;
+}
+
+/* ✅ تصحيح: home-page */
+.home-page {
+    display: none;
+}
+.home-page.active {
+    display: block;
+}
+
+/* ✅ صفحة الدردشة */
+.chat-page {
+    display: none;
+}
+.chat-page.active {
+    display: block;
+}
+
+.chat-page .chats-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-page .chats-list:has(.empty-state) {
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 260px);
+}
+
+.chat-page .chats-list .empty-state {
+    margin: 0;
 }
