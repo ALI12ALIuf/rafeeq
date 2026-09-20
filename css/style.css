@@ -186,51 +186,11 @@ body.conversation-open {
     transition: transform 0.25s ease;
 }
 
-.country-header-dropdown {
-    position: fixed;
-    min-width: 200px;
-    max-width: 240px;
-    max-height: 50vh;
-    overflow-y: auto;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-    z-index: 99999;
-    padding: 6px;
-    animation: dropdownSlide 0.2s ease;
-    -webkit-overflow-scrolling: touch;
+.country-mini-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 6px;
 }
-
-@keyframes dropdownSlide {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.country-mini-option {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 0.85rem;
-    font-family: inherit;
-    cursor: pointer;
-    text-align: right;
-    transition: background 0.15s;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.country-mini-option:hover { background: var(--light); }
-.country-mini-option.active { background: rgba(100, 181, 246, 0.15); color: var(--primary); font-weight: 700; }
-.country-mini-flag { font-size: 1.2rem; line-height: 1; }
-.country-mini-name { flex: 1; text-align: right; }
-.country-mini-option i { font-size: 0.8rem; color: var(--primary); }
-.country-mini-divider { height: 1px; background: var(--border); margin: 4px 6px; }
 
 /* ==================== القسم 8: تبويبات الرئيسية ==================== */
 .home-tabs {
@@ -434,7 +394,6 @@ body.conversation-open {
 
 .post-action-btn:not(:disabled):active { transform: scale(0.95); }
 
-/* ✅ أزرار طريقة التواصل بألوان مميزة */
 .post-action-btn.contact-whatsapp {
     background: var(--whatsapp) !important;
     color: white !important;
@@ -974,51 +933,6 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-.publish-category-dropdown {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    max-height: 300px;
-    overflow-y: auto;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    z-index: 3000;
-    padding: 6px;
-    animation: dropdownSlide2 0.2s ease;
-}
-
-@keyframes dropdownSlide2 {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.publish-category-option {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 0.9rem;
-    font-family: inherit;
-    cursor: pointer;
-    text-align: right;
-    transition: background 0.15s;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.publish-category-option:hover { background: var(--light); }
-.publish-category-option.active { background: rgba(100, 181, 246, 0.15); color: var(--primary); font-weight: 700; }
-
-.publish-category-option .publish-category-name { flex: 1; }
-.publish-category-option i.fa-check { font-size: 0.8rem; color: var(--primary); }
-
 /* ==================== القسم 17: منتقي البلد الداخلي ==================== */
 .publish-country-container {
     position: relative;
@@ -1054,47 +968,6 @@ body.conversation-open {
     color: var(--primary);
     transition: transform 0.2s;
 }
-
-.publish-country-dropdown {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    max-height: 300px;
-    overflow-y: auto;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    z-index: 3000;
-    padding: 6px;
-    animation: dropdownSlide2 0.2s ease;
-}
-
-.publish-country-option {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 0.9rem;
-    font-family: inherit;
-    cursor: pointer;
-    text-align: right;
-    transition: background 0.15s;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.publish-country-option:hover { background: var(--light); }
-.publish-country-option.active { background: rgba(100, 181, 246, 0.15); color: var(--primary); font-weight: 700; }
-
-.publish-country-option .publish-country-flag { font-size: 1.2rem; }
-.publish-country-option .publish-country-name { flex: 1; }
-.publish-country-option i { font-size: 0.8rem; color: var(--primary); }
 
 /* ==================== القسم 18: الحالة الفارغة ==================== */
 .empty-state {
@@ -1340,7 +1213,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 #messageInput { padding: 10px 8px !important; font-size: 1rem !important; min-height: 40px !important; max-height: 120px !important; width: 100% !important; resize: none !important; word-wrap: break-word !important; white-space: pre-wrap !important; overflow-wrap: break-word !important; word-break: break-word !important; line-height: 1.5 !important; flex: 1 !important; min-width: 0 !important; background: transparent !important; border: none !important; outline: none !important; color: var(--text) !important; overflow-y: auto !important; display: block !important; box-sizing: border-box !important; font-family: inherit !important; }
 #actionBtn { width: 36px !important; height: 36px !important; font-size: 1.1rem !important; flex-shrink: 0 !important; }
 
-/* ==================== القسم 25: تحسين قوائم الزواج المخصصة ==================== */
+/* ==================== القسم 25: قوائم الزواج المخصصة ==================== */
 #marriageMarriedSelector .publish-category-btn,
 #marriageChildrenSelector .publish-category-btn {
     background: var(--light);
@@ -1360,7 +1233,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 
 /* ==================== القسم 26: حقول الإدخال مع العداد ==================== */
 
-/* ✅ صف العنوان + العداد (في المنتصف معاً) */
 .field-label-row {
     display: flex;
     align-items: center;
@@ -1408,7 +1280,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     font-weight: 700;
 }
 
-/* ✅ حقول الإدخال الموحدة */
 .edit-field input[type="text"],
 .edit-field textarea {
     width: 100%;
@@ -1450,8 +1321,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 }
 
 /* ==================== القسم 27: طريقة التواصل ==================== */
-
-/* ✅ قائمة طريقة التواصل */
 #jobContactSelector .publish-category-btn,
 #marriageContactSelector .publish-category-btn {
     background: var(--light);
@@ -1464,38 +1333,116 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     transform: scale(0.98);
 }
 
-/* ✅ حقل الإدخال الديناميكي */
 #jobContactValueField,
 #marriageContactValueField {
     transition: opacity 0.3s ease, max-height 0.3s ease;
     overflow: hidden;
 }
 
-/* ✅ أيقونات طريقة التواصل (للاستخدام المستقبلي) */
-.contact-icon-whatsapp { color: var(--whatsapp); }
-.contact-icon-phone { color: var(--phone); }
-.contact-icon-email { color: var(--email); }
+/* ==================== ✅ القسم 28: القوائم المنسدلة الموحدة (dropdown-floating) ==================== */
 
+/* ✅ كلاس جديد كلياً - لا يتأثر بأي CSS قديم */
+.dropdown-floating {
+    position: absolute;
+    z-index: 999999;
+    background: var(--card-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    padding: 6px;
+    max-height: 260px;
+    overflow-y: auto;
+    display: block;
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    animation: dropdownSlide 0.15s ease;
+}
 
+@keyframes dropdownSlide {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
-/* ==================== القسم 28: ضمان ظهور القوائم بشكل صحيح ==================== */
+/* ✅ الخيارات داخل القائمة */
+.dropdown-floating .publish-category-option,
+.dropdown-floating .publish-country-option,
+.dropdown-floating .country-mini-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: right;
+    transition: background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.dropdown-floating .publish-category-option:hover,
+.dropdown-floating .publish-country-option:hover,
+.dropdown-floating .country-mini-option:hover {
+    background: var(--light);
+}
+
+.dropdown-floating .publish-category-option.active,
+.dropdown-floating .publish-country-option.active,
+.dropdown-floating .country-mini-option.active {
+    background: rgba(100, 181, 246, 0.15);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.dropdown-floating .publish-category-name,
+.dropdown-floating .publish-country-name,
+.dropdown-floating .country-mini-name {
+    flex: 1;
+    text-align: right;
+    font-weight: 600;
+}
+
+.dropdown-floating .publish-category-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+}
+
+.dropdown-floating .publish-country-flag,
+.dropdown-floating .country-mini-flag {
+    font-size: 1.2rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.dropdown-floating i.fa-check {
+    font-size: 0.8rem;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.dropdown-floating .country-mini-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 6px;
+}
 
 /* ✅ ضمان أن modal-content يحتوي القوائم */
 .modal-content {
     position: relative !important;
 }
 
-/* ✅ القوائم داخل modal-content */
-.modal-content .publish-category-dropdown,
-.modal-content .publish-country-dropdown {
-    z-index: 99999;
-    pointer-events: auto;
-}
-
-/* ✅ القوائم المفتوحة دائماً فوق كل شيء */
-.publish-category-dropdown,
-.publish-country-dropdown,
-.country-header-dropdown {
-    z-index: 99999 !important;
-    pointer-events: auto !important;
+.modal-content .dropdown-floating {
+    z-index: 999999 !important;
 }
