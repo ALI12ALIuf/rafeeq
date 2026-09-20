@@ -129,6 +129,7 @@ body.conversation-open {
 
 .icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
+/* ✅ الحاوية الرئيسية للمحتوى */
 .app-content { 
     flex: 1; 
     overflow-y: auto; 
@@ -141,19 +142,20 @@ body.conversation-open {
     min-height: 0;
 }
 
+/* ✅ الصفحات: مخفية افتراضياً */
 .page { 
     display: none; 
     padding: 0.5rem;
     width: 100%;
 }
 
+/* ✅ الصفحة النشطة: flex column يملأ المساحة */
 .page.active { 
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
     width: 100%;
-    position: relative;
 }
 
 /* ==================== القسم 6: شريط التنقل السفلي ==================== */
@@ -291,10 +293,9 @@ body.conversation-open {
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    position: relative;
 }
 
-/* ✅ المحتوى الرئيسي (تبويب الوظائف أو الزواج) */
+/* ✅ المحتوى الرئيسي داخل الرئيسية (تبويب الوظائف أو الزواج) */
 .home-content { 
     display: none;
     flex-direction: column;
@@ -666,6 +667,7 @@ body.conversation-open {
 .search-box i { color: var(--text-light); margin-left: 0.5rem; }
 .search-box input { flex: 1; background: none; border: none; color: var(--text); font-size: 0.9rem; font-family: inherit; }
 
+/* ✅ قائمة المحادثات: flex column */
 .chats-list { 
     display: flex; 
     flex-direction: column; 
@@ -1092,25 +1094,29 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== ✅ القسم 18: الحالة الفارغة (مُصلَّح 100%) ==================== */
+/* ==================== ✅ القسم 18: الحالة الفارغة - في منتصف المساحة المتبقية ==================== */
 
 .empty-state {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    /* إلغاء التمركز المطلق لضمان عدم التداخل */
+    position: static; 
+    transform: none;
+    
+    /* استخدام Flexbox لملء المساحة المتبقية تحت التبويبات */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    flex: 1; /* يمتص المساحة المتبقية ويضع المحتوى في منتصفها */
+    
     text-align: center;
-    padding: 1rem;
+    padding: 2rem 1rem;
     color: var(--text-light);
-    width: 90%;
-    max-width: 320px;
+    width: 100%;
     pointer-events: none;
+    min-height: 200px; /* لضمان عدم انكماشها بشكل مبالغ فيه */
 }
 
+/* ✅ السماح بالتفاعل مع الأزرار داخل الحالة الفارغة */
 .empty-state > * {
     pointer-events: auto;
 }
