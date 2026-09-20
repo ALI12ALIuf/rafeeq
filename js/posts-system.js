@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية (إصلاح القوائم بالكامل) ==========
+// ========== posts-system.js - النسخة النهائية (إصلاح كامل للقوائم) ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -12,7 +12,6 @@ const PostsSystem = {
     _isInitialized: false,
     _isLoadingPosts: false,
     
-    _countryCloseHandler: null,
     _activeDropdown: null,
     _activeDropdownHandler: null,
     
@@ -41,10 +40,7 @@ const PostsSystem = {
     
     // ==================== init ====================
     init() {
-        if (this._isInitialized) {
-            console.log('⏭️ PostsSystem مُهيّأ بالفعل - تخطي');
-            return;
-        }
+        if (this._isInitialized) return;
         this._isInitialized = true;
         
         console.log('🚀 تهيئة نظام المنشورات...');
@@ -87,35 +83,41 @@ const PostsSystem = {
             this._activeDropdownHandler = null;
         }
         
-        // ✅ إغلاق كل القوائم المعروفة أيضاً (احتياط)
+        // ✅ احتياط: إغلاق كل القوائم المعروفة
         const allIds = [
             'jobCategoryDropdown', 'jobCountryDropdown', 'marriageCountryDropdown',
             'marriageMarriedDropdown', 'marriageChildrenDropdown',
-            'jobContactDropdown', 'marriageContactDropdown'
+            'jobContactDropdown', 'marriageContactDropdown',
+            'countryHeaderDropdown'
         ];
         allIds.forEach(id => {
             const el = document.getElementById(id);
-            if (el) try { el.remove(); } catch (e) {}
+            if (el) {
+                try { el.remove(); } catch (e) {}
+            }
         });
     },
     
-    // ==================== ✅ دالة فتح قائمة عامة ====================
+    // ==================== ✅ فتح القائمة المنسدلة (الحل النهائي) ====================
     openDropdown({ id, html, anchorBtn, onClose = null }) {
-        // ✅ إغلاق كل القوائم أولاً
         this.closeAllDropdowns();
+        if (!anchorBtn) return null;
         
-        if (!anchorBtn) return;
+        // ✅ العثور على modal-content الأب
+        const modalContent = anchorBtn.closest('.modal-content');
+        const isInModal = !!modalContent;
         
         const rect = anchorBtn.getBoundingClientRect();
         const viewportH = window.innerHeight;
         const viewportW = window.innerWidth;
         const dropdownMaxHeight = 260;
         const margin = 8;
+        const offset = 6;
         
+        // ✅ إنشاء القائمة
         const dropdown = document.createElement('div');
         dropdown.className = 'publish-category-dropdown';
         dropdown.id = id;
-        dropdown.style.position = 'fixed';
         dropdown.style.zIndex = '99999';
         dropdown.style.background = 'var(--card-bg)';
         dropdown.style.border = '1px solid var(--border)';
@@ -125,31 +127,73 @@ const PostsSystem = {
         dropdown.style.maxHeight = dropdownMaxHeight + 'px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.width = rect.width + 'px';
-        
-        // ✅ تحديد موقع أفقي (left) بحيث لا يتجاوز الشاشة
-        let left = rect.left;
-        if (left + rect.width > viewportW - margin) {
-            left = viewportW - rect.width - margin;
-        }
-        if (left < margin) left = margin;
-        dropdown.style.left = left + 'px';
-        
-        // ✅ تحديد موقع رأسي: إذا المساحة تحت الزر قليلة → افتح فوقه
-        const spaceBelow = viewportH - rect.bottom;
-        const spaceAbove = rect.top;
-        
-        if (spaceBelow < dropdownMaxHeight + margin && spaceAbove > spaceBelow) {
-            // افتح فوق الزر
-            dropdown.style.top = 'auto';
-            dropdown.style.bottom = (viewportH - rect.top + 6) + 'px';
-        } else {
-            // افتح تحت الزر
-            dropdown.style.top = (rect.bottom + 6) + 'px';
-            dropdown.style.bottom = 'auto';
-        }
-        
         dropdown.innerHTML = html;
-        document.body.appendChild(dropdown);
+        
+        if (isInModal) {
+            // ✅ داخل modal → absolute نسبة لـ modal-content
+            dropdown.style.position = 'absolute';
+            
+            const modalRect = modalContent.getBoundingClientRect();
+            const scrollTop = modalContent.scrollTop;
+            const scrollLeft = modalContent.scrollLeft;
+            
+            // ✅ الموقع الأفقي نسبة لـ modal-content
+            let leftInModal = rect.left - modalRect.left + scrollLeft;
+            
+            // ✅ التحقق من الحدود
+            const modalVisibleWidth = modalContent.clientWidth;
+            if (leftInModal + rect.width > modalVisibleWidth - margin) {
+                leftInModal = modalVisibleWidth - rect.width - margin;
+            }
+            if (leftInModal < margin) leftInModal = margin;
+            
+            dropdown.style.left = leftInModal + 'px';
+            
+            // ✅ الموقع الرأسي
+            const topInModal = rect.bottom - modalRect.top + scrollTop + offset;
+            const spaceBelow = viewportH - rect.bottom;
+            
+            if (spaceBelow < dropdownMaxHeight + offset && rect.top > spaceBelow) {
+                // افتح فوق
+                const bottomInModal = modalRect.bottom - rect.top - scrollTop + offset;
+                dropdown.style.top = 'auto';
+                dropdown.style.bottom = bottomInModal + 'px';
+            } else {
+                dropdown.style.top = topInModal + 'px';
+                dropdown.style.bottom = 'auto';
+            }
+            
+            // ✅ ضمان position: relative في modal-content
+            if (getComputedStyle(modalContent).position === 'static') {
+                modalContent.style.position = 'relative';
+            }
+            
+            modalContent.appendChild(dropdown);
+            
+        } else {
+            // ✅ خارج modal (قائمة البلد في الهيدر) → fixed
+            dropdown.style.position = 'fixed';
+            
+            let left = rect.left;
+            if (left + rect.width > viewportW - margin) {
+                left = viewportW - rect.width - margin;
+            }
+            if (left < margin) left = margin;
+            dropdown.style.left = left + 'px';
+            
+            const spaceBelow = viewportH - rect.bottom;
+            const spaceAbove = rect.top;
+            
+            if (spaceBelow < dropdownMaxHeight + offset && spaceAbove > spaceBelow) {
+                dropdown.style.top = 'auto';
+                dropdown.style.bottom = (viewportH - rect.top + offset) + 'px';
+            } else {
+                dropdown.style.top = (rect.bottom + offset) + 'px';
+                dropdown.style.bottom = 'auto';
+            }
+            
+            document.body.appendChild(dropdown);
+        }
         
         this._activeDropdown = dropdown;
         
@@ -207,19 +251,14 @@ const PostsSystem = {
                 if (type === 'number') {
                     value = value.replace(/[^0-9]/g, '');
                 }
-                
-                if (value.length > max) {
-                    value = value.substring(0, max);
-                }
+                if (value.length > max) value = value.substring(0, max);
                 
                 if (type === 'textarea') {
                     value = value.replace(/ {3,}/g, ' ');
                     value = value.replace(/\n{3,}/g, '\n\n');
                 }
                 
-                if (e.target.value !== value) {
-                    e.target.value = value;
-                }
+                if (e.target.value !== value) e.target.value = value;
                 
                 const len = value.length;
                 counter.textContent = `${len}/${max}`;
@@ -243,15 +282,11 @@ const PostsSystem = {
                     const pasted = (e.clipboardData || window.clipboardData).getData('text');
                     let value = input.value + pasted;
                     
-                    if (type === 'number') {
-                        value = value.replace(/[^0-9]/g, '');
-                    }
-                    
+                    if (type === 'number') value = value.replace(/[^0-9]/g, '');
                     if (type === 'textarea') {
                         value = value.replace(/ {3,}/g, ' ');
                         value = value.replace(/\n{3,}/g, '\n\n');
                     }
-                    
                     value = value.substring(0, max);
                     input.value = value;
                     input.dispatchEvent(new Event('input'));
@@ -297,7 +332,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== ✅ قائمة طريقة التواصل ====================
+    // ==================== قائمة طريقة التواصل ====================
     renderContactMethodDropdown(type) {
         const isJob = type === 'job';
         const containerId = isJob ? 'jobContactSelector' : 'marriageContactSelector';
@@ -339,7 +374,6 @@ const PostsSystem = {
         
         const dropdownId = type === 'job' ? 'jobContactDropdown' : 'marriageContactDropdown';
         
-        // ✅ إذا كانت نفس القائمة مفتوحة → أغلقها
         const existing = document.getElementById(dropdownId);
         if (existing) {
             this.closeAllDropdowns();
@@ -388,7 +422,7 @@ const PostsSystem = {
         this.renderContactMethodDropdown(type);
     },
     
-    // ==================== ✅ حقل الإدخال الديناميكي ====================
+    // ==================== حقل الإدخال الديناميكي ====================
     renderContactValueField(type, method) {
         const isJob = type === 'job';
         const fieldId = isJob ? 'jobContactValueField' : 'marriageContactValueField';
@@ -413,21 +447,9 @@ const PostsSystem = {
         field.style.display = 'flex';
         
         const config = {
-            whatsapp: {
-                label: 'رابط واتساب',
-                placeholder: 'https://wa.me/9647701234567',
-                max: 200
-            },
-            phone: {
-                label: 'رقم الهاتف',
-                placeholder: '07701234567',
-                max: 15
-            },
-            email: {
-                label: 'البريد الإلكتروني',
-                placeholder: 'example@gmail.com',
-                max: 100
-            }
+            whatsapp: { label: 'رابط واتساب', placeholder: 'https://wa.me/9647701234567', max: 200 },
+            phone: { label: 'رقم الهاتف', placeholder: '07701234567', max: 15 },
+            email: { label: 'البريد الإلكتروني', placeholder: 'example@gmail.com', max: 100 }
         };
         
         const cfg = config[method];
@@ -456,19 +478,15 @@ const PostsSystem = {
         input.addEventListener('input', handler);
     },
     
-    // ==================== ✅ التحقق من قيمة التواصل ====================
+    // ==================== التحقق من قيمة التواصل ====================
     validateContactValue(method, value) {
         if (!method || method === 'none') return { valid: true };
         
         const v = (value || '').trim();
-        if (!v) {
-            return { valid: false, error: 'يرجى إدخال قيمة طريقة التواصل' };
-        }
+        if (!v) return { valid: false, error: 'يرجى إدخال قيمة طريقة التواصل' };
         
         if (method === 'whatsapp') {
-            if (!/^https?:\/\//i.test(v)) {
-                return { valid: false, error: 'رابط واتساب يجب أن يبدأ بـ http:// أو https://' };
-            }
+            if (!/^https?:\/\//i.test(v)) return { valid: false, error: 'رابط واتساب يجب أن يبدأ بـ http:// أو https://' };
             if (!/wa\.me|api\.whatsapp\.com|web\.whatsapp\.com|whatsapp/i.test(v)) {
                 return { valid: false, error: 'رابط واتساب غير صحيح. مثال: https://wa.me/9647701234567' };
             }
@@ -477,16 +495,12 @@ const PostsSystem = {
         
         if (method === 'phone') {
             const digits = v.replace(/[^0-9]/g, '');
-            if (digits.length < 7 || digits.length > 15) {
-                return { valid: false, error: 'رقم الهاتف يجب أن يحتوي على 7-15 رقم' };
-            }
+            if (digits.length < 7 || digits.length > 15) return { valid: false, error: 'رقم الهاتف يجب أن يحتوي على 7-15 رقم' };
             return { valid: true };
         }
         
         if (method === 'email') {
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
-                return { valid: false, error: 'البريد الإلكتروني غير صحيح' };
-            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return { valid: false, error: 'البريد الإلكتروني غير صحيح' };
             return { valid: true };
         }
         
@@ -499,21 +513,13 @@ const PostsSystem = {
         if (!uid) return;
         
         const now = Date.now();
-        if (!force && (now - this._relationshipCache.lastUpdate) < 300000) {
-            return;
-        }
+        if (!force && (now - this._relationshipCache.lastUpdate) < 300000) return;
         
         try {
             const [userDoc, sentSnap, receivedSnap] = await Promise.all([
                 window.db.collection('users').doc(uid).get(),
-                window.db.collection('friendRequests')
-                    .where('from', '==', uid)
-                    .where('status', '==', 'pending')
-                    .get(),
-                window.db.collection('friendRequests')
-                    .where('to', '==', uid)
-                    .where('status', '==', 'pending')
-                    .get()
+                window.db.collection('friendRequests').where('from', '==', uid).where('status', '==', 'pending').get(),
+                window.db.collection('friendRequests').where('to', '==', uid).where('status', '==', 'pending').get()
             ]);
             
             if (userDoc.exists) {
@@ -642,9 +648,7 @@ const PostsSystem = {
         if (contactMethod === 'whatsapp' && post.contactValue) {
             newBtn.onclick = () => {
                 let url = post.contactValue.trim();
-                if (!/^https?:\/\//i.test(url)) {
-                    url = 'https://' + url;
-                }
+                if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
                 window.open(url, '_blank', 'noopener,noreferrer');
             };
             return;
@@ -697,10 +701,7 @@ const PostsSystem = {
         
         try {
             const exist = await window.db.collection('friendRequests')
-                .where('from', '==', uid)
-                .where('to', '==', targetUserId)
-                .where('status', '==', 'pending')
-                .get();
+                .where('from', '==', uid).where('to', '==', targetUserId).where('status', '==', 'pending').get();
             
             if (!exist.empty) { alert('أرسلت طلباً مسبقاً'); return; }
             
@@ -711,9 +712,7 @@ const PostsSystem = {
             }
             
             await window.db.collection('friendRequests').add({
-                from: uid,
-                to: targetUserId,
-                status: 'pending',
+                from: uid, to: targetUserId, status: 'pending',
                 timestamp: new Date(),
                 expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
             });
@@ -731,7 +730,7 @@ const PostsSystem = {
             
             alert('✅ تم إرسال طلب الصداقة');
         } catch (e) {
-            console.error('خطأ في إرسال طلب الصداقة:', e);
+            console.error('خطأ:', e);
             alert('حدث خطأ في إرسال الطلب');
         }
     },
@@ -816,8 +815,6 @@ const PostsSystem = {
         const arrow = btn.querySelector('.country-header-arrow');
         if (arrow) arrow.style.transform = 'rotate(180deg)';
         
-        // مراقبة الإغلاق لتدوير السهم
-        const self = this;
         const observer = setInterval(() => {
             const dd = document.getElementById('countryHeaderDropdown');
             if (!dd) {
@@ -900,7 +897,7 @@ const PostsSystem = {
         return cat ? cat.color : '#64B5F6';
     },
     
-    // ==================== ✅ منتقي القسم (للنشر) ====================
+    // ==================== منتقي القسم ====================
     renderPublishCategoryDropdown() {
         const container = document.getElementById('jobCategorySelector');
         const input = document.getElementById('jobCategory');
@@ -963,7 +960,7 @@ const PostsSystem = {
         this.renderPublishCategoryDropdown();
     },
     
-    // ==================== ✅ منتقي البلد (للنشر) ====================
+    // ==================== منتقي البلد ====================
     renderPublishCountryDropdown(publishType) {
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const containerId = `${prefix}CountrySelector`;
@@ -1028,7 +1025,7 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
-    // ==================== ✅ قوائم الزواج ====================
+    // ==================== قوائم الزواج ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -1133,7 +1130,7 @@ const PostsSystem = {
         this.renderMarriageDropdown(field, value);
     },
     
-    // ==================== التبديل بين التبويبات ====================
+    // ==================== التبديل ====================
     switchTab(tab) {
         this.currentTab = tab;
         this.closeAllDropdowns();
@@ -1154,14 +1151,8 @@ const PostsSystem = {
     },
     
     async loadAllPosts() {
-        await Promise.all([
-            this.loadJobsPosts(),
-            this.loadMarriagePosts()
-        ]);
-        
-        this.loadRelationshipCache().then(() => {
-            this.refreshActionButtons();
-        }).catch(() => {});
+        await Promise.all([this.loadJobsPosts(), this.loadMarriagePosts()]);
+        this.loadRelationshipCache().then(() => this.refreshActionButtons()).catch(() => {});
     },
     
     refreshActionButtons() {
@@ -1507,17 +1498,13 @@ const PostsSystem = {
         this._jobsUnsubscribe = window.db.collection('posts')
             .where('type', '==', 'job')
             .onSnapshot(snapshot => {
-                if (snapshot.docChanges().length > 0) {
-                    this.loadJobsPosts();
-                }
+                if (snapshot.docChanges().length > 0) this.loadJobsPosts();
             }, error => console.warn('⚠️', error.message));
         
         this._marriageUnsubscribe = window.db.collection('posts')
             .where('type', '==', 'marriage')
             .onSnapshot(snapshot => {
-                if (snapshot.docChanges().length > 0) {
-                    this.loadMarriagePosts();
-                }
+                if (snapshot.docChanges().length > 0) this.loadMarriagePosts();
             }, error => console.warn('⚠️', error.message));
     },
     
@@ -1545,12 +1532,7 @@ const PostsSystem = {
                     canvas.toBlob((blob) => {
                         if (!blob) { reject(new Error('فشل ضغط الصورة')); return; }
                         const reader2 = new FileReader();
-                        reader2.onload = () => {
-                            const compressedKB = Math.round(reader2.result.length / 1024);
-                            const originalKB = Math.round(file.size / 1024);
-                            console.log(`📸 قص مربع + ضغط: ${originalKB} KB → ${compressedKB} KB`);
-                            resolve(reader2.result);
-                        };
+                        reader2.onload = () => resolve(reader2.result);
                         reader2.readAsDataURL(blob);
                     }, 'image/jpeg', this.IMAGE_QUALITY);
                 };
@@ -1705,10 +1687,7 @@ window.publishJob = async function() {
     }
     
     const validation = PostsSystem.validateContactValue(contactMethod, contactValue);
-    if (!validation.valid) {
-        alert(validation.error);
-        return;
-    }
+    if (!validation.valid) { alert(validation.error); return; }
     
     try {
         let imageBase64 = null;
@@ -1761,10 +1740,7 @@ window.publishMarriage = async function() {
     }
     
     const validation = PostsSystem.validateContactValue(contactMethod, contactValue);
-    if (!validation.valid) {
-        alert(validation.error);
-        return;
-    }
+    if (!validation.valid) { alert(validation.error); return; }
     
     try {
         let imageBase64 = null;
