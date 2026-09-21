@@ -1466,25 +1466,34 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: توسيط الحالات الفارغة (ثابتة تماماً) ==================== */
+/* ==================== القسم 29: الحالات الفارغة (ثابتة بدون تمرير) ==================== */
 
 body {
     overflow-x: hidden;
 }
 
-/* ✅ كل صفحة = موضع نسبي */
-.home-page,
-.chat-page {
+/* ✅ عند وجود empty-state → منع التمرير نهائياً */
+.app-content:has(.empty-state) {
+    overflow-y: hidden !important;
+    padding-bottom: 0 !important;
+}
+
+/* ✅ إخفاء scrollbar من app-content */
+.app-content::-webkit-scrollbar {
+    width: 0;
     display: none;
-    position: relative;
 }
 
-.home-page.active,
-.chat-page.active {
-    display: block;
+/* ✅ حاوية المنشورات/الدردشة بدون أي ارتفاع زائد */
+.posts-container:has(.empty-state),
+.chats-list:has(.empty-state) {
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    gap: 0 !important;
 }
 
-/* ✅ الحالة الفارغة = موضع مطلق، ثابت في المنتصف */
+/* ✅ الحالة الفارغة = ثابتة في منتصف المساحة المتاحة */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -1492,7 +1501,7 @@ body {
     justify-content: center;
     text-align: center;
     color: var(--text-light);
-    padding: 0 1rem;
+    padding: 1rem;
     margin: 0;
     position: absolute;
     top: 50%;
@@ -1500,8 +1509,6 @@ body {
     transform: translate(-50%, -50%);
     width: calc(100% - 2rem);
     max-width: 400px;
-    min-height: 0;
-    z-index: 10;
     pointer-events: none;
 }
 
@@ -1511,16 +1518,13 @@ body {
     pointer-events: auto;
 }
 
-/* ✅ حاوية المنشورات والدردشة تكون نسبية */
+/* ✅ الحاوية الأب = موضع نسبي */
+.home-page,
+.chat-page {
+    position: relative;
+}
+
 .posts-container,
 .chats-list {
     position: relative;
-    min-height: calc(100vh - 200px);
-}
-
-/* ✅ إخفاء العناصر الفارغة في شبكة المنشورات */
-.posts-container:has(.empty-state)::before {
-    content: '';
-    display: block;
-    min-height: calc(100vh - 250px);
 }
