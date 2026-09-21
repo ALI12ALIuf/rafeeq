@@ -1466,34 +1466,25 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: الحالات الفارغة (ثابتة بدون تمرير) ==================== */
+/* ==================== القسم 29: الحالة الفارغة ثابتة تماماً ==================== */
 
 body {
     overflow-x: hidden;
 }
 
-/* ✅ عند وجود empty-state → منع التمرير نهائياً */
-.app-content:has(.empty-state) {
-    overflow-y: hidden !important;
-    padding-bottom: 0 !important;
-}
-
-/* ✅ إخفاء scrollbar من app-content */
-.app-content::-webkit-scrollbar {
-    width: 0;
+/* ✅ الصفحات */
+.home-page,
+.chat-page {
     display: none;
+    position: relative;
 }
 
-/* ✅ حاوية المنشورات/الدردشة بدون أي ارتفاع زائد */
-.posts-container:has(.empty-state),
-.chats-list:has(.empty-state) {
-    padding: 0 !important;
-    margin: 0 !important;
-    min-height: auto !important;
-    gap: 0 !important;
+.home-page.active,
+.chat-page.active {
+    display: block;
 }
 
-/* ✅ الحالة الفارغة = ثابتة في منتصف المساحة المتاحة */
+/* ✅ الحالة الفارغة = مثبّتة في منتصف الشاشة تماماً */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -1501,14 +1492,20 @@ body {
     justify-content: center;
     text-align: center;
     color: var(--text-light);
-    padding: 1rem;
+    padding: 0 1rem;
     margin: 0;
-    position: absolute;
-    top: 50%;
+    
+    /* ✅ fixed = ثابت في الشاشة لا يتحرك */
+    position: fixed;
+    /* منتصف الشاشة (مع مراعاة الهيدر + الناف) */
+    top: calc(50% - 25px);
     left: 50%;
     transform: translate(-50%, -50%);
+    
     width: calc(100% - 2rem);
     max-width: 400px;
+    min-height: 0;
+    z-index: 5;
     pointer-events: none;
 }
 
@@ -1518,13 +1515,53 @@ body {
     pointer-events: auto;
 }
 
-/* ✅ الحاوية الأب = موضع نسبي */
-.home-page,
-.chat-page {
-    position: relative;
-}
-
+/* ✅ حاوية المنشورات والدردشة — لا min-height زائد */
 .posts-container,
 .chats-list {
     position: relative;
+}
+
+/* ✅ منع التمرير عند ظهور الحالة الفارغة */
+.posts-container:has(.empty-state),
+.chats-list:has(.empty-state) {
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* ✅ إزالة أي min-height من صفحات */
+.home-content,
+.home-content.active {
+    min-height: 0;
+}
+
+/* ✅ تأكيد على التمركز العمودي الدقيق */
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+    opacity: 0.5;
+    line-height: 1;
+    display: block;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.empty-state p {
+    font-size: 1rem;
+    max-width: 300px;
+    margin: 0 auto;
+    line-height: 1.6;
+    color: var(--text-light);
+}
+
+@media (max-width: 480px) {
+    .empty-state i { font-size: 3.5rem; }
+    .empty-state h3 { font-size: 1.3rem; }
+    .empty-state p { font-size: 0.9rem; }
 }
