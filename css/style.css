@@ -1477,32 +1477,35 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: توسيط الحالات الفارغة (flex-based) ==================== */
+/* ==================== القسم 29: توسيط الحالات الفارغة في منتصف الشاشة الفعلي ==================== */
 
-/* ✅ الصفحة الرئيسية كـ flex column */
+/* ✅ الصفحة الرئيسية */
 .home-page {
     display: none;
     flex: 1;
     flex-direction: column;
     padding: 0.5rem !important;
     min-height: 0;
+    position: relative;
 }
 
 .home-page.active {
     display: flex !important;
 }
 
-/* ✅ home-tabs ثابت */
-.home-tabs {
+/* ✅ home-tabs و categories ثابتة */
+.home-tabs,
+.categories-scroll {
     flex-shrink: 0;
 }
 
-/* ✅ home-content يأخذ الباقي */
+/* ✅ home-content flex column */
 .home-content {
     display: none;
     flex: 1;
     flex-direction: column;
     min-height: 0;
+    position: relative;
 }
 
 .home-content.active {
@@ -1515,18 +1518,21 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
-/* ✅ عند وجود empty-state → توسيط في الباقي */
-.home-content .posts-container:has(.empty-state) {
-    justify-content: center;
-    align-items: center;
-    padding-bottom: 60px;
-}
-
+/* ✅ عند وجود empty-state → توسيط مطلق في منتصف الشاشة */
 .home-content .posts-container .empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     margin: 0;
     padding: 1rem;
+    width: 100%;
+    max-width: 400px;
+    /* ✅ تعويض ارتفاع القوائم العلوية */
+    margin-top: -50px;
 }
 
 /* ✅ ===== صفحة الدردشة ===== */
@@ -1536,6 +1542,7 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-direction: column;
     padding: 0.5rem !important;
     min-height: 0;
+    position: relative;
 }
 
 .chat-page.active {
@@ -1551,15 +1558,17 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-direction: column;
     flex: 1;
     min-height: 0;
-}
-
-.chat-page .chats-list:has(.empty-state) {
-    justify-content: center;
-    align-items: center;
-    padding-bottom: 60px;
+    position: relative;
 }
 
 .chat-page .chats-list .empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     margin: 0;
     padding: 1rem;
+    width: 100%;
+    max-width: 400px;
+    margin-top: -30px;
 }
