@@ -124,6 +124,7 @@ body.conversation-open {
     overflow-y: auto; 
     padding-bottom: calc(var(--nav-height) + 30px); 
     -webkit-overflow-scrolling: touch; 
+    position: relative;
 }
 .page { display: none; padding: 1rem; }
 .page.active { display: block; }
@@ -969,7 +970,7 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== القسم 18: الحالة الفارغة (بدون تمرير) ==================== */
+/* ==================== القسم 18: الحالة الفارغة ==================== */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -977,10 +978,6 @@ body.conversation-open {
     justify-content: center;
     text-align: center;
     color: var(--text-light);
-    width: 100%;
-    padding: 2rem 1rem;
-    margin: 0;
-    min-height: 0;
 }
 
 .empty-state i {
@@ -1469,81 +1466,61 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: توسيط الحالات الفارغة (ثابتة بمنتصف الشاشة) ==================== */
+/* ==================== القسم 29: توسيط الحالات الفارغة (ثابتة تماماً) ==================== */
 
-/* ✅ إزالة scrollbar الأفقي */
 body {
     overflow-x: hidden;
 }
 
-/* ✅ ارتفاع الهيدر والشريط السفلي (نفس القيم بالقسم 24) - تتحكم بمنتصف الحالة الفارغة */
-:root {
-    --empty-top: 50px;
-    --empty-bottom: 50px;
-}
-
-/* ✅ الصفحة الرئيسية */
-.home-content {
-    display: none;
-    flex-direction: column;
-}
-
-.home-content.active {
-    display: flex;
-}
-
-.home-content .posts-container {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
-/* ✅ تصحيح: home-page */
-.home-page {
-    display: none;
-}
-.home-page.active {
-    display: block;
-}
-
-/* ✅ صفحة الدردشة */
+/* ✅ كل صفحة = موضع نسبي */
+.home-page,
 .chat-page {
     display: none;
+    position: relative;
 }
+
+.home-page.active,
 .chat-page.active {
     display: block;
 }
 
-.chat-page .chats-list {
-    display: flex;
-    flex-direction: column;
-}
-
-/* ✅ الحاوية إذا فيها حالة فارغة: ما تاخذ ارتفاع ولا تسبب تمرير */
-.home-content .posts-container:has(.empty-state),
-.chat-page .chats-list:has(.empty-state) {
-    min-height: 0;
-    padding: 0;
-    gap: 0;
-}
-
-/* ✅ الحالة الفارغة تنثبت بمنتصف المساحة بين الهيدر والشريط السفلي
-      بغض النظر عن التبويبات (وظائف/زواج) أو التصنيفات أو مربع البحث */
-.home-content .posts-container .empty-state,
-.chat-page .chats-list .empty-state {
-    position: fixed;
-    top: var(--empty-top);
-    bottom: var(--empty-bottom);
-    left: 0;
-    right: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0 1rem;
+/* ✅ الحالة الفارغة = موضع مطلق، ثابت في المنتصف */
+.empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    z-index: 1;
+    color: var(--text-light);
+    padding: 0 1rem;
+    margin: 0;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100% - 2rem);
+    max-width: 400px;
+    min-height: 0;
+    z-index: 10;
     pointer-events: none;
+}
+
+.empty-state i,
+.empty-state h3,
+.empty-state p {
+    pointer-events: auto;
+}
+
+/* ✅ حاوية المنشورات والدردشة تكون نسبية */
+.posts-container,
+.chats-list {
+    position: relative;
+    min-height: calc(100vh - 200px);
+}
+
+/* ✅ إخفاء العناصر الفارغة في شبكة المنشورات */
+.posts-container:has(.empty-state)::before {
+    content: '';
+    display: block;
+    min-height: calc(100vh - 250px);
 }
