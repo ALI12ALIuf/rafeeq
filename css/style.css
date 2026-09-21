@@ -120,12 +120,17 @@ body.conversation-open {
 
 .icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
+/* ✅ app-content كـ flex column */
 .app-content { 
     flex: 1; 
+    display: flex;
+    flex-direction: column;
     overflow-y: auto; 
     padding-bottom: calc(var(--nav-height) + 30px); 
     -webkit-overflow-scrolling: touch; 
+    min-height: 0;
 }
+
 .page { display: none; padding: 1rem; }
 .page.active { display: block; }
 
@@ -202,6 +207,7 @@ body.conversation-open {
     padding: 6px;
     border-radius: 50px;
     box-shadow: var(--shadow);
+    flex-shrink: 0;
 }
 
 .home-tab {
@@ -239,6 +245,7 @@ body.conversation-open {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     scroll-behavior: smooth;
+    flex-shrink: 0;
 }
 
 .categories-scroll::-webkit-scrollbar { display: none; }
@@ -1470,79 +1477,89 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: توسيط الحالات الفارغة ==================== */
+/* ==================== القسم 29: توسيط الحالات الفارغة (flex-based) ==================== */
 
-/* ✅ إزالة scrollbar العمودي */
-body {
-    overflow-x: hidden;
-}
-
-/* ✅ تصحيح الصفحة الرئيسية */
+/* ✅ الصفحة الرئيسية كـ flex column */
 .home-page {
     display: none;
-}
-.home-page.active {
-    display: block;
+    flex: 1;
+    flex-direction: column;
     padding: 0.5rem !important;
+    min-height: 0;
 }
 
+.home-page.active {
+    display: flex !important;
+}
+
+/* ✅ home-tabs ثابت */
+.home-tabs {
+    flex-shrink: 0;
+}
+
+/* ✅ home-content يأخذ الباقي */
 .home-content {
     display: none;
+    flex: 1;
     flex-direction: column;
+    min-height: 0;
 }
 
 .home-content.active {
     display: flex;
 }
 
+/* ✅ posts-container يملأ المساحة */
 .home-content .posts-container {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-height: 0;
 }
 
-/* ✅ توسيط عند عدم وجود منشورات - حساب دقيق */
+/* ✅ عند وجود empty-state → توسيط في الباقي */
 .home-content .posts-container:has(.empty-state) {
     justify-content: center;
     align-items: center;
-    min-height: calc(100vh - 320px);
-    padding-bottom: 0;
+    padding-bottom: 60px;
 }
 
 .home-content .posts-container .empty-state {
     margin: 0;
+    padding: 1rem;
 }
 
-/* ✅ تبويب الوظائف (فيه أقسام) */
-#jobsContent .posts-container:has(.empty-state) {
-    min-height: calc(100vh - 360px);
-}
-
-/* ✅ تبويب الزواج (بدون أقسام) */
-#marriageContent .posts-container:has(.empty-state) {
-    min-height: calc(100vh - 300px);
-}
-
-/* ✅ صفحة الدردشة - كما هي */
+/* ✅ ===== صفحة الدردشة ===== */
 .chat-page {
     display: none;
-}
-.chat-page.active {
-    display: block;
+    flex: 1;
+    flex-direction: column;
     padding: 0.5rem !important;
+    min-height: 0;
+}
+
+.chat-page.active {
+    display: flex !important;
+}
+
+.chat-page .search-container {
+    flex-shrink: 0;
 }
 
 .chat-page .chats-list {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .chat-page .chats-list:has(.empty-state) {
     justify-content: center;
     align-items: center;
-    min-height: calc(100vh - 260px);
+    padding-bottom: 60px;
 }
 
 .chat-page .chats-list .empty-state {
     margin: 0;
+    padding: 1rem;
 }
