@@ -1477,18 +1477,16 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: توسيط الحالات الفارغة في منتصف الشاشة الفعلي ==================== */
+/* ==================== القسم 29: توسيط الحالات الفارغة (نفس بنية الدردشة) ==================== */
 
 /* ✅ الصفحة الرئيسية */
 .home-page {
     display: none;
     flex: 1;
     flex-direction: column;
-    padding: 0.5rem !important;
     min-height: 0;
-    position: relative;
+    padding: 0.5rem !important;
 }
-
 .home-page.active {
     display: flex !important;
 }
@@ -1499,52 +1497,44 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-shrink: 0;
 }
 
-/* ✅ home-content flex column */
+/* ✅ home-content بنفس بنية chat-page */
 .home-content {
     display: none;
     flex: 1;
     flex-direction: column;
     min-height: 0;
-    position: relative;
 }
-
 .home-content.active {
     display: flex;
 }
 
-/* ✅ posts-container يملأ المساحة */
+/* ✅ posts-container بنفس بنية chats-list */
 .home-content .posts-container {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    position: relative;
 }
 
-/* ✅ عند وجود empty-state → توسيط مطلق في منتصف الشاشة */
+/* ✅ عند وجود empty-state → توسيط مثل الدردشة */
+.home-content .posts-container:has(.empty-state) {
+    justify-content: center;
+    align-items: center;
+}
+
 .home-content .posts-container .empty-state {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     margin: 0;
     padding: 1rem;
-    width: 100%;
-    max-width: 400px;
-    /* ✅ تعويض ارتفاع القوائم العلوية */
-    margin-top: -50px;
 }
 
-/* ✅ ===== صفحة الدردشة ===== */
+/* ✅ ===== الدردشة (كما هي) ===== */
 .chat-page {
     display: none;
     flex: 1;
     flex-direction: column;
-    padding: 0.5rem !important;
     min-height: 0;
-    position: relative;
+    padding: 0.5rem !important;
 }
-
 .chat-page.active {
     display: flex !important;
 }
@@ -1558,17 +1548,14 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    position: relative;
+}
+
+.chat-page .chats-list:has(.empty-state) {
+    justify-content: center;
+    align-items: center;
 }
 
 .chat-page .chats-list .empty-state {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     margin: 0;
     padding: 1rem;
-    width: 100%;
-    max-width: 400px;
-    margin-top: -30px;
 }
