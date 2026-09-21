@@ -54,6 +54,7 @@ body {
     transition: background-color 0.3s, color 0.3s;
     height: 100vh;
     overflow: hidden;
+    overflow-x: hidden;
 }
 
 body.conversation-open {
@@ -969,7 +970,7 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== القسم 18: الحالة الفارغة (بدون تمرير) ==================== */
+/* ==================== القسم 18: الحالة الفارغة ==================== */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -1469,14 +1470,22 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: توسيط الحالات الفارغة بدون تمرير ==================== */
+/* ==================== القسم 29: توسيط الحالات الفارغة ==================== */
 
-/* ✅ إزالة scrollbar العمودي من app-content إذا لا حاجة */
+/* ✅ إزالة scrollbar العمودي */
 body {
     overflow-x: hidden;
 }
 
-/* ✅ الصفحة الرئيسية */
+/* ✅ تصحيح الصفحة الرئيسية */
+.home-page {
+    display: none;
+}
+.home-page.active {
+    display: block;
+    padding: 0.5rem !important;
+}
+
 .home-content {
     display: none;
     flex-direction: column;
@@ -1492,10 +1501,11 @@ body {
     min-height: 0;
 }
 
+/* ✅ توسيط عند عدم وجود منشورات - حساب دقيق */
 .home-content .posts-container:has(.empty-state) {
     justify-content: center;
     align-items: center;
-    min-height: calc(100vh - 280px);
+    min-height: calc(100vh - 320px);
     padding-bottom: 0;
 }
 
@@ -1503,20 +1513,23 @@ body {
     margin: 0;
 }
 
-/* ✅ تصحيح: home-page */
-.home-page {
-    display: none;
-}
-.home-page.active {
-    display: block;
+/* ✅ تبويب الوظائف (فيه أقسام) */
+#jobsContent .posts-container:has(.empty-state) {
+    min-height: calc(100vh - 360px);
 }
 
-/* ✅ صفحة الدردشة */
+/* ✅ تبويب الزواج (بدون أقسام) */
+#marriageContent .posts-container:has(.empty-state) {
+    min-height: calc(100vh - 300px);
+}
+
+/* ✅ صفحة الدردشة - كما هي */
 .chat-page {
     display: none;
 }
 .chat-page.active {
     display: block;
+    padding: 0.5rem !important;
 }
 
 .chat-page .chats-list {
