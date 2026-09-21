@@ -54,7 +54,6 @@ body {
     transition: background-color 0.3s, color 0.3s;
     height: 100vh;
     overflow: hidden;
-    overflow-x: hidden;
 }
 
 body.conversation-open {
@@ -120,17 +119,12 @@ body.conversation-open {
 
 .icon-btn { width: 40px; height: 40px; border: none; background: none; border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-/* ✅ app-content كـ flex column */
 .app-content { 
     flex: 1; 
-    display: flex;
-    flex-direction: column;
     overflow-y: auto; 
     padding-bottom: calc(var(--nav-height) + 30px); 
     -webkit-overflow-scrolling: touch; 
-    min-height: 0;
 }
-
 .page { display: none; padding: 1rem; }
 .page.active { display: block; }
 
@@ -207,7 +201,6 @@ body.conversation-open {
     padding: 6px;
     border-radius: 50px;
     box-shadow: var(--shadow);
-    flex-shrink: 0;
 }
 
 .home-tab {
@@ -245,7 +238,6 @@ body.conversation-open {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     scroll-behavior: smooth;
-    flex-shrink: 0;
 }
 
 .categories-scroll::-webkit-scrollbar { display: none; }
@@ -977,7 +969,7 @@ body.conversation-open {
     transition: transform 0.2s;
 }
 
-/* ==================== القسم 18: الحالة الفارغة ==================== */
+/* ==================== القسم 18: الحالة الفارغة (بدون تمرير) ==================== */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -1477,85 +1469,81 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     z-index: 999999 !important;
 }
 
-/* ==================== القسم 29: توسيط الحالات الفارغة (نفس بنية الدردشة) ==================== */
+/* ==================== القسم 29: توسيط الحالات الفارغة (ثابتة بمنتصف الشاشة) ==================== */
+
+/* ✅ إزالة scrollbar الأفقي */
+body {
+    overflow-x: hidden;
+}
+
+/* ✅ ارتفاع الهيدر والشريط السفلي (نفس القيم بالقسم 24) - تتحكم بمنتصف الحالة الفارغة */
+:root {
+    --empty-top: 50px;
+    --empty-bottom: 50px;
+}
 
 /* ✅ الصفحة الرئيسية */
-.home-page {
-    display: none;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-    padding: 0.5rem !important;
-}
-.home-page.active {
-    display: flex !important;
-}
-
-/* ✅ home-tabs و categories ثابتة */
-.home-tabs,
-.categories-scroll {
-    flex-shrink: 0;
-}
-
-/* ✅ home-content بنفس بنية chat-page */
 .home-content {
     display: none;
-    flex: 1;
     flex-direction: column;
-    min-height: 0;
 }
+
 .home-content.active {
     display: flex;
 }
 
-/* ✅ posts-container بنفس بنية chats-list */
 .home-content .posts-container {
     display: flex;
     flex-direction: column;
-    flex: 1;
     min-height: 0;
 }
 
-/* ✅ عند وجود empty-state → توسيط مثل الدردشة */
-.home-content .posts-container:has(.empty-state) {
-    justify-content: center;
-    align-items: center;
+/* ✅ تصحيح: home-page */
+.home-page {
+    display: none;
+}
+.home-page.active {
+    display: block;
 }
 
-.home-content .posts-container .empty-state {
-    margin: 0;
-    padding: 1rem;
-}
-
-/* ✅ ===== الدردشة (كما هي) ===== */
+/* ✅ صفحة الدردشة */
 .chat-page {
     display: none;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-    padding: 0.5rem !important;
 }
 .chat-page.active {
-    display: flex !important;
-}
-
-.chat-page .search-container {
-    flex-shrink: 0;
+    display: block;
 }
 
 .chat-page .chats-list {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 0;
 }
 
+/* ✅ الحاوية إذا فيها حالة فارغة: ما تاخذ ارتفاع ولا تسبب تمرير */
+.home-content .posts-container:has(.empty-state),
 .chat-page .chats-list:has(.empty-state) {
-    justify-content: center;
-    align-items: center;
+    min-height: 0;
+    padding: 0;
+    gap: 0;
 }
 
+/* ✅ الحالة الفارغة تنثبت بمنتصف المساحة بين الهيدر والشريط السفلي
+      بغض النظر عن التبويبات (وظائف/زواج) أو التصنيفات أو مربع البحث */
+.home-content .posts-container .empty-state,
 .chat-page .chats-list .empty-state {
+    position: fixed;
+    top: var(--empty-top);
+    bottom: var(--empty-bottom);
+    left: 0;
+    right: 0;
+    width: 100%;
     margin: 0;
-    padding: 1rem;
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    z-index: 1;
+    pointer-events: none;
 }
