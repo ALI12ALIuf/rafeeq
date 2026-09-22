@@ -1292,13 +1292,13 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 }
 
 .field-counter-label.warning {
-    color: #FFC107;
+    color: #FFC107 !important;
     opacity: 1;
     font-weight: 700;
 }
 
 .field-counter-label.full {
-    color: #f44336;
+    color: #FF9800 !important;
     opacity: 1;
     font-weight: 700;
 }
@@ -1333,14 +1333,6 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     outline: none;
     border-color: var(--primary);
     background: var(--card-bg);
-}
-
-.edit-field input.limit-reached {
-    border-color: #FFC107;
-}
-
-.edit-field textarea.limit-reached {
-    border-color: #FFC107;
 }
 
 /* ==================== القسم 27: طريقة التواصل ==================== */
@@ -1495,9 +1487,7 @@ body {
     padding: 0 1rem;
     margin: 0;
     
-    /* ✅ fixed = ثابت في الشاشة لا يتحرك */
     position: fixed;
-    /* منتصف الشاشة (مع مراعاة الهيدر + الناف) */
     top: calc(50% - 25px);
     left: 50%;
     transform: translate(-50%, -50%);
@@ -1515,26 +1505,22 @@ body {
     pointer-events: auto;
 }
 
-/* ✅ حاوية المنشورات والدردشة — لا min-height زائد */
 .posts-container,
 .chats-list {
     position: relative;
 }
 
-/* ✅ منع التمرير عند ظهور الحالة الفارغة */
 .posts-container:has(.empty-state),
 .chats-list:has(.empty-state) {
     overflow: hidden;
     min-height: 0;
 }
 
-/* ✅ إزالة أي min-height من صفحات */
 .home-content,
 .home-content.active {
     min-height: 0;
 }
 
-/* ✅ تأكيد على التمركز العمودي الدقيق */
 .empty-state i {
     font-size: 4rem;
     margin-bottom: 1rem;
@@ -1564,4 +1550,33 @@ body {
     .empty-state i { font-size: 3.5rem; }
     .empty-state h3 { font-size: 1.3rem; }
     .empty-state p { font-size: 0.9rem; }
+}
+
+/* ==================== القسم 30: الإطارات الملونة للحقول ==================== */
+
+/* ✅ حقل قبل الحد بـ 3 → إطار أصفر */
+.edit-field input.warning-reached,
+.edit-field textarea.warning-reached {
+    border-color: #FFC107 !important;
+    border-width: 2px !important;
+    background: rgba(255, 193, 7, 0.05) !important;
+    transition: all 0.3s ease;
+}
+
+/* ✅ حقل عند الحد → إطار ذهبي/برتقالي */
+.edit-field input.limit-reached,
+.edit-field textarea.limit-reached {
+    border-color: #FF9800 !important;
+    border-width: 2px !important;
+    background: rgba(255, 152, 0, 0.08) !important;
+    transition: all 0.3s ease;
+}
+
+/* ✅ توافق مع الحقول القديمة */
+.edit-field input.char-warning {
+    border-color: #FFC107 !important;
+}
+
+.edit-field input.char-full {
+    border-color: #FF9800 !important;
 }
