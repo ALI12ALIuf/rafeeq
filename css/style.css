@@ -1292,13 +1292,13 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
 }
 
 .field-counter-label.warning {
-    color: #FFC107 !important;
+    color: #FFC107;
     opacity: 1;
     font-weight: 700;
 }
 
 .field-counter-label.full {
-    color: #FF9800 !important;
+    color: #f44336;
     opacity: 1;
     font-weight: 700;
 }
@@ -1335,6 +1335,14 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     background: var(--card-bg);
 }
 
+.edit-field input.limit-reached {
+    border-color: #FFC107;
+}
+
+.edit-field textarea.limit-reached {
+    border-color: #FFC107;
+}
+
 /* ==================== القسم 27: طريقة التواصل ==================== */
 #jobContactSelector .publish-category-btn,
 #marriageContactSelector .publish-category-btn {
@@ -1348,10 +1356,99 @@ body:not(.conversation-open) .conversation-page { display: none !important; }
     transform: scale(0.98);
 }
 
+/* ✅ حقول طريقة التواصل بنفس تصميم الاسم */
 #jobContactValueField,
 #marriageContactValueField {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    text-align: center;
     transition: opacity 0.3s ease, max-height 0.3s ease;
     overflow: hidden;
+}
+
+#jobContactValueField .field-label-row,
+#marriageContactValueField .field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto 6px auto;
+    padding: 0;
+    gap: 6px;
+}
+
+#jobContactValueField .field-label-row label,
+#marriageContactValueField .field-label-row label {
+    margin: 0 !important;
+    padding: 0;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    flex: 0 0 auto;
+    width: auto !important;
+}
+
+#jobContactValueField .field-counter-label,
+#marriageContactValueField .field-counter-label {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-weight: 500;
+    direction: ltr;
+    opacity: 0.7;
+    font-family: monospace;
+    line-height: 1;
+    flex: 0 0 auto;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+#jobContactValueField .field-counter-label.warning,
+#marriageContactValueField .field-counter-label.warning {
+    color: #FFC107;
+    opacity: 1;
+    font-weight: 700;
+}
+
+#jobContactValueField .field-counter-label.full,
+#marriageContactValueField .field-counter-label.full {
+    color: #f44336;
+    opacity: 1;
+    font-weight: 700;
+}
+
+#jobContactValue,
+#marriageContactValue {
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+    display: block;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--light);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: inherit;
+    text-align: center;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+#jobContactValue:focus,
+#marriageContactValue:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--card-bg);
+}
+
+#jobContactValue.limit-reached,
+#marriageContactValue.limit-reached {
+    border-color: #FFC107;
 }
 
 /* ==================== القسم 28: القوائم المنسدلة الموحدة ==================== */
@@ -1464,7 +1561,6 @@ body {
     overflow-x: hidden;
 }
 
-/* ✅ الصفحات */
 .home-page,
 .chat-page {
     display: none;
@@ -1476,7 +1572,6 @@ body {
     display: block;
 }
 
-/* ✅ الحالة الفارغة = مثبّتة في منتصف الشاشة تماماً */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -1486,12 +1581,10 @@ body {
     color: var(--text-light);
     padding: 0 1rem;
     margin: 0;
-    
     position: fixed;
     top: calc(50% - 25px);
     left: 50%;
     transform: translate(-50%, -50%);
-    
     width: calc(100% - 2rem);
     max-width: 400px;
     min-height: 0;
@@ -1550,33 +1643,4 @@ body {
     .empty-state i { font-size: 3.5rem; }
     .empty-state h3 { font-size: 1.3rem; }
     .empty-state p { font-size: 0.9rem; }
-}
-
-/* ==================== القسم 30: الإطارات الملونة للحقول ==================== */
-
-/* ✅ حقل قبل الحد بـ 3 → إطار أصفر */
-.edit-field input.warning-reached,
-.edit-field textarea.warning-reached {
-    border-color: #FFC107 !important;
-    border-width: 2px !important;
-    background: rgba(255, 193, 7, 0.05) !important;
-    transition: all 0.3s ease;
-}
-
-/* ✅ حقل عند الحد → إطار ذهبي/برتقالي */
-.edit-field input.limit-reached,
-.edit-field textarea.limit-reached {
-    border-color: #FF9800 !important;
-    border-width: 2px !important;
-    background: rgba(255, 152, 0, 0.08) !important;
-    transition: all 0.3s ease;
-}
-
-/* ✅ توافق مع الحقول القديمة */
-.edit-field input.char-warning {
-    border-color: #FFC107 !important;
-}
-
-.edit-field input.char-full {
-    border-color: #FF9800 !important;
 }
