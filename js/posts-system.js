@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية (القوائم دائماً كاملة) ==========
+// ========== posts-system.js - النسخة النهائية ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -88,7 +88,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== ✅ فتح القائمة (دائماً كاملة + تمرير تلقائي) ====================
+    // ==================== فتح القائمة (تفتح دائماً للأسفل) ====================
     openDropdown({ id, html, anchorBtn, onClose = null }) {
         this.closeAllDropdowns();
         if (!anchorBtn) return null;
@@ -101,7 +101,6 @@ const PostsSystem = {
         const margin = 8;
         const offset = 6;
         
-        // ✅ ارتفاع ثابت دائماً — بدون تصغير
         const dropdownMaxHeight = 260;
         
         const dropdown = document.createElement('div');
@@ -141,7 +140,6 @@ const PostsSystem = {
             
             dropdown.style.left = leftInModal + 'px';
             
-            // ✅ دائماً تحت الزر (بالحجم الكامل)
             const topInModal = rect.bottom - modalRect.top + scrollTop + offset;
             dropdown.style.top = topInModal + 'px';
             dropdown.style.bottom = 'auto';
@@ -152,7 +150,6 @@ const PostsSystem = {
             
             modalContent.appendChild(dropdown);
             
-            // ✅ تمرير modal-content تلقائياً إذا كانت القائمة تتجاوز أسفله
             setTimeout(() => {
                 const ddRect = dropdown.getBoundingClientRect();
                 const modalRect2 = modalContent.getBoundingClientRect();
@@ -173,14 +170,11 @@ const PostsSystem = {
             if (left < margin) left = margin;
             
             dropdown.style.left = left + 'px';
-            
-            // ✅ دائماً تحت الزر (بالحجم الكامل)
             dropdown.style.top = (rect.bottom + offset) + 'px';
             dropdown.style.bottom = 'auto';
             
             document.body.appendChild(dropdown);
             
-            // ✅ تمرير الصفحة تلقائياً إذا كانت القائمة تتجاوز أسفل الشاشة
             setTimeout(() => {
                 const ddRect = dropdown.getBoundingClientRect();
                 const viewportH = window.innerHeight;
@@ -265,13 +259,17 @@ const PostsSystem = {
                 const len = value.length;
                 counter.textContent = `${len}/${max}`;
                 counter.classList.remove('warning', 'full');
-                input.classList.remove('limit-reached');
+                input.classList.remove('limit-reached', 'warning-reached');
                 
+                // ✅ عند الحد
                 if (len >= max) {
                     counter.classList.add('full');
                     input.classList.add('limit-reached');
-                } else if (len >= max - Math.ceil(max * 0.1)) {
+                }
+                // ✅ قبل الحد بـ 3 → تحذير أصفر
+                else if (len >= max - 3) {
                     counter.classList.add('warning');
+                    input.classList.add('warning-reached');
                 }
             };
             
@@ -330,7 +328,7 @@ const PostsSystem = {
             input.value = '';
             counter.textContent = `0/${max}`;
             counter.classList.remove('warning', 'full');
-            input.classList.remove('limit-reached');
+            input.classList.remove('limit-reached', 'warning-reached');
         });
     },
     
@@ -424,7 +422,7 @@ const PostsSystem = {
         this.renderContactMethodDropdown(type);
     },
     
-    // ==================== حقل الإدخال الديناميكي ====================
+    // ==================== ✅ حقل الإدخال الديناميكي ====================
     renderContactValueField(type, method) {
         const isJob = type === 'job';
         const fieldId = isJob ? 'jobContactValueField' : 'marriageContactValueField';
@@ -439,45 +437,146 @@ const PostsSystem = {
         
         if (!field || !label || !input) return;
         
+        // ❌ إخفاء إذا "لا شيء"
         if (method === 'none' || !method) {
             field.style.display = 'none';
             input.value = '';
-            if (counter) counter.textContent = '0/200';
+            input.type = 'text';
+            input.classList.remove('limit-reached', 'warning-reached');
+            if (counter) {
+                counter.textContent = '0/200';
+                counter.classList.remove('warning', 'full');
+            }
             return;
         }
         
         field.style.display = 'flex';
         
+        // ✅ الإعدادات لكل طريقة تواصل
         const config = {
-            whatsapp: { label: 'رابط واتساب', placeholder: 'https://wa.me/9647701234567', max: 200 },
-            phone: { label: 'رقم الهاتف', placeholder: '07701234567', max: 15 },
-            email: { label: 'البريد الإلكتروني', placeholder: 'example@gmail.com', max: 100 }
+            whatsapp: {
+                label: 'رابط واتساب',
+                placeholder: 'https://wa.me/9647701234567',
+                max: 50,
+                type: 'text',
+                inputMode: 'url'
+            },
+            phone: {
+                label: 'رقم الهاتف',
+                placeholder: '07701234567',
+                max: 15,
+                type: 'tel',
+                inputMode: 'numeric'
+            },
+            email: {
+                label: 'البريد الإلكتروني',
+                placeholder: 'example@gmail.com',
+                max: 30,
+                type: 'email',
+                inputMode: 'email'
+            }
         };
         
         const cfg = config[method];
         if (!cfg) return;
         
+        // ✅ تطبيق الإعدادات
         label.textContent = cfg.label;
         input.placeholder = cfg.placeholder;
         input.setAttribute('maxlength', cfg.max);
-        input.value = '';
-        if (counter) counter.textContent = `0/${cfg.max}`;
+        input.type = cfg.type;
+        input.setAttribute('inputmode', cfg.inputMode);
         
-        if (input._contactCounterHandler) {
-            input.removeEventListener('input', input._contactCounterHandler);
+        input.value = '';
+        input.classList.remove('limit-reached', 'warning-reached');
+        
+        if (counter) {
+            counter.textContent = `0/${cfg.max}`;
+            counter.classList.remove('warning', 'full');
         }
         
+        // ✅ إزالة المستمعين القدامى
+        if (input._contactInputHandler) {
+            input.removeEventListener('input', input._contactInputHandler);
+        }
+        if (input._contactPasteHandler) {
+            input.removeEventListener('paste', input._contactPasteHandler);
+        }
+        if (input._contactKeypressHandler) {
+            input.removeEventListener('keypress', input._contactKeypressHandler);
+        }
+        
+        // ✅ معالج الإدخال
         const handler = (e) => {
             let value = e.target.value;
+            
+            // ✅ للهاتف: أرقام فقط
+            if (method === 'phone') {
+                value = value.replace(/[^0-9]/g, '');
+            }
+            
+            // ✅ منع تجاوز الحد
             if (value.length > cfg.max) {
                 value = value.substring(0, cfg.max);
+            }
+            
+            if (e.target.value !== value) {
                 e.target.value = value;
             }
-            if (counter) counter.textContent = `${value.length}/${cfg.max}`;
+            
+            const len = value.length;
+            if (counter) {
+                counter.textContent = `${len}/${cfg.max}`;
+                counter.classList.remove('warning', 'full');
+            }
+            
+            input.classList.remove('limit-reached', 'warning-reached');
+            
+            // ✅ عند الحد → ذهبي/برتقالي
+            if (len >= cfg.max) {
+                if (counter) counter.classList.add('full');
+                input.classList.add('limit-reached');
+            }
+            // ✅ قبل الحد بـ 3 → أصفر
+            else if (len >= cfg.max - 3) {
+                if (counter) counter.classList.add('warning');
+                input.classList.add('warning-reached');
+            }
         };
         
-        input._contactCounterHandler = handler;
+        input._contactInputHandler = handler;
         input.addEventListener('input', handler);
+        
+        // ✅ منع اللصق الزائد
+        const pasteHandler = (e) => {
+            e.preventDefault();
+            const pasted = (e.clipboardData || window.clipboardData).getData('text');
+            let value = input.value + pasted;
+            
+            if (method === 'phone') {
+                value = value.replace(/[^0-9]/g, '');
+            }
+            
+            value = value.substring(0, cfg.max);
+            input.value = value;
+            input.dispatchEvent(new Event('input'));
+        };
+        
+        input._contactPasteHandler = pasteHandler;
+        input.addEventListener('paste', pasteHandler);
+        
+        // ✅ منع الكتابة عند الوصول للحد
+        const keypressHandler = (e) => {
+            if (e.target.value.length >= cfg.max && e.key.length === 1) {
+                e.preventDefault();
+            }
+        };
+        
+        input._contactKeypressHandler = keypressHandler;
+        input.addEventListener('keypress', keypressHandler);
+        
+        // ✅ تهيئة العداد
+        handler({ target: input });
     },
     
     // ==================== التحقق من قيمة التواصل ====================
@@ -1832,4 +1931,4 @@ window.addEventListener('friendsUpdated', () => {
     PostsSystem.loadAllPosts();
 });
 
-console.log('✅ posts-system.js تم تحميله - القوائم دائماً كاملة');
+console.log('✅ posts-system.js تم تحميله - النسخة النهائية');
