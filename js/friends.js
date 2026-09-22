@@ -1,95 +1,7 @@
-// ========== friends.js - النسخة النهائية (بدون تكرار) ==========
+// ========== friends.js - النسخة النظيفة (بدون كود ميت) ==========
 // نظام الصداقة - مع مزامنة فورية بدون تكرار
 
-// ==================== القسم 1: عرض قائمة الأصدقاء ====================
-window.showFriendsList = function() { 
-    document.querySelector('.profile-page').style.display = 'none'; 
-    document.getElementById('friendsPage').style.display = 'block'; 
-    loadFriendsList(); 
-};
-
-// ==================== القسم 2: تحميل قائمة الأصدقاء ====================
-let friendsLoaded = false;
-
-async function loadFriendsList(force = false) {
-    if (!window.auth?.currentUser) return;
-    const list = document.getElementById('friendsList'); 
-    if (!list) return;
-    
-    if (friendsLoaded && !force) {
-        return;
-    }
-    
-    const template = document.getElementById('friendItemTemplate');
-    if (!template) {
-        console.warn('⚠️ قالب friendItemTemplate غير موجود');
-        return;
-    }
-    
-    try {
-        const doc = await window.db.collection('users').doc(window.auth.currentUser.uid).get();
-        if (!doc.exists) return;
-        const friends = doc.data().friends || [];
-        
-        list.innerHTML = '';
-        
-        if (!friends.length) { 
-            list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا يوجد أصدقاء</h3><p>لم تضف أي أصدقاء بعد</p></div>`; 
-            friendsLoaded = true;
-            return; 
-        }
-        
-        const addedIds = new Set();
-        for (const fid of friends) {
-            if (addedIds.has(fid)) continue;
-            addedIds.add(fid);
-            
-            try {
-                const f = await window.db.collection('users').doc(fid).get();
-                if (f.exists) { 
-                    const d = f.data();
-                    
-                    const clone = template.content.cloneNode(true);
-                    const userItem = clone.querySelector('.user-item');
-                    
-                    const avatar = userItem.querySelector('.user-avatar-emoji');
-                    const name = userItem.querySelector('.user-info h4');
-                    const idText = userItem.querySelector('.user-info p');
-                    const chatBtn = userItem.querySelector('.chat-btn');
-                    const removeBtn = userItem.querySelector('.remove-btn');
-                    
-                    if (avatar) avatar.textContent = getEmojiForUser(d);
-                    if (name) name.textContent = d.name || 'مستخدم';
-                    if (idText) idText.textContent = d.shareableId || '';
-                    
-                    if (chatBtn) chatBtn.onclick = () => openChat(fid);
-                    if (removeBtn) removeBtn.onclick = () => removeFriend(fid);
-                    
-                    list.appendChild(clone);
-                }
-            } catch (e) {
-                console.warn('خطأ في تحميل صديق:', e);
-            }
-        }
-        
-        friendsLoaded = true;
-        
-        if (list.children.length === 0) {
-            list.innerHTML = `<div class="empty-state"><i class="fas fa-user-friends"></i><h3>لا يوجد أصدقاء</h3><p>لم تضف أي أصدقاء بعد</p></div>`;
-        }
-        
-    } catch (e) { 
-        console.error('خطأ في loadFriendsList:', e);
-        friendsLoaded = true;
-    }
-}
-
-function refreshFriends() {
-    friendsLoaded = false;
-    loadFriendsList(true);
-}
-
-// ==================== القسم 3: إضافة صديق جديد ====================
+// ==================== القسم 1: إضافة صديق جديد ====================
 window.addNewFriend = async function(targetUserId) {
     if (!window.auth?.currentUser) return;
     const uid = window.auth.currentUser.uid;
@@ -136,7 +48,7 @@ window.addNewFriend = async function(targetUserId) {
     }
 };
 
-// ==================== القسم 4: قبول طلب الصداقة ====================
+// ==================== القسم 2: قبول طلب الصداقة ====================
 window.acceptFriendRequest = async function(requestId, senderId) {
     if (!window.auth?.currentUser) return;
     try {
@@ -166,8 +78,6 @@ window.acceptFriendRequest = async function(requestId, senderId) {
             _currentChatsElements.requests.delete(requestId);
         }
         
-        // ✅ 5. onSnapshot سيتعامل مع إضافة الصديق (بفضل القفل، لن يحدث تكرار)
-        
         console.log('✅ تم قبول طلب الصداقة بنجاح');
         
     } catch (e) { 
@@ -176,7 +86,7 @@ window.acceptFriendRequest = async function(requestId, senderId) {
     }
 };
 
-// ==================== القسم 5: رفض طلب الصداقة ====================
+// ==================== القسم 3: رفض طلب الصداقة ====================
 window.rejectFriendRequest = async function(requestId) {
     if (!window.auth?.currentUser) return;
     try { 
@@ -196,7 +106,7 @@ window.rejectFriendRequest = async function(requestId) {
     }
 };
 
-// ==================== القسم 6: مستمع طلبات الصداقة ====================
+// ==================== القسم 4: مستمع طلبات الصداقة ====================
 let friendRequestsUnsubscribe = null;
 
 function setupFriendRequestsListener(userId) {
@@ -234,7 +144,7 @@ function setupFriendRequestsListener(userId) {
     }
 }
 
-// ==================== القسم 7: مستمع الأصدقاء ====================
+// ==================== القسم 5: مستمع الأصدقاء ====================
 let friendsUnsubscribe = null;
 
 function setupFriendsListener(userId) {
@@ -266,11 +176,6 @@ function setupFriendsListener(userId) {
                 await smartUpdateChatsList(friends, chatTemplate, requestTemplate, list);
             }
             
-            friendsLoaded = false;
-            if (document.getElementById('friendsPage')?.style.display === 'block') {
-                loadFriendsList(true);
-            }
-            
         }, error => {
             console.warn('خطأ في مستمع الأصدقاء:', error);
         });
@@ -279,7 +184,7 @@ function setupFriendsListener(userId) {
     }
 }
 
-// ==================== القسم 8: تحميل طلبات الصداقة ====================
+// ==================== القسم 6: تحميل طلبات الصداقة ====================
 async function loadFriendRequestsForChat() {
     if (!window.auth?.currentUser) return [];
     try {
@@ -303,7 +208,7 @@ async function loadFriendRequestsForChat() {
     }
 }
 
-// ==================== القسم 9: البحث عن مستخدم ====================
+// ==================== القسم 7: البحث عن مستخدم ====================
 window.findUserById = async function() {
     const inp = document.getElementById('searchInput');
     const rc = document.getElementById('searchResultsContainer');
@@ -483,7 +388,7 @@ window.findUserById = async function() {
     }
 };
 
-// ==================== القسم 10: إخفاء نتائج البحث ====================
+// ==================== القسم 8: إخفاء نتائج البحث ====================
 window.hideSearchResults = function() { 
     const rc = document.getElementById('searchResultsContainer'); 
     const inp = document.getElementById('searchInput');
@@ -494,7 +399,7 @@ window.hideSearchResults = function() {
     if (inp) { inp.value = ''; }
 };
 
-// ==================== القسم 11: تصدير الدوال ====================
+// ==================== القسم 9: تصدير الدوال ====================
 window.loadFriendRequestsForChat = loadFriendRequestsForChat;
 window.setupFriendRequestsListener = setupFriendRequestsListener;
 window.setupFriendsListener = setupFriendsListener;
