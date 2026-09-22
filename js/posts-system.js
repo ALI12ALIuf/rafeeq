@@ -88,7 +88,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== فتح القائمة (تفتح دائماً للأسفل) ====================
+    // ==================== فتح القائمة (دائماً كاملة + تمرير تلقائي) ====================
     openDropdown({ id, html, anchorBtn, onClose = null }) {
         this.closeAllDropdowns();
         if (!anchorBtn) return null;
@@ -259,17 +259,13 @@ const PostsSystem = {
                 const len = value.length;
                 counter.textContent = `${len}/${max}`;
                 counter.classList.remove('warning', 'full');
-                input.classList.remove('limit-reached', 'warning-reached');
+                input.classList.remove('limit-reached');
                 
-                // ✅ عند الحد
                 if (len >= max) {
                     counter.classList.add('full');
                     input.classList.add('limit-reached');
-                }
-                // ✅ قبل الحد بـ 3 → تحذير أصفر
-                else if (len >= max - 3) {
+                } else if (len >= max - Math.ceil(max * 0.1)) {
                     counter.classList.add('warning');
-                    input.classList.add('warning-reached');
                 }
             };
             
@@ -328,7 +324,7 @@ const PostsSystem = {
             input.value = '';
             counter.textContent = `0/${max}`;
             counter.classList.remove('warning', 'full');
-            input.classList.remove('limit-reached', 'warning-reached');
+            input.classList.remove('limit-reached');
         });
     },
     
@@ -422,7 +418,7 @@ const PostsSystem = {
         this.renderContactMethodDropdown(type);
     },
     
-    // ==================== ✅ حقل الإدخال الديناميكي ====================
+    // ==================== حقل الإدخال الديناميكي ====================
     renderContactValueField(type, method) {
         const isJob = type === 'job';
         const fieldId = isJob ? 'jobContactValueField' : 'marriageContactValueField';
@@ -437,67 +433,44 @@ const PostsSystem = {
         
         if (!field || !label || !input) return;
         
-        // ❌ إخفاء إذا "لا شيء"
         if (method === 'none' || !method) {
             field.style.display = 'none';
             input.value = '';
-            input.type = 'text';
-            input.classList.remove('limit-reached', 'warning-reached');
-            if (counter) {
-                counter.textContent = '0/200';
-                counter.classList.remove('warning', 'full');
-            }
+            if (counter) counter.textContent = '0/0';
             return;
         }
         
         field.style.display = 'flex';
         
-        // ✅ الإعدادات لكل طريقة تواصل
         const config = {
             whatsapp: {
                 label: 'رابط واتساب',
-                placeholder: 'https://wa.me/9647701234567',
-                max: 50,
-                type: 'text',
-                inputMode: 'url'
+                placeholder: '',
+                max: 50
             },
             phone: {
                 label: 'رقم الهاتف',
-                placeholder: '07701234567',
-                max: 15,
-                type: 'tel',
-                inputMode: 'numeric'
+                placeholder: '',
+                max: 15
             },
             email: {
                 label: 'البريد الإلكتروني',
-                placeholder: 'example@gmail.com',
-                max: 30,
-                type: 'email',
-                inputMode: 'email'
+                placeholder: '',
+                max: 30
             }
         };
         
         const cfg = config[method];
         if (!cfg) return;
         
-        // ✅ تطبيق الإعدادات
         label.textContent = cfg.label;
         input.placeholder = cfg.placeholder;
         input.setAttribute('maxlength', cfg.max);
-        input.type = cfg.type;
-        input.setAttribute('inputmode', cfg.inputMode);
-        
         input.value = '';
-        input.classList.remove('limit-reached', 'warning-reached');
+        if (counter) counter.textContent = `0/${cfg.max}`;
         
-        if (counter) {
-            counter.textContent = `0/${cfg.max}`;
-            counter.classList.remove('warning', 'full');
-        }
-        
-        // ✅ إزالة المستمعين القدامى
-        if (input._contactInputHandler) {
-            input.removeEventListener('input', input._contactInputHandler);
+        if (input._contactCounterHandler) {
+            input.removeEventListener('input', input._contactCounterHandler);
         }
         if (input._contactPasteHandler) {
             input.removeEventListener('paste', input._contactPasteHandler);
@@ -506,16 +479,13 @@ const PostsSystem = {
             input.removeEventListener('keypress', input._contactKeypressHandler);
         }
         
-        // ✅ معالج الإدخال
         const handler = (e) => {
             let value = e.target.value;
             
-            // ✅ للهاتف: أرقام فقط
             if (method === 'phone') {
                 value = value.replace(/[^0-9]/g, '');
             }
             
-            // ✅ منع تجاوز الحد
             if (value.length > cfg.max) {
                 value = value.substring(0, cfg.max);
             }
@@ -528,26 +498,20 @@ const PostsSystem = {
             if (counter) {
                 counter.textContent = `${len}/${cfg.max}`;
                 counter.classList.remove('warning', 'full');
-            }
-            
-            input.classList.remove('limit-reached', 'warning-reached');
-            
-            // ✅ عند الحد → ذهبي/برتقالي
-            if (len >= cfg.max) {
-                if (counter) counter.classList.add('full');
-                input.classList.add('limit-reached');
-            }
-            // ✅ قبل الحد بـ 3 → أصفر
-            else if (len >= cfg.max - 3) {
-                if (counter) counter.classList.add('warning');
-                input.classList.add('warning-reached');
+                input.classList.remove('limit-reached');
+                
+                if (len >= cfg.max) {
+                    counter.classList.add('full');
+                    input.classList.add('limit-reached');
+                } else if (len >= cfg.max - Math.ceil(cfg.max * 0.1)) {
+                    counter.classList.add('warning');
+                }
             }
         };
         
-        input._contactInputHandler = handler;
+        input._contactCounterHandler = handler;
         input.addEventListener('input', handler);
         
-        // ✅ منع اللصق الزائد
         const pasteHandler = (e) => {
             e.preventDefault();
             const pasted = (e.clipboardData || window.clipboardData).getData('text');
@@ -561,21 +525,17 @@ const PostsSystem = {
             input.value = value;
             input.dispatchEvent(new Event('input'));
         };
-        
         input._contactPasteHandler = pasteHandler;
         input.addEventListener('paste', pasteHandler);
         
-        // ✅ منع الكتابة عند الوصول للحد
         const keypressHandler = (e) => {
             if (e.target.value.length >= cfg.max && e.key.length === 1) {
                 e.preventDefault();
             }
         };
-        
         input._contactKeypressHandler = keypressHandler;
         input.addEventListener('keypress', keypressHandler);
         
-        // ✅ تهيئة العداد
         handler({ target: input });
     },
     
