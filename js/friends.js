@@ -1,5 +1,5 @@
-// ========== friends.js - النسخة النظيفة (بدون كود ميت) ==========
-// نظام الصداقة - مع مزامنة فورية بدون تكرار
+// ========== friends.js - النسخة النظيفة الكاملة ==========
+// نظام الصداقة - بدون كود ميت
 
 // ==================== القسم 1: إضافة صديق جديد ====================
 window.addNewFriend = async function(targetUserId) {
@@ -403,3 +403,5 @@ window.hideSearchResults = function() {
 window.loadFriendRequestsForChat = loadFriendRequestsForChat;
 window.setupFriendRequestsListener = setupFriendRequestsListener;
 window.setupFriendsListener = setupFriendsListener;
+
+console.log('✅ friends.js تم تحميله - نسخة نظيفة بدون كود ميت');
