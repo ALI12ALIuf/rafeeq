@@ -13,6 +13,9 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" id="theme-color" content="#1a1a1a">
+    
+    <!-- ✅ Google Sign-In SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="theme-dark" data-page="home">
 
@@ -295,14 +298,12 @@
             <textarea id="jobBio" maxlength="400" rows="5" placeholder="اكتب نبذة عن مؤهلاتك وخبراتك..."></textarea>
         </div>
         
-        <!-- ✅ طريقة التواصل (اختياري) -->
         <div class="edit-field">
             <label>طريقة التواصل <span style="font-size:0.7rem;color:var(--text-light);font-weight:400;">(اختياري)</span></label>
             <input type="hidden" id="jobContactMethod" value="none">
             <div class="publish-category-container" id="jobContactSelector"></div>
         </div>
         
-        <!-- ✅ حقل الإدخال الديناميكي -->
         <div class="edit-field" id="jobContactValueField" style="display: none;">
             <div class="field-label-row">
                 <label id="jobContactValueLabel">القيمة</label>
@@ -377,14 +378,12 @@
             <div class="publish-category-container" id="marriageChildrenSelector"></div>
         </div>
         
-        <!-- ✅ طريقة التواصل (اختياري) -->
         <div class="edit-field">
             <label>طريقة التواصل <span style="font-size:0.7rem;color:var(--text-light);font-weight:400;">(اختياري)</span></label>
             <input type="hidden" id="marriageContactMethod" value="none">
             <div class="publish-category-container" id="marriageContactSelector"></div>
         </div>
         
-        <!-- ✅ حقل الإدخال الديناميكي -->
         <div class="edit-field" id="marriageContactValueField" style="display: none;">
             <div class="field-label-row">
                 <label id="marriageContactValueLabel">القيمة</label>
@@ -433,13 +432,17 @@
     <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
 </div>
 
-<!-- شاشة تسجيل الدخول -->
+<!-- ==================== شاشة تسجيل الدخول (Google) ==================== -->
 <div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
-    <div style="text-align:center;padding:20px;max-width:350px;">
-        <div style="font-size:5rem;">🛡️</div>
-        <h1 style="font-size:2rem;color:var(--primary);">رفيق</h1>
+    <div style="text-align:center;padding:20px;max-width:350px;width:100%;">
+        <div style="font-size:5rem;margin-bottom:1rem;">🛡️</div>
+        <h1 style="font-size:2rem;color:var(--primary);margin-bottom:0.5rem;">رفيق</h1>
         <p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p>
-        <button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;">
+        
+        <!-- زر Google Sign-In -->
+        <div id="googleBtnContainer" style="display:flex;justify-content:center;margin-bottom:1rem;"></div>
+        
+        <button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;font-family:inherit;transition:all 0.2s;">
             <i class="fab fa-google"></i> المتابعة بحساب جوجل
         </button>
     </div>
@@ -505,34 +508,14 @@
     </div>
 </div>
 
-<!-- ==================== Firebase ==================== -->
-<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
-
-<script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyAuyKDI0JhPn-v02c5l7XekiyymNWeFPIQ",
-        authDomain: "rafeeq2-c0aef.firebaseapp.com",
-        projectId: "rafeeq2-c0aef",
-        storageBucket: "rafeeq2-c0aef.firebasestorage.app",
-        messagingSenderId: "1030537082006",
-        appId: "1:1030537082006:web:7eb0a052da85e1441bfeb7"
-    };
-    firebase.initializeApp(firebaseConfig);
-    window.auth = firebase.auth();
-    window.db = firebase.firestore();
-    window.googleProvider = new firebase.auth.GoogleAuthProvider();
-</script>
-
-<script src="js/i18n.js?v=31"></script>
-<script src="js/countries.js?v=31"></script>
-<script src="js/secure-chat.js?v=31"></script>
-<script src="js/chat-system.js?v=31"></script>
-<script src="js/ui-functions.js?v=31"></script>
-<script src="js/posts-system.js?v=31"></script>
-<script src="js/auth.js?v=31"></script>
-<script src="js/friends.js?v=31"></script>
+<!-- ==================== السكربتات (بدون Firebase) ==================== -->
+<script src="js/i18n.js?v=32"></script>
+<script src="js/countries.js?v=32"></script>
+<script src="js/auth.js?v=32"></script>
+<script src="js/ui-functions.js?v=32"></script>
+<script src="js/posts-system.js?v=32"></script>
+<script src="js/friends.js?v=32"></script>
+<script src="js/chat-system.js?v=32"></script>
 
 <script>
 window.addEventListener('load', function() {
@@ -541,15 +524,24 @@ window.addEventListener('load', function() {
         var app = document.getElementById('app');
         if (splash && !splash.classList.contains('hide')) {
             splash.classList.add('hide');
-            setTimeout(function() { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500);
+            setTimeout(function() { 
+                splash.style.display = 'none'; 
+                if (app) app.style.display = 'flex'; 
+            }, 500);
         }
     }, 3000);
     
     const searchInput = document.getElementById('searchInput');
-    if (searchInput) searchInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') performSearch(); });
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) { 
+            if (e.key === 'Enter') performSearch(); 
+        });
+    }
 });
 
-window.performSearch = function() { if (typeof findUserById === 'function') findUserById(); };
+window.performSearch = function() { 
+    if (typeof findUserById === 'function') findUserById(); 
+};
 </script>
 
 </body>
