@@ -14,10 +14,127 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" id="theme-color" content="#1a1a1a">
     
-    <!-- ✅ Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <!-- ✅ نظام التشخيص -->
+    <style>
+        #diagnosticsPanel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            width: 320px;
+            max-height: 80vh;
+            background: rgba(0,0,0,0.95);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 999999;
+            display: none;
+            overflow-y: auto;
+            border: 2px solid #0f0;
+        }
+        #diagnosticsPanel.show { display: block; }
+        #diagnosticsPanel .header {
+            color: #0ff;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        #diagnosticsPanel .section {
+            margin: 10px 0;
+            padding: 5px;
+            background: rgba(0,255,0,0.05);
+            border-radius: 4px;
+        }
+        #diagnosticsPanel .section-title {
+            color: #ff0;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        #diagnosticsPanel .ok { color: #0f0; }
+        #diagnosticsPanel .warn { color: #ff0; }
+        #diagnosticsPanel .err { color: #f00; }
+        #diagnosticsPanel .info { color: #0ff; }
+        #diagnosticsPanel button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            margin: 2px;
+        }
+        #diagnosticsPanel button:hover { background: #0ff; }
+        #diagnosticsToggle {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #0f0;
+            color: #000;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 999998;
+            display: none;
+            box-shadow: 0 2px 10px rgba(0,255,0,0.5);
+        }
+        #diagnosticsToggle.show { display: flex; align-items: center; justify-content: center; }
+        #diagnosticsPanel textarea {
+            width: 100%;
+            height: 100px;
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            font-family: monospace;
+            font-size: 10px;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+    </style>
 </head>
 <body class="theme-dark" data-page="home">
+
+<!-- ==================== زر التشخيص ==================== -->
+<button id="diagnosticsToggle" onclick="Diagnostics.toggle()">🔍</button>
+
+<!-- ==================== لوحة التشخيص ==================== -->
+<div id="diagnosticsPanel">
+    <div class="header">
+        <span>🔍 Rafeeq Diagnostics</span>
+        <button onclick="Diagnostics.toggle()">✖</button>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">⚡ اختبارات سريعة</div>
+        <button onclick="Diagnostics.runAll()">🔄 فحص الكل</button>
+        <button onclick="Diagnostics.testAPI()">🌐 API</button>
+        <button onclick="Diagnostics.testAuth()">🔐 Auth</button>
+        <button onclick="Diagnostics.testMessages()">💬 Messages</button>
+        <button onclick="Diagnostics.testFriends()">👥 Friends</button>
+        <button onclick="Diagnostics.testCrypto()">🔒 Crypto</button>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">📊 الحالة</div>
+        <div id="diagResults"></div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">📋 نسخ النتائج</div>
+        <button onclick="Diagnostics.copyResults()">📋 نسخ</button>
+        <button onclick="Diagnostics.clearResults()">🗑️ مسح</button>
+        <textarea id="diagCopyBox" readonly placeholder="النتائج ستظهر هنا..."></textarea>
+    </div>
+</div>
 
 <!-- ==================== شاشة البداية ==================== -->
 <div class="splash-screen" id="splash">
@@ -42,7 +159,6 @@
 
     <main class="app-content" id="mainContent">
         
-        <!-- ===== صفحة الرئيسية ===== -->
         <div class="page home-page active">
             
             <div class="home-tabs">
@@ -77,7 +193,6 @@
             
         </div>
 
-        <!-- ===== صفحة الدردشة ===== -->
         <div class="page chat-page">
             <div class="search-container">
                 <div class="search-box">
@@ -152,7 +267,6 @@
             </template>
         </div>
 
-        <!-- ===== صفحة المحادثة ===== -->
         <div class="conversation-page" id="conversationPage" style="display: none;">
             
             <div class="conversation-header">
@@ -191,7 +305,6 @@
             </div>
         </div>
 
-        <!-- ===== صفحة الملف الشخصي ===== -->
         <div class="page profile-page">
             <div class="profile-header">
                 <div class="profile-cover">
@@ -205,7 +318,6 @@
                         <span id="shareableId" class="id-value-numbers"></span>
                         <span class="id-label-english">ID</span>
                     </div>
-                    <!-- ✅ رصيد المحفظة -->
                     <div class="profile-balance" style="background: var(--light); padding: 8px 20px; border-radius: 20px; display: flex; align-items: center; gap: 10px; margin-top: 8px;">
                         <i class="fas fa-wallet" style="color: var(--primary);"></i>
                         <span style="color: var(--text-light); font-size: 0.9rem;">الرصيد:</span>
@@ -236,7 +348,6 @@
             </div>
         </div>
 
-        <!-- ===== صفحة الإعدادات ===== -->
         <div class="page settings-page">
             <div class="settings-list">
                 <div class="settings-item" onclick="openLanguageModal()">
@@ -332,7 +443,6 @@
             </div>
         </div>
         
-        <!-- ✅ إشعار السعر -->
         <div style="background: rgba(100, 181, 246, 0.1); border: 1px solid var(--primary); border-radius: 10px; padding: 10px 14px; margin: 12px auto; max-width: 300px; text-align: center;">
             <p style="color: var(--primary); font-size: 0.85rem; margin: 0;">
                 <i class="fas fa-info-circle"></i>
@@ -420,7 +530,6 @@
             </div>
         </div>
         
-        <!-- ✅ إشعار السعر -->
         <div style="background: rgba(100, 181, 246, 0.1); border: 1px solid var(--primary); border-radius: 10px; padding: 10px 14px; margin: 12px auto; max-width: 300px; text-align: center;">
             <p style="color: var(--primary); font-size: 0.85rem; margin: 0;">
                 <i class="fas fa-info-circle"></i>
@@ -496,20 +605,17 @@
     </div>
 </div>
 
-<!-- شريط التقدم -->
 <div id="progressBar" style="display:none;position:fixed;top:70px;left:0;right:0;height:22px;background:rgba(0,0,0,0.3);z-index:10000;align-items:center;justify-content:center;">
     <div id="progressFill" style="background:linear-gradient(90deg,#4CAF50,#8BC34A);height:100%;width:0%;position:absolute;left:0;top:0;transition:width 0.3s;border-radius:0 2px 2px 0;"></div>
     <span id="progressPercent" style="position:relative;z-index:2;font-size:12px;font-weight:bold;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.5);">0%</span>
 </div>
 
-<!-- شاشة تسجيل الدخول -->
 <div id="loginScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000;align-items:center;justify-content:center;">
     <div style="text-align:center;padding:20px;max-width:350px;">
         <div style="font-size:5rem;">🛡️</div>
         <h1 style="font-size:2rem;color:var(--primary);">رفيق</h1>
         <p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p>
         
-        <!-- ✅ زر Google Sign-In (Client ID الصحيح) -->
         <div id="g_id_onload"
              data-client_id="578021976495-olbueuh63il6oberbrplpnjbjh0balko.apps.googleusercontent.com"
              data-callback="handleGoogleSignIn"
@@ -531,7 +637,6 @@
     </div>
 </div>
 
-<!-- ==================== قوالب الرسائل ==================== -->
 <template id="messageWrapperTemplate"><div class="message"></div></template>
 
 <template id="textMessageTemplate">
@@ -539,8 +644,6 @@
         <span style="font-size:1rem;line-height:1.4;display:block;"></span>
     </div>
 </template>
-
-<!-- ==================== النوافذ المنبثقة الأخرى ==================== -->
 
 <div class="modal" id="editProfileModal">
     <div class="modal-content">
@@ -591,20 +694,267 @@
     </div>
 </div>
 
-<!-- ==================== Scripts ==================== -->
-<script src="js/api-client.js?v=34"></script>
-<script src="js/i18n.js?v=34"></script>
-<script src="js/countries.js?v=34"></script>
-<script src="js/secure-chat.js?v=34"></script>
-<script src="js/chat-system.js?v=34"></script>
-<script src="js/ui-functions.js?v=34"></script>
-<script src="js/posts-system.js?v=34"></script>
-<script src="js/auth.js?v=34"></script>
-<script src="js/friends.js?v=34"></script>
+<script src="js/api-client.js?v=35"></script>
+<script src="js/i18n.js?v=35"></script>
+<script src="js/countries.js?v=35"></script>
+<script src="js/secure-chat.js?v=35"></script>
+<script src="js/chat-system.js?v=35"></script>
+<script src="js/ui-functions.js?v=35"></script>
+<script src="js/posts-system.js?v=35"></script>
+<script src="js/auth.js?v=35"></script>
+<script src="js/friends.js?v=35"></script>
 
+<!-- ✅ نظام التشخيص -->
 <script>
-window.addEventListener('load', function() {
-    setTimeout(function() {
+const Diagnostics = {
+    results: [],
+    enabled: false,
+    
+    init() {
+        console.log('🔍 Diagnostics ready - استخدم Diagnostics.toggle() أو اضغط 🔍');
+        // إظهار الزر بعد 3 ثوانٍ
+        setTimeout(() => {
+            const btn = document.getElementById('diagnosticsToggle');
+            if (btn) btn.classList.add('show');
+        }, 3000);
+    },
+    
+    toggle() {
+        this.enabled = !this.enabled;
+        const panel = document.getElementById('diagnosticsPanel');
+        if (panel) {
+            panel.classList.toggle('show', this.enabled);
+        }
+    },
+    
+    log(type, msg) {
+        const emoji = type === 'ok' ? '✅' : type === 'err' ? '❌' : type === 'warn' ? '⚠️' : 'ℹ️';
+        const line = `${emoji} ${msg}`;
+        this.results.push(line);
+        console.log(line);
+        return line;
+    },
+    
+    render() {
+        const box = document.getElementById('diagResults');
+        if (!box) return;
+        box.innerHTML = this.results.map(r => {
+            const cls = r.includes('✅') ? 'ok' : r.includes('❌') ? 'err' : r.includes('⚠️') ? 'warn' : 'info';
+            return `<div class="${cls}">${r}</div>`;
+        }).join('');
+    },
+    
+    async runAll() {
+        this.results = [];
+        this.log('info', '=== فحص كامل ===');
+        
+        await this.testAPI();
+        await this.testAuth();
+        await this.testCrypto();
+        await this.testFriends();
+        await this.testMessages();
+        
+        this.log('info', '=== انتهى ===');
+        this.render();
+    },
+    
+    async testAPI() {
+        this.log('info', '--- API ---');
+        if (!window.RafeeqAPI) {
+            this.log('err', 'RafeeqAPI غير موجود');
+            this.render();
+            return;
+        }
+        this.log('ok', `URL: ${RafeeqAPI.BASE_URL}`);
+        
+        try {
+            const start = Date.now();
+            const res = await fetch(RafeeqAPI.BASE_URL + '/');
+            const ms = Date.now() - start;
+            const data = await res.json();
+            this.log('ok', `Status: ${res.status} (${ms}ms)`);
+            this.log('ok', `App: ${data.app} v${data.version}`);
+        } catch (e) {
+            this.log('err', `فشل الاتصال: ${e.message}`);
+        }
+        this.render();
+    },
+    
+    async testAuth() {
+        this.log('info', '--- Auth ---');
+        const token = RafeeqAPI.getToken();
+        const user = RafeeqAPI.getUser();
+        
+        if (!token) {
+            this.log('warn', 'لا يوجد Token - غير مسجل دخول');
+        } else {
+            this.log('ok', `Token: ${token.substring(0, 20)}...`);
+        }
+        
+        if (!user) {
+            this.log('warn', 'لا توجد بيانات مستخدم');
+        } else {
+            this.log('ok', `User: ${user.name} (${user.id})`);
+            this.log('ok', `ID: ${user.shareableId}`);
+            this.log('ok', `Balance: $${user.balance || 0}`);
+        }
+        
+        if (token) {
+            try {
+                const res = await RafeeqAPI.auth.me();
+                if (res.success) {
+                    this.log('ok', 'الجلسة صالحة ✅');
+                } else {
+                    this.log('err', 'الجلسة غير صالحة');
+                }
+            } catch (e) {
+                this.log('err', `Auth check: ${e.message}`);
+            }
+        }
+        this.render();
+    },
+    
+    async testCrypto() {
+        this.log('info', '--- Crypto ---');
+        
+        if (!window.crypto || !window.crypto.subtle) {
+            this.log('err', 'Web Crypto API غير متاح!');
+            this.render();
+            return;
+        }
+        this.log('ok', 'Web Crypto API متاح');
+        
+        if (!window.SecureChatSystem) {
+            this.log('err', 'SecureChatSystem غير محمّل');
+            this.render();
+            return;
+        }
+        this.log('ok', 'SecureChatSystem محمّل');
+        
+        const uid = RafeeqAPI.getUser()?.id;
+        if (!uid) {
+            this.log('warn', 'لا يوجد مستخدم - تخطي فحص المفاتيح');
+            this.render();
+            return;
+        }
+        
+        const privateKeyStr = localStorage.getItem(`enc_private_key_${uid}`);
+        if (privateKeyStr) {
+            this.log('ok', 'المفتاح الخاص موجود في localStorage');
+        } else {
+            this.log('err', 'المفتاح الخاص مفقود!');
+        }
+        
+        try {
+            const pk = await SecureChatSystem.getMyPrivateKey();
+            if (pk) {
+                this.log('ok', 'يمكن تحميل المفتاح الخاص');
+            } else {
+                this.log('err', 'فشل تحميل المفتاح الخاص');
+            }
+        } catch (e) {
+            this.log('err', `Private key: ${e.message}`);
+        }
+        
+        this.render();
+    },
+    
+    async testFriends() {
+        this.log('info', '--- Friends ---');
+        if (!RafeeqAPI.getToken()) {
+            this.log('warn', 'يجب تسجيل الدخول');
+            this.render();
+            return;
+        }
+        
+        try {
+            const friendsRes = await RafeeqAPI.friends.getMyFriends();
+            if (friendsRes.success) {
+                this.log('ok', `عدد الأصدقاء: ${friendsRes.friends?.length || 0}`);
+            }
+            
+            const reqRes = await RafeeqAPI.friends.getRequests();
+            if (reqRes.success) {
+                this.log('ok', `طلبات الصداقة: ${reqRes.requests?.length || 0}`);
+            }
+        } catch (e) {
+            this.log('err', `Friends: ${e.message}`);
+        }
+        this.render();
+    },
+    
+    async testMessages() {
+        this.log('info', '--- Messages ---');
+        if (!RafeeqAPI.getToken()) {
+            this.log('warn', 'يجب تسجيل الدخول');
+            this.render();
+            return;
+        }
+        
+        try {
+            const res = await RafeeqAPI.messages.getPending(0);
+            if (res.success) {
+                this.log('ok', `رسائل معلقة: ${res.messages?.length || 0}`);
+            } else {
+                this.log('err', `API: ${res.error || 'فشل'}`);
+            }
+        } catch (e) {
+            this.log('err', `Messages API: ${e.message}`);
+        }
+        
+        // فحص polling
+        const lastCheck = localStorage.getItem('last_message_check');
+        if (lastCheck) {
+            const last = parseInt(lastCheck);
+            const ago = Math.floor(Date.now()/1000) - last;
+            if (ago > 60) {
+                this.log('warn', `آخر فحص: منذ ${ago} ثانية (متأخر!)`);
+            } else {
+                this.log('ok', `آخر فحص: منذ ${ago} ثانية`);
+            }
+        } else {
+            this.log('warn', 'لم يبدأ polling بعد');
+        }
+        
+        // فحص المحادثات المحلية
+        const uid = RafeeqAPI.getUser()?.id;
+        if (uid) {
+            let chatsCount = 0;
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith(`chat_${uid}_`)) chatsCount++;
+            }
+            this.log('ok', `محادثات محلية: ${chatsCount}`);
+        }
+        
+        this.render();
+    },
+    
+    copyResults() {
+        const text = this.results.join('\n');
+        const box = document.getElementById('diagCopyBox');
+        if (box) box.value = text;
+        
+        navigator.clipboard.writeText(text).then(() => {
+            this.log('ok', 'تم النسخ');
+            this.render();
+        }).catch(() => {
+            alert('انسخ يدوياً من الصندوق');
+        });
+    },
+    
+    clearResults() {
+        this.results = [];
+        this.render();
+        const box = document.getElementById('diagCopyBox');
+        if (box) box.value = '';
+    }
+};
+
+window.Diagnostics = Diagnostics;
+
+window.addEventListener('load', () => {
+    setTimeout(() => {
         var splash = document.getElementById('splash');
         var app = document.getElementById('app');
         if (splash && !splash.classList.contains('hide')) {
@@ -612,6 +962,8 @@ window.addEventListener('load', function() {
             setTimeout(function() { splash.style.display = 'none'; if (app) app.style.display = 'flex'; }, 500);
         }
     }, 3000);
+    
+    Diagnostics.init();
     
     const searchInput = document.getElementById('searchInput');
     if (searchInput) searchInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') performSearch(); });
