@@ -1,4 +1,4 @@
-// ========== ui-functions.js - Rafeeq UI via Cloudflare API ==========
+// ========== ui-functions.js - Rafeeq UI with Polling ==========
 
 window._pageStack = [];
 
@@ -28,6 +28,15 @@ let _currentChatsElements = {
 let _updateLock = false;
 let _unreadMessages = new Map();
 
+// ✅ Polling intervals
+let _requestsPollingInterval = null;
+let _friendsPollingInterval = null;
+let _profilePollingInterval = null;
+
+// ✅ تخزين مؤقت للطلبات
+let _cachedRequests = [];
+let _cachedFriends = [];
+
 // ==================== دوال حفظ/تحميل حالة غير المقروء ====================
 function saveUnreadMessages() {
     const uid = RafeeqAPI.getUser()?.id;
@@ -56,17 +65,9 @@ function loadUnreadMessages() {
                 _unreadMessages.set(fid, data[fid]);
             }
         });
-        console.log(`📩 تم تحميل ${_unreadMessages.size} محادثة غير مقروءة`);
     } catch (e) {
         console.warn('⚠️ فشل تحميل حالة غير المقروء:', e);
     }
-}
-
-function clearUnreadMessages() {
-    const uid = RafeeqAPI.getUser()?.id;
-    if (!uid) return;
-    localStorage.removeItem(`unread_${uid}`);
-    _unreadMessages.clear();
 }
 
 // ==================== تحميل المحادثات ====================
@@ -89,7 +90,6 @@ async function loadChats(force = false) {
     }
     
     try { 
-        // ✅ جلب قائمة الأصدقاء من API
         const friendsResult = await RafeeqAPI.friends.getMyFriends();
         const friends = friendsResult.success && friendsResult.friends 
             ? friendsResult.friends.map(f => f.id) 
@@ -135,6 +135,8 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
         }
         
         const pendingRequests = await loadFriendRequestsForChat();
+        _cachedRequests = pendingRequests;
+        _cachedFriends = friends;
         
         const currentFriendIds = new Set(friends);
         
@@ -157,7 +159,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             }
         });
         
-        // إضافة الطلبات الجديدة
+        // ✅ إضافة الطلبات الجديدة
         const addedRequestIds = new Set();
         for (const req of pendingRequests) {
             if (addedRequestIds.has(req.id)) continue;
@@ -165,7 +167,6 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             addedRequestIds.add(req.id);
             
             try {
-                // البيانات موجودة في الطلب نفسه
                 const clone = requestTemplate.content.cloneNode(true);
                 const requestItem = clone.querySelector('.friend-request-item');
                 
@@ -193,8 +194,20 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
                     };
                 }
                 
-                if (acceptBtn) acceptBtn.onclick = (e) => { e.stopPropagation(); window.acceptFriendRequest(req.id, req.from); };
-                if (rejectBtn) rejectBtn.onclick = (e) => { e.stopPropagation(); window.rejectFriendRequest(req.id); };
+                if (acceptBtn) acceptBtn.onclick = async (e) => { 
+                    e.stopPropagation(); 
+                    await window.acceptFriendRequest(req.id, req.from);
+                    // ✅ فوراً أعد التحميل
+                    chatsLoaded = false;
+                    await loadChats(true);
+                };
+                if (rejectBtn) rejectBtn.onclick = async (e) => { 
+                    e.stopPropagation(); 
+                    await window.rejectFriendRequest(req.id);
+                    // ✅ فوراً أعد التحميل
+                    chatsLoaded = false;
+                    await loadChats(true);
+                };
                 
                 requestItem.setAttribute('data-request-id', req.id);
                 requestItem.setAttribute('data-type', 'request');
@@ -212,7 +225,7 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             }
         }
         
-        // إضافة الأصدقاء الجدد
+        // ✅ إضافة الأصدقاء الجدد
         const addedFriendIds = new Set();
         for (const fid of friends) {
             if (addedFriendIds.has(fid)) continue;
@@ -220,7 +233,6 @@ async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list
             addedFriendIds.add(fid);
             
             try { 
-                // جلب بيانات الصديق من API
                 const result = await RafeeqAPI.users.getById(fid);
                 if (result.success && result.user) {
                     const f = result.user;
@@ -326,7 +338,7 @@ function reorderChatsList(list) {
     });
 }
 
-// ==================== جلب وقت آخر رسالة ====================
+// ==================== وقت آخر رسالة ====================
 function getLastMessageTime(friendId) {
     const uid = RafeeqAPI.getUser()?.id;
     if (!uid || !friendId) return 0;
@@ -344,6 +356,141 @@ function getLastMessageTime(friendId) {
     }
 }
 
+// ==================== Polling: تحديث الطلبات تلقائياً ====================
+function startRequestsPolling() {
+    if (_requestsPollingInterval) {
+        clearInterval(_requestsPollingInterval);
+    }
+    
+    console.log('🔄 بدء Polling للطلبات (كل 5 ثوانٍ)');
+    
+    _requestsPollingInterval = setInterval(async () => {
+        if (!RafeeqAPI.getToken()) return;
+        
+        // لا نُحدّث إذا كنا في محادثة
+        if (document.body.classList.contains('conversation-open')) return;
+        
+        try {
+            const result = await RafeeqAPI.friends.getRequests();
+            if (!result.success) return;
+            
+            const newRequests = result.requests || [];
+            const oldIds = _cachedRequests.map(r => r.id).sort().join(',');
+            const newIds = newRequests.map(r => r.id).sort().join(',');
+            
+            // إذا تغيّرت القائمة → أعد التحميل
+            if (oldIds !== newIds) {
+                console.log('🔄 طلبات جديدة — تحديث القائمة');
+                _cachedRequests = newRequests;
+                
+                // أعد تحميل المحادثات
+                const list = document.getElementById('chatsList');
+                const chatTemplate = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
+                const requestTemplate = document.getElementById('friendRequestChatTemplate');
+                
+                if (list && chatTemplate && requestTemplate) {
+                    const friendsResult = await RafeeqAPI.friends.getMyFriends();
+                    const friends = friendsResult.success && friendsResult.friends 
+                        ? friendsResult.friends.map(f => f.id) 
+                        : [];
+                    
+                    await smartUpdateChatsList(friends, chatTemplate, requestTemplate, list);
+                }
+            }
+        } catch (e) {
+            // نتجاهل الأخطاء
+        }
+    }, 5000);
+}
+
+// ==================== Polling: تحديث الأصدقاء تلقائياً ====================
+function startFriendsPolling() {
+    if (_friendsPollingInterval) {
+        clearInterval(_friendsPollingInterval);
+    }
+    
+    console.log('🔄 بدء Polling للأصدقاء (كل 10 ثوانٍ)');
+    
+    _friendsPollingInterval = setInterval(async () => {
+        if (!RafeeqAPI.getToken()) return;
+        
+        if (document.body.classList.contains('conversation-open')) return;
+        
+        try {
+            const result = await RafeeqAPI.friends.getMyFriends();
+            if (!result.success) return;
+            
+            const newFriends = (result.friends || []).map(f => f.id).sort();
+            const oldFriends = _cachedFriends.slice().sort();
+            
+            if (JSON.stringify(newFriends) !== JSON.stringify(oldFriends)) {
+                console.log('🔄 قائمة الأصدقاء تغيّرت — تحديث');
+                _cachedFriends = newFriends;
+                
+                const list = document.getElementById('chatsList');
+                const chatTemplate = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
+                const requestTemplate = document.getElementById('friendRequestChatTemplate');
+                
+                if (list && chatTemplate && requestTemplate) {
+                    await smartUpdateChatsList(newFriends, chatTemplate, requestTemplate, list);
+                }
+            }
+        } catch (e) {
+            // نتجاهل
+        }
+    }, 10000);
+}
+
+// ==================== Polling: تحديث بيانات المستخدم ====================
+function startProfilePolling() {
+    if (_profilePollingInterval) {
+        clearInterval(_profilePollingInterval);
+    }
+    
+    console.log('🔄 بدء Polling للملف الشخصي (كل 30 ثانية)');
+    
+    _profilePollingInterval = setInterval(async () => {
+        if (!RafeeqAPI.getToken()) return;
+        
+        try {
+            const result = await RafeeqAPI.auth.me();
+            if (!result.success || !result.user) return;
+            
+            const cachedUser = RafeeqAPI.getUser();
+            
+            // إذا تغيّرت البيانات → حدّث
+            if (JSON.stringify(result.user) !== JSON.stringify(cachedUser)) {
+                console.log('🔄 بيانات المستخدم تحدّثت');
+                RafeeqAPI.setUser(result.user);
+                
+                // تحديث الواجهة
+                if (typeof loadUserData === 'function') {
+                    await loadUserData(result.user);
+                }
+            }
+        } catch (e) {
+            // نتجاهل
+        }
+    }, 30000);
+}
+
+// ==================== إيقاف جميع Pollings ====================
+function stopAllPollings() {
+    if (_requestsPollingInterval) {
+        clearInterval(_requestsPollingInterval);
+        _requestsPollingInterval = null;
+    }
+    if (_friendsPollingInterval) {
+        clearInterval(_friendsPollingInterval);
+        _friendsPollingInterval = null;
+    }
+    if (_profilePollingInterval) {
+        clearInterval(_profilePollingInterval);
+        _profilePollingInterval = null;
+    }
+    console.log('⏹️ تم إيقاف جميع Pollings');
+}
+
 // ==================== تسجيل رسالة غير مقروءة ====================
 window.markMessageAsUnread = function(friendId) {
     if (!friendId) return;
@@ -353,7 +500,7 @@ window.markMessageAsUnread = function(friendId) {
     
     saveUnreadMessages();
     
-    console.log(`📩 رسالة جديدة من ${friendId} - عدد غير المقروء: ${currentCount + 1}`);
+    console.log(`📩 رسالة جديدة من ${friendId}`);
     
     const list = document.getElementById('chatsList');
     if (list) {
@@ -368,7 +515,6 @@ window.clearUnreadStatus = function(friendId) {
     if (_unreadMessages.has(friendId)) {
         _unreadMessages.delete(friendId);
         saveUnreadMessages();
-        console.log(`✅ تم مسح حالة غير المقروء لـ ${friendId}`);
     }
     
     const element = _currentChatsElements.friends.get(friendId);
@@ -408,15 +554,9 @@ function updateEmptyState(list) {
         }
     } else {
         if (existingEmpty) {
-            existingEl.remove();
+            existingEmpty.remove();
         }
     }
-}
-
-// ==================== مسح الكاش ====================
-function resetChatsCache() {
-    _currentChatsElements.requests.clear();
-    _currentChatsElements.friends.clear();
 }
 
 // ==================== اختيار الأفاتار ====================
@@ -444,7 +584,6 @@ window.selectAvatar = async function(type) {
         selectedBtn.style.boxShadow = '0 0 20px rgba(33, 150, 243, 0.3)';
     }
     
-    // ✅ تحديث في API
     if (RafeeqAPI.getToken()) {
         try {
             await RafeeqAPI.users.updateProfile({ avatarType: type });
@@ -532,7 +671,6 @@ function setupNavigation() {
         if (pageTitle) {
             const titles = { 'home': 'الرئيسية', 'chat': 'الدردشة', 'profile': 'الملف الشخصي', 'settings': 'الإعدادات' };
             pageTitle.textContent = titles[id] || id;
-            pageTitle.setAttribute('data-i18n', id);
         }
         
         if (id === 'chat') {
@@ -542,7 +680,7 @@ function setupNavigation() {
                     reorderChatsList(list);
                 }
             } else {
-                loadChats();
+                loadChats(true);
             }
         }
         
@@ -568,7 +706,7 @@ function setupModals() {
     }); 
 }
 
-// ==================== دالة closeModal ====================
+// ==================== closeModal ====================
 window.closeModal = function(modalId) {
     if (modalId) {
         const modal = document.getElementById(modalId);
@@ -640,6 +778,7 @@ window.saveProfile = async function() {
         if (nameEl) nameEl.textContent = n;
         
         window.closeModal('editProfileModal');
+        alert('✅ تم حفظ التغييرات');
         
     } catch (e) {
         alert('فشل حفظ التغييرات: ' + e.message);
@@ -768,11 +907,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// ✅ authReady — تحميل البيانات
+// ✅ authReady — بدء Pollings
 window.addEventListener('authReady', function() {
-    console.log('✅ authReady - تحميل البيانات');
+    console.log('✅ authReady - بدء Pollings');
     setTimeout(() => {
         loadUnreadMessages();
+        startRequestsPolling();      // 🔄 تحديث الطلبات
+        startFriendsPolling();       // 🔄 تحديث الأصدقاء
+        startProfilePolling();       // 🔄 تحديث الملف الشخصي
     }, 100);
 });
 
@@ -790,13 +932,12 @@ window.addEventListener('unhandledrejection', function(event) {
 
 // ✅ تصدير الدوال
 window.smartUpdateChatsList = smartUpdateChatsList;
-window.resetChatsCache = resetChatsCache;
 window.reorderChatsList = reorderChatsList;
 window.getLastMessageTime = getLastMessageTime;
 window._unreadMessages = _unreadMessages;
 window.saveUnreadMessages = saveUnreadMessages;
 window.loadUnreadMessages = loadUnreadMessages;
-window.clearUnreadMessages = clearUnreadMessages;
 window.loadChats = loadChats;
+window.stopAllPollings = stopAllPollings;
 
-console.log('✅ ui-functions.js loaded - Cloudflare API mode');
+console.log('✅ ui-functions.js loaded - with Polling (requests/friends/profile)');
