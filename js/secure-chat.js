@@ -34,7 +34,6 @@ const SecureChatSystem = {
         
         // ✅ إذا كان المفتاح موجود محلياً، نتحقق من المفتاح العام
         if (existingKey) {
-            // جلب بيانات المستخدم من API
             try {
                 const result = await RafeeqAPI.users.getProfile();
                 if (result.success && result.user && result.user.publicKey) {
@@ -54,9 +53,9 @@ const SecureChatSystem = {
         // ✅ حفظ المفتاح العام في الـ API
         try {
             await RafeeqAPI.users.updateProfile({ publicKey });
+            console.log('✅ تم حفظ المفتاح العام في API');
         } catch (e) {
             console.warn('⚠️ فشل حفظ المفتاح العام في API:', e.message);
-            // نستمر — نحفظ محلياً
         }
         
         // ✅ حفظ المفتاح الخاص محلياً
@@ -127,7 +126,6 @@ const SecureChatSystem = {
     async getReceiverPublicKey(userId) {
         if (!userId) return null;
         try {
-            // ✅ جلب من API
             const result = await RafeeqAPI.users.getById(userId);
             if (!result.success || !result.user || !result.user.publicKey) {
                 console.warn('⚠️ لا يوجد مفتاح عام للمستخدم:', userId);
@@ -209,7 +207,7 @@ function startSecureChatPolling() {
         clearInterval(_secureChatPollingInterval);
     }
     
-    console.log('🔄 بدء Polling للرسائل (SecureChat)');
+    console.log('🔄 بدء Polling للرسائل (كل 3 ثوانٍ)');
     
     _secureChatPollingInterval = setInterval(async () => {
         if (!RafeeqAPI.getToken()) return;
@@ -218,6 +216,7 @@ function startSecureChatPolling() {
             const now = Math.floor(Date.now() / 1000);
             const lastCheck = parseInt(localStorage.getItem('last_message_check') || '0');
             
+            // ✅ نستقبل الرسائل دائماً — حتى لو كنا في محادثة
             const result = await RafeeqAPI.messages.getPending(lastCheck);
             
             if (result.success && result.messages && result.messages.length > 0) {
@@ -233,7 +232,7 @@ function startSecureChatPolling() {
         } catch (error) {
             // نتجاهل الأخطاء
         }
-    }, 5000);
+    }, 3000);  // ← 3 ثوانٍ للتحديث الفوري
 }
 
 // ==================== معالجة الرسائل المستلمة ====================
@@ -248,7 +247,6 @@ SecureChatSystem.processReceivedMessage = async function(msg) {
         
         if (!myPrivateKey || !senderPublicKey) {
             console.warn('⚠️ لا يمكن فك التشفير - مفاتيح ناقصة');
-            // حذف الرسالة من السيرفر
             try { await RafeeqAPI.messages.markAsRead(msg.id); } catch(e) {}
             return;
         }
@@ -271,17 +269,31 @@ SecureChatSystem.processReceivedMessage = async function(msg) {
             if (typeof ChatSystem !== 'undefined' && ChatSystem.saveMessage) {
                 ChatSystem.saveMessage(msg.fromUser, messageData);
                 
-                // ✅ عرض في المحادثة
+                // ✅ إذا كنا في نفس المحادثة — أضف الرسالة فوراً
                 if (ChatSystem.currentChat === msg.fromUser) {
-                    ChatSystem.displayMessages(msg.fromUser);
+                    console.log('📩 عرض الرسالة فوراً في المحادثة الحالية');
+                    
+                    // ✅ عرض الرسالة مباشرة (بدون إعادة عرض الكل)
+                    ChatSystem.displayMessage(messageData);
+                    
+                    // ✅ مرر للأسفل
+                    const container = document.getElementById('messagesContainer');
+                    if (container) {
+                        setTimeout(() => {
+                            container.scrollTop = container.scrollHeight;
+                        }, 100);
+                    }
                 } else {
+                    // ✅ إشعار كمقروءة
                     if (typeof window.markMessageAsUnread === 'function') {
                         window.markMessageAsUnread(msg.fromUser);
                     }
                 }
                 
                 // ✅ تحديث آخر رسالة
-                ChatSystem.updateLastMessage(msg.fromUser, decryptedText);
+                if (ChatSystem.updateLastMessage) {
+                    ChatSystem.updateLastMessage(msg.fromUser, decryptedText);
+                }
                 
                 // ✅ إعادة الترتيب
                 if (typeof window.reorderChatsList === 'function') {
@@ -320,4 +332,4 @@ if (window.RafeeqAPI && RafeeqAPI.getToken()) {
 
 window.SecureChatSystem = SecureChatSystem;
 
-console.log('✅ secure-chat.js loaded - Cloudflare mode');
+console.log('✅ secure-chat.js loaded - Cloudflare mode with 3s polling');
