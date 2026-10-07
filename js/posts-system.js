@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية ==========
+// ========== posts-system.js - Rafeeq Posts via Cloudflare API ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -21,6 +21,8 @@ const PostsSystem = {
         receivedRequests: new Map(),
         lastUpdate: 0
     },
+    
+    _postPrice: 5, // سيتم تحديثه من API
     
     jobCategories: [
         { code: 'all', name: 'الكل', icon: 'fas fa-layer-group', color: '#64B5F6' },
@@ -46,13 +48,29 @@ const PostsSystem = {
         console.log('🚀 تهيئة نظام المنشورات...');
         this.loadSavedSettings();
         this.setupFieldCounters();
+        this.loadPostPrice();
         
         this.loadAllPosts();
-        this.setupRealtimeListeners();
         this.renderCountryHeaderSelector();
         this.renderJobCategories();
         
         console.log('✅ تم تهيئة نظام المنشورات');
+    },
+    
+    // ==================== جلب سعر المنشور من API ====================
+    async loadPostPrice() {
+        try {
+            // نحاول الحصول عليه من الإعدادات العامة
+            // أو نستخدم القيمة الافتراضية
+            this._postPrice = 5;
+            
+            const jobPriceEl = document.getElementById('jobPriceDisplay');
+            const marriagePriceEl = document.getElementById('marriagePriceDisplay');
+            if (jobPriceEl) jobPriceEl.textContent = this._postPrice + '$';
+            if (marriagePriceEl) marriagePriceEl.textContent = this._postPrice + '$';
+        } catch (e) {
+            console.warn('⚠️ لا يمكن جلب سعر المنشور');
+        }
     },
     
     loadSavedSettings() {
@@ -71,7 +89,7 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== إغلاق جميع القوائم ====================
+    // ==================== إغلاق القوائم المنسدلة ====================
     closeAllDropdowns() {
         if (this._activeDropdown) {
             try { this._activeDropdown.remove(); } catch (e) {}
@@ -88,7 +106,7 @@ const PostsSystem = {
         });
     },
     
-    // ==================== فتح القائمة (دائماً كاملة + تمرير تلقائي) ====================
+    // ==================== فتح القائمة المنسدلة ====================
     openDropdown({ id, html, anchorBtn, onClose = null }) {
         this.closeAllDropdowns();
         if (!anchorBtn) return null;
@@ -101,13 +119,11 @@ const PostsSystem = {
         const margin = 8;
         const offset = 6;
         
-        const dropdownMaxHeight = 260;
-        
         const dropdown = document.createElement('div');
         dropdown.className = 'dropdown-floating';
         dropdown.id = id;
         
-        dropdown.style.position = 'absolute';
+        dropdown.style.position = isInModal ? 'absolute' : 'fixed';
         dropdown.style.zIndex = '999999';
         dropdown.style.background = 'var(--card-bg)';
         dropdown.style.color = 'var(--text)';
@@ -115,22 +131,17 @@ const PostsSystem = {
         dropdown.style.borderRadius = '10px';
         dropdown.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
         dropdown.style.padding = '6px';
-        dropdown.style.maxHeight = dropdownMaxHeight + 'px';
+        dropdown.style.maxHeight = '260px';
         dropdown.style.overflowY = 'auto';
         dropdown.style.width = rect.width + 'px';
-        dropdown.style.display = 'block';
-        dropdown.style.visibility = 'visible';
-        dropdown.style.opacity = '1';
-        dropdown.style.pointerEvents = 'auto';
         
         dropdown.innerHTML = html;
         
         if (isInModal) {
             const modalRect = modalContent.getBoundingClientRect();
             const scrollTop = modalContent.scrollTop;
-            const scrollLeft = modalContent.scrollLeft;
             
-            let leftInModal = rect.left - modalRect.left + scrollLeft;
+            let leftInModal = rect.left - modalRect.left;
             const modalVisibleWidth = modalContent.clientWidth;
             
             if (leftInModal + rect.width > modalVisibleWidth - margin) {
@@ -139,30 +150,13 @@ const PostsSystem = {
             if (leftInModal < margin) leftInModal = margin;
             
             dropdown.style.left = leftInModal + 'px';
-            
-            const topInModal = rect.bottom - modalRect.top + scrollTop + offset;
-            dropdown.style.top = topInModal + 'px';
-            dropdown.style.bottom = 'auto';
+            dropdown.style.top = (rect.bottom - modalRect.top + scrollTop + offset) + 'px';
             
             if (getComputedStyle(modalContent).position === 'static') {
                 modalContent.style.position = 'relative';
             }
-            
             modalContent.appendChild(dropdown);
-            
-            setTimeout(() => {
-                const ddRect = dropdown.getBoundingClientRect();
-                const modalRect2 = modalContent.getBoundingClientRect();
-                
-                if (ddRect.bottom > modalRect2.bottom - 8) {
-                    const scrollAmount = ddRect.bottom - modalRect2.bottom + 20;
-                    modalContent.scrollBy({ top: scrollAmount, behavior: 'smooth' });
-                }
-            }, 50);
-            
         } else {
-            dropdown.style.position = 'fixed';
-            
             let left = rect.left;
             if (left + rect.width > viewportW - margin) {
                 left = viewportW - rect.width - margin;
@@ -171,25 +165,7 @@ const PostsSystem = {
             
             dropdown.style.left = left + 'px';
             dropdown.style.top = (rect.bottom + offset) + 'px';
-            dropdown.style.bottom = 'auto';
-            
             document.body.appendChild(dropdown);
-            
-            setTimeout(() => {
-                const ddRect = dropdown.getBoundingClientRect();
-                const viewportH = window.innerHeight;
-                
-                if (ddRect.bottom > viewportH - 8) {
-                    const scrollAmount = ddRect.bottom - viewportH + 20;
-                    const appContent = document.getElementById('mainContent') || document.querySelector('.app-content');
-                    
-                    if (appContent) {
-                        appContent.scrollBy({ top: scrollAmount, behavior: 'smooth' });
-                    } else {
-                        window.scrollBy({ top: scrollAmount, behavior: 'smooth' });
-                    }
-                }
-            }, 50);
         }
         
         this._activeDropdown = dropdown;
@@ -197,13 +173,9 @@ const PostsSystem = {
         const self = this;
         const closeHandler = (e) => {
             const dd = document.getElementById(id);
-            if (!dd) {
-                self.closeAllDropdowns();
-                return;
-            }
+            if (!dd) { self.closeAllDropdowns(); return; }
             if (dd.contains(e.target)) return;
             if (anchorBtn.contains(e.target)) return;
-            
             if (onClose) onClose();
             self.closeAllDropdowns();
         };
@@ -218,7 +190,7 @@ const PostsSystem = {
         return dropdown;
     },
     
-    // ==================== إعداد العدادات ====================
+    // ==================== العدادات ====================
     setupFieldCounters() {
         const fields = [
             { inputId: 'jobName', counterId: 'jobNameCounter', max: 15, type: 'text' },
@@ -244,11 +216,8 @@ const PostsSystem = {
             const handler = (e) => {
                 let value = e.target.value;
                 
-                if (type === 'number') {
-                    value = value.replace(/[^0-9]/g, '');
-                }
+                if (type === 'number') value = value.replace(/[^0-9]/g, '');
                 if (value.length > max) value = value.substring(0, max);
-                
                 if (type === 'textarea') {
                     value = value.replace(/ {3,}/g, ' ');
                     value = value.replace(/\n{3,}/g, '\n\n');
@@ -289,16 +258,6 @@ const PostsSystem = {
                 };
                 input._pasteHandler = pasteHandler;
                 input.addEventListener('paste', pasteHandler);
-            }
-            
-            if (!input._keypressHandler) {
-                const keypressHandler = (e) => {
-                    if (e.target.value.length >= max && e.key.length === 1) {
-                        e.preventDefault();
-                    }
-                };
-                input._keypressHandler = keypressHandler;
-                input.addEventListener('keypress', keypressHandler);
             }
             
             handler({ target: input });
@@ -418,7 +377,6 @@ const PostsSystem = {
         this.renderContactMethodDropdown(type);
     },
     
-    // ==================== حقل الإدخال الديناميكي ====================
     renderContactValueField(type, method) {
         const isJob = type === 'job';
         const fieldId = isJob ? 'jobContactValueField' : 'marriageContactValueField';
@@ -443,21 +401,9 @@ const PostsSystem = {
         field.style.display = 'flex';
         
         const config = {
-            whatsapp: {
-                label: 'رابط واتساب',
-                placeholder: '',
-                max: 50
-            },
-            phone: {
-                label: 'رقم الهاتف',
-                placeholder: '',
-                max: 15
-            },
-            email: {
-                label: 'البريد الإلكتروني',
-                placeholder: '',
-                max: 30
-            }
+            whatsapp: { label: 'رابط واتساب', placeholder: 'https://wa.me/964...', max: 50 },
+            phone: { label: 'رقم الهاتف', placeholder: '07XXXXXXXXX', max: 15 },
+            email: { label: 'البريد الإلكتروني', placeholder: 'user@example.com', max: 30 }
         };
         
         const cfg = config[method];
@@ -472,37 +418,19 @@ const PostsSystem = {
         if (input._contactCounterHandler) {
             input.removeEventListener('input', input._contactCounterHandler);
         }
-        if (input._contactPasteHandler) {
-            input.removeEventListener('paste', input._contactPasteHandler);
-        }
-        if (input._contactKeypressHandler) {
-            input.removeEventListener('keypress', input._contactKeypressHandler);
-        }
         
         const handler = (e) => {
             let value = e.target.value;
-            
-            if (method === 'phone') {
-                value = value.replace(/[^0-9]/g, '');
-            }
-            
-            if (value.length > cfg.max) {
-                value = value.substring(0, cfg.max);
-            }
-            
-            if (e.target.value !== value) {
-                e.target.value = value;
-            }
+            if (method === 'phone') value = value.replace(/[^0-9]/g, '');
+            if (value.length > cfg.max) value = value.substring(0, cfg.max);
+            if (e.target.value !== value) e.target.value = value;
             
             const len = value.length;
             if (counter) {
                 counter.textContent = `${len}/${cfg.max}`;
                 counter.classList.remove('warning', 'full');
-                input.classList.remove('limit-reached');
-                
                 if (len >= cfg.max) {
                     counter.classList.add('full');
-                    input.classList.add('limit-reached');
                 } else if (len >= cfg.max - Math.ceil(cfg.max * 0.1)) {
                     counter.classList.add('warning');
                 }
@@ -512,34 +440,9 @@ const PostsSystem = {
         input._contactCounterHandler = handler;
         input.addEventListener('input', handler);
         
-        const pasteHandler = (e) => {
-            e.preventDefault();
-            const pasted = (e.clipboardData || window.clipboardData).getData('text');
-            let value = input.value + pasted;
-            
-            if (method === 'phone') {
-                value = value.replace(/[^0-9]/g, '');
-            }
-            
-            value = value.substring(0, cfg.max);
-            input.value = value;
-            input.dispatchEvent(new Event('input'));
-        };
-        input._contactPasteHandler = pasteHandler;
-        input.addEventListener('paste', pasteHandler);
-        
-        const keypressHandler = (e) => {
-            if (e.target.value.length >= cfg.max && e.key.length === 1) {
-                e.preventDefault();
-            }
-        };
-        input._contactKeypressHandler = keypressHandler;
-        input.addEventListener('keypress', keypressHandler);
-        
         handler({ target: input });
     },
     
-    // ==================== التحقق من قيمة التواصل ====================
     validateContactValue(method, value) {
         if (!method || method === 'none') return { valid: true };
         
@@ -548,9 +451,7 @@ const PostsSystem = {
         
         if (method === 'whatsapp') {
             if (!/^https?:\/\//i.test(v)) return { valid: false, error: 'رابط واتساب يجب أن يبدأ بـ http:// أو https://' };
-            if (!/wa\.me|api\.whatsapp\.com|web\.whatsapp\.com|whatsapp/i.test(v)) {
-                return { valid: false, error: 'رابط واتساب غير صحيح. مثال: https://wa.me/9647701234567' };
-            }
+            if (!/wa\.me|whatsapp/i.test(v)) return { valid: false, error: 'رابط واتساب غير صحيح. مثال: https://wa.me/964...' };
             return { valid: true };
         }
         
@@ -570,34 +471,31 @@ const PostsSystem = {
     
     // ==================== تحميل حالات العلاقات ====================
     async loadRelationshipCache(force = false) {
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         if (!uid) return;
         
         const now = Date.now();
         if (!force && (now - this._relationshipCache.lastUpdate) < 300000) return;
         
         try {
-            const [userDoc, sentSnap, receivedSnap] = await Promise.all([
-                window.db.collection('users').doc(uid).get(),
-                window.db.collection('friendRequests').where('from', '==', uid).where('status', '==', 'pending').get(),
-                window.db.collection('friendRequests').where('to', '==', uid).where('status', '==', 'pending').get()
+            const [friendsResult, requestsResult] = await Promise.all([
+                RafeeqAPI.friends.getMyFriends(),
+                RafeeqAPI.friends.getRequests()
             ]);
             
-            if (userDoc.exists) {
-                this._relationshipCache.friends = new Set(userDoc.data().friends || []);
+            this._relationshipCache.friends = new Set();
+            if (friendsResult.success && friendsResult.friends) {
+                friendsResult.friends.forEach(f => {
+                    this._relationshipCache.friends.add(f.id);
+                });
             }
             
-            this._relationshipCache.sentRequests = new Set();
-            sentSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.to) this._relationshipCache.sentRequests.add(data.to);
-            });
-            
             this._relationshipCache.receivedRequests = new Map();
-            receivedSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.from) this._relationshipCache.receivedRequests.set(data.from, doc.id);
-            });
+            if (requestsResult.success && requestsResult.requests) {
+                requestsResult.requests.forEach(r => {
+                    this._relationshipCache.receivedRequests.set(r.fromUser, r.id);
+                });
+            }
             
             this._relationshipCache.lastUpdate = now;
         } catch (e) {
@@ -606,18 +504,17 @@ const PostsSystem = {
     },
     
     getRelationshipState(targetUserId) {
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         if (!uid) return 'guest';
         if (uid === targetUserId) return 'self';
         if (this._relationshipCache.friends.has(targetUserId)) return 'friend';
-        if (this._relationshipCache.sentRequests.has(targetUserId)) return 'sent';
         if (this._relationshipCache.receivedRequests.has(targetUserId)) return 'received';
         return 'none';
     },
     
-    // ==================== إنشاء زر الإجراء ====================
+    // ==================== زر الإجراء ====================
     createPostActionButton(post) {
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         const isOwner = uid === post.userId;
         
         if (isOwner) {
@@ -642,7 +539,6 @@ const PostsSystem = {
         
         if (contactMethod === 'whatsapp') {
             btn.innerHTML = `<i class="fab fa-whatsapp"></i>`;
-            btn.classList.add('contact-whatsapp');
             btn.style.cssText = `background: #25D366; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; padding: 0; flex-shrink: 0;`;
             btn.title = 'تواصل عبر واتساب';
             return btn;
@@ -650,7 +546,6 @@ const PostsSystem = {
         
         if (contactMethod === 'phone') {
             btn.innerHTML = `<i class="fas fa-phone"></i>`;
-            btn.classList.add('contact-phone');
             btn.style.cssText = `background: #2196F3; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
             btn.title = 'اتصال هاتفي';
             return btn;
@@ -658,7 +553,6 @@ const PostsSystem = {
         
         if (contactMethod === 'email') {
             btn.innerHTML = `<i class="fas fa-envelope"></i>`;
-            btn.classList.add('contact-email');
             btn.style.cssText = `background: #FF9800; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
             btn.title = 'إرسال بريد';
             return btn;
@@ -671,12 +565,6 @@ const PostsSystem = {
                 btn.innerHTML = `<i class="fas fa-comment"></i>`;
                 btn.style.cssText = `background: var(--primary); color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
                 btn.title = 'مراسلة';
-                break;
-            case 'sent':
-                btn.innerHTML = `<i class="fas fa-clock"></i>`;
-                btn.style.cssText = `background: transparent; color: var(--primary); border: 1.5px solid var(--primary); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-                btn.title = 'طلب معلق';
-                btn.disabled = true;
                 break;
             case 'received':
                 btn.innerHTML = `<i class="fas fa-check"></i>`;
@@ -695,13 +583,13 @@ const PostsSystem = {
     
     bindActionButton(card, post) {
         if (!post.userId) return;
-        const isOwner = window.auth?.currentUser?.uid === post.userId;
+        const isOwner = RafeeqAPI.getUser()?.id === post.userId;
         if (isOwner) return;
         
         const newBtn = card.querySelector('.post-action-btn');
         if (!newBtn) return;
         
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         if (!uid) return;
         
         const contactMethod = post.contactMethod && post.contactMethod !== 'none' ? post.contactMethod : null;
@@ -732,76 +620,26 @@ const PostsSystem = {
         const state = this.getRelationshipState(post.userId);
         
         if (state === 'friend') {
-            newBtn.onclick = () => {
-                if (typeof openChat === 'function') {
-                    window.db.collection('users').doc(post.userId).get().then(doc => {
-                        if (doc.exists) {
-                            const f = doc.data();
-                            openChat(post.userId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
-                        }
-                    });
-                }
-            };
+            newBtn.onclick = () => openChat(post.userId);
         } else if (state === 'received') {
             newBtn.onclick = async () => {
                 const requestId = this._relationshipCache.receivedRequests.get(post.userId);
-                if (requestId && typeof acceptFriendRequest === 'function') {
-                    await acceptFriendRequest(requestId, post.userId);
-                    this.refreshPostsAfterAction(post.userId);
+                if (requestId) {
+                    await window.acceptFriendRequest(requestId, post.userId);
+                    this.refreshPostsAfterAction();
                 }
             };
         } else if (state === 'none') {
-            newBtn.onclick = () => this.sendFriendRequestFromPost(post.userId, newBtn);
+            newBtn.onclick = () => window.addNewFriend(post.userId);
         }
     },
     
-    async sendFriendRequestFromPost(targetUserId, btnElement) {
-        const uid = window.auth?.currentUser?.uid;
-        if (!uid) { alert('يجب تسجيل الدخول أولاً'); return; }
-        if (uid === targetUserId) { alert('لا يمكنك إضافة نفسك'); return; }
-        
-        try {
-            const exist = await window.db.collection('friendRequests')
-                .where('from', '==', uid).where('to', '==', targetUserId).where('status', '==', 'pending').get();
-            
-            if (!exist.empty) { alert('أرسلت طلباً مسبقاً'); return; }
-            
-            const me = await window.db.collection('users').doc(uid).get();
-            if (me.exists && (me.data().friends || []).includes(targetUserId)) {
-                alert('صديقك بالفعل');
-                return;
-            }
-            
-            await window.db.collection('friendRequests').add({
-                from: uid, to: targetUserId, status: 'pending',
-                timestamp: new Date(),
-                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
-            });
-            
-            this._relationshipCache.sentRequests.add(targetUserId);
-            this._relationshipCache.lastUpdate = Date.now();
-            
-            if (btnElement) {
-                btnElement.innerHTML = `<i class="fas fa-clock"></i>`;
-                btnElement.style.cssText = `background: transparent; color: var(--primary); border: 1.5px solid var(--primary); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-                btnElement.title = 'طلب معلق';
-                btnElement.disabled = true;
-                btnElement.onclick = null;
-            }
-            
-            alert('✅ تم إرسال طلب الصداقة');
-        } catch (e) {
-            console.error('خطأ:', e);
-            alert('حدث خطأ في إرسال الطلب');
-        }
-    },
-    
-    refreshPostsAfterAction(targetUserId) {
+    refreshPostsAfterAction() {
         this._relationshipCache.lastUpdate = 0;
         this.loadAllPosts();
     },
     
-    // ==================== منتقي البلد في الرأس ====================
+    // ==================== منتقي البلد ====================
     renderCountryHeaderSelector() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
@@ -830,16 +668,10 @@ const PostsSystem = {
     },
     
     toggleHeaderCountryDropdown(event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const existing = document.getElementById('countryHeaderDropdown');
-        if (existing) {
-            this.closeAllDropdowns();
-            return;
-        }
+        if (existing) { this.closeAllDropdowns(); return; }
         
         const btn = document.querySelector('.country-header-btn');
         if (!btn) return;
@@ -887,17 +719,6 @@ const PostsSystem = {
             dropdown.style.left = 'auto';
             dropdown.style.right = right + 'px';
         }
-        
-        const arrow = btn.querySelector('.country-header-arrow');
-        if (arrow) arrow.style.transform = 'rotate(180deg)';
-        
-        const observer = setInterval(() => {
-            const dd = document.getElementById('countryHeaderDropdown');
-            if (!dd) {
-                if (arrow) arrow.style.transform = 'rotate(0deg)';
-                clearInterval(observer);
-            }
-        }, 200);
     },
     
     selectCountry(code) {
@@ -910,10 +731,8 @@ const PostsSystem = {
         if (btn) {
             const flagSpan = btn.querySelector('.country-header-flag');
             const nameSpan = btn.querySelector('.country-header-name');
-            const arrow = btn.querySelector('.country-header-arrow');
             if (flagSpan) flagSpan.textContent = window.Countries.getFlag(code);
             if (nameSpan) nameSpan.textContent = window.Countries.getName(code);
-            if (arrow) arrow.style.transform = 'rotate(0deg)';
         }
         this.loadAllPosts();
     },
@@ -927,10 +746,8 @@ const PostsSystem = {
         if (btn) {
             const flagSpan = btn.querySelector('.country-header-flag');
             const nameSpan = btn.querySelector('.country-header-name');
-            const arrow = btn.querySelector('.country-header-arrow');
             if (flagSpan) flagSpan.textContent = '🌍';
             if (nameSpan) nameSpan.textContent = 'الكل';
-            if (arrow) arrow.style.transform = 'rotate(0deg)';
         }
         this.loadAllPosts();
     },
@@ -994,17 +811,11 @@ const PostsSystem = {
     },
     
     togglePublishCategoryDropdown(event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const dropdownId = 'jobCategoryDropdown';
         const existing = document.getElementById(dropdownId);
-        if (existing) {
-            this.closeAllDropdowns();
-            return;
-        }
+        if (existing) { this.closeAllDropdowns(); return; }
         
         const btn = document.querySelector('#jobCategorySelector .publish-category-btn');
         if (!btn) return;
@@ -1036,7 +847,7 @@ const PostsSystem = {
         this.renderPublishCategoryDropdown();
     },
     
-    // ==================== منتقي البلد ====================
+    // ==================== منتقي البلد للنشر ====================
     renderPublishCountryDropdown(publishType) {
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const containerId = `${prefix}CountrySelector`;
@@ -1058,19 +869,13 @@ const PostsSystem = {
     },
     
     togglePublishCountryDropdown(publishType, event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const dropdownId = `${prefix}CountryDropdown`;
         
         const existing = document.getElementById(dropdownId);
-        if (existing) {
-            this.closeAllDropdowns();
-            return;
-        }
+        if (existing) { this.closeAllDropdowns(); return; }
         
         const btn = document.querySelector(`#${prefix}CountrySelector .publish-country-btn`);
         if (!btn) return;
@@ -1135,18 +940,12 @@ const PostsSystem = {
     },
     
     toggleMarriageDropdown(field, event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
         
         const existing = document.getElementById(dropdownId);
-        if (existing) {
-            this.closeAllDropdowns();
-            return;
-        }
+        if (existing) { this.closeAllDropdowns(); return; }
         
         const btn = document.querySelector(`.publish-category-btn[data-field="${field}"]`);
         if (!btn) return;
@@ -1256,42 +1055,31 @@ const PostsSystem = {
         });
     },
     
+    // ==================== تحميل المنشورات ====================
     async loadJobsPosts() {
         const container = document.getElementById('jobsPostsContainer');
         const emptyState = document.getElementById('jobsEmptyState');
         if (!container) return;
         
         try {
-            let query = window.db.collection('posts').where('type', '==', 'job');
-            if (!this.showAllCountries && this.selectedCountry) {
-                query = query.where('countryCode', '==', this.selectedCountry);
-            }
-            if (this.selectedCategory && this.selectedCategory !== 'all') {
-                query = query.where('category', '==', this.selectedCategory);
-            }
+            const country = this.showAllCountries ? 'all' : this.selectedCountry;
+            const result = await RafeeqAPI.posts.getPosts('job', country, this.selectedCategory);
             
-            const snapshot = await query.limit(50).get();
             container.innerHTML = '';
             
-            if (snapshot.empty) {
+            if (!result.success || !result.posts || result.posts.length === 0) {
                 if (emptyState) emptyState.style.display = 'flex';
                 return;
             }
             if (emptyState) emptyState.style.display = 'none';
             
-            const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            posts.sort((a, b) => {
-                const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
-                const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
-                return timeB - timeA;
-            });
-            
             const fragment = document.createDocumentFragment();
-            for (const post of posts) {
+            for (const post of result.posts) {
                 const el = this.createJobPost(post);
                 if (el) fragment.appendChild(el);
             }
             container.appendChild(fragment);
+            
         } catch (e) {
             console.error('❌ خطأ في تحميل الوظائف:', e);
             if (emptyState) emptyState.style.display = 'flex';
@@ -1304,33 +1092,24 @@ const PostsSystem = {
         if (!container) return;
         
         try {
-            let query = window.db.collection('posts').where('type', '==', 'marriage');
-            if (!this.showAllCountries && this.selectedCountry) {
-                query = query.where('countryCode', '==', this.selectedCountry);
-            }
+            const country = this.showAllCountries ? 'all' : this.selectedCountry;
+            const result = await RafeeqAPI.posts.getPosts('marriage', country, null);
             
-            const snapshot = await query.limit(50).get();
             container.innerHTML = '';
             
-            if (snapshot.empty) {
+            if (!result.success || !result.posts || result.posts.length === 0) {
                 if (emptyState) emptyState.style.display = 'flex';
                 return;
             }
             if (emptyState) emptyState.style.display = 'none';
             
-            const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            posts.sort((a, b) => {
-                const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
-                const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
-                return timeB - timeA;
-            });
-            
             const fragment = document.createDocumentFragment();
-            for (const post of posts) {
+            for (const post of result.posts) {
                 const el = this.createMarriagePost(post);
                 if (el) fragment.appendChild(el);
             }
             container.appendChild(fragment);
+            
         } catch (e) {
             console.error('❌ خطأ في تحميل الزواج:', e);
             if (emptyState) emptyState.style.display = 'flex';
@@ -1341,7 +1120,8 @@ const PostsSystem = {
         const card = document.createElement('div');
         card.className = 'post-card job-post-card';
         
-        const isOwner = window.auth?.currentUser?.uid === post.userId;
+        const uid = RafeeqAPI.getUser()?.id;
+        const isOwner = uid === post.userId;
         const flag = window.Countries.getFlag(post.countryCode);
         const catIcon = this.getCategoryIcon(post.category);
         const catName = this.getCategoryName(post.category);
@@ -1350,10 +1130,6 @@ const PostsSystem = {
         const avatarContent = post.image 
             ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy">` 
             : '👤';
-        
-        const deleteBtn = isOwner 
-            ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
-            : '';
         
         let actionBtnHTML = '';
         if (post.userId && !isOwner) {
@@ -1371,7 +1147,6 @@ const PostsSystem = {
                 </div>
                 <div class="post-header-actions">
                     ${actionBtnHTML}
-                    ${deleteBtn}
                 </div>
             </div>
             <div class="post-content">
@@ -1401,7 +1176,8 @@ const PostsSystem = {
         const card = document.createElement('div');
         card.className = 'post-card marriage-post-card';
         
-        const isOwner = window.auth?.currentUser?.uid === post.userId;
+        const uid = RafeeqAPI.getUser()?.id;
+        const isOwner = uid === post.userId;
         const flag = window.Countries.getFlag(post.countryCode);
         
         const marriedText = {
@@ -1413,10 +1189,6 @@ const PostsSystem = {
         const avatarContent = post.image 
             ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy">` 
             : '👤';
-        
-        const deleteBtn = isOwner 
-            ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
-            : '';
         
         let actionBtnHTML = '';
         if (post.userId && !isOwner) {
@@ -1439,14 +1211,13 @@ const PostsSystem = {
                 </div>
                 <div class="post-header-actions">
                     ${actionBtnHTML}
-                    ${deleteBtn}
                 </div>
             </div>
             <div class="post-content">
                 <div class="post-info-row">
                     <span><i class="fas fa-user"></i> ${post.age || '?'} سنة</span>
                     <span><span style="font-size:1.1rem;">${flag}</span> ${this.escapeHtml(post.country || '')}</span>
-                    <span><i class="fas fa-heart"></i> ${marriedText[post.married] || post.married || ''}</span>
+                    <span><i class="fas fa-heart"></i> ${marriedText[post.married] || ''}</span>
                     ${childrenSpan}
                 </div>
                 <div class="post-bio">${this.escapeHtml(post.bio || '')}</div>
@@ -1516,10 +1287,6 @@ const PostsSystem = {
             } else if (touches.length === 1 && isTouching && currentScale > 1) {
                 translateX = touches[0].clientX - startX;
                 translateY = touches[0].clientY - startY;
-                const maxX = (currentScale - 1) * 200;
-                const maxY = (currentScale - 1) * 200;
-                translateX = Math.min(maxX, Math.max(-maxX, translateX));
-                translateY = Math.min(maxY, Math.max(-maxY, translateY));
                 updateTransform();
             }
         };
@@ -1563,25 +1330,11 @@ const PostsSystem = {
     async deletePost(postId) {
         if (!confirm('هل أنت متأكد من حذف هذا المنشور؟')) return;
         try {
-            await window.db.collection('posts').doc(postId).delete();
+            await RafeeqAPI.posts.delete(postId);
             this.loadAllPosts();
         } catch (e) {
             alert('حدث خطأ في الحذف');
         }
-    },
-    
-    setupRealtimeListeners() {
-        this._jobsUnsubscribe = window.db.collection('posts')
-            .where('type', '==', 'job')
-            .onSnapshot(snapshot => {
-                if (snapshot.docChanges().length > 0) this.loadJobsPosts();
-            }, error => console.warn('⚠️', error.message));
-        
-        this._marriageUnsubscribe = window.db.collection('posts')
-            .where('type', '==', 'marriage')
-            .onSnapshot(snapshot => {
-                if (snapshot.docChanges().length > 0) this.loadMarriagePosts();
-            }, error => console.warn('⚠️', error.message));
     },
     
     async compressImage(file) {
@@ -1660,7 +1413,7 @@ const PostsSystem = {
     }
 };
 
-// ==================== دوال الواجهة العامة ====================
+// ==================== دوال الواجهة ====================
 
 window.switchHomeTab = (tab) => PostsSystem.switchTab(tab);
 
@@ -1739,8 +1492,9 @@ window.closePostImagePreview = function() {
     }
 };
 
+// ==================== نشر وظيفة ====================
 window.publishJob = async function() {
-    if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول'); return; }
+    if (!RafeeqAPI.getToken()) { alert('يجب تسجيل الدخول'); return; }
     
     const name = document.getElementById('jobName')?.value?.trim();
     const age = document.getElementById('jobAge')?.value;
@@ -1772,28 +1526,46 @@ window.publishJob = async function() {
             catch (err) { alert('فشل معالجة الصورة: ' + err.message); return; }
         }
         
-        await window.db.collection('posts').add({
-            type: 'job', userId: window.auth.currentUser.uid,
+        const countryName = window.Countries.getName(countryCode);
+        
+        const result = await RafeeqAPI.posts.create({
+            type: 'job',
             name, age: ageNum,
-            country: window.Countries.getName(countryCode),
+            country: countryName,
             countryCode, category, jobTitle, bio,
             contactMethod: contactMethod,
             contactValue: (contactMethod === 'none') ? '' : contactValue,
-            image: imageBase64,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            image: imageBase64
         });
         
         window.closeModal('publishJobModal');
         clearJobForm();
-        alert('✅ تم نشر الوظيفة بنجاح');
+        
+        alert('✅ تم إرسال المنشور للمراجعة\nسيتم خصم ' + PostsSystem._postPrice + '$ من رصيدك');
+        
         if (typeof switchPage === 'function') switchPage('home');
         PostsSystem.selectCountry(countryCode);
         setTimeout(() => PostsSystem.switchTab('jobs'), 100);
-    } catch (e) { alert('حدث خطأ: ' + e.message); }
+        
+        // تحديث الرصيد
+        if (result.balance !== undefined) {
+            const user = RafeeqAPI.getUser();
+            if (user) {
+                user.balance = result.balance;
+                RafeeqAPI.setUser(user);
+                const balanceEl = document.getElementById('profileBalance');
+                if (balanceEl) balanceEl.textContent = `$${result.balance.toFixed(2)}`;
+            }
+        }
+        
+    } catch (e) { 
+        alert('❌ ' + (e.message || 'حدث خطأ')); 
+    }
 };
 
+// ==================== نشر زواج ====================
 window.publishMarriage = async function() {
-    if (!window.auth?.currentUser) { alert('يجب تسجيل الدخول'); return; }
+    if (!RafeeqAPI.getToken()) { alert('يجب تسجيل الدخول'); return; }
     
     const name = document.getElementById('marriageName')?.value?.trim();
     const age = document.getElementById('marriageAge')?.value;
@@ -1825,25 +1597,42 @@ window.publishMarriage = async function() {
             catch (err) { alert('فشل معالجة الصورة: ' + err.message); return; }
         }
         
-        await window.db.collection('posts').add({
-            type: 'marriage', userId: window.auth.currentUser.uid,
+        const countryName = window.Countries.getName(countryCode);
+        
+        const result = await RafeeqAPI.posts.create({
+            type: 'marriage',
             name, age: ageNum,
-            country: window.Countries.getName(countryCode),
+            country: countryName,
             countryCode, bio, married,
             children: (married === 'no') ? 'no' : children,
             contactMethod: contactMethod,
             contactValue: (contactMethod === 'none') ? '' : contactValue,
-            image: imageBase64,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            image: imageBase64
         });
         
         window.closeModal('publishMarriageModal');
         clearMarriageForm();
-        alert('✅ تم نشر إعلان الزواج بنجاح');
+        
+        alert('✅ تم إرسال الإعلان للمراجعة\nسيتم خصم ' + PostsSystem._postPrice + '$ من رصيدك');
+        
         if (typeof switchPage === 'function') switchPage('home');
         PostsSystem.selectCountry(countryCode);
         setTimeout(() => PostsSystem.switchTab('marriage'), 100);
-    } catch (e) { alert('حدث خطأ: ' + e.message); }
+        
+        // تحديث الرصيد
+        if (result.balance !== undefined) {
+            const user = RafeeqAPI.getUser();
+            if (user) {
+                user.balance = result.balance;
+                RafeeqAPI.setUser(user);
+                const balanceEl = document.getElementById('profileBalance');
+                if (balanceEl) balanceEl.textContent = `$${result.balance.toFixed(2)}`;
+            }
+        }
+        
+    } catch (e) { 
+        alert('❌ ' + (e.message || 'حدث خطأ')); 
+    }
 };
 
 function clearJobForm() {
@@ -1886,9 +1675,4 @@ window.addEventListener('authReady', () => {
     setTimeout(() => PostsSystem.init(), 100);
 });
 
-window.addEventListener('friendsUpdated', () => {
-    PostsSystem._relationshipCache.lastUpdate = 0;
-    PostsSystem.loadAllPosts();
-});
-
-console.log('✅ posts-system.js تم تحميله - النسخة النهائية');
+console.log('✅ posts-system.js loaded - Cloudflare API mode');
