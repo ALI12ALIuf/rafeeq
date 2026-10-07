@@ -13,6 +13,9 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" id="theme-color" content="#1a1a1a">
+    
+    <!-- ✅ Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="theme-dark" data-page="home">
 
@@ -202,6 +205,15 @@
                         <span id="shareableId" class="id-value-numbers"></span>
                         <span class="id-label-english">ID</span>
                     </div>
+                    <!-- ✅ رصيد المحفظة -->
+                    <div class="profile-balance" style="background: var(--light); padding: 8px 20px; border-radius: 20px; display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                        <i class="fas fa-wallet" style="color: var(--primary);"></i>
+                        <span style="color: var(--text-light); font-size: 0.9rem;">الرصيد:</span>
+                        <span id="profileBalance" style="color: var(--primary); font-weight: 700; font-size: 1.1rem;">$0.00</span>
+                        <button onclick="openDepositModal()" style="background: var(--primary); border: none; color: white; padding: 4px 12px; border-radius: 12px; cursor: pointer; font-size: 0.8rem; margin-right: 8px;">
+                            <i class="fas fa-plus"></i> إيداع
+                        </button>
+                    </div>
                 </div>
                 <p class="profile-bio" id="profileBio"></p>
             </div>
@@ -295,14 +307,12 @@
             <textarea id="jobBio" maxlength="400" rows="5" placeholder="اكتب نبذة عن مؤهلاتك وخبراتك..."></textarea>
         </div>
         
-        <!-- ✅ طريقة التواصل (اختياري) -->
         <div class="edit-field">
             <label>طريقة التواصل <span style="font-size:0.7rem;color:var(--text-light);font-weight:400;">(اختياري)</span></label>
             <input type="hidden" id="jobContactMethod" value="none">
             <div class="publish-category-container" id="jobContactSelector"></div>
         </div>
         
-        <!-- ✅ حقل الإدخال الديناميكي -->
         <div class="edit-field" id="jobContactValueField" style="display: none;">
             <div class="field-label-row">
                 <label id="jobContactValueLabel">القيمة</label>
@@ -320,6 +330,14 @@
                     <i class="fas fa-camera"></i> اختر صورة
                 </button>
             </div>
+        </div>
+        
+        <!-- ✅ إشعار السعر -->
+        <div style="background: rgba(100, 181, 246, 0.1); border: 1px solid var(--primary); border-radius: 10px; padding: 10px 14px; margin: 12px auto; max-width: 300px; text-align: center;">
+            <p style="color: var(--primary); font-size: 0.85rem; margin: 0;">
+                <i class="fas fa-info-circle"></i>
+                سيتم خصم <strong id="jobPriceDisplay">5$</strong> من رصيدك عند النشر
+            </p>
         </div>
         
         <div class="modal-actions">
@@ -377,14 +395,12 @@
             <div class="publish-category-container" id="marriageChildrenSelector"></div>
         </div>
         
-        <!-- ✅ طريقة التواصل (اختياري) -->
         <div class="edit-field">
             <label>طريقة التواصل <span style="font-size:0.7rem;color:var(--text-light);font-weight:400;">(اختياري)</span></label>
             <input type="hidden" id="marriageContactMethod" value="none">
             <div class="publish-category-container" id="marriageContactSelector"></div>
         </div>
         
-        <!-- ✅ حقل الإدخال الديناميكي -->
         <div class="edit-field" id="marriageContactValueField" style="display: none;">
             <div class="field-label-row">
                 <label id="marriageContactValueLabel">القيمة</label>
@@ -404,11 +420,64 @@
             </div>
         </div>
         
+        <!-- ✅ إشعار السعر -->
+        <div style="background: rgba(100, 181, 246, 0.1); border: 1px solid var(--primary); border-radius: 10px; padding: 10px 14px; margin: 12px auto; max-width: 300px; text-align: center;">
+            <p style="color: var(--primary); font-size: 0.85rem; margin: 0;">
+                <i class="fas fa-info-circle"></i>
+                سيتم خصم <strong id="marriagePriceDisplay">5$</strong> من رصيدك عند النشر
+            </p>
+        </div>
+        
         <div class="modal-actions">
             <button class="modal-btn modal-btn-outline" onclick="closeModal('publishMarriageModal')">إلغاء</button>
             <button class="modal-btn modal-btn-outline" onclick="publishMarriage()">نشر</button>
         </div>
         <button class="close-modal" onclick="closeModal('publishMarriageModal')"><i class="fas fa-times"></i></button>
+    </div>
+</div>
+
+<!-- ==================== نافذة الإيداع ==================== -->
+<div class="modal" id="depositModal">
+    <div class="modal-content">
+        <h3><i class="fas fa-wallet" style="color: var(--primary);"></i> طلب إيداع</h3>
+        
+        <div class="edit-field">
+            <label>المبلغ (بالدولار)</label>
+            <input type="text" inputmode="numeric" id="depositAmount" placeholder="مثال: 10">
+        </div>
+        
+        <div class="edit-field">
+            <label>صورة الإيصال</label>
+            <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+                <div id="depositImagePreview" style="width: 80px; height: 80px; border-radius: 12px; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden;">
+                    <i class="fas fa-receipt" style="color: var(--text-light);"></i>
+                </div>
+                <input type="file" id="depositImage" accept="image/*" style="display: none;" onchange="previewDepositImage(event)">
+                <button type="button" class="change-avatar-btn" onclick="document.getElementById('depositImage').click()">
+                    <i class="fas fa-camera"></i> اختر إيصال
+                </button>
+            </div>
+        </div>
+        
+        <div class="edit-field">
+            <label>ملاحظة (اختياري)</label>
+            <input type="text" id="depositNote" maxlength="100" placeholder="ملاحظة للآدمن">
+        </div>
+        
+        <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid #FFC107; border-radius: 10px; padding: 10px 14px; margin: 12px auto; max-width: 300px;">
+            <p style="color: #FFC107; font-size: 0.8rem; margin: 0; text-align: center;">
+                <i class="fas fa-info-circle"></i>
+                حوّل المبلغ إلى:<br>
+                <strong>زين كاش: 07701234567</strong><br>
+                ثم ارفع صورة الإيصال
+            </p>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="modal-btn modal-btn-outline" onclick="closeModal('depositModal')">إلغاء</button>
+            <button class="modal-btn modal-btn-outline" onclick="submitDeposit()">إرسال</button>
+        </div>
+        <button class="close-modal" onclick="closeModal('depositModal')"><i class="fas fa-times"></i></button>
     </div>
 </div>
 
@@ -439,9 +508,26 @@
         <div style="font-size:5rem;">🛡️</div>
         <h1 style="font-size:2rem;color:var(--primary);">رفيق</h1>
         <p style="color:var(--text-light);margin-bottom:2rem;">سجل دخولك للوصول إلى جميع الميزات</p>
-        <button onclick="startGoogleLogin()" style="background:var(--primary);color:white;border:none;border-radius:30px;padding:15px 30px;font-size:1.1rem;cursor:pointer;width:100%;">
-            <i class="fab fa-google"></i> المتابعة بحساب جوجل
-        </button>
+        
+        <!-- ✅ زر Google Sign-In الجديد -->
+        <div id="g_id_onload"
+             data-client_id="578021976495-olbueuh63il6oberbrplpnjbjh0balko.apps.googleusercontent.com"
+             data-callback="handleGoogleSignIn"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-size="large"
+             data-theme="filled_blue"
+             data-text="sign_in_with"
+             data-shape="pill"
+             data-logo_alignment="left"
+             style="display: flex; justify-content: center;">
+        </div>
+        
+        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 1.5rem;">
+            <i class="fas fa-lock"></i> آمن ومشفر بالكامل
+        </p>
     </div>
 </div>
 
@@ -505,34 +591,16 @@
     </div>
 </div>
 
-<!-- ==================== Firebase ==================== -->
-<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
-
-<script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyAuyKDI0JhPn-v02c5l7XekiyymNWeFPIQ",
-        authDomain: "rafeeq2-c0aef.firebaseapp.com",
-        projectId: "rafeeq2-c0aef",
-        storageBucket: "rafeeq2-c0aef.firebasestorage.app",
-        messagingSenderId: "1030537082006",
-        appId: "1:1030537082006:web:7eb0a052da85e1441bfeb7"
-    };
-    firebase.initializeApp(firebaseConfig);
-    window.auth = firebase.auth();
-    window.db = firebase.firestore();
-    window.googleProvider = new firebase.auth.GoogleAuthProvider();
-</script>
-
-<script src="js/i18n.js?v=31"></script>
-<script src="js/countries.js?v=31"></script>
-<script src="js/secure-chat.js?v=31"></script>
-<script src="js/chat-system.js?v=31"></script>
-<script src="js/ui-functions.js?v=31"></script>
-<script src="js/posts-system.js?v=31"></script>
-<script src="js/auth.js?v=31"></script>
-<script src="js/friends.js?v=31"></script>
+<!-- ==================== Scripts ==================== -->
+<script src="js/api-client.js?v=32"></script>
+<script src="js/i18n.js?v=32"></script>
+<script src="js/countries.js?v=32"></script>
+<script src="js/secure-chat.js?v=32"></script>
+<script src="js/chat-system.js?v=32"></script>
+<script src="js/ui-functions.js?v=32"></script>
+<script src="js/posts-system.js?v=32"></script>
+<script src="js/auth.js?v=32"></script>
+<script src="js/friends.js?v=32"></script>
 
 <script>
 window.addEventListener('load', function() {
