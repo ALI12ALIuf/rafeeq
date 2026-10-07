@@ -1,15 +1,13 @@
-// ========== auth.js - النسخة المحسّنة (بدون authReady مكرر) ==========
+// ========== auth.js - Rafeeq Auth via Cloudflare API ==========
 
+// ✅ Google Client ID
+const GOOGLE_CLIENT_ID = '578021976495-olbueuh63il6oberbrplpnjbjh0balko.apps.googleusercontent.com';
+
+// ==================== دوال مساعدة ====================
 function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
     return num.toString();
-}
-
-function generateShareableId() {
-    let id = '';
-    for (let i = 0; i < 10; i++) { id += Math.floor(Math.random() * 10).toString(); }
-    return id;
 }
 
 function getEmojiForUser(userData) {
@@ -27,19 +25,10 @@ function getEmojiForUser(userData) {
     return emojiMap[userData.avatarType] || '🧔🏻‍♂️';
 }
 
-const FieldValue = firebase.firestore.FieldValue;
-
-// ✅ منع التشغيل المزدوج لـ authReady
-let _authReadyFired = false;
-function fireAuthReady() {
-    if (_authReadyFired) return;
-    _authReadyFired = true;
-    console.log('🔔 إطلاق authReady (مرة واحدة)');
-    window.dispatchEvent(new Event('authReady'));
-}
-
+// ==================== الشاشات ====================
 function showApp() {
-    const splash = document.getElementById('splash'), app = document.getElementById('app');
+    const splash = document.getElementById('splash');
+    const app = document.getElementById('app');
     const loginScreen = document.getElementById('loginScreen');
     if (loginScreen) loginScreen.style.display = 'none';
     if (splash) splash.style.display = 'none';
@@ -47,182 +36,324 @@ function showApp() {
 }
 
 function showLoginScreen() {
+    const splash = document.getElementById('splash');
     const loginScreen = document.getElementById('loginScreen');
+    if (splash) splash.style.display = 'none';
     if (loginScreen) loginScreen.style.display = 'flex';
 }
 
-async function startGoogleLogin() {
-    try {
-        if (!window.auth || !window.googleProvider) {
-            alert('مكتبة Firebase لم يتم تحميلها بعد.');
-            return;
-        }
-        const splash = document.getElementById('splash');
-        if (splash) splash.style.display = 'none';
-        const loginScreen = document.getElementById('loginScreen');
-        if (loginScreen) loginScreen.style.display = 'none';
-        
-        const result = await window.auth.signInWithPopup(window.googleProvider);
-        await saveUserAndEnter(result.user);
-    } catch (error) {
-        let msg = 'حدث خطأ في تسجيل الدخول';
-        if (error.code === 'auth/popup-closed-by-user') msg = 'تم إغلاق نافذة تسجيل الدخول';
-        else if (error.code === 'auth/network-request-failed') msg = 'خطأ في الشبكة';
-        alert(msg);
+// ==================== Google Sign-In ====================
+window.handleGoogleSignIn = async function(response) {
+    console.log('🔐 Google Sign-In Response received');
+    
+    if (!response.credential) {
+        alert('فشل تسجيل الدخول: لا يوجد credential');
+        return;
     }
-}
-
-// ✅ saveUserAndEnter — بدون dispatchEvent (authReady يُطلق من onAuthStateChanged فقط)
-async function saveUserAndEnter(user) {
+    
+    const idToken = response.credential;
+    
     try {
-        const userDoc = await window.db.collection('users').doc(user.uid).get();
+        // إظهار شاشة الانتظار
+        showLoadingScreen('جاري تسجيل الدخول...');
         
-        let shortName = (user.displayName || 'مستخدم').trim();
-        if (shortName.length > 15) shortName = shortName.substring(0, 15);
+        // إرسال idToken للـ API
+        const result = await RafeeqAPI.auth.signInWithGoogle(idToken);
         
-        if (!userDoc.exists) {
-            await window.db.collection('users').doc(user.uid).set({
-                uid: user.uid,
-                name: shortName,
-                email: user.email || '',
-                shareableId: generateShareableId(),
-                bio: '',
-                avatarType: 'man_light',
-                friends: [],
-                blocked: [],
-                createdAt: new Date()
-            });
-            console.log('✅ مستخدم جديد - تم حفظ الاسم:', shortName);
-        } else {
-            const userData = userDoc.data();
-            const updates = {};
-            if (userData.name && userData.name.length > 15) {
-                updates.name = userData.name.substring(0, 15);
-            }
-            if (!userData.friends) updates.friends = [];
-            if (userData.followers) updates.followers = [];
-            if (userData.following) updates.following = [];
-            if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
-                updates.avatarType = 'man_light';
-            }
-            if (Object.keys(updates).length > 0) {
-                await window.db.collection('users').doc(user.uid).update(updates);
-            }
+        if (!result.success || !result.user) {
+            throw new Error('فشل تسجيل الدخول من السيرفر');
         }
         
-        // ✅ إعداد المستمعين
-        if (typeof setupFriendRequestsListener === 'function') setupFriendRequestsListener(user.uid);
-        if (typeof setupFriendsListener === 'function') setupFriendsListener(user.uid);
+        console.log('✅ تسجيل دخول ناجح:', result.user.name);
         
-        // ✅ إشعار واحد فقط
-        fireAuthReady();
+        // حفظ بيانات المستخدم
+        RafeeqAPI.setUser(result.user);
         
-        await loadUserData(user.uid);
+        // تحميل البيانات
+        await loadUserData(result.user);
         
-        // ✅ SecureChatSystem بدون انتظار (في الخلفية)
+        // إخفاء شاشة الانتظار
+        hideLoadingScreen();
+        
+        // إظهار التطبيق
+        showApp();
+        
+        // ✅ إشعار authReady
+        window.dispatchEvent(new Event('authReady'));
+        
+        // ✅ بدء الاستماع للرسائل
         if (typeof SecureChatSystem !== 'undefined') {
             SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
         }
         
-        showApp();
-    } catch (error) {
-        console.error('خطأ في حفظ المستخدم:', error);
-        alert('حدث خطأ في إعداد الحساب');
-    }
-}
-
-async function signInWithGoogle() { await startGoogleLogin(); }
-
-function updateUserUI() {
-    const splash = document.getElementById('splash'), app = document.getElementById('app');
-    if (splash) {
-        splash.classList.add('hide');
+        // ✅ تحميل المحادثات
         setTimeout(() => {
-            splash.style.display = 'none';
-            if (app) app.style.display = 'flex';
+            if (typeof loadChats === 'function') {
+                chatsLoaded = false;
+                loadChats(true);
+            }
+            if (typeof ChatSystem !== 'undefined' && ChatSystem.loadAllChats) {
+                ChatSystem.loadAllChats();
+            }
         }, 500);
+        
+    } catch (error) {
+        hideLoadingScreen();
+        console.error('❌ Sign-In Error:', error);
+        alert('فشل تسجيل الدخول: ' + error.message);
+    }
+};
+
+// ==================== شاشات الانتظار ====================
+function showLoadingScreen(message = 'جاري التحميل...') {
+    let loader = document.getElementById('globalLoader');
+    if (!loader) {
+        loader = document.createElement('div');
+        loader.id = 'globalLoader';
+        loader.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            color: white;
+            font-family: inherit;
+        `;
+        loader.innerHTML = `
+            <div style="width: 50px; height: 50px; border: 4px solid rgba(100, 181, 246, 0.3); border-top-color: #64B5F6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;"></div>
+            <div id="loaderMessage" style="font-size: 1rem; color: #64B5F6;"></div>
+        `;
+        
+        const style = document.createElement('style');
+        style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(loader);
+    }
+    const msg = document.getElementById('loaderMessage');
+    if (msg) msg.textContent = message;
+    loader.style.display = 'flex';
+}
+
+function hideLoadingScreen() {
+    const loader = document.getElementById('globalLoader');
+    if (loader) loader.style.display = 'none';
+}
+
+// ==================== تحميل بيانات المستخدم ====================
+async function loadUserData(user) {
+    try {
+        if (!user) {
+            const cached = RafeeqAPI.getUser();
+            if (cached) user = cached;
+        }
+        
+        if (!user) {
+            console.warn('⚠️ لا توجد بيانات مستخدم');
+            return;
+        }
+        
+        // تحديث الواجهة
+        const pn = document.getElementById('profileName');
+        const pa = document.getElementById('profileAvatarEmoji');
+        const pb = document.getElementById('profileBio');
+        const si = document.getElementById('shareableId');
+        const ca = document.getElementById('currentAvatarEmoji');
+        const balanceEl = document.getElementById('profileBalance');
+        
+        let displayName = user.name || 'مستخدم';
+        if (displayName.length > 15) {
+            displayName = displayName.substring(0, 15);
+        }
+        
+        if (pn) pn.textContent = displayName;
+        if (pb) pb.textContent = user.bio || '';
+        if (si) si.textContent = user.shareableId || '0000000000';
+        
+        const emoji = getEmojiForUser(user);
+        if (pa) pa.textContent = emoji;
+        if (ca) ca.textContent = emoji;
+        
+        // ✅ تحديث الرصيد
+        if (balanceEl) {
+            balanceEl.textContent = `$${(user.balance || 0).toFixed(2)}`;
+        }
+        
+        console.log('✅ تم تحميل بيانات المستخدم:', displayName);
+        
+    } catch (e) {
+        console.warn('⚠️ خطأ في loadUserData:', e);
     }
 }
 
+// ==================== تسجيل الخروج ====================
 async function logout() {
+    if (!confirm('هل أنت متأكد من تسجيل الخروج؟')) return;
+    
     try {
-        if (window.auth?.currentUser) {
-            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                online: false,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-    } catch (e) {}
-    try { await window.auth.signOut(); } catch (e) {}
-    console.log('🔓 تم تسجيل الخروج');
+        await RafeeqAPI.auth.logout();
+    } catch (e) {
+        console.warn('Logout API error:', e);
+    }
+    
+    RafeeqAPI.clearAll();
+    
+    // إعادة تحميل الصفحة
     window.location.reload();
 }
 
-async function loadUserData(uid) {
-    try {
-        const doc = await window.db.collection('users').doc(uid).get();
-        if (doc.exists) {
-            const d = doc.data();
-            const pn = document.getElementById('profileName');
-            const pa = document.getElementById('profileAvatarEmoji');
-            const pb = document.getElementById('profileBio');
-            const si = document.getElementById('shareableId');
-            const ca = document.getElementById('currentAvatarEmoji');
-            
-            let displayName = d.name || 'مستخدم';
-            if (displayName.length > 15) {
-                displayName = displayName.substring(0, 15);
-                try {
-                    await window.db.collection('users').doc(uid).update({ name: displayName });
-                } catch (e) {}
-            }
-            if (pn) pn.textContent = displayName;
-            if (pb) pb.textContent = d.bio || '';
-            if (si) si.textContent = d.shareableId || '0000000000';
-            
-            const emoji = getEmojiForUser(d);
-            if (pa) pa.textContent = emoji;
-            if (ca) ca.textContent = emoji;
-        }
-    } catch (e) {
-        console.warn('خطأ في loadUserData:', e);
-    }
-}
-
-// ==================== ✅ onAuthStateChanged — المُشغِّل الوحيد ====================
-if (typeof window.auth !== 'undefined') {
-    window.auth.onAuthStateChanged(async (user) => {
-        const splash = document.getElementById('splash'), app = document.getElementById('app');
-        
-        if (user) {
-            // ✅ إعداد المستمعين
-            if (typeof setupFriendRequestsListener === 'function') setupFriendRequestsListener(user.uid);
-            if (typeof setupFriendsListener === 'function') setupFriendsListener(user.uid);
-            
-            // ✅ إطلاق authReady
-            fireAuthReady();
-            
-            await loadUserData(user.uid);
-            
-            // ✅ SecureChatSystem في الخلفية
-            if (typeof SecureChatSystem !== 'undefined') {
-                SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
-            }
-            
-            showApp();
-        } else {
-            _authReadyFired = false;
-            if (app) app.style.display = 'none';
-            if (splash) splash.style.display = 'flex';
-            setTimeout(() => {
-                if (splash) splash.style.display = 'none';
-                showLoginScreen();
-            }, 2500);
-        }
+// ==================== نسخ ID ====================
+function copyId() {
+    const el = document.getElementById('shareableId');
+    if (!el) return;
+    
+    const text = el.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('✅ تم نسخ الـ ID: ' + text);
+    }).catch(() => {
+        alert('فشل النسخ');
     });
 }
 
-function copyId() {
-    const el = document.getElementById('shareableId');
-    if (el) navigator.clipboard.writeText(el.textContent).then(() => alert('تم النسخ'));
+// ==================== تهيئة Google Sign-In ====================
+function initGoogleSignIn() {
+    if (typeof google === 'undefined' || !google.accounts) {
+        console.warn('⚠️ Google Identity Services not loaded yet');
+        return false;
+    }
+    
+    try {
+        google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: window.handleGoogleSignIn,
+            auto_select: false,
+            cancel_on_tap_outside: true
+        });
+        
+        // عرض الزر
+        const signInDiv = document.querySelector('.g_id_signin');
+        if (signInDiv) {
+            google.accounts.id.renderButton(signInDiv, {
+                type: 'standard',
+                size: 'large',
+                theme: 'filled_blue',
+                text: 'sign_in_with',
+                shape: 'pill',
+                logo_alignment: 'left',
+                width: 280
+            });
+        }
+        
+        console.log('✅ Google Sign-In initialized');
+        return true;
+    } catch (e) {
+        console.error('❌ Google Sign-In init error:', e);
+        return false;
+    }
 }
+
+// ==================== التحقق من الجلسة عند التحميل ====================
+async function checkExistingSession() {
+    const token = RafeeqAPI.getToken();
+    
+    if (!token) {
+        showLoginScreen();
+        return false;
+    }
+    
+    try {
+        showLoadingScreen('جاري التحقق من الجلسة...');
+        
+        // التحقق من الجلسة عبر API
+        const result = await RafeeqAPI.auth.me();
+        
+        if (!result.success || !result.user) {
+            throw new Error('جلسة غير صالحة');
+        }
+        
+        // حفظ المستخدم
+        RafeeqAPI.setUser(result.user);
+        
+        await loadUserData(result.user);
+        
+        hideLoadingScreen();
+        showApp();
+        
+        // إشعار authReady
+        window.dispatchEvent(new Event('authReady'));
+        
+        // بدء SecureChatSystem
+        if (typeof SecureChatSystem !== 'undefined') {
+            SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
+        }
+        
+        // تحميل المحادثات
+        setTimeout(() => {
+            if (typeof loadChats === 'function') {
+                chatsLoaded = false;
+                loadChats(true);
+            }
+            if (typeof ChatSystem !== 'undefined' && ChatSystem.loadAllChats) {
+                ChatSystem.loadAllChats();
+            }
+        }, 500);
+        
+        return true;
+        
+    } catch (error) {
+        console.warn('⚠️ فشل التحقق من الجلسة:', error.message);
+        RafeeqAPI.clearAll();
+        hideLoadingScreen();
+        showLoginScreen();
+        return false;
+    }
+}
+
+// ==================== إشعار عند انتهاء الجلسة ====================
+window.onSessionExpired = function() {
+    console.warn('⚠️ انتهت الجلسة');
+    RafeeqAPI.clearAll();
+    alert('انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.');
+    window.location.reload();
+};
+
+// ==================== تهيئة عند التحميل ====================
+window.addEventListener('load', function() {
+    console.log('🚀 auth.js - بدء التهيئة...');
+    
+    // انتظر تحميل Google SDK
+    let attempts = 0;
+    const waitForGoogle = setInterval(() => {
+        attempts++;
+        if (initGoogleSignIn()) {
+            clearInterval(waitForGoogle);
+            console.log('✅ Google Sign-In ready after', attempts, 'attempts');
+        } else if (attempts > 20) {
+            clearInterval(waitForGoogle);
+            console.error('❌ Google Sign-In failed to load');
+        }
+    }, 250);
+    
+    // ✅ التحقق من الجلسة الحالية
+    checkExistingSession();
+});
+
+// ==================== تصدير الدوال ====================
+window.startGoogleLogin = function() {
+    if (typeof google !== 'undefined' && google.accounts) {
+        google.accounts.id.prompt();
+    } else {
+        alert('Google Sign-In غير جاهز. أعد تحميل الصفحة.');
+    }
+};
+
+window.loadUserData = loadUserData;
+window.showLoginScreen = showLoginScreen;
+window.showApp = showApp;
+window.logout = logout;
+window.copyId = copyId;
+
+console.log('✅ auth.js loaded - Cloudflare API mode');
