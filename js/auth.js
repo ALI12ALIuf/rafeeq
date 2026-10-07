@@ -1,7 +1,7 @@
 // ========== auth.js - Rafeeq Auth via Cloudflare API ==========
 
-// ✅ Google Client ID (مصحح)
-const GOOGLE_CLIENT_ID = '578021976495-olbuh63il6oberbrplpnjbjh0balko.apps.googleusercontent.com';
+// ✅ Google Client ID (الصحيح من Firebase)
+const GOOGLE_CLIENT_ID = '578021976495-olbueuh63il6oberbrplpnjbjh0balko.apps.googleusercontent.com';
 
 // ==================== دوال مساعدة ====================
 function formatNumber(num) {
