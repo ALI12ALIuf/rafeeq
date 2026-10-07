@@ -1,23 +1,113 @@
-// ========== chat-system.js - النسخة النهائية (حد 200 حرف) ==========
+// ========== chat-system.js - Rafeeq Chat via Cloudflare API ==========
 
 const ChatSystem = {
-    currentChat: null, messages: {},
+    currentChat: null,
+    messages: {},
     friendInConversation: false,
     chatItemTemplate: null,
     _displayedIds: new Set(),
     _isProcessing: false,
+    _pollingInterval: null,
     
-    // ✅ الحد الأقصى للرسالة
     MAX_MESSAGE_LENGTH: 200,
     
     init() { 
         this.loadAllChats(); 
         this.chatItemTemplate = document.getElementById('chatItemTemplate');
+        this.startPolling();
+    },
+    
+    // ==================== Polling للرسائل الجديدة ====================
+    startPolling() {
+        // إيقاف القديم إن وجد
+        if (this._pollingInterval) {
+            clearInterval(this._pollingInterval);
+        }
+        
+        // فحص كل 5 ثوانٍ
+        this._pollingInterval = setInterval(async () => {
+            await this.checkNewMessages();
+        }, 5000);
+        
+        console.log('✅ بدء استقبال الرسائل (Polling)');
+    },
+    
+    async checkNewMessages() {
+        if (!RafeeqAPI.getToken()) return;
+        
+        try {
+            const now = Math.floor(Date.now() / 1000);
+            const lastCheck = parseInt(localStorage.getItem('last_message_check') || '0');
+            
+            const result = await RafeeqAPI.messages.getPending(lastCheck);
+            
+            if (result.success && result.messages && result.messages.length > 0) {
+                for (const msg of result.messages) {
+                    await this.processIncomingMessage(msg);
+                }
+            }
+            
+            localStorage.setItem('last_message_check', now.toString());
+            
+        } catch (error) {
+            // لا نعرض الخطأ — فقط نتجاهل
+        }
+    },
+    
+    async processIncomingMessage(msg) {
+        try {
+            // ✅ فك تشفير الرسالة
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const senderPublicKey = await SecureChatSystem.getReceiverPublicKey(msg.fromUser);
+            
+            if (!myPrivateKey || !senderPublicKey) {
+                console.warn('⚠️ لا يمكن فك تشفير الرسالة');
+                return;
+            }
+            
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, senderPublicKey);
+            const decryptedText = await SecureChatSystem.decryptData(msg.package.data, sharedKey);
+            
+            // ✅ حفظ الرسالة
+            this.saveMessage(msg.fromUser, {
+                id: msg.package.id || msg.id,
+                type: 'text',
+                text: decryptedText,
+                sender: 'friend',
+                time: new Date().toISOString()
+            });
+            
+            // ✅ إذا كنا في المحادثة نفسها، اعرضها
+            if (this.currentChat === msg.fromUser) {
+                this.displayMessages(msg.fromUser);
+                // حذفها من السيرفر (قرأها)
+                await RafeeqAPI.messages.markAsRead(msg.id);
+            } else {
+                // إشعار كمقروءة
+                if (typeof window.markMessageAsUnread === 'function') {
+                    window.markMessageAsUnread(msg.fromUser);
+                }
+                // حذفها من السيرفر (حفظناها محلياً)
+                await RafeeqAPI.messages.markAsRead(msg.id);
+            }
+            
+            // تحديث آخر رسالة
+            this.updateLastMessage(msg.fromUser, decryptedText);
+            
+            // إعادة ترتيب
+            if (typeof window.reorderChatsList === 'function') {
+                const list = document.getElementById('chatsList');
+                if (list) window.reorderChatsList(list);
+            }
+            
+        } catch (error) {
+            console.error('❌ خطأ في معالجة الرسالة:', error);
+        }
     },
     
     // ==================== تحميل جميع المحادثات ====================
     loadAllChats() { 
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         if (!uid) { this.messages = {}; return; }
         
         this.messages = {};
@@ -38,9 +128,8 @@ const ChatSystem = {
         }
     },
     
-    // ==================== تحميل رسائل صديق معين ====================
     loadChatMessages(friendId) {
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         if (!uid || !friendId) return [];
         
         const key = `chat_${uid}_${friendId}`;
@@ -56,7 +145,7 @@ const ChatSystem = {
     },
     
     // ==================== فتح المحادثة ====================
-    openChat(friendId, friendName, friendAvatar) {
+    async openChat(friendId, friendName, friendAvatar) {
         if (typeof window.clearUnreadStatus === 'function') {
             window.clearUnreadStatus(friendId);
         }
@@ -73,16 +162,61 @@ const ChatSystem = {
         this.loadChatMessages(friendId);
         
         document.body.classList.add('conversation-open');
-        const nameEl = document.getElementById('conversationName'), avatarEl = document.getElementById('conversationAvatar');
+        const nameEl = document.getElementById('conversationName');
+        const avatarEl = document.getElementById('conversationAvatar');
         if (nameEl) nameEl.textContent = friendName;
         if (avatarEl) avatarEl.textContent = friendAvatar || '👤';
+        
         document.querySelector('.chat-page').style.display = 'none'; 
         document.getElementById('conversationPage').style.display = 'flex';
+        
+        // ✅ جلب الرسائل القديمة من API (للمزامنة بين الأجهزة)
+        await this.syncMessagesFromServer(friendId);
         
         this.displayMessages(friendId);
         
         setTimeout(() => { const inp = document.getElementById('messageInput'); if (inp) inp.focus(); }, 300);
         setTimeout(() => { const c = document.getElementById('messagesContainer'); if (c) c.scrollTop = c.scrollHeight; }, 100);
+    },
+    
+    // ==================== مزامنة الرسائل من السيرفر ====================
+    async syncMessagesFromServer(friendId) {
+        try {
+            const result = await RafeeqAPI.messages.getWithFriend(friendId);
+            
+            if (!result.success || !result.messages) return;
+            
+            const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
+            const friendPublicKey = await SecureChatSystem.getReceiverPublicKey(friendId);
+            
+            if (!myPrivateKey || !friendPublicKey) return;
+            
+            const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, friendPublicKey);
+            
+            // ✅ فك تشفير كل الرسائل من السيرفر
+            for (const msg of result.messages) {
+                try {
+                    const decryptedText = await SecureChatSystem.decryptData(msg.package.data, sharedKey);
+                    
+                    const messageData = {
+                        id: msg.package.id || msg.id,
+                        type: 'text',
+                        text: decryptedText,
+                        sender: msg.isMine ? 'me' : 'friend',
+                        time: new Date(msg.createdAt * 1000).toISOString()
+                    };
+                    
+                    // حفظ في localStorage
+                    this.saveMessage(friendId, messageData);
+                    
+                } catch (e) {
+                    console.warn('⚠️ لا يمكن فك رسالة:', e.message);
+                }
+            }
+            
+        } catch (error) {
+            console.warn('⚠️ syncMessagesFromServer:', error.message);
+        }
     },
     
     // ==================== إغلاق المحادثة ====================
@@ -92,7 +226,7 @@ const ChatSystem = {
         }
         
         const chatId = this.currentChat;
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         
         if (chatId && uid) {
             const key = `chat_${uid}_${chatId}`;
@@ -114,9 +248,8 @@ const ChatSystem = {
         this.friendInConversation = false;
     },
     
-    // ==================== تنظيف بيانات المحادثة ====================
     cleanConversationData(chatId, cleanAll = false) {
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         if (!uid) return;
         
         const key = `chat_${uid}_${chatId}`;
@@ -135,7 +268,7 @@ const ChatSystem = {
         if (container) container.innerHTML = '';
     },
     
-    // ==================== عرض جميع الرسائل ====================
+    // ==================== عرض الرسائل ====================
     displayMessages(friendId) { 
         if (this._isProcessing) return;
         this._isProcessing = true;
@@ -163,7 +296,6 @@ const ChatSystem = {
         }, 50);
     },
 
-    // ==================== عرض رسالة واحدة ====================
     displayMessage(msg) {
         if (this._displayedIds.has(msg.id)) return;
         this._displayedIds.add(msg.id);
@@ -202,16 +334,15 @@ const ChatSystem = {
         setTimeout(() => { c.scrollTop = c.scrollHeight; }, 50);
     },
     
-    // ==================== إرسال رسالة (مع حد 200 حرف) ====================
+    // ==================== إرسال رسالة ====================
     async sendMessage(text) { 
         if (!this.currentChat || !text.trim()) return false; 
         
         const messageText = text.trim();
-        const MAX_LENGTH = this.MAX_MESSAGE_LENGTH; // 200
+        const MAX_LENGTH = this.MAX_MESSAGE_LENGTH;
         
-        // ✅ التحقق من الحد الأقصى
         if (messageText.length > MAX_LENGTH) {
-            alert(`❌ الرسالة طويلة جداً!\n\nالحد الأقصى: ${MAX_LENGTH} حرف\nالحالي: ${messageText.length} حرف\n\nيرجى تقصير الرسالة.`);
+            alert(`❌ الرسالة طويلة جداً!\n\nالحد الأقصى: ${MAX_LENGTH} حرف\nالحالي: ${messageText.length} حرف`);
             return false;
         }
         
@@ -229,20 +360,17 @@ const ChatSystem = {
         this.saveMessage(chatId, msg); 
         this.displayMessage(msg); 
         
-        // ✅ إعادة الترتيب (نقل الصديق للأعلى)
         if (typeof window.reorderChatsList === 'function') {
             const list = document.getElementById('chatsList');
             if (list) window.reorderChatsList(list);
         }
         
-        console.log('⚡ تم عرض الرسالة فوراً - جاري الإرسال في الخلفية');
-        
+        // ✅ إرسال في الخلفية
         this._sendMessageInBackground(chatId, mid, messageText);
         
         return true; 
     },
     
-    // ==================== إرسال في الخلفية ====================
     async _sendMessageInBackground(chatId, messageId, text) {
         try {
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
@@ -256,25 +384,25 @@ const ChatSystem = {
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(text, sharedKey);
             
-            await SecureChatSystem.sendToServer(chatId, { 
-                id: messageId, 
-                type: 'text', 
-                data: encrypted, 
-                timestamp: Date.now() 
+            // ✅ إرسال عبر API
+            await RafeeqAPI.messages.send(chatId, {
+                id: messageId,
+                type: 'text',
+                data: encrypted,
+                timestamp: Date.now()
             });
             
-            console.log(`✅ تم إرسال الرسالة ${messageId} بنجاح`);
+            console.log(`✅ تم إرسال الرسالة ${messageId}`);
         } catch (e) { 
-            console.error('❌ فشل إرسال الرسالة في الخلفية:', e);
+            console.error('❌ فشل إرسال الرسالة:', e);
         }
     },
 
-    // ==================== حفظ رسالة ====================
     saveMessage(friendId, message) { 
         if (!friendId || !message) return;
         if (message.type !== 'text') return;
         
-        const uid = window.auth?.currentUser?.uid;
+        const uid = RafeeqAPI.getUser()?.id;
         if (!uid) return;
         
         const key = `chat_${uid}_${friendId}`; 
@@ -296,18 +424,17 @@ const ChatSystem = {
         }
     },
 
-    // ==================== تحديث آخر رسالة ====================
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
             if (item.getAttribute('onclick')?.includes(friendId)) { 
-                const lm = item.querySelector('.last-message'), tm = item.querySelector('.chat-time'); 
+                const lm = item.querySelector('.last-message');
+                const tm = item.querySelector('.chat-time'); 
                 if (lm) lm.textContent = lastMessage; 
                 if (tm) tm.textContent = 'الآن'; 
             } 
         }); 
     },
 
-    // ==================== escapeHtml ====================
     escapeHtml(text) { 
         if (!text) return '';
         const div = document.createElement('div'); 
@@ -322,6 +449,7 @@ ChatSystem.chatItemTemplate = document.getElementById('chatItemTemplate');
 window.addEventListener('authReady', function() {
     setTimeout(() => {
         ChatSystem.loadAllChats();
+        ChatSystem.startPolling();
         if (typeof loadChats === 'function') {
             chatsLoaded = false;
             loadChats(true);
@@ -329,13 +457,8 @@ window.addEventListener('authReady', function() {
     }, 100);
 });
 
-if (window.auth?.currentUser) {
-    setTimeout(() => ChatSystem.loadAllChats(), 100);
-}
-
 // ==================== دوال الواجهة العامة ====================
 
-// ✅ إرسال الرسالة
 window.sendMessage = () => { 
     const inp = document.getElementById('messageInput'); 
     if (inp && inp.value.trim()) {
@@ -343,9 +466,8 @@ window.sendMessage = () => {
             if (s) { 
                 inp.value = ''; 
                 inp.style.height = 'auto';
-                inp.style.color = 'var(--text)'; // ✅ إعادة اللون الطبيعي
+                inp.style.color = 'var(--text)';
                 
-                // ✅ إخفاء العداد
                 const counter = document.getElementById('messageCharCounter');
                 if (counter) {
                     counter.classList.remove('show', 'warning', 'full');
@@ -357,25 +479,21 @@ window.sendMessage = () => {
     }
 };
 
-// ✅ منع Enter من إرسال الرسالة (إلا مع Shift)
 window.handleMessageKeyPress = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
     }
 };
 
-// ✅ معالجة الكتابة (عداد + تنبيه)
 window.handleMessageInput = function(e) {
     const input = e.target;
     const maxLength = 200;
     const currentLength = input.value.length;
     
-    // ✅ تحديث حالة زر الإرسال
     if (typeof window.toggleSendButton === 'function') {
         window.toggleSendButton();
     }
     
-    // ✅ العداد (يظهر عند 180+)
     const counter = document.getElementById('messageCharCounter');
     if (counter) {
         if (currentLength >= maxLength - 20) {
@@ -384,18 +502,17 @@ window.handleMessageInput = function(e) {
             
             if (currentLength >= maxLength) {
                 counter.className = 'show full';
-                input.style.color = '#f44336'; // أحمر
+                input.style.color = '#f44336';
             } else {
                 counter.className = 'show warning';
-                input.style.color = '#FFC107'; // أصفر
+                input.style.color = '#FFC107';
             }
         } else {
             counter.classList.remove('show', 'warning', 'full');
-            input.style.color = 'var(--text)'; // عادي
+            input.style.color = 'var(--text)';
         }
     }
     
-    // ✅ تحديث زر الإرسال
     const sendBtn = document.getElementById('actionBtn');
     if (sendBtn) {
         if (currentLength >= maxLength) {
@@ -408,7 +525,6 @@ window.handleMessageInput = function(e) {
     }
 };
 
-// ✅ زر الإرسال
 window.toggleSendButton = function() {
     const input = document.getElementById('messageInput');
     const btn = document.getElementById('actionBtn');
@@ -422,14 +538,12 @@ window.toggleSendButton = function() {
     btn.style.display = 'flex';
 };
 
-// ✅ زر الإجراء
 window.handleActionButton = function() {
     const input = document.getElementById('messageInput');
     if (!input) return;
     if (input.value.trim().length > 0) window.sendMessage();
 };
 
-// ✅ إغلاق المحادثة
 window.closeConversation = () => { 
     ChatSystem.closeChat();
     
@@ -459,8 +573,7 @@ window.closeConversation = () => {
     }, 200);
 };
 
-// ✅ فتح محادثة
-window.openChat = friendId => {
+window.openChat = async function(friendId) {
     if (document.getElementById('friendsPage') && document.getElementById('friendsPage').style.display === 'block') {
         pushPage('subpage', 'friendsPage');
     } else if (document.querySelector('.profile-page') && getComputedStyle(document.querySelector('.profile-page')).display === 'block') {
@@ -469,25 +582,16 @@ window.openChat = friendId => {
         pushPage('page', 'chat');
     }
     
-    window.db.collection('users').doc(friendId).get().then(doc => {
-        if (doc.exists) {
-            const f = doc.data();
-            ChatSystem.openChat(friendId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
+    try {
+        const result = await RafeeqAPI.users.getById(friendId);
+        if (result.success && result.user) {
+            const f = result.user;
+            ChatSystem.openChat(friendId, f.name, getEmojiForUser(f));
         }
-    }).catch(() => {});
+    } catch (e) {
+        console.error('خطأ في فتح المحادثة:', e);
+    }
 };
-
-// ==================== التنظيف الشامل ====================
-function performGlobalCleanup() {
-    const container = document.getElementById('messagesContainer');
-    if (container) container.innerHTML = '';
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', performGlobalCleanup);
-} else {
-    performGlobalCleanup();
-}
 
 // ==================== إصلاح الكيبورد ====================
 const initVisualViewportFix = () => {
@@ -520,13 +624,4 @@ document.addEventListener('touchmove', function(e) {
     }
 }, { passive: false });
 
-document.addEventListener('touchstart', function (e) {
-    if (e.touches.length > 1) { e.preventDefault(); }
-}, { passive: false });
-
-let lastTouchEnd = 0;
-document.addEventListener('touchend', function (e) {
-    const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) { e.preventDefault(); }
-    lastTouchEnd = now;
-}, { passive: false });
+console.log('✅ chat-system.js loaded - Cloudflare API mode');
