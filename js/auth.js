@@ -1,7 +1,7 @@
 // ========== auth.js - Rafeeq Auth via Cloudflare API ==========
 
-// ✅ Google Client ID
-const GOOGLE_CLIENT_ID = '578021976495-olbueuh63il6oberbrplpnjbjh0balko.apps.googleusercontent.com';
+// ✅ Google Client ID (مصحح)
+const GOOGLE_CLIENT_ID = '578021976495-olbuh63il6oberbrplpnjbjh0balko.apps.googleusercontent.com';
 
 // ==================== دوال مساعدة ====================
 function formatNumber(num) {
@@ -54,10 +54,8 @@ window.handleGoogleSignIn = async function(response) {
     const idToken = response.credential;
     
     try {
-        // إظهار شاشة الانتظار
         showLoadingScreen('جاري تسجيل الدخول...');
         
-        // إرسال idToken للـ API
         const result = await RafeeqAPI.auth.signInWithGoogle(idToken);
         
         if (!result.success || !result.user) {
@@ -66,27 +64,18 @@ window.handleGoogleSignIn = async function(response) {
         
         console.log('✅ تسجيل دخول ناجح:', result.user.name);
         
-        // حفظ بيانات المستخدم
         RafeeqAPI.setUser(result.user);
-        
-        // تحميل البيانات
         await loadUserData(result.user);
         
-        // إخفاء شاشة الانتظار
         hideLoadingScreen();
-        
-        // إظهار التطبيق
         showApp();
         
-        // ✅ إشعار authReady
         window.dispatchEvent(new Event('authReady'));
         
-        // ✅ بدء الاستماع للرسائل
         if (typeof SecureChatSystem !== 'undefined') {
             SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
         }
         
-        // ✅ تحميل المحادثات
         setTimeout(() => {
             if (typeof loadChats === 'function') {
                 chatsLoaded = false;
@@ -156,7 +145,6 @@ async function loadUserData(user) {
             return;
         }
         
-        // تحديث الواجهة
         const pn = document.getElementById('profileName');
         const pa = document.getElementById('profileAvatarEmoji');
         const pb = document.getElementById('profileBio');
@@ -177,7 +165,6 @@ async function loadUserData(user) {
         if (pa) pa.textContent = emoji;
         if (ca) ca.textContent = emoji;
         
-        // ✅ تحديث الرصيد
         if (balanceEl) {
             balanceEl.textContent = `$${(user.balance || 0).toFixed(2)}`;
         }
@@ -200,8 +187,6 @@ async function logout() {
     }
     
     RafeeqAPI.clearAll();
-    
-    // إعادة تحميل الصفحة
     window.location.reload();
 }
 
@@ -233,7 +218,6 @@ function initGoogleSignIn() {
             cancel_on_tap_outside: true
         });
         
-        // عرض الزر
         const signInDiv = document.querySelector('.g_id_signin');
         if (signInDiv) {
             google.accounts.id.renderButton(signInDiv, {
@@ -267,30 +251,24 @@ async function checkExistingSession() {
     try {
         showLoadingScreen('جاري التحقق من الجلسة...');
         
-        // التحقق من الجلسة عبر API
         const result = await RafeeqAPI.auth.me();
         
         if (!result.success || !result.user) {
             throw new Error('جلسة غير صالحة');
         }
         
-        // حفظ المستخدم
         RafeeqAPI.setUser(result.user);
-        
         await loadUserData(result.user);
         
         hideLoadingScreen();
         showApp();
         
-        // إشعار authReady
         window.dispatchEvent(new Event('authReady'));
         
-        // بدء SecureChatSystem
         if (typeof SecureChatSystem !== 'undefined') {
             SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
         }
         
-        // تحميل المحادثات
         setTimeout(() => {
             if (typeof loadChats === 'function') {
                 chatsLoaded = false;
@@ -324,7 +302,6 @@ window.onSessionExpired = function() {
 window.addEventListener('load', function() {
     console.log('🚀 auth.js - بدء التهيئة...');
     
-    // انتظر تحميل Google SDK
     let attempts = 0;
     const waitForGoogle = setInterval(() => {
         attempts++;
@@ -337,7 +314,6 @@ window.addEventListener('load', function() {
         }
     }, 250);
     
-    // ✅ التحقق من الجلسة الحالية
     checkExistingSession();
 });
 
@@ -357,3 +333,4 @@ window.logout = logout;
 window.copyId = copyId;
 
 console.log('✅ auth.js loaded - Cloudflare API mode');
+console.log('📌 GOOGLE_CLIENT_ID:', GOOGLE_CLIENT_ID);
