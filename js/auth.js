@@ -70,21 +70,8 @@ window.handleGoogleSignIn = async function(response) {
         hideLoadingScreen();
         showApp();
         
-        window.dispatchEvent(new Event('authReady'));
-        
-        if (typeof SecureChatSystem !== 'undefined') {
-            SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
-        }
-        
-        setTimeout(() => {
-            if (typeof loadChats === 'function') {
-                chatsLoaded = false;
-                loadChats(true);
-            }
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.loadAllChats) {
-                ChatSystem.loadAllChats();
-            }
-        }, 500);
+        // ✅ بدء التطبيق
+        await startApp();
         
     } catch (error) {
         hideLoadingScreen();
@@ -92,6 +79,50 @@ window.handleGoogleSignIn = async function(response) {
         alert('فشل تسجيل الدخول: ' + error.message);
     }
 };
+
+// ==================== ✅ دالة موحدة لبدء التطبيق ====================
+async function startApp() {
+    console.log('🚀 بدء تشغيل التطبيق...');
+    
+    // ✅ 1. تشغيل SecureChatSystem
+    if (typeof SecureChatSystem !== 'undefined') {
+        try {
+            await SecureChatSystem.init();
+            console.log('✅ SecureChatSystem جاهز');
+        } catch (e) {
+            console.warn('⚠️ SecureChatSystem:', e.message);
+        }
+    }
+    
+    // ✅ 2. بدء Polling للرسائل مباشرة
+    if (typeof startSecureChatPolling === 'function') {
+        startSecureChatPolling();
+        console.log('✅ Polling للرسائل بدأ');
+    } else {
+        console.warn('⚠️ startSecureChatPolling غير موجودة');
+    }
+    
+    // ✅ 3. بدء باقي Pollings (طلبات + أصدقاء + ملف)
+    if (typeof startRequestsPolling === 'function') startRequestsPolling();
+    if (typeof startFriendsPolling === 'function') startFriendsPolling();
+    if (typeof startProfilePolling === 'function') startProfilePolling();
+    
+    // ✅ 4. إطلاق authReady
+    window.dispatchEvent(new Event('authReady'));
+    
+    // ✅ 5. تحميل المحادثات
+    setTimeout(() => {
+        if (typeof loadChats === 'function') {
+            chatsLoaded = false;
+            loadChats(true);
+        }
+        if (typeof ChatSystem !== 'undefined' && ChatSystem.loadAllChats) {
+            ChatSystem.loadAllChats();
+        }
+    }, 500);
+    
+    console.log('✅ التطبيق جاهز');
+}
 
 // ==================== شاشات الانتظار ====================
 function showLoadingScreen(message = 'جاري التحميل...') {
@@ -239,11 +270,12 @@ function initGoogleSignIn() {
     }
 }
 
-// ==================== التحقق من الجلسة عند التحميل ====================
+// ==================== ✅ التحقق من الجلسة + بدء التطبيق ====================
 async function checkExistingSession() {
     const token = RafeeqAPI.getToken();
     
     if (!token) {
+        console.log('ℹ️ لا يوجد token — عرض شاشة تسجيل الدخول');
         showLoginScreen();
         return false;
     }
@@ -263,21 +295,8 @@ async function checkExistingSession() {
         hideLoadingScreen();
         showApp();
         
-        window.dispatchEvent(new Event('authReady'));
-        
-        if (typeof SecureChatSystem !== 'undefined') {
-            SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
-        }
-        
-        setTimeout(() => {
-            if (typeof loadChats === 'function') {
-                chatsLoaded = false;
-                loadChats(true);
-            }
-            if (typeof ChatSystem !== 'undefined' && ChatSystem.loadAllChats) {
-                ChatSystem.loadAllChats();
-            }
-        }, 500);
+        // ✅ بدء التطبيق (يشمل Pollings)
+        await startApp();
         
         return true;
         
@@ -331,6 +350,7 @@ window.showLoginScreen = showLoginScreen;
 window.showApp = showApp;
 window.logout = logout;
 window.copyId = copyId;
+window.startApp = startApp;
 
 console.log('✅ auth.js loaded - Cloudflare API mode');
 console.log('📌 GOOGLE_CLIENT_ID:', GOOGLE_CLIENT_ID);
