@@ -7,56 +7,22 @@ const ChatSystem = {
     chatItemTemplate: null,
     _displayedIds: new Set(),
     _isProcessing: false,
-    _pollingInterval: null,
     
     MAX_MESSAGE_LENGTH: 200,
     
     init() { 
         this.loadAllChats(); 
         this.chatItemTemplate = document.getElementById('chatItemTemplate');
-        this.startPolling();
+        // ✅ لا نبدأ Polling هنا — SecureChatSystem مسؤول عن ذلك
     },
     
-    // ==================== Polling للرسائل الجديدة ====================
-    startPolling() {
-        // إيقاف القديم إن وجد
-        if (this._pollingInterval) {
-            clearInterval(this._pollingInterval);
-        }
-        
-        // فحص كل 5 ثوانٍ
-        this._pollingInterval = setInterval(async () => {
-            await this.checkNewMessages();
-        }, 5000);
-        
-        console.log('✅ بدء استقبال الرسائل (Polling)');
-    },
-    
-    async checkNewMessages() {
-        if (!RafeeqAPI.getToken()) return;
-        
-        try {
-            const now = Math.floor(Date.now() / 1000);
-            const lastCheck = parseInt(localStorage.getItem('last_message_check') || '0');
-            
-            const result = await RafeeqAPI.messages.getPending(lastCheck);
-            
-            if (result.success && result.messages && result.messages.length > 0) {
-                for (const msg of result.messages) {
-                    await this.processIncomingMessage(msg);
-                }
-            }
-            
-            localStorage.setItem('last_message_check', now.toString());
-            
-        } catch (error) {
-            // لا نعرض الخطأ — فقط نتجاهل
-        }
-    },
-    
+    // ==================== معالجة الرسائل المستلمة ====================
+    // ✅ هذه الدالة تُستدعى من SecureChatSystem
     async processIncomingMessage(msg) {
         try {
-            // ✅ فك تشفير الرسالة
+            console.log('📨 ChatSystem.processIncomingMessage:', msg);
+            
+            // فك التشفير
             const myPrivateKey = await SecureChatSystem.getMyPrivateKey();
             const senderPublicKey = await SecureChatSystem.getReceiverPublicKey(msg.fromUser);
             
@@ -69,32 +35,39 @@ const ChatSystem = {
             const decryptedText = await SecureChatSystem.decryptData(msg.package.data, sharedKey);
             
             // ✅ حفظ الرسالة
-            this.saveMessage(msg.fromUser, {
+            const messageData = {
                 id: msg.package.id || msg.id,
                 type: 'text',
                 text: decryptedText,
                 sender: 'friend',
                 time: new Date().toISOString()
-            });
+            };
             
-            // ✅ إذا كنا في المحادثة نفسها، اعرضها
+            this.saveMessage(msg.fromUser, messageData);
+            
+            // ✅ إذا كنا في المحادثة نفسها، اعرضها فوراً
             if (this.currentChat === msg.fromUser) {
-                this.displayMessages(msg.fromUser);
-                // حذفها من السيرفر (قرأها)
-                await RafeeqAPI.messages.markAsRead(msg.id);
+                console.log('📩 عرض فوري للرسالة');
+                this.displayMessage(messageData);
+                
+                // ✅ تمرير للأسفل
+                const container = document.getElementById('messagesContainer');
+                if (container) {
+                    setTimeout(() => {
+                        container.scrollTop = container.scrollHeight;
+                    }, 100);
+                }
             } else {
                 // إشعار كمقروءة
                 if (typeof window.markMessageAsUnread === 'function') {
                     window.markMessageAsUnread(msg.fromUser);
                 }
-                // حذفها من السيرفر (حفظناها محلياً)
-                await RafeeqAPI.messages.markAsRead(msg.id);
             }
             
-            // تحديث آخر رسالة
+            // ✅ تحديث آخر رسالة
             this.updateLastMessage(msg.fromUser, decryptedText);
             
-            // إعادة ترتيب
+            // ✅ إعادة ترتيب
             if (typeof window.reorderChatsList === 'function') {
                 const list = document.getElementById('chatsList');
                 if (list) window.reorderChatsList(list);
@@ -170,7 +143,7 @@ const ChatSystem = {
         document.querySelector('.chat-page').style.display = 'none'; 
         document.getElementById('conversationPage').style.display = 'flex';
         
-        // ✅ جلب الرسائل القديمة من API (للمزامنة بين الأجهزة)
+        // ✅ جلب الرسائل القديمة من API
         await this.syncMessagesFromServer(friendId);
         
         this.displayMessages(friendId);
@@ -193,7 +166,6 @@ const ChatSystem = {
             
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, friendPublicKey);
             
-            // ✅ فك تشفير كل الرسائل من السيرفر
             for (const msg of result.messages) {
                 try {
                     const decryptedText = await SecureChatSystem.decryptData(msg.package.data, sharedKey);
@@ -206,7 +178,6 @@ const ChatSystem = {
                         time: new Date(msg.createdAt * 1000).toISOString()
                     };
                     
-                    // حفظ في localStorage
                     this.saveMessage(friendId, messageData);
                     
                 } catch (e) {
@@ -384,7 +355,6 @@ const ChatSystem = {
             const sharedKey = await SecureChatSystem.deriveSharedKey(myPrivateKey, receiverPublicKey);
             const encrypted = await SecureChatSystem.encryptData(text, sharedKey);
             
-            // ✅ إرسال عبر API
             await RafeeqAPI.messages.send(chatId, {
                 id: messageId,
                 type: 'text',
@@ -426,7 +396,7 @@ const ChatSystem = {
 
     updateLastMessage(friendId, lastMessage) { 
         document.querySelectorAll('.chat-item').forEach(item => { 
-            if (item.getAttribute('onclick')?.includes(friendId)) { 
+            if (item.getAttribute('data-friend-id') === friendId) { 
                 const lm = item.querySelector('.last-message');
                 const tm = item.querySelector('.chat-time'); 
                 if (lm) lm.textContent = lastMessage; 
@@ -446,14 +416,15 @@ const ChatSystem = {
 // ==================== تشغيل النظام ====================
 ChatSystem.chatItemTemplate = document.getElementById('chatItemTemplate');
 
+// ✅ عند authReady — نُحمّل المحادثات فقط (Polling مسؤولية SecureChatSystem)
 window.addEventListener('authReady', function() {
     setTimeout(() => {
         ChatSystem.loadAllChats();
-        ChatSystem.startPolling();
         if (typeof loadChats === 'function') {
             chatsLoaded = false;
             loadChats(true);
         }
+        console.log('✅ ChatSystem جاهز');
     }, 100);
 });
 
@@ -624,4 +595,4 @@ document.addEventListener('touchmove', function(e) {
     }
 }, { passive: false });
 
-console.log('✅ chat-system.js loaded - Cloudflare API mode');
+console.log('✅ chat-system.js loaded - No polling (SecureChatSystem handles it)');
