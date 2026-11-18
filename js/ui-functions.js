@@ -1,21 +1,4 @@
-// ========== ui-functions.js - النسخة النظيفة 100% (بدون دردشة وبدون أصدقاء) ==========
-
-window._pageStack = [];
-
-function pushPage(pageType, pageId) {
-    window._pageStack.push({ type: pageType, id: pageId });
-}
-
-function popPage() {
-    if (window._pageStack.length > 0) {
-        return window._pageStack.pop();
-    }
-    return null;
-}
-
-function clearStack() {
-    window._pageStack = [];
-}
+// ========== ui-functions.js - النسخة النظيفة (بدون دردشة) ==========
 
 // ==================== اختيار الأفاتار ====================
 window.selectAvatar = function(type) {
@@ -42,8 +25,8 @@ window.selectAvatar = function(type) {
         selectedBtn.style.boxShadow = '0 0 20px rgba(33, 150, 243, 0.3)';
     }
     
-    if (window.auth?.currentUser && window.db) {
-        window.db.collection('users').doc(window.auth.currentUser.uid).update({ avatarType: type })
+    if (auth?.currentUser) {
+        db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
             .then(() => { setTimeout(() => window.closeModal('avatarModal'), 500); })
             .catch(() => {});
     }
@@ -80,7 +63,6 @@ window.getEmojiForUser = function(userData) {
 };
 
 function ensureSinglePage() { 
-    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); 
     document.querySelectorAll('.page').forEach(p => { 
         p.style.display = p.classList.contains('active') ? 'block' : 'none'; 
     }); 
@@ -93,18 +75,15 @@ function setupNavigation() {
     if (!nav.length || !pages.length) return; 
     
     function switchPage(id) { 
-        clearStack(); 
         pages.forEach(p => p.classList.remove('active')); 
         const t = document.querySelector(`.page.${id}-page`); 
         if (t) { 
             t.classList.add('active'); 
             t.style.display = 'block'; 
-        } 
+        }
         pages.forEach(p => { 
             if (!p.classList.contains('active')) p.style.display = 'none'; 
         }); 
-        document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); 
-        document.body.classList.remove('profile-subpage-open'); 
         
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) {
@@ -199,8 +178,8 @@ window.saveProfile = function() {
         alert('الاسم مطلوب ولا يزيد عن 15 حرف');
         return;
     }
-    if (window.auth?.currentUser && window.db) {
-        window.db.collection('users').doc(window.auth.currentUser.uid).update({ name: n })
+    if (auth?.currentUser) {
+        db.collection('users').doc(auth.currentUser.uid).update({ name: n })
             .then(() => {
                 const nameEl = document.getElementById('profileName');
                 if (nameEl) nameEl.textContent = n;
@@ -212,7 +191,7 @@ window.saveProfile = function() {
 
 // ==================== تهيئة الصفحة ====================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 تهيئة ui-functions (نظيف تماماً)...');
+    console.log('🚀 تهيئة ui-functions...');
     ensureSinglePage();
     setupNavigation();
     setupModals();
