@@ -39,7 +39,7 @@
 
     <main class="app-content" id="mainContent">
         
-        <!-- ===== صفحة الرئيسية (المنشورات) ===== -->
+        <!-- ===== صفحة الرئيسية ===== -->
         <div class="page home-page active">
             
             <div class="home-tabs">
@@ -125,7 +125,6 @@
         </div>
     </main>
 
-    <!-- شريط التنقل السفلي (تم إزالة الدردشة) -->
     <nav class="bottom-nav">
         <button class="nav-item active" data-page="home"><i class="fas fa-home"></i></button>
         <button class="nav-item" data-page="profile"><i class="fas fa-user"></i></button>
@@ -327,8 +326,7 @@
     </div>
 </div>
 
-<!-- ==================== النوافذ المنبثقة الأخرى ==================== -->
-
+<!-- ==================== النوافذ المنبثقة ==================== -->
 <div class="modal" id="editProfileModal">
     <div class="modal-content">
         <h3 data-i18n="edit_profile">تعديل الملف الشخصي</h3>
@@ -384,7 +382,6 @@
 <script src="https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore-compat.js"></script>
 
 <script>
-    // ✅ مفاتيح Firebase للمشروع الجديد (rafeeq-new)
     const firebaseConfig = {
         apiKey: "AIzaSyABM3lw2YYtNdSzyTMJexZg_OHI6vNSI6g",
         authDomain: "rafeeq-new.firebaseapp.com",
@@ -399,13 +396,12 @@
     window.googleProvider = new firebase.auth.GoogleAuthProvider();
 </script>
 
-<!-- تم إزالة chat-system.js و secure-chat.js -->
+<!-- ✅ تم حذف سكربتات الدردشة والتشفير والأصدقاء -->
 <script src="js/i18n.js?v=31"></script>
 <script src="js/countries.js?v=31"></script>
-<script src="js/ui-functions.js?v=31"></script>
-<script src="js/posts-system.js?v=31"></script>
-<script src="js/auth.js?v=31"></script>
-<script src="js/friends.js?v=31"></script>
+<script src="js/ui-functions.js?v=32"></script>
+<script src="js/posts-system.js?v=32"></script>
+<script src="js/auth.js?v=32"></script>
 
 <script>
 window.addEventListener('load', function() {
