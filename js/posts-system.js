@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النهائية ==========
+// ========== posts-system.js - النسخة النظيفة (بدون دردشة) ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -10,17 +10,8 @@ const PostsSystem = {
     IMAGE_QUALITY: 0.75,
     
     _isInitialized: false,
-    _isLoadingPosts: false,
-    
     _activeDropdown: null,
     _activeDropdownHandler: null,
-    
-    _relationshipCache: {
-        friends: new Set(),
-        sentRequests: new Set(),
-        receivedRequests: new Map(),
-        lastUpdate: 0
-    },
     
     jobCategories: [
         { code: 'all', name: 'الكل', icon: 'fas fa-layer-group', color: '#64B5F6' },
@@ -38,7 +29,6 @@ const PostsSystem = {
         { code: 'other', name: 'أخرى', icon: 'fas fa-th-large', color: '#9E9E9E' }
     ],
     
-    // ==================== init ====================
     init() {
         if (this._isInitialized) return;
         this._isInitialized = true;
@@ -71,7 +61,6 @@ const PostsSystem = {
         } catch (e) {}
     },
     
-    // ==================== إغلاق جميع القوائم ====================
     closeAllDropdowns() {
         if (this._activeDropdown) {
             try { this._activeDropdown.remove(); } catch (e) {}
@@ -88,7 +77,6 @@ const PostsSystem = {
         });
     },
     
-    // ==================== فتح القائمة (دائماً كاملة + تمرير تلقائي) ====================
     openDropdown({ id, html, anchorBtn, onClose = null }) {
         this.closeAllDropdowns();
         if (!anchorBtn) return null;
@@ -218,7 +206,6 @@ const PostsSystem = {
         return dropdown;
     },
     
-    // ==================== إعداد العدادات ====================
     setupFieldCounters() {
         const fields = [
             { inputId: 'jobName', counterId: 'jobNameCounter', max: 15, type: 'text' },
@@ -328,7 +315,6 @@ const PostsSystem = {
         });
     },
     
-    // ==================== قائمة طريقة التواصل ====================
     renderContactMethodDropdown(type) {
         const isJob = type === 'job';
         const containerId = isJob ? 'jobContactSelector' : 'marriageContactSelector';
@@ -341,7 +327,7 @@ const PostsSystem = {
         const current = input.value || 'none';
         
         const options = [
-            { value: 'none', label: 'لا شيء (طلب صداقة)', icon: 'fas fa-user-plus', color: '#64B5F6' },
+            { value: 'none', label: 'لا شيء (عرض فقط)', icon: 'fas fa-user-plus', color: '#64B5F6' },
             { value: 'whatsapp', label: 'رابط واتساب', icon: 'fab fa-whatsapp', color: '#25D366' },
             { value: 'phone', label: 'رقم الهاتف', icon: 'fas fa-phone', color: '#2196F3' },
             { value: 'email', label: 'البريد الإلكتروني', icon: 'fas fa-envelope', color: '#FF9800' }
@@ -380,7 +366,7 @@ const PostsSystem = {
         if (!btn) return;
         
         const options = [
-            { value: 'none', label: 'لا شيء (طلب صداقة)', icon: 'fas fa-user-plus', color: '#64B5F6' },
+            { value: 'none', label: 'لا شيء (عرض فقط)', icon: 'fas fa-user-plus', color: '#64B5F6' },
             { value: 'whatsapp', label: 'رابط واتساب', icon: 'fab fa-whatsapp', color: '#25D366' },
             { value: 'phone', label: 'رقم الهاتف', icon: 'fas fa-phone', color: '#2196F3' },
             { value: 'email', label: 'البريد الإلكتروني', icon: 'fas fa-envelope', color: '#FF9800' }
@@ -418,7 +404,6 @@ const PostsSystem = {
         this.renderContactMethodDropdown(type);
     },
     
-    // ==================== حقل الإدخال الديناميكي ====================
     renderContactValueField(type, method) {
         const isJob = type === 'job';
         const fieldId = isJob ? 'jobContactValueField' : 'marriageContactValueField';
@@ -443,21 +428,9 @@ const PostsSystem = {
         field.style.display = 'flex';
         
         const config = {
-            whatsapp: {
-                label: 'رابط واتساب',
-                placeholder: '',
-                max: 50
-            },
-            phone: {
-                label: 'رقم الهاتف',
-                placeholder: '',
-                max: 15
-            },
-            email: {
-                label: 'البريد الإلكتروني',
-                placeholder: '',
-                max: 30
-            }
+            whatsapp: { label: 'رابط واتساب', placeholder: 'https://wa.me/964...', max: 50 },
+            phone: { label: 'رقم الهاتف', placeholder: '07xxxxxxxxx', max: 15 },
+            email: { label: 'البريد الإلكتروني', placeholder: 'example@mail.com', max: 30 }
         };
         
         const cfg = config[method];
@@ -469,37 +442,17 @@ const PostsSystem = {
         input.value = '';
         if (counter) counter.textContent = `0/${cfg.max}`;
         
-        if (input._contactCounterHandler) {
-            input.removeEventListener('input', input._contactCounterHandler);
-        }
-        if (input._contactPasteHandler) {
-            input.removeEventListener('paste', input._contactPasteHandler);
-        }
-        if (input._contactKeypressHandler) {
-            input.removeEventListener('keypress', input._contactKeypressHandler);
-        }
-        
         const handler = (e) => {
             let value = e.target.value;
-            
-            if (method === 'phone') {
-                value = value.replace(/[^0-9]/g, '');
-            }
-            
-            if (value.length > cfg.max) {
-                value = value.substring(0, cfg.max);
-            }
-            
-            if (e.target.value !== value) {
-                e.target.value = value;
-            }
+            if (method === 'phone') value = value.replace(/[^0-9]/g, '');
+            if (value.length > cfg.max) value = value.substring(0, cfg.max);
+            if (e.target.value !== value) e.target.value = value;
             
             const len = value.length;
             if (counter) {
                 counter.textContent = `${len}/${cfg.max}`;
                 counter.classList.remove('warning', 'full');
                 input.classList.remove('limit-reached');
-                
                 if (len >= cfg.max) {
                     counter.classList.add('full');
                     input.classList.add('limit-reached');
@@ -509,40 +462,15 @@ const PostsSystem = {
             }
         };
         
+        if (input._contactCounterHandler) input.removeEventListener('input', input._contactCounterHandler);
         input._contactCounterHandler = handler;
         input.addEventListener('input', handler);
-        
-        const pasteHandler = (e) => {
-            e.preventDefault();
-            const pasted = (e.clipboardData || window.clipboardData).getData('text');
-            let value = input.value + pasted;
-            
-            if (method === 'phone') {
-                value = value.replace(/[^0-9]/g, '');
-            }
-            
-            value = value.substring(0, cfg.max);
-            input.value = value;
-            input.dispatchEvent(new Event('input'));
-        };
-        input._contactPasteHandler = pasteHandler;
-        input.addEventListener('paste', pasteHandler);
-        
-        const keypressHandler = (e) => {
-            if (e.target.value.length >= cfg.max && e.key.length === 1) {
-                e.preventDefault();
-            }
-        };
-        input._contactKeypressHandler = keypressHandler;
-        input.addEventListener('keypress', keypressHandler);
         
         handler({ target: input });
     },
     
-    // ==================== التحقق من قيمة التواصل ====================
     validateContactValue(method, value) {
         if (!method || method === 'none') return { valid: true };
-        
         const v = (value || '').trim();
         if (!v) return { valid: false, error: 'يرجى إدخال قيمة طريقة التواصل' };
         
@@ -568,81 +496,14 @@ const PostsSystem = {
         return { valid: true };
     },
     
-    // ==================== تحميل حالات العلاقات ====================
-    async loadRelationshipCache(force = false) {
-        const uid = window.auth?.currentUser?.uid;
-        if (!uid) return;
-        
-        const now = Date.now();
-        if (!force && (now - this._relationshipCache.lastUpdate) < 300000) return;
-        
-        try {
-            const [userDoc, sentSnap, receivedSnap] = await Promise.all([
-                window.db.collection('users').doc(uid).get(),
-                window.db.collection('friendRequests').where('from', '==', uid).where('status', '==', 'pending').get(),
-                window.db.collection('friendRequests').where('to', '==', uid).where('status', '==', 'pending').get()
-            ]);
-            
-            if (userDoc.exists) {
-                this._relationshipCache.friends = new Set(userDoc.data().friends || []);
-            }
-            
-            this._relationshipCache.sentRequests = new Set();
-            sentSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.to) this._relationshipCache.sentRequests.add(data.to);
-            });
-            
-            this._relationshipCache.receivedRequests = new Map();
-            receivedSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.from) this._relationshipCache.receivedRequests.set(data.from, doc.id);
-            });
-            
-            this._relationshipCache.lastUpdate = now;
-        } catch (e) {
-            console.warn('⚠️ خطأ في حالات العلاقات:', e);
-        }
-    },
-    
-    getRelationshipState(targetUserId) {
-        const uid = window.auth?.currentUser?.uid;
-        if (!uid) return 'guest';
-        if (uid === targetUserId) return 'self';
-        if (this._relationshipCache.friends.has(targetUserId)) return 'friend';
-        if (this._relationshipCache.sentRequests.has(targetUserId)) return 'sent';
-        if (this._relationshipCache.receivedRequests.has(targetUserId)) return 'received';
-        return 'none';
-    },
-    
-    // ==================== إنشاء زر الإجراء ====================
     createPostActionButton(post) {
-        const uid = window.auth?.currentUser?.uid;
-        const isOwner = uid === post.userId;
-        
-        if (isOwner) {
-            const btn = document.createElement('button');
-            btn.style.display = 'none';
-            return btn;
-        }
-        
         const btn = document.createElement('button');
         btn.className = 'post-action-btn';
-        btn.setAttribute('data-user-id', post.userId);
-        
-        if (!uid) {
-            btn.innerHTML = `<i class="fas fa-lock"></i>`;
-            btn.style.cssText = `background: transparent; color: var(--text-light); border: 1.5px solid var(--border); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-            btn.title = 'سجل الدخول';
-            btn.disabled = true;
-            return btn;
-        }
         
         const contactMethod = post.contactMethod && post.contactMethod !== 'none' ? post.contactMethod : null;
         
         if (contactMethod === 'whatsapp') {
             btn.innerHTML = `<i class="fab fa-whatsapp"></i>`;
-            btn.classList.add('contact-whatsapp');
             btn.style.cssText = `background: #25D366; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; padding: 0; flex-shrink: 0;`;
             btn.title = 'تواصل عبر واتساب';
             return btn;
@@ -650,7 +511,6 @@ const PostsSystem = {
         
         if (contactMethod === 'phone') {
             btn.innerHTML = `<i class="fas fa-phone"></i>`;
-            btn.classList.add('contact-phone');
             btn.style.cssText = `background: #2196F3; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
             btn.title = 'اتصال هاتفي';
             return btn;
@@ -658,51 +518,19 @@ const PostsSystem = {
         
         if (contactMethod === 'email') {
             btn.innerHTML = `<i class="fas fa-envelope"></i>`;
-            btn.classList.add('contact-email');
             btn.style.cssText = `background: #FF9800; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
             btn.title = 'إرسال بريد';
             return btn;
         }
         
-        const state = this.getRelationshipState(post.userId);
-        
-        switch(state) {
-            case 'friend':
-                btn.innerHTML = `<i class="fas fa-comment"></i>`;
-                btn.style.cssText = `background: var(--primary); color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-                btn.title = 'مراسلة';
-                break;
-            case 'sent':
-                btn.innerHTML = `<i class="fas fa-clock"></i>`;
-                btn.style.cssText = `background: transparent; color: var(--primary); border: 1.5px solid var(--primary); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-                btn.title = 'طلب معلق';
-                btn.disabled = true;
-                break;
-            case 'received':
-                btn.innerHTML = `<i class="fas fa-check"></i>`;
-                btn.style.cssText = `background: #4CAF50; color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-                btn.title = 'قبول الطلب';
-                break;
-            case 'none':
-            default:
-                btn.innerHTML = `<i class="fas fa-plus"></i>`;
-                btn.style.cssText = `background: var(--primary); color: white; border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-                btn.title = 'إرسال طلب صداقة';
-                break;
-        }
+        // ✅ إذا لم تكن هناك طريقة تواصل، نخفي الزر
+        btn.style.display = 'none';
         return btn;
     },
     
     bindActionButton(card, post) {
-        if (!post.userId) return;
-        const isOwner = window.auth?.currentUser?.uid === post.userId;
-        if (isOwner) return;
-        
         const newBtn = card.querySelector('.post-action-btn');
         if (!newBtn) return;
-        
-        const uid = window.auth?.currentUser?.uid;
-        if (!uid) return;
         
         const contactMethod = post.contactMethod && post.contactMethod !== 'none' ? post.contactMethod : null;
         
@@ -728,80 +556,8 @@ const PostsSystem = {
             };
             return;
         }
-        
-        const state = this.getRelationshipState(post.userId);
-        
-        if (state === 'friend') {
-            newBtn.onclick = () => {
-                if (typeof openChat === 'function') {
-                    window.db.collection('users').doc(post.userId).get().then(doc => {
-                        if (doc.exists) {
-                            const f = doc.data();
-                            openChat(post.userId, f.name, window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️');
-                        }
-                    });
-                }
-            };
-        } else if (state === 'received') {
-            newBtn.onclick = async () => {
-                const requestId = this._relationshipCache.receivedRequests.get(post.userId);
-                if (requestId && typeof acceptFriendRequest === 'function') {
-                    await acceptFriendRequest(requestId, post.userId);
-                    this.refreshPostsAfterAction(post.userId);
-                }
-            };
-        } else if (state === 'none') {
-            newBtn.onclick = () => this.sendFriendRequestFromPost(post.userId, newBtn);
-        }
     },
     
-    async sendFriendRequestFromPost(targetUserId, btnElement) {
-        const uid = window.auth?.currentUser?.uid;
-        if (!uid) { alert('يجب تسجيل الدخول أولاً'); return; }
-        if (uid === targetUserId) { alert('لا يمكنك إضافة نفسك'); return; }
-        
-        try {
-            const exist = await window.db.collection('friendRequests')
-                .where('from', '==', uid).where('to', '==', targetUserId).where('status', '==', 'pending').get();
-            
-            if (!exist.empty) { alert('أرسلت طلباً مسبقاً'); return; }
-            
-            const me = await window.db.collection('users').doc(uid).get();
-            if (me.exists && (me.data().friends || []).includes(targetUserId)) {
-                alert('صديقك بالفعل');
-                return;
-            }
-            
-            await window.db.collection('friendRequests').add({
-                from: uid, to: targetUserId, status: 'pending',
-                timestamp: new Date(),
-                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
-            });
-            
-            this._relationshipCache.sentRequests.add(targetUserId);
-            this._relationshipCache.lastUpdate = Date.now();
-            
-            if (btnElement) {
-                btnElement.innerHTML = `<i class="fas fa-clock"></i>`;
-                btnElement.style.cssText = `background: transparent; color: var(--primary); border: 1.5px solid var(--primary); cursor: not-allowed; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; padding: 0; flex-shrink: 0;`;
-                btnElement.title = 'طلب معلق';
-                btnElement.disabled = true;
-                btnElement.onclick = null;
-            }
-            
-            alert('✅ تم إرسال طلب الصداقة');
-        } catch (e) {
-            console.error('خطأ:', e);
-            alert('حدث خطأ في إرسال الطلب');
-        }
-    },
-    
-    refreshPostsAfterAction(targetUserId) {
-        this._relationshipCache.lastUpdate = 0;
-        this.loadAllPosts();
-    },
-    
-    // ==================== منتقي البلد في الرأس ====================
     renderCountryHeaderSelector() {
         const container = document.getElementById('countryHeaderSelector');
         if (!container) return;
@@ -830,16 +586,10 @@ const PostsSystem = {
     },
     
     toggleHeaderCountryDropdown(event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const existing = document.getElementById('countryHeaderDropdown');
-        if (existing) {
-            this.closeAllDropdowns();
-            return;
-        }
+        if (existing) { this.closeAllDropdowns(); return; }
         
         const btn = document.querySelector('.country-header-btn');
         if (!btn) return;
@@ -861,11 +611,7 @@ const PostsSystem = {
             `).join('')}
         `;
         
-        const dropdown = this.openDropdown({
-            id: 'countryHeaderDropdown',
-            html: html,
-            anchorBtn: btn
-        });
+        const dropdown = this.openDropdown({ id: 'countryHeaderDropdown', html: html, anchorBtn: btn });
         
         if (dropdown) {
             const rect = btn.getBoundingClientRect();
@@ -880,9 +626,7 @@ const PostsSystem = {
             
             let right = viewportW - rect.right;
             if (right < margin) right = margin;
-            if (right + dropdownWidth > viewportW - margin) {
-                right = Math.max(margin, viewportW - dropdownWidth - margin);
-            }
+            if (right + dropdownWidth > viewportW - margin) right = Math.max(margin, viewportW - dropdownWidth - margin);
             
             dropdown.style.left = 'auto';
             dropdown.style.right = right + 'px';
@@ -935,7 +679,6 @@ const PostsSystem = {
         this.loadAllPosts();
     },
     
-    // ==================== أقسام الوظائف ====================
     renderJobCategories() {
         const container = document.getElementById('jobCategories');
         if (!container) return;
@@ -973,7 +716,6 @@ const PostsSystem = {
         return cat ? cat.color : '#64B5F6';
     },
     
-    // ==================== منتقي القسم ====================
     renderPublishCategoryDropdown() {
         const container = document.getElementById('jobCategorySelector');
         const input = document.getElementById('jobCategory');
@@ -994,17 +736,11 @@ const PostsSystem = {
     },
     
     togglePublishCategoryDropdown(event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const dropdownId = 'jobCategoryDropdown';
         const existing = document.getElementById(dropdownId);
-        if (existing) {
-            this.closeAllDropdowns();
-            return;
-        }
+        if (existing) { this.closeAllDropdowns(); return; }
         
         const btn = document.querySelector('#jobCategorySelector .publish-category-btn');
         if (!btn) return;
@@ -1022,11 +758,7 @@ const PostsSystem = {
             </button>
         `).join('');
         
-        this.openDropdown({
-            id: dropdownId,
-            html: html,
-            anchorBtn: btn
-        });
+        this.openDropdown({ id: dropdownId, html: html, anchorBtn: btn });
     },
     
     selectPublishCategory(code) {
@@ -1036,7 +768,6 @@ const PostsSystem = {
         this.renderPublishCategoryDropdown();
     },
     
-    // ==================== منتقي البلد ====================
     renderPublishCountryDropdown(publishType) {
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const containerId = `${prefix}CountrySelector`;
@@ -1058,19 +789,13 @@ const PostsSystem = {
     },
     
     togglePublishCountryDropdown(publishType, event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const prefix = publishType === 'jobs' ? 'job' : 'marriage';
         const dropdownId = `${prefix}CountryDropdown`;
         
         const existing = document.getElementById(dropdownId);
-        if (existing) {
-            this.closeAllDropdowns();
-            return;
-        }
+        if (existing) { this.closeAllDropdowns(); return; }
         
         const btn = document.querySelector(`#${prefix}CountrySelector .publish-country-btn`);
         if (!btn) return;
@@ -1086,11 +811,7 @@ const PostsSystem = {
             </button>
         `).join('');
         
-        this.openDropdown({
-            id: dropdownId,
-            html: html,
-            anchorBtn: btn
-        });
+        this.openDropdown({ id: dropdownId, html: html, anchorBtn: btn });
     },
     
     selectPublishCountry(publishType, code) {
@@ -1101,7 +822,6 @@ const PostsSystem = {
         this.renderPublishCountryDropdown(publishType);
     },
     
-    // ==================== قوائم الزواج ====================
     renderMarriageDropdown(field, selectedValue) {
         const options = field === 'married'
             ? [
@@ -1110,10 +830,7 @@ const PostsSystem = {
                 { value: 'divorced', label: 'مطلق/مطلقة' },
                 { value: 'widowed', label: 'أرمل/أرملة' }
               ]
-            : [
-                { value: 'no', label: 'لا' },
-                { value: 'yes', label: 'نعم' }
-              ];
+            : [ { value: 'no', label: 'لا' }, { value: 'yes', label: 'نعم' } ];
         
         const containerId = field === 'married' ? 'marriageMarriedSelector' : 'marriageChildrenSelector';
         const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
@@ -1135,18 +852,11 @@ const PostsSystem = {
     },
     
     toggleMarriageDropdown(field, event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
+        if (event) { event.stopPropagation(); event.preventDefault(); }
         
         const dropdownId = field === 'married' ? 'marriageMarriedDropdown' : 'marriageChildrenDropdown';
-        
         const existing = document.getElementById(dropdownId);
-        if (existing) {
-            this.closeAllDropdowns();
-            return;
-        }
+        if (existing) { this.closeAllDropdowns(); return; }
         
         const btn = document.querySelector(`.publish-category-btn[data-field="${field}"]`);
         if (!btn) return;
@@ -1158,10 +868,7 @@ const PostsSystem = {
                 { value: 'divorced', label: 'مطلق/مطلقة' },
                 { value: 'widowed', label: 'أرمل/أرملة' }
               ]
-            : [
-                { value: 'no', label: 'لا' },
-                { value: 'yes', label: 'نعم' }
-              ];
+            : [ { value: 'no', label: 'لا' }, { value: 'yes', label: 'نعم' } ];
         
         const inputId = field === 'married' ? 'marriageMarried' : 'marriageChildren';
         const input = document.getElementById(inputId);
@@ -1175,11 +882,7 @@ const PostsSystem = {
             </button>
         `).join('');
         
-        this.openDropdown({
-            id: dropdownId,
-            html: html,
-            anchorBtn: btn
-        });
+        this.openDropdown({ id: dropdownId, html: html, anchorBtn: btn });
     },
     
     selectMarriageOption(field, value) {
@@ -1206,13 +909,10 @@ const PostsSystem = {
         this.renderMarriageDropdown(field, value);
     },
     
-    // ==================== التبديل ====================
     switchTab(tab) {
         this.currentTab = tab;
         this.closeAllDropdowns();
-        document.querySelectorAll('.home-tab').forEach(t => {
-            t.classList.toggle('active', t.dataset.tab === tab);
-        });
+        document.querySelectorAll('.home-tab').forEach(t => { t.classList.toggle('active', t.dataset.tab === tab); });
         document.querySelectorAll('.home-content').forEach(c => c.classList.remove('active'));
         
         if (tab === 'jobs') {
@@ -1228,32 +928,6 @@ const PostsSystem = {
     
     async loadAllPosts() {
         await Promise.all([this.loadJobsPosts(), this.loadMarriagePosts()]);
-        this.loadRelationshipCache().then(() => this.refreshActionButtons()).catch(() => {});
-    },
-    
-    refreshActionButtons() {
-        document.querySelectorAll('.post-card').forEach(card => {
-            const oldBtn = card.querySelector('.post-action-btn');
-            if (!oldBtn) return;
-            
-            const userId = oldBtn.getAttribute('data-user-id');
-            if (!userId) return;
-            
-            const post = { userId };
-            const newBtn = this.createPostActionButton(post);
-            
-            if (newBtn.style.display === 'none') {
-                oldBtn.style.display = 'none';
-                return;
-            }
-            
-            oldBtn.innerHTML = newBtn.innerHTML;
-            oldBtn.style.cssText = newBtn.style.cssText;
-            oldBtn.title = newBtn.title;
-            oldBtn.disabled = newBtn.disabled;
-            
-            this.bindActionButton(card, post);
-        });
     },
     
     async loadJobsPosts() {
@@ -1263,12 +937,8 @@ const PostsSystem = {
         
         try {
             let query = window.db.collection('posts').where('type', '==', 'job');
-            if (!this.showAllCountries && this.selectedCountry) {
-                query = query.where('countryCode', '==', this.selectedCountry);
-            }
-            if (this.selectedCategory && this.selectedCategory !== 'all') {
-                query = query.where('category', '==', this.selectedCategory);
-            }
+            if (!this.showAllCountries && this.selectedCountry) query = query.where('countryCode', '==', this.selectedCountry);
+            if (this.selectedCategory && this.selectedCategory !== 'all') query = query.where('category', '==', this.selectedCategory);
             
             const snapshot = await query.limit(50).get();
             container.innerHTML = '';
@@ -1305,9 +975,7 @@ const PostsSystem = {
         
         try {
             let query = window.db.collection('posts').where('type', '==', 'marriage');
-            if (!this.showAllCountries && this.selectedCountry) {
-                query = query.where('countryCode', '==', this.selectedCountry);
-            }
+            if (!this.showAllCountries && this.selectedCountry) query = query.where('countryCode', '==', this.selectedCountry);
             
             const snapshot = await query.limit(50).get();
             container.innerHTML = '';
@@ -1347,13 +1015,9 @@ const PostsSystem = {
         const catName = this.getCategoryName(post.category);
         const catColor = this.getCategoryColor(post.category);
         
-        const avatarContent = post.image 
-            ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy">` 
-            : '👤';
+        const avatarContent = post.image ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy">` : '👤';
         
-        const deleteBtn = isOwner 
-            ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
-            : '';
+        const deleteBtn = isOwner ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` : '';
         
         let actionBtnHTML = '';
         if (post.userId && !isOwner) {
@@ -1366,13 +1030,8 @@ const PostsSystem = {
                 <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
                     ${avatarContent}
                 </div>
-                <div class="post-user">
-                    <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
-                </div>
-                <div class="post-header-actions">
-                    ${actionBtnHTML}
-                    ${deleteBtn}
-                </div>
+                <div class="post-user"><h4>${this.escapeHtml(post.name || 'مستخدم')}</h4></div>
+                <div class="post-header-actions">${actionBtnHTML}${deleteBtn}</div>
             </div>
             <div class="post-content">
                 <div class="post-job-title" style="color: ${catColor}; background: ${catColor}15;">
@@ -1404,19 +1063,12 @@ const PostsSystem = {
         const isOwner = window.auth?.currentUser?.uid === post.userId;
         const flag = window.Countries.getFlag(post.countryCode);
         
-        const marriedText = {
-            'no': 'أعزب/عزباء', 'yes': 'متزوج/متزوجة',
-            'divorced': 'مطلق/مطلقة', 'widowed': 'أرمل/أرملة'
-        };
+        const marriedText = { 'no': 'أعزب/عزباء', 'yes': 'متزوج/متزوجة', 'divorced': 'مطلق/مطلقة', 'widowed': 'أرمل/أرملة' };
         const childrenText = post.children === 'yes' ? 'نعم' : 'لا';
         
-        const avatarContent = post.image 
-            ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy">` 
-            : '👤';
+        const avatarContent = post.image ? `<img src="${post.image}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy">` : '👤';
         
-        const deleteBtn = isOwner 
-            ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` 
-            : '';
+        const deleteBtn = isOwner ? `<button class="post-menu" onclick="PostsSystem.deletePost('${post.id}')" title="حذف"><i class="fas fa-trash"></i></button>` : '';
         
         let actionBtnHTML = '';
         if (post.userId && !isOwner) {
@@ -1434,13 +1086,8 @@ const PostsSystem = {
                 <div class="post-avatar-emoji" ${post.image ? `onclick="PostsSystem.openImagePreview('${post.id}')"` : ''}>
                     ${avatarContent}
                 </div>
-                <div class="post-user">
-                    <h4>${this.escapeHtml(post.name || 'مستخدم')}</h4>
-                </div>
-                <div class="post-header-actions">
-                    ${actionBtnHTML}
-                    ${deleteBtn}
-                </div>
+                <div class="post-user"><h4>${this.escapeHtml(post.name || 'مستخدم')}</h4></div>
+                <div class="post-header-actions">${actionBtnHTML}${deleteBtn}</div>
             </div>
             <div class="post-content">
                 <div class="post-info-row">
@@ -1483,9 +1130,7 @@ const PostsSystem = {
         let startX = 0, startY = 0, translateX = 0, translateY = 0, isTouching = false;
         const minScale = 1, maxScale = 4;
         
-        const updateTransform = () => {
-            img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
-        };
+        const updateTransform = () => { img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`; };
         
         const touchStartHandler = (e) => {
             e.preventDefault();
@@ -1528,10 +1173,7 @@ const PostsSystem = {
             e.preventDefault();
             initialDistance = 0;
             isTouching = false;
-            if (currentScale < 1) {
-                currentScale = 1; translateX = 0; translateY = 0;
-                updateTransform();
-            }
+            if (currentScale < 1) { currentScale = 1; translateX = 0; translateY = 0; updateTransform(); }
         };
         
         let lastTap = 0;
@@ -1539,9 +1181,8 @@ const PostsSystem = {
             const now = Date.now();
             if (now - lastTap < 300) {
                 e.preventDefault();
-                if (currentScale > 1.5) {
-                    currentScale = 1; translateX = 0; translateY = 0;
-                } else { currentScale = 2; }
+                if (currentScale > 1.5) { currentScale = 1; translateX = 0; translateY = 0; }
+                else { currentScale = 2; }
                 updateTransform();
             }
             lastTap = now;
@@ -1565,23 +1206,17 @@ const PostsSystem = {
         try {
             await window.db.collection('posts').doc(postId).delete();
             this.loadAllPosts();
-        } catch (e) {
-            alert('حدث خطأ في الحذف');
-        }
+        } catch (e) { alert('حدث خطأ في الحذف'); }
     },
     
     setupRealtimeListeners() {
-        this._jobsUnsubscribe = window.db.collection('posts')
-            .where('type', '==', 'job')
-            .onSnapshot(snapshot => {
-                if (snapshot.docChanges().length > 0) this.loadJobsPosts();
-            }, error => console.warn('⚠️', error.message));
+        this._jobsUnsubscribe = window.db.collection('posts').where('type', '==', 'job').onSnapshot(snapshot => {
+            if (snapshot.docChanges().length > 0) this.loadJobsPosts();
+        }, error => console.warn('⚠️', error.message));
         
-        this._marriageUnsubscribe = window.db.collection('posts')
-            .where('type', '==', 'marriage')
-            .onSnapshot(snapshot => {
-                if (snapshot.docChanges().length > 0) this.loadMarriagePosts();
-            }, error => console.warn('⚠️', error.message));
+        this._marriageUnsubscribe = window.db.collection('posts').where('type', '==', 'marriage').onSnapshot(snapshot => {
+            if (snapshot.docChanges().length > 0) this.loadMarriagePosts();
+        }, error => console.warn('⚠️', error.message));
     },
     
     async compressImage(file) {
@@ -1752,15 +1387,10 @@ window.publishJob = async function() {
     const contactValue = document.getElementById('jobContactValue')?.value?.trim() || '';
     const imageInput = document.getElementById('jobImage');
     
-    if (!name || !age || !countryCode || !category || !jobTitle || !bio) {
-        alert('يرجى تعبئة جميع الحقول'); return;
-    }
+    if (!name || !age || !countryCode || !category || !jobTitle || !bio) { alert('يرجى تعبئة جميع الحقول'); return; }
     
     const ageNum = parseInt(age);
-    if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) {
-        alert('العمر يجب أن يكون بين 18 و 99');
-        return;
-    }
+    if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) { alert('العمر يجب أن يكون بين 18 و 99'); return; }
     
     const validation = PostsSystem.validateContactValue(contactMethod, contactValue);
     if (!validation.valid) { alert(validation.error); return; }
@@ -1805,15 +1435,10 @@ window.publishMarriage = async function() {
     const contactValue = document.getElementById('marriageContactValue')?.value?.trim() || '';
     const imageInput = document.getElementById('marriageImage');
     
-    if (!name || !age || !countryCode || !bio) {
-        alert('يرجى تعبئة جميع الحقول'); return;
-    }
+    if (!name || !age || !countryCode || !bio) { alert('يرجى تعبئة جميع الحقول'); return; }
     
     const ageNum = parseInt(age);
-    if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) {
-        alert('العمر يجب أن يكون بين 18 و 99');
-        return;
-    }
+    if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) { alert('العمر يجب أن يكون بين 18 و 99'); return; }
     
     const validation = PostsSystem.validateContactValue(contactMethod, contactValue);
     if (!validation.valid) { alert(validation.error); return; }
@@ -1847,9 +1472,7 @@ window.publishMarriage = async function() {
 };
 
 function clearJobForm() {
-    if (window.PostsSystem && PostsSystem.resetFieldCounters) {
-        PostsSystem.resetFieldCounters();
-    }
+    if (window.PostsSystem && PostsSystem.resetFieldCounters) PostsSystem.resetFieldCounters();
     ['jobName', 'jobAge', 'jobTitle', 'jobBio', 'jobContactValue'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -1863,9 +1486,7 @@ function clearJobForm() {
 }
 
 function clearMarriageForm() {
-    if (window.PostsSystem && PostsSystem.resetFieldCounters) {
-        PostsSystem.resetFieldCounters();
-    }
+    if (window.PostsSystem && PostsSystem.resetFieldCounters) PostsSystem.resetFieldCounters();
     ['marriageName', 'marriageAge', 'marriageBio', 'marriageContactValue'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -1886,9 +1507,4 @@ window.addEventListener('authReady', () => {
     setTimeout(() => PostsSystem.init(), 100);
 });
 
-window.addEventListener('friendsUpdated', () => {
-    PostsSystem._relationshipCache.lastUpdate = 0;
-    PostsSystem.loadAllPosts();
-});
-
-console.log('✅ posts-system.js تم تحميله - النسخة النهائية');
+console.log('✅ posts-system.js تم تحميله - النسخة النظيفة');
