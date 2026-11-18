@@ -1,4 +1,4 @@
-// ========== auth.js - النسخة المحسّنة (بدون authReady مكرر) ==========
+// ========== auth.js - النسخة النظيفة (بدون دردشة) ==========
 
 function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
@@ -27,9 +27,7 @@ function getEmojiForUser(userData) {
     return emojiMap[userData.avatarType] || '🧔🏻‍♂️';
 }
 
-const FieldValue = firebase.firestore.FieldValue;
-
-// ✅ منع التشغيل المزدوج لـ authReady
+// ✅ منع التشغيل المزدوج
 let _authReadyFired = false;
 function fireAuthReady() {
     if (_authReadyFired) return;
@@ -72,7 +70,6 @@ async function startGoogleLogin() {
     }
 }
 
-// ✅ saveUserAndEnter — بدون dispatchEvent (authReady يُطلق من onAuthStateChanged فقط)
 async function saveUserAndEnter(user) {
     try {
         const userDoc = await window.db.collection('users').doc(user.uid).get();
@@ -88,8 +85,6 @@ async function saveUserAndEnter(user) {
                 shareableId: generateShareableId(),
                 bio: '',
                 avatarType: 'man_light',
-                friends: [],
-                blocked: [],
                 createdAt: new Date()
             });
             console.log('✅ مستخدم جديد - تم حفظ الاسم:', shortName);
@@ -99,9 +94,6 @@ async function saveUserAndEnter(user) {
             if (userData.name && userData.name.length > 15) {
                 updates.name = userData.name.substring(0, 15);
             }
-            if (!userData.friends) updates.friends = [];
-            if (userData.followers) updates.followers = [];
-            if (userData.following) updates.following = [];
             if (!userData.avatarType || ['male','female','boy','girl','father','mother','grandfather','grandmother'].includes(userData.avatarType)) {
                 updates.avatarType = 'man_light';
             }
@@ -110,20 +102,8 @@ async function saveUserAndEnter(user) {
             }
         }
         
-        // ✅ إعداد المستمعين
-        if (typeof setupFriendRequestsListener === 'function') setupFriendRequestsListener(user.uid);
-        if (typeof setupFriendsListener === 'function') setupFriendsListener(user.uid);
-        
-        // ✅ إشعار واحد فقط
         fireAuthReady();
-        
         await loadUserData(user.uid);
-        
-        // ✅ SecureChatSystem بدون انتظار (في الخلفية)
-        if (typeof SecureChatSystem !== 'undefined') {
-            SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
-        }
-        
         showApp();
     } catch (error) {
         console.error('خطأ في حفظ المستخدم:', error);
@@ -133,26 +113,7 @@ async function saveUserAndEnter(user) {
 
 async function signInWithGoogle() { await startGoogleLogin(); }
 
-function updateUserUI() {
-    const splash = document.getElementById('splash'), app = document.getElementById('app');
-    if (splash) {
-        splash.classList.add('hide');
-        setTimeout(() => {
-            splash.style.display = 'none';
-            if (app) app.style.display = 'flex';
-        }, 500);
-    }
-}
-
 async function logout() {
-    try {
-        if (window.auth?.currentUser) {
-            await window.db.collection('users').doc(window.auth.currentUser.uid).update({
-                online: false,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-    } catch (e) {}
     try { await window.auth.signOut(); } catch (e) {}
     console.log('🔓 تم تسجيل الخروج');
     window.location.reload();
@@ -189,26 +150,14 @@ async function loadUserData(uid) {
     }
 }
 
-// ==================== ✅ onAuthStateChanged — المُشغِّل الوحيد ====================
+// ==================== onAuthStateChanged ====================
 if (typeof window.auth !== 'undefined') {
     window.auth.onAuthStateChanged(async (user) => {
         const splash = document.getElementById('splash'), app = document.getElementById('app');
         
         if (user) {
-            // ✅ إعداد المستمعين
-            if (typeof setupFriendRequestsListener === 'function') setupFriendRequestsListener(user.uid);
-            if (typeof setupFriendsListener === 'function') setupFriendsListener(user.uid);
-            
-            // ✅ إطلاق authReady
             fireAuthReady();
-            
             await loadUserData(user.uid);
-            
-            // ✅ SecureChatSystem في الخلفية
-            if (typeof SecureChatSystem !== 'undefined') {
-                SecureChatSystem.init().catch(e => console.warn('⚠️ SecureChat:', e.message));
-            }
-            
             showApp();
         } else {
             _authReadyFired = false;
