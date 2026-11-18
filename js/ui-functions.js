@@ -1,4 +1,4 @@
-// ========== ui-functions.js - النسخة النهائية المحسّنة ==========
+// ========== ui-functions.js - النسخة النظيفة 100% (بدون دردشة وبدون أصدقاء) ==========
 
 window._pageStack = [];
 
@@ -15,468 +15,6 @@ function popPage() {
 
 function clearStack() {
     window._pageStack = [];
-}
-
-let chatsLoaded = false;
-let isLoadingChats = false;
-
-let _currentChatsElements = {
-    requests: new Map(),
-    friends: new Map()
-};
-
-let _updateLock = false;
-let _unreadMessages = new Map();
-
-// ==================== دوال حفظ/تحميل حالة غير المقروء ====================
-function saveUnreadMessages() {
-    const uid = window.auth?.currentUser?.uid;
-    if (!uid) return;
-    
-    try {
-        const data = {};
-        _unreadMessages.forEach((count, fid) => {
-            data[fid] = count;
-        });
-        localStorage.setItem(`unread_${uid}`, JSON.stringify(data));
-    } catch (e) {
-        console.warn('⚠️ فشل حفظ حالة غير المقروء:', e);
-    }
-}
-
-function loadUnreadMessages() {
-    const uid = window.auth?.currentUser?.uid;
-    if (!uid) return;
-    
-    _unreadMessages.clear();
-    try {
-        const data = JSON.parse(localStorage.getItem(`unread_${uid}`)) || {};
-        Object.keys(data).forEach(fid => {
-            if (data[fid] > 0) {
-                _unreadMessages.set(fid, data[fid]);
-            }
-        });
-        console.log(`📩 تم تحميل ${_unreadMessages.size} محادثة غير مقروءة`);
-    } catch (e) {
-        console.warn('⚠️ فشل تحميل حالة غير المقروء:', e);
-    }
-}
-
-function clearUnreadMessages() {
-    const uid = window.auth?.currentUser?.uid;
-    if (!uid) return;
-    localStorage.removeItem(`unread_${uid}`);
-    _unreadMessages.clear();
-}
-
-// ==================== تحميل المحادثات ====================
-async function loadChats(force = false) { 
-    if (!window.auth || !window.auth.currentUser) return; 
-    const list = document.getElementById('chatsList'); 
-    if (!list) return; 
-    
-    if (isLoadingChats) return;
-    if (chatsLoaded && !force) return;
-    
-    isLoadingChats = true;
-    
-    const chatTemplate = ChatSystem.chatItemTemplate || document.getElementById('chatItemTemplate');
-    const requestTemplate = document.getElementById('friendRequestChatTemplate');
-    
-    if (!chatTemplate) {
-        isLoadingChats = false;
-        return;
-    }
-    
-    try { 
-        const udoc = await window.db.collection('users').doc(window.auth.currentUser.uid).get(); 
-        if (!udoc.exists) {
-            isLoadingChats = false;
-            return; 
-        }
-        const friends = udoc.data().friends || []; 
-        
-        loadUnreadMessages();
-        
-        _currentChatsElements.requests.clear();
-        _currentChatsElements.friends.clear();
-        list.innerHTML = '';
-        
-        await smartUpdateChatsList(friends, chatTemplate, requestTemplate, list);
-        
-        chatsLoaded = true;
-        isLoadingChats = false;
-        
-    } catch (e) {
-        console.error('خطأ في loadChats:', e);
-        isLoadingChats = false;
-    } 
-}
-
-// ==================== التحديث الذكي ====================
-async function smartUpdateChatsList(friends, chatTemplate, requestTemplate, list) {
-    if (_updateLock) {
-        await new Promise(resolve => {
-            const checkLock = setInterval(() => {
-                if (!_updateLock) {
-                    clearInterval(checkLock);
-                    resolve();
-                }
-            }, 50);
-        });
-    }
-    
-    _updateLock = true;
-    
-    try {
-        const uid = window.auth?.currentUser?.uid;
-        if (!uid) {
-            _updateLock = false;
-            return;
-        }
-        
-        const pendingRequests = await window.loadFriendRequestsForChat 
-            ? await window.loadFriendRequestsForChat() 
-            : [];
-        
-        const currentFriendIds = new Set(friends);
-        
-        _currentChatsElements.requests.forEach((el, id) => {
-            const stillExists = pendingRequests.some(r => r.id === id);
-            if (!stillExists) {
-                el.remove();
-                _currentChatsElements.requests.delete(id);
-            }
-        });
-        
-        _currentChatsElements.friends.forEach((el, id) => {
-            if (!currentFriendIds.has(id)) {
-                el.remove();
-                _currentChatsElements.friends.delete(id);
-                _unreadMessages.delete(id);
-                saveUnreadMessages();
-            }
-        });
-        
-        const addedRequestIds = new Set();
-        for (const req of pendingRequests) {
-            if (addedRequestIds.has(req.id)) continue;
-            if (_currentChatsElements.requests.has(req.id)) continue;
-            addedRequestIds.add(req.id);
-            
-            try {
-                const senderDoc = await window.db.collection('users').doc(req.from).get();
-                if (!senderDoc.exists) continue;
-                
-                const sender = senderDoc.data();
-                const clone = requestTemplate.content.cloneNode(true);
-                const requestItem = clone.querySelector('.friend-request-item');
-                
-                const avatar = requestItem.querySelector('.chat-avatar-emoji');
-                const nameSpan = requestItem.querySelector('.friend-request-name');
-                const idSpan = requestItem.querySelector('.friend-request-id');
-                const copyBtn = requestItem.querySelector('.copy-id-btn');
-                const acceptBtn = requestItem.querySelector('.accept-friend-btn');
-                const rejectBtn = requestItem.querySelector('.reject-friend-btn');
-                
-                if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(sender) : '🧔🏻‍♂️';
-                if (nameSpan) nameSpan.textContent = sender.name || 'مستخدم';
-                if (idSpan) idSpan.textContent = sender.shareableId || '0000000000';
-                
-                if (copyBtn) {
-                    copyBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        navigator.clipboard.writeText(sender.shareableId || '0000000000').then(() => {
-                            const icon = copyBtn.querySelector('i');
-                            if (icon) {
-                                icon.className = 'fas fa-check';
-                                setTimeout(() => { icon.className = 'far fa-copy'; }, 1500);
-                            }
-                        }).catch(() => {});
-                    };
-                }
-                
-                if (acceptBtn) acceptBtn.onclick = (e) => { e.stopPropagation(); window.acceptFriendRequest(req.id, req.from); };
-                if (rejectBtn) rejectBtn.onclick = (e) => { e.stopPropagation(); window.rejectFriendRequest(req.id); };
-                
-                requestItem.setAttribute('data-request-id', req.id);
-                requestItem.setAttribute('data-type', 'request');
-                
-                if (list.firstChild) {
-                    list.insertBefore(requestItem, list.firstChild);
-                } else {
-                    list.appendChild(requestItem);
-                }
-                
-                _currentChatsElements.requests.set(req.id, requestItem);
-                
-            } catch (e) {
-                console.warn('خطأ في عرض طلب صداقة:', e);
-            }
-        }
-        
-        const addedFriendIds = new Set();
-        for (const fid of friends) {
-            if (addedFriendIds.has(fid)) continue;
-            if (_currentChatsElements.friends.has(fid)) continue;
-            addedFriendIds.add(fid);
-            
-            try { 
-                const fdoc = await window.db.collection('users').doc(fid).get(); 
-                if (fdoc.exists) { 
-                    const f = fdoc.data(); 
-                    
-                    const clone = chatTemplate.content.cloneNode(true);
-                    const chatItem = clone.querySelector('.chat-item');
-                    
-                    const avatar = chatItem.querySelector('.chat-avatar-emoji');
-                    const name = chatItem.querySelector('.chat-info h4');
-                    const userIdSpan = chatItem.querySelector('.chat-user-id');
-                    const copyIdBtn = chatItem.querySelector('.copy-chat-id-btn');
-                    const removeBtn = chatItem.querySelector('.remove-friend-btn');
-                    
-                    if (avatar) avatar.textContent = window.getEmojiForUser ? window.getEmojiForUser(f) : '🧔🏻‍♂️';
-                    if (name) name.textContent = f.name || 'مستخدم';
-                    if (userIdSpan) userIdSpan.textContent = f.shareableId || '';
-                    
-                    if (copyIdBtn) {
-                        copyIdBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            const id = f.shareableId || '';
-                            if (!id) return;
-                            navigator.clipboard.writeText(id).then(() => {
-                                const icon = copyIdBtn.querySelector('i');
-                                if (icon) {
-                                    icon.className = 'fas fa-check';
-                                    setTimeout(() => { icon.className = 'far fa-copy'; }, 1500);
-                                }
-                            }).catch(() => {});
-                        };
-                    }
-                    
-                    if (removeBtn) {
-                        removeBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            window.confirmRemoveFriend(fid, f.name || 'مستخدم');
-                        };
-                    }
-                    
-                    chatItem.onclick = (e) => {
-                        if (e.target.closest('.remove-friend-btn') || e.target.closest('.copy-chat-id-btn')) return;
-                        if (typeof window.clearUnreadStatus === 'function') {
-                            window.clearUnreadStatus(fid);
-                        }
-                        openChat(fid);
-                    };
-                    
-                    chatItem.setAttribute('data-friend-id', fid);
-                    chatItem.setAttribute('data-type', 'friend');
-                    
-                    list.appendChild(chatItem);
-                    
-                    _currentChatsElements.friends.set(fid, chatItem);
-                } 
-            } catch (e) {
-                console.warn('خطأ في تحميل صديق:', e);
-            }
-        }
-        
-        reorderChatsList(list);
-        updateEmptyState(list);
-        
-    } finally {
-        _updateLock = false;
-    }
-}
-
-// ==================== إعادة الترتيب ====================
-function reorderChatsList(list) {
-    if (!list) return;
-    
-    const requests = [];
-    const friendsWithTime = [];
-    
-    _currentChatsElements.requests.forEach(el => requests.push(el));
-    
-    _currentChatsElements.friends.forEach((el, fid) => {
-        const lastTime = getLastMessageTime(fid);
-        friendsWithTime.push({ el, fid, lastTime });
-    });
-    
-    friendsWithTime.sort((a, b) => b.lastTime - a.lastTime);
-    
-    [...requests, ...friendsWithTime.map(f => f.el)].forEach(el => {
-        if (el.parentNode === list) {
-            el.remove();
-        }
-    });
-    
-    requests.forEach(el => list.appendChild(el));
-    friendsWithTime.forEach(f => list.appendChild(f.el));
-    
-    _currentChatsElements.friends.forEach((el, fid) => {
-        const nameEl = el.querySelector('.chat-info h4');
-        
-        if (_unreadMessages.has(fid) && _unreadMessages.get(fid) > 0) {
-            if (nameEl) nameEl.style.color = 'var(--primary)';
-            el.classList.add('unread-dot');
-        } else {
-            if (nameEl) nameEl.style.color = 'var(--text)';
-            el.classList.remove('unread-dot');
-        }
-    });
-}
-
-// ==================== جلب وقت آخر رسالة ====================
-function getLastMessageTime(friendId) {
-    const uid = window.auth?.currentUser?.uid;
-    if (!uid || !friendId) return 0;
-    
-    const key = `chat_${uid}_${friendId}`;
-    try {
-        const messages = JSON.parse(localStorage.getItem(key)) || [];
-        if (messages.length === 0) return 0;
-        
-        const lastMsg = messages[messages.length - 1];
-        const time = new Date(lastMsg.time).getTime();
-        return isNaN(time) ? 0 : time;
-    } catch (e) {
-        return 0;
-    }
-}
-
-// ==================== تسجيل رسالة غير مقروءة ====================
-window.markMessageAsUnread = function(friendId) {
-    if (!friendId) return;
-    
-    const currentCount = _unreadMessages.get(friendId) || 0;
-    _unreadMessages.set(friendId, currentCount + 1);
-    
-    saveUnreadMessages();
-    
-    console.log(`📩 رسالة جديدة من ${friendId} - عدد غير المقروء: ${currentCount + 1}`);
-    
-    const list = document.getElementById('chatsList');
-    if (list) {
-        reorderChatsList(list);
-    }
-};
-
-// ==================== مسح حالة غير المقروء ====================
-window.clearUnreadStatus = function(friendId) {
-    if (!friendId) return;
-    
-    if (_unreadMessages.has(friendId)) {
-        _unreadMessages.delete(friendId);
-        saveUnreadMessages();
-        console.log(`✅ تم مسح حالة غير المقروء لـ ${friendId}`);
-    }
-    
-    const element = _currentChatsElements.friends.get(friendId);
-    if (element) {
-        const nameEl = element.querySelector('.chat-info h4');
-        if (nameEl) {
-            nameEl.style.color = 'var(--text)';
-        }
-        element.classList.remove('unread-dot');
-    }
-    
-    setTimeout(() => {
-        const list = document.getElementById('chatsList');
-        if (list && typeof reorderChatsList === 'function') {
-            reorderChatsList(list);
-        }
-    }, 50);
-};
-
-// ==================== إدارة الحالة الفارغة ====================
-function updateEmptyState(list) {
-    const hasRequests = _currentChatsElements.requests.size > 0;
-    const hasFriends = _currentChatsElements.friends.size > 0;
-    
-    const existingEmpty = list.querySelector('.empty-state');
-    
-    if (!hasRequests && !hasFriends) {
-        if (!existingEmpty) {
-            const emptyEl = document.createElement('div');
-            emptyEl.className = 'empty-state';
-            emptyEl.innerHTML = `
-                <i class="fas fa-comments"></i>
-                <h3>لا توجد محادثات</h3>
-                <p>أضف أصدقاء لبدء المحادثة</p>
-            `;
-            list.appendChild(emptyEl);
-        }
-    } else {
-        if (existingEmpty) {
-            existingEmpty.remove();
-        }
-    }
-}
-
-// ==================== مسح الكاش ====================
-function resetChatsCache() {
-    _currentChatsElements.requests.clear();
-    _currentChatsElements.friends.clear();
-}
-
-// ==================== تأكيد حذف الصديق ====================
-window.confirmRemoveFriend = function(friendId, friendName) {
-    const confirmed = confirm(`هل أنت متأكد من حذف "${friendName}" من قائمة الأصدقاء؟`);
-    if (confirmed) {
-        removeFriend(friendId);
-    }
-};
-
-// ==================== حذف الصديق ====================
-window.removeFriend = async function(friendId) {
-    if (!window.auth?.currentUser) return;
-    try { 
-        const uid = window.auth.currentUser.uid; 
-        const FieldValue = firebase.firestore.FieldValue;
-        
-        await window.db.collection('users').doc(uid).update({ 
-            friends: FieldValue.arrayRemove(friendId) 
-        }); 
-        
-        await window.db.collection('users').doc(friendId).update({ 
-            friends: FieldValue.arrayRemove(uid) 
-        }); 
-        
-        const userKey = `chat_${uid}_${friendId}`;
-        localStorage.removeItem(userKey);
-        if (typeof ChatSystem !== 'undefined' && ChatSystem.messages) {
-            delete ChatSystem.messages[friendId];
-        }
-        
-        _unreadMessages.delete(friendId);
-        saveUnreadMessages();
-        
-        const element = _currentChatsElements.friends.get(friendId);
-        if (element) {
-            element.remove();
-            _currentChatsElements.friends.delete(friendId);
-            const list = document.getElementById('chatsList');
-            if (list) updateEmptyState(list);
-        }
-        
-        console.log(`✅ تم حذف الصديق ${friendId} بنجاح`);
-        
-    } catch (e) { 
-        console.error('❌ خطأ في حذف الصديق:', e);
-        alert('حدث خطأ في حذف الصديق'); 
-    }
-};
-
-// ==================== مستمعو النقرات ====================
-function setupChatListeners() { 
-    document.addEventListener('click', e => { 
-        const m = document.getElementById('attachmentMenu'); 
-        const ab = document.querySelector('.attach-btn'); 
-        if (m && ab && !m.contains(e.target) && !ab.contains(e.target)) {
-            m.style.display = 'none'; 
-        }
-    }); 
 }
 
 // ==================== اختيار الأفاتار ====================
@@ -504,8 +42,8 @@ window.selectAvatar = function(type) {
         selectedBtn.style.boxShadow = '0 0 20px rgba(33, 150, 243, 0.3)';
     }
     
-    if (auth?.currentUser) {
-        db.collection('users').doc(auth.currentUser.uid).update({ avatarType: type })
+    if (window.auth?.currentUser && window.db) {
+        window.db.collection('users').doc(window.auth.currentUser.uid).update({ avatarType: type })
             .then(() => { setTimeout(() => window.closeModal('avatarModal'), 500); })
             .catch(() => {});
     }
@@ -541,12 +79,6 @@ window.getEmojiForUser = function(userData) {
     return emojiMap[userData.avatarType] || '🧔🏻‍♂️';
 };
 
-function formatNumber(num) { 
-    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; 
-    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; 
-    return num.toString(); 
-}
-
 function ensureSinglePage() { 
     document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none'); 
     document.querySelectorAll('.page').forEach(p => { 
@@ -573,29 +105,12 @@ function setupNavigation() {
         }); 
         document.querySelectorAll('.profile-subpage').forEach(s => s.style.display = 'none'); 
         document.body.classList.remove('profile-subpage-open'); 
-        document.body.classList.remove('conversation-open'); 
-        
-        if (typeof window.hideSearchResults === 'function') {
-            window.hideSearchResults();
-        }
         
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) {
-            const titles = { 'home': 'الرئيسية', 'chat': 'الدردشة', 'profile': 'الملف الشخصي', 'settings': 'الإعدادات' };
+            const titles = { 'home': 'الرئيسية', 'profile': 'الملف الشخصي', 'settings': 'الإعدادات' };
             pageTitle.textContent = titles[id] || id;
             pageTitle.setAttribute('data-i18n', id);
-        }
-        
-        // ✅ تحميل الدردشة فقط عند الحاجة
-        if (id === 'chat') {
-            const list = document.getElementById('chatsList');
-            if (chatsLoaded && list && list.children.length > 0) {
-                if (typeof reorderChatsList === 'function') {
-                    reorderChatsList(list);
-                }
-            } else {
-                loadChats();
-            }
         }
         
         if (typeof PostsSystem !== 'undefined' && PostsSystem.updateCountrySelectorVisibility) {
@@ -684,8 +199,8 @@ window.saveProfile = function() {
         alert('الاسم مطلوب ولا يزيد عن 15 حرف');
         return;
     }
-    if (auth?.currentUser) {
-        db.collection('users').doc(auth.currentUser.uid).update({ name: n })
+    if (window.auth?.currentUser && window.db) {
+        window.db.collection('users').doc(window.auth.currentUser.uid).update({ name: n })
             .then(() => {
                 const nameEl = document.getElementById('profileName');
                 if (nameEl) nameEl.textContent = n;
@@ -695,49 +210,18 @@ window.saveProfile = function() {
     }
 };
 
-window.goBack = function() {
-    document.querySelectorAll('.profile-subpage').forEach(p => p.style.display = 'none');
-    document.body.classList.remove('profile-subpage-open');
-    
-    const profilePage = document.querySelector('.profile-page');
-    if (profilePage) {
-        profilePage.style.display = 'block';
-        profilePage.classList.add('active');
-    }
-    
-    clearStack();
-    document.querySelectorAll('.nav-item').forEach(n => {
-        n.classList.remove('active');
-        if (n.dataset.page === 'profile') n.classList.add('active');
-    });
-};
-
 // ==================== تهيئة الصفحة ====================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 تهيئة ui-functions...');
+    console.log('🚀 تهيئة ui-functions (نظيف تماماً)...');
     ensureSinglePage();
     setupNavigation();
     setupModals();
-    // ✅ إزالة loadChats() — ستُستدعى عند الدخول إلى تبويب الدردشة
-    setupChatListeners();
     
     const nameInput = document.getElementById('editName');
     if (nameInput) {
         nameInput.addEventListener('input', window.updateCharCounter);
     }
 });
-
-// ✅ authReady — فقط تحميل حالة غير المقروء (SecureChatSystem موجود في auth.js)
-window.addEventListener('authReady', function() {
-    console.log('✅ authReady - تحميل حالة غير المقروء');
-    setTimeout(() => {
-        loadUnreadMessages();
-    }, 100);
-});
-
-if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
-}
 
 window.addEventListener('error', function(event) {
     console.error('❌ خطأ عام:', event.error);
@@ -746,13 +230,3 @@ window.addEventListener('error', function(event) {
 window.addEventListener('unhandledrejection', function(event) {
     console.error('❌ خطأ غير معالج:', event.reason);
 });
-
-// ✅ تصدير الدوال
-window.smartUpdateChatsList = smartUpdateChatsList;
-window.resetChatsCache = resetChatsCache;
-window.reorderChatsList = reorderChatsList;
-window.getLastMessageTime = getLastMessageTime;
-window._unreadMessages = _unreadMessages;
-window.saveUnreadMessages = saveUnreadMessages;
-window.loadUnreadMessages = loadUnreadMessages;
-window.clearUnreadMessages = clearUnreadMessages;
