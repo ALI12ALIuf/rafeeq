@@ -54,6 +54,7 @@ body {
     line-height: 1.6;
     transition: background-color 0.3s, color 0.3s;
     height: 100vh;
+    height: 100dvh; /* ✅ حل مشكلة القفز في الهواتف */
     overflow: hidden;
 }
 
@@ -67,7 +68,13 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==================== القسم 5: الحاوية الرئيسية ==================== */
-.app-container { height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+.app-container { 
+    height: 100vh; 
+    height: 100dvh; /* ✅ حل مشكلة القفز في الهواتف */
+    display: flex; 
+    flex-direction: column; 
+    background: var(--bg); 
+}
 
 .app-header { 
     height: var(--header-height); 
