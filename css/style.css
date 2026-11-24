@@ -1201,3 +1201,68 @@ body {
 #marriageChildrenSelector .publish-category-btn:active { transform: scale(0.98); }
 
 #marriageChildrenField { transition: opacity 0.3s ease, max-height 0.3s ease; overflow: hidden; }
+
+
+
+/* ==================== القسم 24: صفحة الأقسام (نشر إعلان) ==================== */
+.categories-page {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+}
+
+.categories-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding-bottom: 2rem;
+}
+
+.category-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+}
+
+.category-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--primary);
+    box-shadow: 0 6px 20px rgba(100, 181, 246, 0.15);
+}
+
+.category-card:active {
+    transform: scale(0.97);
+}
+
+.category-card-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+}
+
+.category-card h3 {
+    color: var(--text);
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.category-card p {
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
