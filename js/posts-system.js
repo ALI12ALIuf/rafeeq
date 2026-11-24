@@ -1,4 +1,4 @@
-// ========== posts-system.js - النسخة النظيفة (بدون دردشة) ==========
+// ========== posts-system.js - النسخة النهائية النظيفة (بدون دردشة - تواصل إجباري) ==========
 
 const PostsSystem = {
     currentTab: 'jobs',
@@ -315,6 +315,7 @@ const PostsSystem = {
         });
     },
     
+    // ✅ قائمة طرق التواصل (تم إزالة خيار "لا شيء")
     renderContactMethodDropdown(type) {
         const isJob = type === 'job';
         const containerId = isJob ? 'jobContactSelector' : 'marriageContactSelector';
@@ -324,10 +325,13 @@ const PostsSystem = {
         const input = document.getElementById(inputId);
         if (!container || !input) return;
         
-        const current = input.value || 'none';
+        let current = input.value;
+        if (!current || current === 'none') {
+            current = 'whatsapp';
+            input.value = 'whatsapp';
+        }
         
         const options = [
-            { value: 'none', label: 'لا شيء (عرض فقط)', icon: 'fas fa-user-plus', color: '#64B5F6' },
             { value: 'whatsapp', label: 'رابط واتساب', icon: 'fab fa-whatsapp', color: '#25D366' },
             { value: 'phone', label: 'رقم الهاتف', icon: 'fas fa-phone', color: '#2196F3' },
             { value: 'email', label: 'البريد الإلكتروني', icon: 'fas fa-envelope', color: '#FF9800' }
@@ -366,7 +370,6 @@ const PostsSystem = {
         if (!btn) return;
         
         const options = [
-            { value: 'none', label: 'لا شيء (عرض فقط)', icon: 'fas fa-user-plus', color: '#64B5F6' },
             { value: 'whatsapp', label: 'رابط واتساب', icon: 'fab fa-whatsapp', color: '#25D366' },
             { value: 'phone', label: 'رقم الهاتف', icon: 'fas fa-phone', color: '#2196F3' },
             { value: 'email', label: 'البريد الإلكتروني', icon: 'fas fa-envelope', color: '#FF9800' }
@@ -374,7 +377,8 @@ const PostsSystem = {
         
         const inputId = type === 'job' ? 'jobContactMethod' : 'marriageContactMethod';
         const input = document.getElementById(inputId);
-        const current = input ? input.value : 'none';
+        let current = input ? input.value : 'whatsapp';
+        if (!current || current === 'none') current = 'whatsapp';
         
         const html = options.map(opt => `
             <button type="button" class="publish-category-option ${opt.value === current ? 'active' : ''}" 
@@ -470,7 +474,7 @@ const PostsSystem = {
     },
     
     validateContactValue(method, value) {
-        if (!method || method === 'none') return { valid: true };
+        if (!method || method === 'none') return { valid: false, error: 'طريقة التواصل إجبارية' };
         const v = (value || '').trim();
         if (!v) return { valid: false, error: 'يرجى إدخال قيمة طريقة التواصل' };
         
@@ -500,7 +504,7 @@ const PostsSystem = {
         const btn = document.createElement('button');
         btn.className = 'post-action-btn';
         
-        const contactMethod = post.contactMethod && post.contactMethod !== 'none' ? post.contactMethod : null;
+        const contactMethod = post.contactMethod || 'whatsapp';
         
         if (contactMethod === 'whatsapp') {
             btn.innerHTML = `<i class="fab fa-whatsapp"></i>`;
@@ -523,7 +527,6 @@ const PostsSystem = {
             return btn;
         }
         
-        // ✅ إذا لم تكن هناك طريقة تواصل، نخفي الزر
         btn.style.display = 'none';
         return btn;
     },
@@ -532,7 +535,7 @@ const PostsSystem = {
         const newBtn = card.querySelector('.post-action-btn');
         if (!newBtn) return;
         
-        const contactMethod = post.contactMethod && post.contactMethod !== 'none' ? post.contactMethod : null;
+        const contactMethod = post.contactMethod || 'whatsapp';
         
         if (contactMethod === 'whatsapp' && post.contactValue) {
             newBtn.onclick = () => {
@@ -1322,9 +1325,9 @@ PostsSystem.fillPublishJobForm = function() {
     this.setupFieldCounters();
     
     const contactInput = document.getElementById('jobContactMethod');
-    if (contactInput) contactInput.value = 'none';
+    if (contactInput) contactInput.value = 'whatsapp'; // الافتراضي الآن واتساب
     this.renderContactMethodDropdown('job');
-    this.renderContactValueField('job', 'none');
+    this.renderContactValueField('job', 'whatsapp');
     
     const preview = document.getElementById('jobImagePreview');
     if (preview) preview.innerHTML = '👤';
@@ -1353,9 +1356,9 @@ PostsSystem.fillPublishMarriageForm = function() {
     this.setupFieldCounters();
     
     const contactInput = document.getElementById('marriageContactMethod');
-    if (contactInput) contactInput.value = 'none';
+    if (contactInput) contactInput.value = 'whatsapp'; // الافتراضي الآن واتساب
     this.renderContactMethodDropdown('marriage');
-    this.renderContactValueField('marriage', 'none');
+    this.renderContactValueField('marriage', 'whatsapp');
     
     const preview = document.getElementById('marriageImagePreview');
     if (preview) preview.innerHTML = '👤';
@@ -1383,7 +1386,7 @@ window.publishJob = async function() {
     const category = document.getElementById('jobCategory')?.value;
     const jobTitle = document.getElementById('jobTitle')?.value?.trim();
     const bio = document.getElementById('jobBio')?.value?.trim();
-    const contactMethod = document.getElementById('jobContactMethod')?.value || 'none';
+    const contactMethod = document.getElementById('jobContactMethod')?.value || 'whatsapp';
     const contactValue = document.getElementById('jobContactValue')?.value?.trim() || '';
     const imageInput = document.getElementById('jobImage');
     
@@ -1408,7 +1411,7 @@ window.publishJob = async function() {
             country: window.Countries.getName(countryCode),
             countryCode, category, jobTitle, bio,
             contactMethod: contactMethod,
-            contactValue: (contactMethod === 'none') ? '' : contactValue,
+            contactValue: contactValue,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -1431,7 +1434,7 @@ window.publishMarriage = async function() {
     const bio = document.getElementById('marriageBio')?.value?.trim();
     const married = document.getElementById('marriageMarried')?.value;
     const children = document.getElementById('marriageChildren')?.value;
-    const contactMethod = document.getElementById('marriageContactMethod')?.value || 'none';
+    const contactMethod = document.getElementById('marriageContactMethod')?.value || 'whatsapp';
     const contactValue = document.getElementById('marriageContactValue')?.value?.trim() || '';
     const imageInput = document.getElementById('marriageImage');
     
@@ -1457,7 +1460,7 @@ window.publishMarriage = async function() {
             countryCode, bio, married,
             children: (married === 'no') ? 'no' : children,
             contactMethod: contactMethod,
-            contactValue: (contactMethod === 'none') ? '' : contactValue,
+            contactValue: contactValue,
             image: imageBase64,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -1478,7 +1481,7 @@ function clearJobForm() {
         if (el) el.value = '';
     });
     const contactInput = document.getElementById('jobContactMethod');
-    if (contactInput) contactInput.value = 'none';
+    if (contactInput) contactInput.value = 'whatsapp';
     const preview = document.getElementById('jobImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('jobImage');
@@ -1492,7 +1495,7 @@ function clearMarriageForm() {
         if (el) el.value = '';
     });
     const contactInput = document.getElementById('marriageContactMethod');
-    if (contactInput) contactInput.value = 'none';
+    if (contactInput) contactInput.value = 'whatsapp';
     const preview = document.getElementById('marriageImagePreview');
     if (preview) preview.innerHTML = '👤';
     const input = document.getElementById('marriageImage');
@@ -1507,4 +1510,4 @@ window.addEventListener('authReady', () => {
     setTimeout(() => PostsSystem.init(), 100);
 });
 
-console.log('✅ posts-system.js تم تحميله - النسخة النظيفة');
+console.log('✅ posts-system.js تم تحميله - النسخة النهائية (تواصل إجباري)');
